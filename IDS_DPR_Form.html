@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · Daily Progress Report</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F3EE; --surface:#FFFFFF; --surface2:#F9F8F5;
+  --border:#E2DFD8; --border2:#CBC7BC;
+  --text:#1A1917; --text2:#6B6860; --text3:#9E9B94;
+  --accent:#1F3A5F; --accent-light:#E8EDF4;
+  --green:#2D6A2D; --green-light:#EAF3EA;
+  --amber:#7A4F0A; --amber-light:#FDF3E3;
+  --red:#8B2020; --red-light:#FDEAEA;
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:90px}
+
+/* header */
+.app-header{background:var(--accent);padding:18px 20px 14px;position:sticky;top:0;z-index:100}
+.app-header-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.logo-mark svg{width:14px;height:14px;fill:white}
+.logo-text{font-size:13px;font-weight:500;color:rgba(255,255,255,.9)}
+.logo-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace}
+.header-date{font-size:11px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;text-align:right}
+
+/* score strip */
+.score-strip{background:var(--accent);padding:0 20px 18px}
+.score-strip-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,.15);border-radius:var(--radius);overflow:hidden}
+.score-cell{background:rgba(255,255,255,.08);padding:10px 14px;text-align:center}
+.score-val{font-size:22px;font-weight:500;color:#fff;line-height:1;font-family:'DM Mono',monospace}
+.score-lbl{font-size:10px;color:rgba(255,255,255,.45);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+
+/* banner */
+.banner{background:var(--amber-light);border-bottom:1px solid #e8c87a;padding:7px 20px;text-align:center;font-size:12px;color:var(--amber);font-weight:500}
+.banner.late{background:var(--red-light);border-bottom-color:#f0a0a0;color:var(--red)}
+
+/* page */
+.page{max-width:560px;margin:0 auto;padding:16px 20px}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow);overflow:hidden}
+.card-head{padding:13px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-num{width:21px;height:21px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'DM Mono',monospace}
+.card-title{font-size:13px;font-weight:500;color:var(--text)}
+.card-sub{font-size:11px;color:var(--text3);margin-left:auto}
+.card-body{padding:16px 18px}
+
+/* fields */
+.field{margin-bottom:13px}
+.field:last-child{margin-bottom:0}
+.lbl{font-size:12px;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.req{font-size:10px;color:var(--red);font-family:'DM Mono',monospace}
+.opt{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+select,input[type=number],textarea{
+  width:100%;font-family:'DM Sans',sans-serif;font-size:14px;
+  color:var(--text);background:var(--surface2);
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 12px;outline:none;
+  appearance:none;-webkit-appearance:none;
+  transition:border-color .15s,background .15s;
+}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239E9B94' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+select:focus,input:focus,textarea:focus{border-color:var(--accent);background:var(--surface)}
+textarea{resize:vertical;min-height:78px;line-height:1.55}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.divider{height:1px;background:var(--border);margin:13px 0}
+
+/* project block */
+.proj-block{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden}
+.proj-block:last-child{margin-bottom:0}
+.proj-head{background:var(--accent-light);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.proj-title{font-size:11px;font-weight:500;color:var(--accent);font-family:'DM Mono',monospace;letter-spacing:.05em}
+.proj-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.proj-remove:hover{color:var(--red);border-color:var(--red)}
+.proj-body{padding:13px}
+
+/* task rows */
+.task-thead{display:grid;grid-template-columns:1fr 66px 48px 22px;gap:6px;padding-bottom:5px;margin-bottom:4px;border-bottom:1px solid var(--border)}
+.task-th{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:'DM Mono',monospace}
+.task-row{display:grid;grid-template-columns:1fr 66px 48px 22px;gap:6px;align-items:center;margin-bottom:6px}
+.task-pts{font-size:11px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace}
+.task-pts.lit{color:var(--green);font-weight:500}
+.rm-task{width:22px;height:22px;border-radius:50%;background:none;border:1px solid var(--border);color:var(--text3);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rm-task:hover{border-color:var(--red);color:var(--red)}
+.add-task{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:5px 0 0;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:4px}
+.add-task:hover{opacity:.7}
+
+/* visit toggle */
+.visit-row{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0}
+.tog{width:34px;height:18px;border-radius:9px;background:var(--border2);border:none;cursor:pointer;position:relative;transition:background .15s;flex-shrink:0}
+.tog::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .15s}
+.tog.on{background:var(--accent)}
+.tog.on::after{transform:translateX(16px)}
+.visit-lbl{font-size:13px;color:var(--text2)}
+.visit-detail{display:none;padding-top:10px;border-top:1px solid var(--border);margin-top:4px}
+.visit-detail.open{display:block}
+
+/* add project */
+.add-proj{width:100%;padding:11px;font-size:13px;color:var(--accent);background:var(--accent-light);border:1px dashed rgba(31,58,95,.3);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
+.add-proj:hover{background:#dce5f0}
+.add-proj:disabled{opacity:.35;cursor:not-allowed}
+
+/* radio */
+.radio-group{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.radio-opt{display:flex;align-items:center;gap:7px;cursor:pointer;padding:9px 13px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);flex:1;min-width:130px;transition:all .15s}
+.radio-opt input{display:none}
+.rdot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.rdot::after{content:'';width:6px;height:6px;border-radius:50%;background:white;display:none}
+.radio-opt input:checked~.rdot{border-color:var(--accent);background:var(--accent)}
+.radio-opt input:checked~.rdot::after{display:block}
+.radio-opt input:checked~.rtxt{color:var(--accent);font-weight:500}
+.rtxt{font-size:13px;color:var(--text2)}
+
+/* mood */
+.mood-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px}
+.mood-opt{text-align:center;cursor:pointer}
+.mood-opt input{display:none}
+.mood-emoji{font-size:22px;width:100%;padding:8px 0;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);display:block;transition:all .15s;line-height:1}
+.mood-opt input:checked+.mood-emoji{border-color:var(--accent);background:var(--accent-light);transform:scale(1.08)}
+.mood-name{font-size:10px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace}
+
+/* submit bar */
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:10px 20px;box-shadow:0 -4px 12px rgba(0,0,0,.06);z-index:100}
+.submit-bar-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.sbar-info{flex:1}
+.sbar-name{font-size:13px;font-weight:500;color:var(--text)}
+.sbar-pts{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.submit-btn{padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap;flex-shrink:0}
+.submit-btn:hover{background:#162d4a}
+.submit-btn:active{transform:scale(.97)}
+.submit-btn:disabled{background:var(--border2);cursor:not-allowed}
+
+/* loading skeleton */
+.skeleton{height:40px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm)}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.lists-loading{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+
+/* sending */
+.sending{display:none;position:fixed;inset:0;background:rgba(245,243,238,.88);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.sending.show{display:flex}
+.spinner{width:34px;height:34px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sending-txt{font-size:13px;color:var(--text2)}
+
+/* success */
+.success{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px}
+.success.show{display:flex}
+.success-icon{width:60px;height:60px;border-radius:50%;background:var(--green-light);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.success-icon svg{width:26px;height:26px;stroke:var(--green)}
+.success-title{font-size:21px;font-weight:500;margin-bottom:7px}
+.success-sub{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:22px}
+.success-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:300px;margin:0 auto 24px}
+.sc-cell{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px;text-align:center}
+.sc-val{font-size:21px;font-weight:500;color:var(--accent);font-family:'DM Mono',monospace}
+.sc-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.close-btn{padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer}
+
+/* toast */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
+.toast.show{opacity:1}
+
+@media(max-width:400px){
+  .task-thead,.task-row{grid-template-columns:1fr 58px 42px 20px}
+  .row2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">Ideaform Design Studio</div>
+        <div class="logo-sub">Daily Progress Report</div>
+      </div>
+    </div>
+    <div class="header-date" id="header-date"></div>
+  </div>
+</header>
+
+<div class="banner" id="banner">Submit before 7:30 PM · responses go directly to your scoresheet</div>
+
+<div class="score-strip">
+  <div class="score-strip-inner">
+    <div class="score-cell"><div class="score-val" id="sc-pts">0.0</div><div class="score-lbl">Weighted pts</div></div>
+    <div class="score-cell"><div class="score-val" id="sc-units">0</div><div class="score-lbl">Task units</div></div>
+    <div class="score-cell"><div class="score-val" id="sc-proj">0</div><div class="score-lbl">Projects</div></div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- 1. Identity -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-num">1</div>
+      <div class="card-title">Who are you?</div>
+      <div class="card-sub">required</div>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <div class="lbl">Your name <span class="req">*</span></div>
+        <div id="member-wrap">
+          <div class="lists-loading"><div class="skeleton"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Project work -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-num">2</div>
+      <div class="card-title">Project work today</div>
+      <div class="card-sub">up to 3 projects</div>
+    </div>
+    <div class="card-body">
+      <div id="proj-blocks"></div>
+      <button class="add-proj" id="add-proj-btn" onclick="addProject()" disabled>
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+        Add another project
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. Accountability -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-num">3</div>
+      <div class="card-title">Accountability</div>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <div class="lbl">Arrived on time today? <span class="req">*</span></div>
+        <div class="radio-group">
+          <label class="radio-opt"><input type="radio" name="ontime" value="Yes"><div class="rdot"></div><div class="rtxt">Yes — before 10:45 AM</div></label>
+          <label class="radio-opt"><input type="radio" name="ontime" value="No"><div class="rdot"></div><div class="rtxt">No — arrived late</div></label>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <div class="lbl">Client / lead referrals given today <span class="opt">optional</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" id="referrals" min="0" max="20" value="0" style="width:70px">
+          <span style="font-size:13px;color:var(--text2)">referrals today</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Summary -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-num">4</div>
+      <div class="card-title">Today's summary</div>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <div class="lbl">Full list of deliverables released today <span class="req">*</span></div>
+        <textarea id="deliverables" placeholder="1. Sharma residence — false ceiling drawings complete&#10;2. Taj convention — DD elevation set sent to client&#10;&#10;Copy-paste from your WhatsApp group message"></textarea>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <div class="lbl">Anything blocking you? <span class="opt">optional</span></div>
+        <textarea id="blockers" style="min-height:56px" placeholder="Waiting on structural engineer / client not responding / need direction on..."></textarea>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <div class="lbl">How was your day?</div>
+        <div class="mood-grid">
+          <label class="mood-opt"><input type="radio" name="mood" value="1"><span class="mood-emoji">😞</span><div class="mood-name">Rough</div></label>
+          <label class="mood-opt"><input type="radio" name="mood" value="2"><span class="mood-emoji">😐</span><div class="mood-name">Okay</div></label>
+          <label class="mood-opt"><input type="radio" name="mood" value="3" checked><span class="mood-emoji">🙂</span><div class="mood-name">Good</div></label>
+          <label class="mood-opt"><input type="radio" name="mood" value="4"><span class="mood-emoji">😊</span><div class="mood-name">Great</div></label>
+          <label class="mood-opt"><input type="radio" name="mood" value="5"><span class="mood-emoji">🔥</span><div class="mood-name">Crushing it</div></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:76px"></div>
+</div>
+
+<!-- submit bar -->
+<div class="submit-bar">
+  <div class="submit-bar-inner">
+    <div class="sbar-info">
+      <div class="sbar-name" id="sbar-name">Select your name to begin</div>
+      <div class="sbar-pts" id="sbar-pts">loading team list…</div>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()" disabled>Submit</button>
+  </div>
+</div>
+
+<!-- overlays -->
+<div class="sending" id="sending"><div class="spinner"></div><div class="sending-txt">Sending your report…</div></div>
+
+<div class="success" id="success">
+  <div class="success-icon"><svg viewBox="0 0 26 26" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13l6 6L22 7"/></svg></div>
+  <div class="success-title">Report submitted!</div>
+  <div class="success-sub">Your progress has been logged.<br>Your lead will review and approve your tasks.</div>
+  <div class="success-scores">
+    <div class="sc-cell"><div class="sc-val" id="fin-pts">—</div><div class="sc-lbl">Est. pts</div></div>
+    <div class="sc-cell"><div class="sc-val" id="fin-units">—</div><div class="sc-lbl">Units done</div></div>
+    <div class="sc-cell"><div class="sc-val" id="fin-proj">—</div><div class="sc-lbl">Projects</div></div>
+  </div>
+  <button class="close-btn" onclick="document.getElementById('success').classList.remove('show')">Close</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────────────
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycov0w_lwa95bd1jbdq8nY_IHpp0vbPz_lTenGku_QNTzWuGJYySF_kzw0QeHAQrkkYw/exec';
+
+// ── TASK TYPES with base points ────────────────────────────────
+const STAGES = [
+  {label:'— select task type —', pts:0},
+  {label:'Concept / Schematic', pts:3},
+  {label:'Design Development (DD)', pts:4},
+  {label:'Construction Documents (CD)', pts:5},
+  {label:'Interior Design — concept', pts:3},
+  {label:'Interior Design — 2D drafting', pts:2},
+  {label:'Interior Design — 3D modelling', pts:3},
+  {label:'3D Rendering (Rerender AI)', pts:2},
+  {label:'Walkthrough / animation', pts:4},
+  {label:'Elevation concept + 3D model', pts:3},
+  {label:'Elevation revision', pts:1.5},
+  {label:'Arch. WD — brickwork drawings', pts:2},
+  {label:'Arch. WD — building sections', pts:2},
+  {label:'Arch. WD — elevation drawings', pts:2},
+  {label:'Arch. WD — door/window schedule', pts:1.5},
+  {label:'Structural WD — foundation layout', pts:3},
+  {label:'Structural WD — beam & slab', pts:3},
+  {label:'Structural WD — lintel & staircase', pts:2.5},
+  {label:'Structural WD — check & release', pts:1},
+  {label:'Electrical WD — slab drawings', pts:2},
+  {label:'Electrical WD — wall drawings', pts:2},
+  {label:'Electrical WD — check & release', pts:1},
+  {label:'Plumbing WD — underground sanitation', pts:2.5},
+  {label:'Plumbing WD — per floor', pts:2},
+  {label:'Plumbing WD — rainwater disposal', pts:1.5},
+  {label:'False ceiling WD — per room', pts:1.5},
+  {label:'Interior WD — wall panel / furniture', pts:2},
+  {label:'Flooring / wall tiling WD', pts:1.5},
+  {label:'Coordination / Approvals', pts:2},
+  {label:'Photoshop / presentation', pts:1},
+  {label:'Area statement / BoQ', pts:1.5},
+  {label:'Sale / corporation drawings', pts:2},
+  {label:'Site supervision visit', pts:1},
+];
+
+const DISC = {
+  'Luxury Residential — small (<10k sft)': 1.0,
+  'Luxury Residential — large (>10k sft)': 1.5,
+  'High-rise Commercial': 2.0,
+  'High-rise Residential': 1.8,
+  'Township / Plotted Development': 1.8,
+  'Hospitality — Boutique (<50 keys)': 1.2,
+  'Hospitality — Mid (50–150 keys)': 1.8,
+  'Hospitality — 5-star (150+ keys)': 2.5,
+};
+
+// ── state ──────────────────────────────────────────────────────
+let projCount = 0;
+let teamList  = [];
+let projList  = [];
+let listsLoaded = false;
+
+// ── init ───────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  setHeaderDate();
+  setDeadlineBanner();
+  fetchLists();
+});
+
+function setHeaderDate() {
+  const now = new Date();
+  document.getElementById('header-date').innerHTML =
+    now.toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'});
+}
+
+function setDeadlineBanner() {
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const deadline = 19 * 60 + 30;
+  const banner = document.getElementById('banner');
+  if (mins > deadline) {
+    banner.className = 'banner late';
+    banner.textContent = 'Past 7:30 PM — please submit now. Late submissions are flagged.';
+  } else if (mins > deadline - 60) {
+    banner.textContent = `Less than ${deadline - mins} minutes left — submit before 7:30 PM`;
+  }
+}
+
+// ── fetch team + project lists from Google Sheet ───────────────
+async function fetchLists() {
+  try {
+    if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      // Demo mode — use sample data
+      teamList = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Minakshi Gokhale',
+                  'Himanshu Malviya','Muskan Jain','Monika Bhartiya','Sahil Maurya',
+                  'Yash Sahu','Aman Raghuvanshi','Tanish Tukdiya'];
+      projList = ['Sharma Grand Residence','Kapoor Farmhouse','Bhopal IT Tower A',
+                  'Indore Skyline Residences','Raipur Multiplex','Taj Convention Centre',
+                  'La Maison Boutique','Grand Meridian Hotel','Narmada Greens Township',
+                  'Greenfield Villas','Malviya Nagar Bungalow','Jabalpur Commercial Hub'];
+    } else {
+      const res  = await fetch(`${APPS_SCRIPT_URL}?action=getLists`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      teamList = data.team  || [];
+      projList = data.projects || [];
+    }
+    onListsLoaded();
+  } catch(err) {
+    document.getElementById('member-wrap').innerHTML =
+      `<div style="font-size:12px;color:var(--red);padding:8px 0">
+        Could not load team list. Check your Apps Script URL or internet connection.
+       </div>`;
+    document.getElementById('sbar-pts').textContent = 'lists failed to load';
+  }
+}
+
+function onListsLoaded() {
+  listsLoaded = true;
+
+  // Build member dropdown
+  const sel = document.createElement('select');
+  sel.id = 'member-name';
+  sel.onchange = updateSubmitBar;
+  sel.innerHTML = '<option value="">— select your name —</option>' +
+    teamList.map(m => `<option>${m}</option>`).join('');
+  document.getElementById('member-wrap').innerHTML = '';
+  document.getElementById('member-wrap').appendChild(sel);
+
+  // Enable UI
+  document.getElementById('add-proj-btn').disabled = false;
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('sbar-pts').textContent = '— pts today';
+
+  // Add first project block
+  addProject(false);
+}
+
+// ── project block ──────────────────────────────────────────────
+function addProject(removable = true) {
+  if (projCount >= 3) return;
+  projCount++;
+  const id = `pb${projCount}`;
+
+  const projOpts = '<option value="">— select project —</option>' +
+    projList.map(p => `<option>${p}</option>`).join('');
+
+  const discOpts = '<option value="">— select discipline —</option>' +
+    Object.entries(DISC).map(([k,v]) => `<option value="${v}">${k}</option>`).join('');
+
+  const stageOpts = STAGES.map((s,i) =>
+    `<option value="${i}">${s.label}${s.pts ? ' · '+s.pts+'pts' : ''}</option>`
+  ).join('');
+
+  const div = document.createElement('div');
+  div.className = 'proj-block';
+  div.id = id;
+  div.innerHTML = `
+    <div class="proj-head">
+      <div class="proj-title">PROJECT ${projCount}</div>
+      ${removable ? `<button class="proj-remove" onclick="removeProject('${id}')">✕ Remove</button>` : ''}
+    </div>
+    <div class="proj-body">
+      <div class="field">
+        <div class="lbl">Project name <span class="req">*</span></div>
+        <select class="p-name" onchange="calcScore()">${projOpts}</select>
+      </div>
+      <div class="field">
+        <div class="lbl">Discipline &amp; scale <span class="req">*</span></div>
+        <select class="p-disc" onchange="calcScore()">${discOpts}</select>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <div class="lbl">Tasks completed on this project</div>
+        <div class="task-thead">
+          <div class="task-th">Task type</div>
+          <div class="task-th">Units</div>
+          <div class="task-th">Pts</div>
+          <div></div>
+        </div>
+        <div class="task-rows" id="${id}-tasks"></div>
+        <button class="add-task" onclick="addTask('${id}-tasks','${id}')">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5.5" y1="1" x2="5.5" y2="10"/><line x1="1" y1="5.5" x2="10" y2="5.5"/></svg>
+          Add task row
+        </button>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <div class="visit-row" onclick="toggleVisit('${id}')">
+          <button class="tog" id="${id}-tog" type="button"></button>
+          <span class="visit-lbl">Site visit or client meeting for this project today</span>
+        </div>
+        <div class="visit-detail" id="${id}-vd">
+          <div class="row2" style="margin-bottom:10px">
+            <div class="field" style="margin-bottom:0">
+              <div class="lbl">Visit type</div>
+              <select class="p-vtype">
+                <option>Client meeting</option>
+                <option>Site visit</option>
+                <option>Client meeting + site visit</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <div class="lbl">Duration</div>
+              <select class="p-vdur">
+                <option>Under 1 hour</option>
+                <option>1–2 hours</option>
+                <option>2–3 hours</option>
+                <option>3+ hours</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <div class="lbl">Visit notes <span class="opt">optional</span></div>
+            <textarea class="p-vnotes" style="min-height:52px" placeholder="Key decisions, client feedback, next steps…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('proj-blocks').appendChild(div);
+  addTask(`${id}-tasks`, id);
+
+  if (projCount >= 3) document.getElementById('add-proj-btn').disabled = true;
+  calcScore();
+}
+
+function removeProject(id) {
+  document.getElementById(id).remove();
+  projCount--;
+  document.getElementById('add-proj-btn').disabled = false;
+  calcScore();
+}
+
+function addTask(containerId, pbId) {
+  const stageOpts = STAGES.map((s,i) =>
+    `<option value="${i}">${s.label}${s.pts ? ' · '+s.pts+'pts' : ''}</option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.className = 'task-row';
+  row.innerHTML = `
+    <select class="t-type" onchange="refreshTaskPts(this);calcScore()">${stageOpts}</select>
+    <input type="number" class="t-units" min="1" max="30" value="1" oninput="calcScore()">
+    <div class="task-pts">—</div>
+    <button class="rm-task" type="button" onclick="this.closest('.task-row').remove();calcScore()">×</button>
+  `;
+  document.getElementById(containerId).appendChild(row);
+}
+
+function refreshTaskPts(sel) {
+  const pts = STAGES[parseInt(sel.value)]?.pts || 0;
+  const disp = sel.closest('.task-row').querySelector('.task-pts');
+  disp.textContent = pts ? pts + 'p' : '—';
+  disp.className   = pts ? 'task-pts lit' : 'task-pts';
+}
+
+function toggleVisit(id) {
+  document.getElementById(`${id}-tog`).classList.toggle('on');
+  document.getElementById(`${id}-vd`).classList.toggle('open');
+}
+
+// ── score calculator ───────────────────────────────────────────
+function calcScore() {
+  let totalPts = 0, totalUnits = 0, projTouched = 0;
+  document.querySelectorAll('.proj-block').forEach(pb => {
+    const mult    = parseFloat(pb.querySelector('.p-disc')?.value) || 1;
+    const hasProj = pb.querySelector('.p-name')?.value;
+    if (hasProj) projTouched++;
+    pb.querySelectorAll('.task-row').forEach(tr => {
+      const idx   = parseInt(tr.querySelector('.t-type')?.value) || 0;
+      const units = parseFloat(tr.querySelector('.t-units')?.value) || 1;
+      const base  = STAGES[idx]?.pts || 0;
+      if (base) {
+        const earned = base * mult * units;
+        totalPts  += earned;
+        totalUnits += units;
+        const disp = tr.querySelector('.task-pts');
+        disp.textContent = earned.toFixed(1) + 'p';
+        disp.className   = 'task-pts lit';
+      }
+    });
+  });
+  document.getElementById('sc-pts').textContent   = totalPts.toFixed(1);
+  document.getElementById('sc-units').textContent = totalUnits;
+  document.getElementById('sc-proj').textContent  = projTouched;
+  document.getElementById('sbar-pts').textContent = `${totalPts.toFixed(1)} weighted pts today`;
+}
+
+function updateSubmitBar() {
+  const name = document.getElementById('member-name')?.value;
+  document.getElementById('sbar-name').textContent = name || 'Select your name to begin';
+}
+
+// ── collect + flatten ──────────────────────────────────────────
+function collectData() {
+  const data = {
+    'Timestamp'        : new Date().toISOString(),
+    'Member'           : document.getElementById('member-name')?.value || '',
+    'Arrived on Time'  : document.querySelector('input[name=ontime]:checked')?.value || '',
+    'Referrals Today'  : parseInt(document.getElementById('referrals').value) || 0,
+    'Deliverables List': document.getElementById('deliverables').value.trim(),
+    'Blockers'         : document.getElementById('blockers').value.trim(),
+    'Mood Score'       : document.querySelector('input[name=mood]:checked')?.value || '3',
+    'Total Weighted Pts': parseFloat(document.getElementById('sc-pts').textContent) || 0,
+    'Total Task Units' : parseInt(document.getElementById('sc-units').textContent) || 0,
+    'Projects Count'   : parseInt(document.getElementById('sc-proj').textContent) || 0,
+  };
+
+  let pi = 0;
+  document.querySelectorAll('.proj-block').forEach(pb => {
+    const pname = pb.querySelector('.p-name')?.value;
+    if (!pname) return;
+    pi++;
+    const n    = pi;
+    const discSel = pb.querySelector('.p-disc');
+    const mult = parseFloat(discSel?.value) || 1;
+    const disc = discSel?.options[discSel.selectedIndex]?.text || '';
+    const tasks = [];
+
+    pb.querySelectorAll('.task-row').forEach(tr => {
+      const idx   = parseInt(tr.querySelector('.t-type')?.value) || 0;
+      const stage = STAGES[idx];
+      if (!stage || !stage.pts) return;
+      const units = parseFloat(tr.querySelector('.t-units')?.value) || 1;
+      tasks.push(`${stage.label} ×${units} = ${(stage.pts*mult*units).toFixed(1)}pts`);
+    });
+
+    const hasVisit = document.getElementById(`pb${n}-tog`)?.classList.contains('on');
+    data[`P${n} Name`]        = pname;
+    data[`P${n} Discipline`]  = disc;
+    data[`P${n} Multiplier`]  = mult;
+    data[`P${n} Tasks`]       = tasks.join(' | ');
+    data[`P${n} Pts`]         = parseFloat(pb.querySelectorAll('.task-pts')
+                                  ? [...pb.querySelectorAll('.task-pts.lit')]
+                                      .reduce((a,el)=>a+parseFloat(el.textContent)||0, 0)
+                                  : 0).toFixed(2);
+    data[`P${n} Visit`]       = hasVisit ? pb.querySelector('.p-vtype')?.value + ' · ' + pb.querySelector('.p-vdur')?.value : 'No';
+    data[`P${n} Visit Notes`] = hasVisit ? pb.querySelector('.p-vnotes')?.value || '' : '';
+  });
+
+  return data;
+}
+
+// ── validate ───────────────────────────────────────────────────
+function validate(d) {
+  if (!d['Member'])           { toast('Please select your name');            return false; }
+  if (!d['Arrived on Time'])  { toast('Please mark your arrival time');      return false; }
+  if (!d['Deliverables List']){ toast("Fill in today's deliverables");       return false; }
+  if (!d['Projects Count'])   { toast('Add at least one project with tasks');return false; }
+  return true;
+}
+
+// ── submit ─────────────────────────────────────────────────────
+async function submitForm() {
+  const data = collectData();
+  if (!validate(data)) return;
+
+  document.getElementById('sending').classList.add('show');
+
+  try {
+    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      await fetch(APPS_SCRIPT_URL, {
+        method : 'POST',
+        mode   : 'no-cors',
+        headers: {'Content-Type':'application/json'},
+        body   : JSON.stringify(data),
+      });
+    }
+    document.getElementById('sending').classList.remove('show');
+    document.getElementById('fin-pts').textContent   = data['Total Weighted Pts'].toFixed(1);
+    document.getElementById('fin-units').textContent = data['Total Task Units'];
+    document.getElementById('fin-proj').textContent  = data['Projects Count'];
+    document.getElementById('success').classList.add('show');
+  } catch(err) {
+    document.getElementById('sending').classList.remove('show');
+    toast('Submission failed — check your connection and try again');
+  }
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
