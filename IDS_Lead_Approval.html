@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · Lead Approval</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;
+  --border:#E2DFD8;--border2:#CBC7BC;
+  --text:#1A1917;--text2:#6B6860;--text3:#9E9B94;
+  --accent:#1F3A5F;--accent-light:#E8EDF4;
+  --green:#2D6A2D;--green-light:#EAF3EA;
+  --red:#8B2020;--red-light:#FDEAEA;
+  --amber:#7A4F0A;--amber-light:#FDF3E3;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px}
+
+/* header */
+.app-header{background:var(--accent);padding:18px 20px 14px;position:sticky;top:0;z-index:100}
+.app-header-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.logo-mark svg{width:14px;height:14px;fill:white}
+.logo-text{font-size:13px;font-weight:500;color:rgba(255,255,255,.9)}
+.logo-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace}
+.header-right{text-align:right}
+.header-date{font-size:11px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace}
+.header-count{font-size:11px;color:rgba(255,255,255,.7);font-family:'DM Mono',monospace;margin-top:2px}
+
+/* summary strip */
+.summary-strip{background:var(--accent);padding:0 20px 18px}
+.summary-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,.15);border-radius:var(--radius);overflow:hidden}
+.sum-cell{background:rgba(255,255,255,.08);padding:10px 14px;text-align:center}
+.sum-val{font-size:22px;font-weight:500;color:#fff;line-height:1;font-family:'DM Mono',monospace}
+.sum-lbl{font-size:10px;color:rgba(255,255,255,.45);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+
+.page{max-width:560px;margin:0 auto;padding:16px 20px}
+
+/* lead selector */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow);overflow:hidden}
+.card-head{padding:13px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-title{font-size:13px;font-weight:500;color:var(--text)}
+.card-sub{font-size:11px;color:var(--text3);margin-left:auto}
+.card-body{padding:16px 18px}
+.lbl{font-size:12px;color:var(--text2);margin-bottom:5px}
+select,textarea,input[type=text]{
+  width:100%;font-family:'DM Sans',sans-serif;font-size:14px;
+  color:var(--text);background:var(--surface2);
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 12px;outline:none;
+  appearance:none;-webkit-appearance:none;
+  transition:border-color .15s;
+}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239E9B94' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:52px;line-height:1.5}
+
+/* task card */
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;box-shadow:var(--shadow);overflow:hidden;transition:border-color .2s}
+.task-card.approved{border-color:#639922}
+.task-card.rejected{border-color:#E24B4A}
+.task-head{padding:12px 16px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+.task-member{font-size:13px;font-weight:500;color:var(--text)}
+.task-project{font-size:11px;color:var(--text3);margin-top:2px}
+.task-status{font-size:10px;padding:3px 9px;border-radius:10px;font-weight:500;white-space:nowrap;font-family:'DM Mono',monospace}
+.st-pending{background:var(--amber-light);color:var(--amber)}
+.st-approved{background:var(--green-light);color:var(--green)}
+.st-rejected{background:var(--red-light);color:var(--red)}
+.task-body{padding:12px 16px}
+.task-detail-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+.task-type{font-size:13px;color:var(--text);font-weight:500}
+.task-pts{font-size:12px;color:var(--accent);font-family:'DM Mono',monospace;font-weight:500}
+.task-meta{display:flex;gap:12px;margin-bottom:10px}
+.task-meta-item{font-size:11px;color:var(--text3)}
+.task-meta-item span{color:var(--text2);font-weight:500}
+.action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.btn-approve{padding:10px;font-size:13px;font-weight:500;color:var(--green);background:var(--green-light);border:1.5px solid #639922;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center}
+.btn-approve:hover,.btn-approve.active{background:#639922;color:#fff}
+.btn-reject{padding:10px;font-size:13px;font-weight:500;color:var(--red);background:var(--red-light);border:1.5px solid #E24B4A;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center}
+.btn-reject:hover,.btn-reject.active{background:#E24B4A;color:#fff}
+.note-field{display:none}
+.note-field.open{display:block}
+
+/* empty state */
+.empty{text-align:center;padding:48px 20px}
+.empty-icon{font-size:48px;margin-bottom:16px}
+.empty-title{font-size:18px;font-weight:500;color:var(--text);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--text2)}
+
+/* loading */
+.skeleton{height:120px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius);margin-bottom:10px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* submit bar */
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:10px 20px;box-shadow:0 -4px 12px rgba(0,0,0,.06);z-index:100}
+.submit-bar-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.sbar-info{flex:1}
+.sbar-reviewed{font-size:13px;font-weight:500;color:var(--text)}
+.sbar-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.submit-btn{padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s}
+.submit-btn:hover{background:#162d4a}
+.submit-btn:disabled{background:var(--border2);cursor:not-allowed}
+
+/* overlays */
+.sending{display:none;position:fixed;inset:0;background:rgba(245,243,238,.88);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.sending.show{display:flex}
+.spinner{width:34px;height:34px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sending-txt{font-size:13px;color:var(--text2)}
+.success{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px}
+.success.show{display:flex}
+.success-icon{width:60px;height:60px;border-radius:50%;background:var(--green-light);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.success-icon svg{width:26px;height:26px;stroke:var(--green)}
+.success-title{font-size:21px;font-weight:500;margin-bottom:7px}
+.success-sub{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:6px}
+.success-stats{font-size:13px;font-family:'DM Mono',monospace;color:var(--accent);margin-top:12px}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">Ideaform Design Studio</div>
+        <div class="logo-sub">Lead Approval</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-date" id="header-date"></div>
+      <div class="header-count" id="header-count">loading…</div>
+    </div>
+  </div>
+</header>
+
+<div class="summary-strip">
+  <div class="summary-inner">
+    <div class="sum-cell"><div class="sum-val" id="sum-pending">—</div><div class="sum-lbl">Pending</div></div>
+    <div class="sum-cell"><div class="sum-val" id="sum-approved">0</div><div class="sum-lbl">Approved</div></div>
+    <div class="sum-cell"><div class="sum-val" id="sum-rejected">0</div><div class="sum-lbl">Rejected</div></div>
+  </div>
+</div>
+
+<div class="page">
+  <!-- Lead selector -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Approving as</div>
+      <div class="card-sub">required</div>
+    </div>
+    <div class="card-body">
+      <div class="lbl">Your name</div>
+      <select id="lead-name" onchange="updateBar()">
+        <option value="">— select your name —</option>
+        <option>Siddharth</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Task list -->
+  <div id="task-list">
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+  </div>
+</div>
+
+<div class="submit-bar">
+  <div class="submit-bar-inner">
+    <div class="sbar-info">
+      <div class="sbar-reviewed" id="sbar-reviewed">0 of — reviewed</div>
+      <div class="sbar-sub" id="sbar-sub">select your name and review all tasks</div>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="submitApprovals()" disabled>Submit</button>
+  </div>
+</div>
+
+<div class="sending" id="sending"><div class="spinner"></div><div class="sending-txt">Saving approvals…</div></div>
+
+<div class="success" id="success">
+  <div class="success-icon"><svg viewBox="0 0 26 26" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13l6 6L22 7"/></svg></div>
+  <div class="success-title">Approvals saved!</div>
+  <div class="success-sub">Task log has been updated.<br>Team members will see their scores reflected.</div>
+  <div class="success-stats" id="success-stats"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+// Leads loaded from CONFIG via getConfig
+let LEADS = [];
+
+let tasks     = [];   // all tasks loaded from sheet
+let decisions = {};   // {rowIndex: {decision, note}}
+
+// ── Init ───────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Set date
+  document.getElementById('header-date').textContent =
+    new Date().toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'});
+
+  // Fetch leads from CONFIG + tasks in parallel
+  fetchAll();
+});
+
+// ── Fetch leads + tasks in parallel ──────────────────────────
+async function fetchAll() {
+  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  try {
+    if (demo) {
+      LEADS = ['Siddharth Inani', 'Astha Inani'];
+      // Demo data
+      tasks = [
+        {row:2, subId:'A1B2C3', date:'2026-05-01', member:'Astha Inani',    project:'Tarun Maheshwari',   discipline:'Luxury Residential',   taskType:'Interior Design — 3D modelling', units:2, pts:6.0,  visit:false},
+        {row:3, subId:'A1B2C3', date:'2026-05-01', member:'Astha Inani',    project:'Tarun Maheshwari',   discipline:'Luxury Residential',   taskType:'Interior Design — concept',       units:1, pts:3.0,  visit:false},
+        {row:4, subId:'A1B2C3', date:'2026-05-01', member:'Astha Inani',    project:'Tarun Maheshwari',   discipline:'Luxury Residential',   taskType:'Site visit (3+ hours)',            units:1, pts:2.0,  visit:true},
+        {row:5, subId:'A1B2C3', date:'2026-05-01', member:'Astha Inani',    project:'Rohit Jain',         discipline:'Luxury Residential',   taskType:'Construction Documents (CD)',      units:2, pts:10.0, visit:false},
+        {row:6, subId:'D4E5F6', date:'2026-05-01', member:'Deepak Soni',    project:'Taj Convention',     discipline:'Hospitality 5-star',   taskType:'Design Development (DD)',          units:1, pts:10.0, visit:false},
+        {row:7, subId:'G7H8I9', date:'2026-05-01', member:'Bhavesh Bhagwat',project:'Narmada Township',   discipline:'Township / Plotted',   taskType:'Coordination / Approvals',         units:3, pts:10.8, visit:false},
+      ];
+    } else {
+      const [taskRes, configRes] = await Promise.all([
+        fetch(`${APPS_SCRIPT_URL}?action=getPendingTasks`),
+        fetch(`${APPS_SCRIPT_URL}?action=getConfig`)
+      ]);
+      const taskData   = await taskRes.json();
+      const configData = await configRes.json();
+      if (taskData.error)   throw new Error(taskData.error);
+      if (configData.error) throw new Error(configData.error);
+      tasks = taskData.tasks || [];
+      LEADS = (configData.leads || []).map(l => l.name);
+    }
+
+    // Build lead dropdown from loaded leads
+    const sel = document.getElementById('lead-name');
+    sel.innerHTML = '<option value="">— select your name —</option>' +
+      LEADS.map(l => `<option>${l}</option>`).join('');
+
+    renderTasks();
+
+  } catch(err) {
+    document.getElementById('task-list').innerHTML =
+      `<div style="font-size:13px;color:var(--red);padding:16px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+        Could not load tasks: ${err.message}
+       </div>`;
+    document.getElementById('header-count').textContent = 'failed to load';
+  }
+}
+
+// ── Render task cards ──────────────────────────────────────────
+function renderTasks() {
+  const count = tasks.length;
+  document.getElementById('header-count').textContent = `${count} task${count !== 1 ? 's' : ''} pending`;
+  document.getElementById('sum-pending').textContent  = count;
+
+  if (count === 0) {
+    document.getElementById('task-list').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">All caught up!</div>
+        <div class="empty-sub">No pending tasks for today.</div>
+      </div>`;
+    return;
+  }
+
+  // Group by date, most recent first
+  const byDate = {};
+  tasks.forEach((t, i) => {
+    if (!byDate[t.date]) byDate[t.date] = [];
+    byDate[t.date].push({...t, idx: i});
+  });
+  const today = new Date().toISOString().substring(0, 10);
+  const dates = Object.keys(byDate).sort().reverse();
+
+  let html = '';
+  dates.forEach(date => {
+    const isToday = date === today;
+    const label   = isToday ? 'Today — ' + date : date;
+    html += `<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;font-family:'DM Mono',monospace">${label}</div>`;
+    byDate[date].forEach(t => {
+      const i = t.idx;
+      html += `
+    <div class="task-card" id="tc-${i}">
+      <div class="task-head">
+        <div>
+          <div class="task-member">${t.member}</div>
+          <div class="task-project">${t.project} · ${t.discipline}</div>
+        </div>
+        <div class="task-status st-pending" id="st-${i}">Pending</div>
+      </div>
+      <div class="task-body">
+        <div class="task-detail-row">
+          <div class="task-type">${t.taskType}</div>
+          <div class="task-pts">${t.pts} pts</div>
+        </div>
+        <div class="task-meta">
+          <div class="task-meta-item">Units: <span>${t.units}</span></div>
+          <div class="task-meta-item">Sub ID: <span>${t.subId}</span></div>
+        </div>
+        <div class="action-row">
+          <button class="btn-approve" id="btn-approve-${i}" onclick="decide(${i}, 'Yes')">✓ Approve</button>
+          <button class="btn-reject"  id="btn-reject-${i}"  onclick="decide(${i}, 'No')">✕ Reject</button>
+        </div>
+        <div class="note-field" id="note-${i}">
+          <textarea placeholder="Note for ${t.member} (optional for approval, recommended for rejection)…" oninput="updateNote(${i}, this.value)"></textarea>
+        </div>
+      </div>
+    </div>`;
+    });
+  });
+  document.getElementById('task-list').innerHTML = html;
+
+  updateBar();
+}
+
+// ── Decision handling ──────────────────────────────────────────
+function decide(i, decision) {
+  decisions[i] = decisions[i] || {};
+  decisions[i].decision = decision;
+
+  // Update card styling
+  const card    = document.getElementById(`tc-${i}`);
+  const status  = document.getElementById(`st-${i}`);
+  const btnA    = document.getElementById(`btn-approve-${i}`);
+  const btnR    = document.getElementById(`btn-reject-${i}`);
+  const noteDiv = document.getElementById(`note-${i}`);
+
+  card.className   = `task-card ${decision === 'Yes' ? 'approved' : 'rejected'}`;
+  status.className = `task-status ${decision === 'Yes' ? 'st-approved' : 'st-rejected'}`;
+  status.textContent = decision === 'Yes' ? 'Approved' : 'Rejected';
+
+  btnA.className = `btn-approve${decision === 'Yes' ? ' active' : ''}`;
+  btnR.className = `btn-reject${decision === 'No'  ? ' active' : ''}`;
+
+  // Always show note field
+  noteDiv.className = 'note-field open';
+
+  updateSummary();
+  updateBar();
+}
+
+function updateNote(i, val) {
+  if (!decisions[i]) decisions[i] = {};
+  decisions[i].note = val;
+}
+
+function updateSummary() {
+  const approved = Object.values(decisions).filter(d => d.decision === 'Yes').length;
+  const rejected = Object.values(decisions).filter(d => d.decision === 'No').length;
+  document.getElementById('sum-approved').textContent = approved;
+  document.getElementById('sum-rejected').textContent = rejected;
+}
+
+function updateBar() {
+  const leadName = document.getElementById('lead-name').value;
+  const reviewed = Object.keys(decisions).length;
+  const total    = tasks.length;
+  const allDone  = reviewed === total && total > 0 && leadName;
+
+  document.getElementById('sbar-reviewed').textContent =
+    `${reviewed} of ${total} reviewed`;
+  document.getElementById('sbar-sub').textContent =
+    allDone ? 'ready to submit' : leadName ? `${total - reviewed} tasks remaining` : 'select your name first';
+  document.getElementById('submit-btn').disabled = !allDone;
+}
+
+// ── Submit approvals ───────────────────────────────────────────
+async function submitApprovals() {
+  const leadName = document.getElementById('lead-name').value;
+  if (!leadName) { toast('Please select your name'); return; }
+
+  const reviewed = Object.keys(decisions).length;
+  if (reviewed < tasks.length) {
+    toast(`Please review all ${tasks.length} tasks before submitting`);
+    return;
+  }
+
+  document.getElementById('sending').classList.add('show');
+
+  // Build payload — array of decisions
+  const payload = tasks.map((t, i) => ({
+    row      : t.row,
+    decision : decisions[i]?.decision || 'Pending',
+    note     : decisions[i]?.note     || '',
+    leadName : leadName,
+    date     : new Date().toISOString(),
+  }));
+
+  try {
+    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      await fetch(APPS_SCRIPT_URL, {
+        method : 'POST', mode: 'no-cors',
+        headers: {'Content-Type':'application/json'},
+        body   : JSON.stringify({action: 'submitApprovals', approvals: payload}),
+      });
+    }
+
+    const approved = payload.filter(p => p.decision === 'Yes').length;
+    const rejected = payload.filter(p => p.decision === 'No').length;
+
+    document.getElementById('sending').classList.remove('show');
+    document.getElementById('success-stats').textContent =
+      `${approved} approved · ${rejected} rejected`;
+    document.getElementById('success').classList.add('show');
+
+  } catch(err) {
+    document.getElementById('sending').classList.remove('show');
+    toast('Submission failed — check your connection');
+  }
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
