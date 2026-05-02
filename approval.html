@@ -400,10 +400,15 @@ async function submitApprovals() {
 
   try {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await fetch(APPS_SCRIPT_URL, {
-        method : 'POST', mode: 'no-cors',
-        headers: {'Content-Type':'application/json'},
-        body   : JSON.stringify({action: 'submitApprovals', approvals: payload}),
+      // Use XMLHttpRequest with text/plain to bypass CORS preflight
+      // Apps Script accepts this and parses the JSON body correctly
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', APPS_SCRIPT_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain');
+        xhr.onload  = () => resolve();
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(JSON.stringify({action: 'submitApprovals', approvals: payload}));
       });
     }
 
@@ -417,7 +422,7 @@ async function submitApprovals() {
 
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
-    toast('Submission failed — check your connection');
+    toast('Submission failed — check your connection and try again');
   }
 }
 
