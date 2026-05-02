@@ -197,7 +197,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycov0w_lwa95bd1jbdq8nY_IHpp0vbPz_lTenGku_QNTzWuGJYySF_kzw0QeHAQrkkYw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
 
 // Leads loaded from CONFIG via getConfig
 let LEADS = [];
@@ -391,11 +391,12 @@ async function submitApprovals() {
 
   // Build payload — array of decisions
   const payload = tasks.map((t, i) => ({
-    row      : t.row,
-    decision : decisions[i]?.decision || 'Pending',
-    note     : decisions[i]?.note     || '',
-    leadName : leadName,
-    date     : new Date().toISOString(),
+    row           : t.row,
+    taskAssignRow : t.taskAssignRow || null,
+    decision      : decisions[i]?.decision || 'Pending',
+    note          : decisions[i]?.note     || '',
+    leadName      : leadName,
+    date          : new Date().toISOString(),
   }));
 
   try {
