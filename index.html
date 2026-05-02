@@ -619,10 +619,13 @@ async function submitForm() {
   document.getElementById('sending').classList.add('show');
   try {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await fetch(APPS_SCRIPT_URL, {
-        method : 'POST', mode: 'no-cors',
-        headers: {'Content-Type':'application/json'},
-        body   : JSON.stringify(data),
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', APPS_SCRIPT_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain');
+        xhr.onload  = () => resolve();
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(JSON.stringify(data));
       });
     }
     document.getElementById('sending').classList.remove('show');
