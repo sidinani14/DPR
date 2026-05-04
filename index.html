@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>IDS · Daily Progress Report</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -151,6 +152,21 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .atc-opt input:checked+.atc-btn.bl{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
 .no-tasks{padding:16px;text-align:center;font-size:12px;color:var(--text3)}
 .assigned-loading{font-size:12px;color:var(--text3);padding:12px 0;text-align:center}
+
+/* google sign-in */
+.gsignin-wrap{margin-bottom:0}
+.gsignin-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;transition:background .15s}
+.gsignin-btn:hover{background:var(--surface2)}
+.gsignin-btn svg{width:18px;height:18px;flex-shrink:0}
+.guser-confirmed{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--green-light);border:1px solid rgba(74,155,111,.3);border-radius:var(--radius-sm)}
+.guser-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.guser-info{flex:1;min-width:0}
+.guser-name{font-size:13px;font-weight:500;color:var(--text)}
+.guser-email{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.guser-verified{font-size:10px;color:var(--green);font-family:'DM Mono',monospace;margin-top:2px}
+.gsignout-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;font-family:'DM Sans',sans-serif}
+.gsignout-btn:hover{color:var(--red)}
+.gblocked{padding:10px 12px;background:var(--red-light);border:1px solid rgba(192,80,80,.3);border-radius:var(--radius-sm);font-size:12px;color:var(--red)}
 </style>
 </head>
 <body>
@@ -184,9 +200,22 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
   <div class="card">
     <div class="card-head"><div class="card-num">1</div><div class="card-title">Who are you?</div><div class="card-sub">required</div></div>
     <div class="card-body">
-      <div class="field">
-        <div class="lbl">Your name <span class="req">*</span></div>
-        <div id="member-wrap"><div class="skeleton"></div></div>
+      <div class="field gsignin-wrap">
+        <div class="lbl">Sign in to continue <span class="req">*</span></div>
+        <div id="gsignin-area">
+          <button class="gsignin-btn" onclick="triggerGoogleSignIn()">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Sign in with Google
+          </button>
+        </div>
+        <div id="member-wrap" style="display:none">
+          <select id="member-name" onchange="updateSubmitBar();fetchAssignedTasks()" style="display:none"></select>
+        </div>
       </div>
     </div>
   </div>
@@ -221,7 +250,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
       <div class="field">
         <div class="lbl">Arrived on time today? <span class="req">*</span></div>
         <div class="radio-group">
-          <label class="radio-opt"><input type="radio" name="ontime" value="Yes"><div class="rdot"></div><div class="rtxt">Yes — before 10:45 AM</div></label>
+          <label class="radio-opt"><input type="radio" name="ontime" value="Yes"><div class="rdot"></div><div class="rtxt">Yes — before 9:00 AM</div></label>
           <label class="radio-opt"><input type="radio" name="ontime" value="No"><div class="rdot"></div><div class="rtxt">No — arrived late</div></label>
         </div>
       </div>
@@ -291,7 +320,11 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
+
+let googleUser = null;   // verified Google account
+let EMAIL_MAP  = {};     // name → email from LISTS tab
 
 // ── Loaded from sheet ──────────────────────────────────────────
 let TEAM      = [];
@@ -375,8 +408,9 @@ async function fetchAll() {
       if (lists.error)  throw new Error('Lists: ' + lists.error);
       if (config.error) throw new Error('Config: ' + config.error);
 
-      TEAM     = lists.team      || [];
-      PROJECTS = lists.projects  || [];
+      TEAM          = lists.team      || [];
+      PROJECTS      = lists.projects  || [];
+      window._EMAILS = lists.emails   || [];
       STAGES   = config.stages   || [];
       DISCS    = config.disciplines || [];
       VISITS   = config.visits   || [];
@@ -401,13 +435,28 @@ function onReady() {
   sel.onchange = () => { updateSubmitBar(); fetchAssignedTasks(); };
   sel.innerHTML = '<option value="">— select your name —</option>' +
     TEAM.map(m => `<option>${m}</option>`).join('');
+  // Build email map: name → email
+  if (Array.isArray(window._EMAILS)) {
+    TEAM.forEach((name, i) => {
+      if (window._EMAILS[i]) EMAIL_MAP[name] = window._EMAILS[i];
+    });
+  }
+  // Initialize Google Sign-In after lists loaded
+  if (GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com') {
+    google.accounts.id.initialize({
+      client_id  : GOOGLE_CLIENT_ID,
+      callback   : (response) => handleGoogleCredential(parseJwt(response.credential)),
+      auto_select: true,
+    });
+  }
   document.getElementById('member-wrap').innerHTML = '';
   document.getElementById('member-wrap').appendChild(sel);
 
   document.getElementById('add-proj-btn').disabled = false;
   document.getElementById('submit-btn').disabled   = false;
-  document.getElementById('sbar-name').textContent = 'Select your name to begin';
+  document.getElementById('sbar-name').textContent = 'Sign in with Google to begin';
   document.getElementById('sbar-pts').textContent  = '— pts today';
+  document.getElementById('submit-btn').disabled   = true; // disabled until Google sign-in
 
   addProject(false);
 }
@@ -663,9 +712,96 @@ function calcScore() {
   document.getElementById('sbar-pts').textContent = `${totalPts.toFixed(1)} weighted pts today`;
 }
 
+// ── Google Sign-In ────────────────────────────────────────────
+function triggerGoogleSignIn() {
+  if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com') {
+    // Demo mode — simulate sign-in
+    handleGoogleCredential({name:'Demo User', email:'demo@gmail.com', picture:''});
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id : GOOGLE_CLIENT_ID,
+    callback  : (response) => {
+      const payload = parseJwt(response.credential);
+      handleGoogleCredential(payload);
+    },
+    auto_select: false,
+  });
+  google.accounts.id.prompt();
+}
+
+function handleGoogleCredential(payload) {
+  const email   = (payload.email || '').toLowerCase();
+  const name    = payload.name  || '';
+  const picture = payload.picture || '';
+
+  // Match email against LISTS tab EMAIL_MAP
+  let matchedName = null;
+  Object.entries(EMAIL_MAP).forEach(([n, e]) => {
+    if (e.toLowerCase() === email) matchedName = n;
+  });
+
+  if (!matchedName) {
+    document.getElementById('gsignin-area').innerHTML = `
+      <div class="gblocked">
+        ✗ <strong>${email}</strong> is not registered in the system.
+        Contact Siddharth to get added to the team list.
+      </div>`;
+    document.getElementById('submit-btn').disabled = true;
+    return;
+  }
+
+  // Set verified user
+  googleUser = {name: matchedName, email, picture};
+
+  // Auto-select name in hidden dropdown
+  const sel = document.getElementById('member-name');
+  sel.value = matchedName;
+
+  // Show verified user card
+  document.getElementById('gsignin-area').innerHTML = `
+    <div class="guser-confirmed">
+      ${picture ? `<img class="guser-avatar" src="${picture}" alt="">` : ''}
+      <div class="guser-info">
+        <div class="guser-name">${matchedName}</div>
+        <div class="guser-email">${email}</div>
+        <div class="guser-verified">✓ Verified via Google</div>
+      </div>
+      <button class="gsignout-btn" onclick="signOut()">Sign out</button>
+    </div>`;
+
+  document.getElementById('submit-btn').disabled = false;
+  updateSubmitBar();
+  fetchAssignedTasks();
+}
+
+function signOut() {
+  googleUser = null;
+  document.getElementById('gsignin-area').innerHTML = `
+    <button class="gsignin-btn" onclick="triggerGoogleSignIn()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Sign in with Google
+    </button>`;
+  document.getElementById('assigned-tasks-list').innerHTML =
+    '<div class="assigned-loading">Select your name to load tasks…</div>';
+  document.getElementById('assigned-count').textContent = 'loading…';
+  document.getElementById('sbar-name').textContent = 'Sign in to begin';
+  document.getElementById('submit-btn').disabled = true;
+}
+
+function parseJwt(token) {
+  const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(atob(base64));
+}
+
 function updateSubmitBar() {
-  const name = document.getElementById('member-name')?.value;
-  document.getElementById('sbar-name').textContent = name || 'Select your name to begin';
+  const name = googleUser ? googleUser.name : (document.getElementById('member-name')?.value || '');
+  document.getElementById('sbar-name').textContent = name || 'Sign in with Google to begin';
 }
 
 // ── Collect & flatten ──────────────────────────────────────────
@@ -681,6 +817,7 @@ function collectData() {
   const data = {
     'Timestamp'         : new Date().toISOString(),
     'Member'            : document.getElementById('member-name')?.value || '',
+    'Member Email'      : googleUser ? googleUser.email : '',
     'Assigned Statuses' : JSON.stringify(assignedStatuses),
     'Arrived on Time'   : document.querySelector('input[name=ontime]:checked')?.value || '',
     'Referrals Today'   : parseInt(document.getElementById('referrals').value) || 0,
@@ -728,6 +865,9 @@ function collectData() {
 
 // ── Validate ───────────────────────────────────────────────────
 function validate(d) {
+  if (!googleUser && GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com') {
+    toast('Please sign in with Google first'); return false;
+  }
   if (!d['Member'])            { toast('Please select your name');             return false; }
   if (!d['Arrived on Time'])   { toast('Please mark your arrival time');       return false; }
   if (!d['Deliverables List']) { toast("Fill in today's deliverables");        return false; }
