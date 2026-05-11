@@ -172,28 +172,92 @@ async function fetchAll() {
   const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
-      TEAM     = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Sahil Maurya','Aman Raghuvanshi'];
+      TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
       PROJECTS = [
-        {id:'P001',name:'Ajay Chordia',discipline:'Luxury Residential (Large >8k sft)',multiplier:1.5,status:'Ongoing'},
-        {id:'P002',name:'Rohit Jain',discipline:'Premium Residential (Small <8k sft)',multiplier:1.0,status:'Ongoing'},
-        {id:'P011',name:'Multani Jewellers',discipline:'Commercial (Small <5k sft)',multiplier:1.0,status:'Ongoing'},
-      ];
-      STAGES = [
-        {label:'Concept / Schematic — Layout',pts:3,category:'Concept / Schematic'},
-        {label:'Design Development — Plan',pts:4,category:'Design Development'},
-        {label:'Construction Documents — Architectural',pts:5,category:'Construction Documents'},
-        {label:'ID Working Drawing — False Ceiling',pts:1.5,category:'Interior Design'},
-        {label:'3D Rendering — Interior View',pts:1.5,category:'3D / Visualization'},
-      ];
-    } else {
-      const [l,c] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
-        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
-      ]);
-      TEAM     = l.team     || [];
-      PROJECTS = l.projects || [];
-      STAGES   = (c.stages  || []).filter(s => s.pts > 0);
-    } else {
+  {id:"P001",name:"Ajay Chordia",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P002",name:"Rohit Jain",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P003",name:"Tarun Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P004",name:"Vishal Gautam",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P005",name:"Dr. Aalok Somani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P006",name:"Yuga Doshi",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P007",name:"Amit Maheshwari",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P008",name:"Tulsivanam",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"P009",name:"Naman Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P010",name:"Bhandari Furnitures",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P011",name:"Multani Jewellers",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P012",name:"Abhay Nagar",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P013",name:"Agrawal House Harda",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P014",name:"Harsh Gupta",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P015",name:"Krishna Mandowara",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P016",name:"Sanjay Chauhan",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P017",name:"Simrol Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
+  {id:"P018",name:"Venkatesh Mandir",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P019",name:"Bhopal Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
+  {id:"P020",name:"Abhay Dhoot",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P021",name:"Madhur Business Park",discipline:"High-rise Commercial",multiplier:1.0,status:""},
+  {id:"P022",name:"Ratnesh Agrawal - Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P023",name:"Sawariya Enclave Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P024",name:"Sawariya Hills",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P025",name:"Aditya Jhawar",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P026",name:"Shrijii Township Narmadapuram",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P027",name:"Ritesh Somani",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P028",name:"Sameer Yadav",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P029",name:"Hemant kakani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P030",name:"Nilesh Lathi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"P031",name:"BBM Indore",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P032",name:"BBM Mhow",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P033",name:"Param - 40' x 60' Ratnesh",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P034",name:"Sai Kripa Biaora",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P035",name:"Chaman Rai",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Aditya Modi",discipline:"Hospitality 5-star (150+ keys)",multiplier:2.5,status:""},
+  {id:"",name:"Sonu Sengar",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
+  {id:"",name:"Nikhar Garg Farm house",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
+  {id:"",name:"Satnam Bagga Commercial",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Kunjan Anil Mittal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Vikas Gupta",discipline:"High-rise Commercial",multiplier:1.0,status:""},
+  {id:"",name:"Shivesh Kanadiya",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"",name:"140 Mittal",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"",name:"Tinu Doshi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"",name:"Deedwaniya Parisar",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Alankar Wadhwani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"",name:"Pradeep Sodani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Payal Khandelwal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Bhavesh Kothari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Shubham Samriddhi",discipline:"Township / Plotted Dev. (> 10 acre)",multiplier:1.8,status:""},
+  {id:"",name:"SBRE Mhow",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"",name:"SBRE Budni",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"",name:"SBRE HGB",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"",name:"Deokar Hospital",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Pratik Jain",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Mayank Makhija",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Shubham Samridddhi Self Residence",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Girish Laddha",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Gagan Beesani 2 Projects",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Anand Shah 2bhk",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Nakoda Estate",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Shaily Farm House",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"KK Farm House",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Anand Beesani",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Govind Laddha",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Narmada House Biaora - Lakshya",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Laabham Housing",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Rajpal Bhati Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Pradeep Mundra",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Gurudwara",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"SBRE Row Housing",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Anand Malviya",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Tarun Maheshwari Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Dinesh Maheshwari",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"SBRE Itarsi",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"SBRE Babai",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"AD Fefartal Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Sampat Demo Flats",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Vaibhav Beesani",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Apex Pools",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Navneet Palrecha",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Kurawar Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Shaily Ahuja",discipline:"",multiplier:1.0,status:""}
+];
       STAGES   = [
   {label:"Concept / Schematic \u2014 Layout",pts:3.0,category:"Concept / Schematic"},
   {label:"Concept / Schematic \u2014 3D Massing",pts:2.0,category:"Concept / Schematic"},
@@ -247,6 +311,16 @@ async function fetchAll() {
   {label:"Area Statement / BOQ",pts:1.5,category:"Coordination / Approvals"},
   {label:"Procurement \u2014 Vendor Coordination",pts:1.0,category:"Coordination / Approvals"}
 ];
+    } else {
+      const [l,c] = await Promise.all([
+        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
+        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
+      ]);
+      if (l.error) throw new Error('Lists: '+l.error);
+      if (c.error) throw new Error('Config: '+c.error);
+      TEAM     = l.team     || [];
+      PROJECTS = l.projects || [];
+      STAGES   = (c.stages  || []).filter(s => s.pts > 0); // skip category headers
     }
     buildForm();
   } catch(e) {
