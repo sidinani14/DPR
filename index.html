@@ -659,14 +659,13 @@ function addProject(removable=true) {
       <div class="divider"></div>
       <div class="field">
         <div class="lbl">Tasks completed on this project</div>
-        <div class="task-thead">
-          <div class="task-th">Task type</div><div class="task-th">Units</div>
-          <div class="task-th">Pts</div><div></div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;display:grid;grid-template-columns:1fr 60px 44px 22px;gap:6px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em">
+          <div>Task type</div><div>Units</div><div style="text-align:center">Pts</div><div></div>
         </div>
         <div class="task-rows" id="${id}-tasks"></div>
         <button class="add-task" onclick="addTask('${id}-tasks')">
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5.5" y1="1" x2="5.5" y2="10"/><line x1="1" y1="5.5" x2="10" y2="5.5"/></svg>
-          Add task row
+          Add task / drawing
         </button>
       </div>
       <div class="divider"></div>
@@ -711,19 +710,29 @@ function removeProject(id) {
 
 function addTask(containerId) {
   const row=document.createElement('div');
-  row.className='task-row';
+  row.className='task-entry';
+  row.style.cssText='border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;background:var(--surface2)';
   row.innerHTML=`
-    <select class="t-type" onchange="refreshTaskPts(this);calcScore()">${stageOptions()}</select>
-    <input type="number" class="t-units" min="1" max="30" value="1" oninput="calcScore()">
-    <div class="task-pts">—</div>
-    <button class="rm-task" type="button" onclick="this.closest('.task-row').remove();calcScore()">×</button>`;
+    <div style="display:grid;grid-template-columns:1fr 60px 44px 22px;gap:6px;align-items:center;margin-bottom:7px">
+      <select class="t-type" onchange="refreshTaskPts(this);calcScore()">${stageOptions()}</select>
+      <input type="number" class="t-units" min="1" max="30" value="1" oninput="calcScore()" placeholder="Units">
+      <div class="task-pts t-pts-display" style="font-size:11px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace">—</div>
+      <button class="rm-task" type="button" onclick="this.closest('.task-entry').remove();calcScore()">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <input type="text" class="t-area" placeholder="Area / Space (e.g. Drawing Room)" style="font-size:12px;padding:6px 10px">
+      <input type="text" class="t-drawing" placeholder="Drawing name (e.g. False Ceiling Plan)" style="font-size:12px;padding:6px 10px">
+    </div>`;
   document.getElementById(containerId).appendChild(row);
 }
 
 function refreshTaskPts(sel) {
-  const idx=parseInt(sel.value), pts=STAGES[idx]?.pts||0;
-  const disp=sel.closest('.task-row').querySelector('.task-pts');
-  disp.textContent=pts?pts+'p':'—'; disp.className=pts?'task-pts lit':'task-pts';
+  const idx=parseInt(sel.value), stage=STAGES[idx];
+  const entry=sel.closest('.task-entry');
+  const disp=entry?.querySelector('.t-pts-display');
+  if(!disp) return;
+  if(stage?.pts){ disp.textContent=stage.pts+'p'; disp.style.color='var(--green)'; }
+  else { disp.textContent='—'; disp.style.color='var(--text3)'; }
 }
 
 function onProjSelect(sel) {
@@ -750,14 +759,16 @@ function calcScore() {
     const proj=(!isNaN(pnIdx)&&PROJECTS[pnIdx])?PROJECTS[pnIdx]:null;
     const mult=proj?proj.multiplier:1;
     if (proj) projTouched++;
-    pb.querySelectorAll('.task-row').forEach(tr=>{
+    pb.querySelectorAll('.task-entry').forEach(tr=>{
       const idx=parseInt(tr.querySelector('.t-type')?.value);
       const stage=(!isNaN(idx)&&STAGES[idx])?STAGES[idx]:null;
       const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
+      const disp=tr.querySelector('.t-pts-display');
       if (stage&&stage.pts){
         const earned=stage.pts*mult*units; totalPts+=earned; totalUnits+=units;
-        const disp=tr.querySelector('.task-pts');
-        disp.textContent=earned.toFixed(1)+'p'; disp.className='task-pts lit';
+        if(disp){ disp.textContent=earned.toFixed(1)+'p'; disp.style.color='var(--green)'; disp.style.fontWeight='500'; }
+      } else {
+        if(disp){ disp.textContent='—'; disp.style.color='var(--text3)'; disp.style.fontWeight='normal'; }
       }
     });
     const tog=document.getElementById(`${pb.id}-tog`);
@@ -808,13 +819,20 @@ function collectData() {
     if (!proj) return;
     pi++;
     const tasks=[];
-    pb.querySelectorAll('.task-row').forEach(tr=>{
+    pb.querySelectorAll('.task-entry').forEach(tr=>{
       const idx=parseInt(tr.querySelector('.t-type')?.value);
       const stage=(!isNaN(idx)&&STAGES[idx])?STAGES[idx]:null;
       if (!stage||!stage.pts) return;
       const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
+      const area=tr.querySelector('.t-area')?.value.trim()||'';
+      const drawing=tr.querySelector('.t-drawing')?.value.trim()||'';
       const earned=(stage.pts*proj.multiplier*units).toFixed(1);
-      tasks.push(`${stage.label} ×${units} = ${earned}pts`);
+      // Encode area+drawing into the task string for script parsing
+      let taskStr=`${stage.label}`;
+      if(area)    taskStr+=` [Area: ${area}]`;
+      if(drawing) taskStr+=` [Drawing: ${drawing}]`;
+      taskStr+=` ×${units} = ${earned}pts`;
+      tasks.push(taskStr);
     });
     const hasVisit=document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
     const vdur=pb.querySelector('.p-vdur')?.value||'';
