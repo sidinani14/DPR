@@ -326,7 +326,8 @@ async function fetchAll() {
   const demo = APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
-      TEAM     = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Sahil Maurya','Aman Raghuvanshi'];
+      TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
+      EMAIL_MAP= {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"};
       PROJECTS = [
   {id:"P001",name:"Ajay Chordia",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
   {id:"P002",name:"Rohit Jain",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
@@ -412,7 +413,7 @@ async function fetchAll() {
   {id:"",name:"Kurawar Township",discipline:"",multiplier:1.0,status:""},
   {id:"",name:"Shaily Ahuja",discipline:"",multiplier:1.0,status:""}
 ];
-      STAGES = [
+      STAGES   = [
   {label:"Concept / Schematic \u2014 Layout",pts:3.0,category:"Concept / Schematic"},
   {label:"Concept / Schematic \u2014 3D Massing",pts:2.0,category:"Concept / Schematic"},
   {label:"Design Development \u2014 Plan",pts:4.0,category:"Design Development"},
@@ -465,7 +466,7 @@ async function fetchAll() {
   {label:"Area Statement / BOQ",pts:1.5,category:"Coordination / Approvals"},
   {label:"Procurement \u2014 Vendor Coordination",pts:1.0,category:"Coordination / Approvals"}
 ];
-      VISITS = [
+      VISITS   = [
   {duration:"Under 1 hour",pts:0.5},
   {duration:"1\u20132 hours",pts:1.0},
   {duration:"2\u20133 hours",pts:1.5},
@@ -478,15 +479,14 @@ async function fetchAll() {
         fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
         fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
       ]);
+      if (l.error) throw new Error('Lists: '+l.error);
+      if (c.error) throw new Error('Config: '+c.error);
       TEAM     = l.team     || [];
-      PROJECTS = l.projects || [];
+      PROJECTS = l.projects || [];  // [{id,name,discipline,multiplier,status}]
       STAGES   = (c.stages  || []).filter(s=>s.pts>0);
       VISITS   = c.visits   || [];
       window._EMAILS = l.emails || [];
       TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
-    } else {
-      // Demo fallback email map
-      EMAIL_MAP = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"};
     }
     buildMemberDropdown();
     addProject(false);
