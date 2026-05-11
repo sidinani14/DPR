@@ -5,19 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>IDS · Daily Progress Report</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;
-  --border:#E2DFD8;--border2:#CBC7BC;
-  --text:#1A1917;--text2:#6B6860;--text3:#9E9B94;
-  --accent:#1F3A5F;--accent-light:#E8EDF4;
-  --green:#2D6A2D;--green-light:#EAF3EA;
-  --amber:#7A4F0A;--amber-light:#FDF3E3;
-  --red:#8B2020;--red-light:#FDEAEA;
-  --radius:10px;--radius-sm:6px;
-  --shadow:0 1px 3px rgba(0,0,0,.06);
-}
+:root{--bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;--border:#E2DFD8;--border2:#CBC7BC;--text:#1A1917;--text2:#6B6860;--text3:#9E9B94;--accent:#1F3A5F;--accent-light:#E8EDF4;--green:#2D6A2D;--green-light:#EAF3EA;--amber:#7A4F0A;--amber-light:#FDF3E3;--red:#8B2020;--red-light:#FDEAEA;--radius:10px;--radius-sm:6px;--shadow:0 1px 3px rgba(0,0,0,.06)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:90px}
 .app-header{background:var(--accent);padding:18px 20px 14px;position:sticky;top:0;z-index:100}
@@ -26,7 +16,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .logo-mark{width:30px;height:30px;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;display:flex;align-items:center;justify-content:center}
 .logo-mark svg{width:14px;height:14px;fill:white}
 .logo-text{font-size:13px;font-weight:500;color:rgba(255,255,255,.9)}
-.logo-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace}
+.logo-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;margin-top:2px}
 .header-date{font-size:11px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;text-align:right}
 .score-strip{background:var(--accent);padding:0 20px 18px;position:sticky;top:96px;z-index:97}
 .score-strip-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,.15);border-radius:var(--radius);overflow:hidden}
@@ -42,24 +32,50 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .card-title{font-size:13px;font-weight:500;color:var(--text)}
 .card-sub{font-size:11px;color:var(--text3);margin-left:auto}
 .card-body{padding:16px 18px}
-.field{margin-bottom:13px}
-.field:last-child{margin-bottom:0}
+.field{margin-bottom:13px}.field:last-child{margin-bottom:0}
 .lbl{font-size:12px;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:5px}
 .req{font-size:10px;color:var(--red);font-family:'DM Mono',monospace}
 .opt{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
-select,input[type=number],textarea{
-  width:100%;font-family:'DM Sans',sans-serif;font-size:14px;
-  color:var(--text);background:var(--surface2);
-  border:1px solid var(--border);border-radius:var(--radius-sm);
-  padding:9px 12px;outline:none;
-  appearance:none;-webkit-appearance:none;
-  transition:border-color .15s,background .15s;
-}
+select,input[type=number],textarea{width:100%;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .15s}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239E9B94' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-select:focus,input:focus,textarea:focus{border-color:var(--accent);background:var(--surface)}
+select:focus,textarea:focus{border-color:var(--accent);background:var(--surface)}
 textarea{resize:vertical;min-height:78px;line-height:1.55}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .divider{height:1px;background:var(--border);margin:13px 0}
+/* Google sign-in */
+.gsignin-wrap{margin-bottom:0}
+.guser-confirmed{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--green-light);border:1px solid rgba(74,155,111,.3);border-radius:var(--radius-sm);margin-top:8px}
+.guser-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.guser-info{flex:1;min-width:0}
+.guser-name{font-size:13px;font-weight:500;color:var(--text)}
+.guser-email{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.guser-verified{font-size:10px;color:var(--green);font-family:'DM Mono',monospace;margin-top:2px}
+.gsignout-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;font-family:'DM Sans',sans-serif}
+.gsignout-btn:hover{color:var(--red)}
+.gblocked{padding:10px 12px;background:var(--red-light);border:1px solid rgba(192,80,80,.3);border-radius:var(--radius-sm);font-size:12px;color:var(--red);margin-top:8px}
+/* Assigned tasks */
+.assigned-task-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden}
+.assigned-task-card.revision{border-left:3px solid var(--red)}
+.atc-head{padding:10px 13px}
+.atc-type{font-size:13px;font-weight:500;color:var(--text)}
+.atc-project{font-size:11px;color:var(--text3);margin-top:2px}
+.atc-area{font-size:11px;color:var(--accent);margin-top:2px;font-family:'DM Mono',monospace}
+.atc-revision{font-size:11px;color:var(--red);margin-top:4px;padding:4px 8px;background:var(--red-light);border-radius:4px}
+.atc-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px}
+.atc-m{font-size:11px;color:var(--text3)}
+.atc-m span{color:var(--text2)}
+.atc-m.overdue span{color:var(--red)}
+.atc-status-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 13px 12px}
+.atc-opt{cursor:pointer;text-align:center}
+.atc-opt input{display:none}
+.atc-btn{display:block;padding:7px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s;font-family:'DM Sans',sans-serif}
+.atc-opt input:checked+.atc-btn.ns{border-color:var(--text3);background:rgba(158,155,148,.15);color:var(--text2);font-weight:500}
+.atc-opt input:checked+.atc-btn.ip{border-color:var(--amber);background:var(--amber-light);color:var(--amber);font-weight:500}
+.atc-opt input:checked+.atc-btn.dn{border-color:var(--green);background:var(--green-light);color:var(--green);font-weight:500}
+.atc-opt input:checked+.atc-btn.bl{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
+.assigned-loading{padding:16px;text-align:center;font-size:12px;color:var(--text3)}
+.no-tasks{padding:16px;text-align:center;font-size:12px;color:var(--text3)}
+/* Proj block */
 .proj-block{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden}
 .proj-block:last-child{margin-bottom:0}
 .proj-head{background:var(--accent-light);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
@@ -67,6 +83,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .proj-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .proj-remove:hover{color:var(--red);border-color:var(--red)}
 .proj-body{padding:13px}
+.auto-disc{font-size:13px;color:var(--accent);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Mono',monospace}
 .task-thead{display:grid;grid-template-columns:1fr 66px 48px 22px;gap:6px;padding-bottom:5px;margin-bottom:4px;border-bottom:1px solid var(--border)}
 .task-th{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:'DM Mono',monospace}
 .task-row{display:grid;grid-template-columns:1fr 66px 48px 22px;gap:6px;align-items:center;margin-bottom:6px}
@@ -132,41 +149,6 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
 .toast.show{opacity:1}
 @media(max-width:400px){.task-thead,.task-row{grid-template-columns:1fr 58px 42px 20px}.row2{grid-template-columns:1fr}}
-
-/* assigned tasks section */
-.assigned-task-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden}
-.atc-head{padding:10px 13px;display:flex;align-items:start;justify-content:space-between;gap:8px}
-.atc-type{font-size:13px;font-weight:500;color:var(--text)}
-.atc-project{font-size:11px;color:var(--text3);margin-top:2px}
-.atc-meta{display:flex;gap:10px;flex-wrap:wrap}
-.atc-m{font-size:11px;color:var(--text3)}
-.atc-m span{color:var(--text2)}
-.atc-m.overdue span{color:var(--red)}
-.atc-status-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 13px 12px}
-.atc-opt{cursor:pointer;text-align:center}
-.atc-opt input{display:none}
-.atc-btn{display:block;padding:7px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s;font-family:'DM Sans',sans-serif}
-.atc-opt input:checked+.atc-btn.ns{border-color:var(--text3);background:rgba(90,86,82,.2);color:var(--text2);font-weight:500}
-.atc-opt input:checked+.atc-btn.ip{border-color:var(--amber);background:var(--amber-light);color:var(--amber);font-weight:500}
-.atc-opt input:checked+.atc-btn.dn{border-color:var(--green);background:var(--green-light);color:var(--green);font-weight:500}
-.atc-opt input:checked+.atc-btn.bl{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
-.no-tasks{padding:16px;text-align:center;font-size:12px;color:var(--text3)}
-.assigned-loading{font-size:12px;color:var(--text3);padding:12px 0;text-align:center}
-
-/* google sign-in */
-.gsignin-wrap{margin-bottom:0}
-.gsignin-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;transition:background .15s}
-.gsignin-btn:hover{background:var(--surface2)}
-.gsignin-btn svg{width:18px;height:18px;flex-shrink:0}
-.guser-confirmed{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--green-light);border:1px solid rgba(74,155,111,.3);border-radius:var(--radius-sm)}
-.guser-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
-.guser-info{flex:1;min-width:0}
-.guser-name{font-size:13px;font-weight:500;color:var(--text)}
-.guser-email{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
-.guser-verified{font-size:10px;color:var(--green);font-family:'DM Mono',monospace;margin-top:2px}
-.gsignout-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;font-family:'DM Sans',sans-serif}
-.gsignout-btn:hover{color:var(--red)}
-.gblocked{padding:10px 12px;background:var(--red-light);border:1px solid rgba(192,80,80,.3);border-radius:var(--radius-sm);font-size:12px;color:var(--red)}
 </style>
 </head>
 <body>
@@ -174,13 +156,8 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 <header class="app-header">
   <div class="app-header-inner">
     <div class="logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
-      </div>
-      <div>
-        <div class="logo-text">Ideaform Design Studio</div>
-        <div class="logo-sub">Daily Progress Report</div>
-      </div>
+      <div class="logo-mark"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></div>
+      <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Daily Progress Report</div></div>
     </div>
     <div class="header-date" id="header-date"></div>
   </div>
@@ -197,31 +174,23 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 </div>
 
 <div class="page">
+
+  <!-- Section 1: Sign In -->
   <div class="card">
     <div class="card-head"><div class="card-num">1</div><div class="card-title">Who are you?</div><div class="card-sub">required</div></div>
     <div class="card-body">
       <div class="field gsignin-wrap">
         <div class="lbl">Sign in to continue <span class="req">*</span></div>
-        <div id="gsignin-area">
-          <!-- Google renders its own button here — most reliable approach -->
-          <div id="g_id_onload"
-            data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
-            data-context="signin"
-            data-ux_mode="popup"
-            data-callback="onGoogleSignIn"
-            data-auto_prompt="false">
-          </div>
-          <div class="g_id_signin"
-            data-type="standard"
-            data-shape="rectangular"
-            data-theme="outline"
-            data-text="sign_in_with"
-            data-size="large"
-            data-logo_alignment="left"
-            data-width="100%">
-          </div>
+        <div id="g_id_onload"
+          data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
+          data-context="signin" data-ux_mode="popup"
+          data-callback="onGoogleSignIn" data-auto_prompt="false">
         </div>
-        <div id="gsignin-confirmed" style="display:none"></div>
+        <div class="g_id_signin" data-type="standard" data-shape="rectangular"
+          data-theme="outline" data-text="sign_in_with" data-size="large"
+          data-logo_alignment="left" data-width="100%">
+        </div>
+        <div id="gsignin-confirmed"></div>
         <div id="member-wrap" style="display:none">
           <select id="member-name" onchange="updateSubmitBar();fetchAssignedTasks()" style="display:none"></select>
         </div>
@@ -229,19 +198,16 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Assigned tasks section -->
+  <!-- Section 2: Assigned Tasks -->
   <div class="card">
-    <div class="card-head">
-      <div class="card-num">2</div>
-      <div class="card-title">Your assigned tasks</div>
-      <div class="card-sub" id="assigned-count">loading…</div>
-    </div>
+    <div class="card-head"><div class="card-num">2</div><div class="card-title">Your assigned tasks</div><div class="card-sub" id="assigned-count">sign in first</div></div>
     <div class="card-body">
-      <div id="assigned-tasks-list"><div class="assigned-loading">Select your name to load tasks…</div></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:10px">Mark each task status — updates the Task Dashboard automatically.</div>
+      <div id="assigned-tasks-list"><div class="assigned-loading">Sign in to load your assigned tasks…</div></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:10px">Mark each task — updates the Task Dashboard automatically.</div>
     </div>
   </div>
 
+  <!-- Section 3: Additional / Unplanned Work -->
   <div class="card">
     <div class="card-head"><div class="card-num">3</div><div class="card-title">Additional / unplanned work today</div><div class="card-sub">up to 3 projects</div></div>
     <div class="card-body">
@@ -253,6 +219,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
+  <!-- Section 4: Accountability -->
   <div class="card">
     <div class="card-head"><div class="card-num">4</div><div class="card-title">Accountability</div></div>
     <div class="card-body">
@@ -274,12 +241,13 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
+  <!-- Section 5: Summary -->
   <div class="card">
     <div class="card-head"><div class="card-num">5</div><div class="card-title">Today's summary</div></div>
     <div class="card-body">
       <div class="field">
         <div class="lbl">Full list of deliverables released today <span class="req">*</span></div>
-        <textarea id="deliverables" placeholder="1. Sharma residence — false ceiling drawings complete&#10;2. Taj convention — DD elevation set sent to client&#10;&#10;Copy-paste from your WhatsApp group message"></textarea>
+        <textarea id="deliverables" placeholder="1. Ajay Chordia — false ceiling WD, Drawing Room complete&#10;2. Multani Jewellers — elevation concept sent to client&#10;&#10;Copy-paste from your WhatsApp group message"></textarea>
       </div>
       <div class="divider"></div>
       <div class="field">
@@ -305,8 +273,8 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 <div class="submit-bar">
   <div class="submit-bar-inner">
     <div class="sbar-info">
-      <div class="sbar-name" id="sbar-name">Loading…</div>
-      <div class="sbar-pts" id="sbar-pts">fetching config…</div>
+      <div class="sbar-name" id="sbar-name">Sign in with Google to begin</div>
+      <div class="sbar-pts" id="sbar-pts">— pts today</div>
     </div>
     <button class="submit-btn" id="submit-btn" onclick="submitForm()" disabled>Submit</button>
   </div>
@@ -330,272 +298,370 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 
 <script>
 const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
-const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com'; // also set in g_id_onload data attribute
+const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 
-let googleUser = null;   // verified Google account
-let EMAIL_MAP  = {};     // name → email from LISTS tab
+let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[];
+let EMAIL_MAP  = {};
+let googleUser = null;
+let assignedTasks = [];
+let projCount  = 0;
 
-// ── Loaded from sheet ──────────────────────────────────────────
-let TEAM      = [];
-let PROJECTS  = [];
-let STAGES    = [];   // [{label, pts}]
-let DISCS     = [];   // [{label, multiplier}]
-let VISITS    = [];   // [{duration, pts}]
-
-let projCount    = 0;
-let listsLoaded  = false;
-let configLoaded = false;
-
-// ── Init ───────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  setHeaderDate();
-  setDeadlineBanner();
-  fetchAll();
+  setHeaderDate(); setDeadlineBanner(); fetchAll();
 });
 
 function setHeaderDate() {
   document.getElementById('header-date').innerHTML =
-    new Date().toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'});
+    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
 }
 
 function setDeadlineBanner() {
-  const now  = new Date();
-  const mins = now.getHours() * 60 + now.getMinutes();
-  const dead = 19 * 60 + 30;
-  const b    = document.getElementById('banner');
-  if (mins > dead) {
-    b.className = 'banner late';
-    b.textContent = 'Past 7:30 PM — please submit now. Late submissions are flagged.';
-  } else if (mins > dead - 60) {
-    b.textContent = `Less than ${dead - mins} minutes left — submit before 7:30 PM`;
-  }
+  const now=new Date(), mins=now.getHours()*60+now.getMinutes(), dead=19*60+30;
+  const b=document.getElementById('banner');
+  if (mins>dead){ b.className='banner late'; b.textContent='Past 7:30 PM — please submit now. Late submissions are flagged.'; }
+  else if (mins>dead-60){ b.textContent=`Less than ${dead-mins} minutes left — submit before 7:30 PM`; }
 }
 
-// ── Fetch lists + config in parallel ──────────────────────────
 async function fetchAll() {
-  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
-
+  const demo = APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
-      // Demo mode — use fallback data
-      TEAM     = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Minakshi Gokhale',
-                  'Himanshu Malviya','Muskan Jain','Monika Bhartiya','Sahil Maurya',
-                  'Yash Sahu','Aman Raghuvanshi','Tanish Tukdiya'];
-      PROJECTS = ['Sharma Grand Residence','Kapoor Farmhouse','Bhopal IT Tower A',
-                  'Indore Skyline Residences','Raipur Multiplex','Taj Convention Centre',
-                  'La Maison Boutique','Grand Meridian Hotel','Narmada Greens Township',
-                  'Greenfield Villas','Malviya Nagar Bungalow','Jabalpur Commercial Hub'];
-      STAGES   = [
-        {label:'Concept / Schematic',pts:3},{label:'Design Development (DD)',pts:4},
-        {label:'Construction Documents (CD)',pts:5},{label:'Interior Design (ID)',pts:3},
-        {label:'3D / Visualization',pts:2},{label:'Coordination / Approvals',pts:2},
-        {label:'Site Supervision',pts:1}
-      ];
-      DISCS    = [
-        {label:'Luxury Residential — small (<10k sft)',multiplier:1.0},
-        {label:'Luxury Residential — large (>10k sft)',multiplier:1.5},
-        {label:'High-rise Commercial',multiplier:2.0},
-        {label:'High-rise Residential',multiplier:1.8},
-        {label:'Township / Plotted Dev.',multiplier:1.8},
-        {label:'Hospitality Boutique (<50 keys)',multiplier:1.2},
-        {label:'Hospitality Mid (50-150 keys)',multiplier:1.8},
-        {label:'Hospitality 5-star (150+ keys)',multiplier:2.5}
-      ];
-      VISITS   = [
-        {duration:'Under 1 hour',pts:0.5},{duration:'1–2 hours',pts:1.0},
-        {duration:'2–3 hours',pts:1.5},{duration:'3+ hours',pts:2.0}
-      ];
+      TEAM     = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Sahil Maurya','Aman Raghuvanshi'];
+      PROJECTS = [
+  {id:"P001",name:"Ajay Chordia",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P002",name:"Rohit Jain",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P003",name:"Tarun Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P004",name:"Vishal Gautam",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P005",name:"Dr. Aalok Somani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P006",name:"Yuga Doshi",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P007",name:"Amit Maheshwari",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P008",name:"Tulsivanam",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"P009",name:"Naman Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P010",name:"Bhandari Furnitures",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P011",name:"Multani Jewellers",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P012",name:"Abhay Nagar",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"P013",name:"Agrawal House Harda",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P014",name:"Harsh Gupta",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P015",name:"Krishna Mandowara",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P016",name:"Sanjay Chauhan",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P017",name:"Simrol Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
+  {id:"P018",name:"Venkatesh Mandir",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P019",name:"Bhopal Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
+  {id:"P020",name:"Abhay Dhoot",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P021",name:"Madhur Business Park",discipline:"High-rise Commercial",multiplier:1.0,status:""},
+  {id:"P022",name:"Ratnesh Agrawal - Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P023",name:"Sawariya Enclave Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P024",name:"Sawariya Hills",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P025",name:"Aditya Jhawar",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P026",name:"Shrijii Township Narmadapuram",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"P027",name:"Ritesh Somani",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P028",name:"Sameer Yadav",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P029",name:"Hemant kakani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P030",name:"Nilesh Lathi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"P031",name:"BBM Indore",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P032",name:"BBM Mhow",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"P033",name:"Param - 40' x 60' Ratnesh",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P034",name:"Sai Kripa Biaora",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"P035",name:"Chaman Rai",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Aditya Modi",discipline:"Hospitality 5-star (150+ keys)",multiplier:2.5,status:""},
+  {id:"",name:"Sonu Sengar",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
+  {id:"",name:"Nikhar Garg Farm house",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
+  {id:"",name:"Satnam Bagga Commercial",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Kunjan Anil Mittal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Vikas Gupta",discipline:"High-rise Commercial",multiplier:1.0,status:""},
+  {id:"",name:"Shivesh Kanadiya",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"",name:"140 Mittal",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"",name:"Tinu Doshi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
+  {id:"",name:"Deedwaniya Parisar",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Alankar Wadhwani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
+  {id:"",name:"Pradeep Sodani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Payal Khandelwal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Bhavesh Kothari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Shubham Samriddhi",discipline:"Township / Plotted Dev. (> 10 acre)",multiplier:1.8,status:""},
+  {id:"",name:"SBRE Mhow",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"",name:"SBRE Budni",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"",name:"SBRE HGB",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
+  {id:"",name:"Deokar Hospital",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
+  {id:"",name:"Pratik Jain",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Mayank Makhija",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Shubham Samridddhi Self Residence",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Girish Laddha",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Gagan Beesani 2 Projects",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Anand Shah 2bhk",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Nakoda Estate",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Shaily Farm House",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"KK Farm House",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Anand Beesani",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Govind Laddha",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Narmada House Biaora - Lakshya",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Laabham Housing",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Rajpal Bhati Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Pradeep Mundra",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Gurudwara",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"SBRE Row Housing",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Anand Malviya",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Tarun Maheshwari Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Dinesh Maheshwari",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"SBRE Itarsi",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"SBRE Babai",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"AD Fefartal Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Sampat Demo Flats",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Vaibhav Beesani",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Apex Pools",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Navneet Palrecha",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Kurawar Township",discipline:"",multiplier:1.0,status:""},
+  {id:"",name:"Shaily Ahuja",discipline:"",multiplier:1.0,status:""}
+];
+      STAGES = [
+  {label:"Concept / Schematic \u2014 Layout",pts:3.0,category:"Concept / Schematic"},
+  {label:"Concept / Schematic \u2014 3D Massing",pts:2.0,category:"Concept / Schematic"},
+  {label:"Design Development \u2014 Plan",pts:4.0,category:"Design Development"},
+  {label:"Design Development \u2014 Elevation",pts:3.0,category:"Design Development"},
+  {label:"Design Development \u2014 Section",pts:3.0,category:"Design Development"},
+  {label:"Working Drawing \u2014 Floor Plan",pts:2.0,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Reflected Ceiling Plan",pts:2.0,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 External Elevation",pts:2.0,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Section Detail",pts:1.5,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Door / Window Schedule",pts:1.5,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Toilet Detail",pts:1.5,category:"Construction Documents"},
+  {label:"Structural \u2014 Foundation Layout",pts:3.0,category:"Construction Documents"},
+  {label:"Structural \u2014 Beam & Slab",pts:3.0,category:"Construction Documents"},
+  {label:"Structural \u2014 Lintel & Staircase",pts:2.5,category:"Construction Documents"},
+  {label:"Structural \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Electrical \u2014 Slab Drawing",pts:2.0,category:"Construction Documents"},
+  {label:"Electrical \u2014 Wall Drawing",pts:2.0,category:"Construction Documents"},
+  {label:"Electrical \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Plumbing \u2014 Underground Sanitation",pts:2.5,category:"Construction Documents"},
+  {label:"Plumbing \u2014 Per Floor",pts:2.0,category:"Construction Documents"},
+  {label:"Plumbing \u2014 Rainwater Disposal",pts:1.5,category:"Construction Documents"},
+  {label:"Plumbing \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Firefighting / HVAC Layout",pts:2.0,category:"Construction Documents"},
+  {label:"Firefighting / HVAC Layout \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"ID Concept \u2014 Mood Board",pts:2.0,category:"Interior Design"},
+  {label:"ID Concept \u2014 Space Planning",pts:3.0,category:"Interior Design"},
+  {label:"ID Design \u2014 2D Layout per Room",pts:2.0,category:"Interior Design"},
+  {label:"ID Design \u2014 Elevation per Room",pts:2.0,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Furniture Layout",pts:2.0,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 False Ceiling",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Flooring Pattern",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Wall Panelling",pts:2.0,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Electrical Layout",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Plumbing Layout",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Joinery Detail",pts:2.0,category:"Interior Design"},
+  {label:"Material Selection \u2014 Finishes",pts:1.5,category:"Interior Design"},
+  {label:"Material Selection \u2014 Furniture",pts:1.5,category:"Interior Design"},
+  {label:"BOQ \u2014 Interior",pts:2.0,category:"Interior Design"},
+  {label:"3D Modelling \u2014 Exterior",pts:3.0,category:"3D / Visualization"},
+  {label:"3D Modelling \u2014 Interior per Room",pts:2.0,category:"3D / Visualization"},
+  {label:"3D Rendering \u2014 Exterior View",pts:2.0,category:"3D / Visualization"},
+  {label:"3D Rendering \u2014 Interior View",pts:1.5,category:"3D / Visualization"},
+  {label:"3D Rendering \u2014 Aerial / Bird's Eye",pts:2.5,category:"3D / Visualization"},
+  {label:"Walkthrough / Animation",pts:4.0,category:"3D / Visualization"},
+  {label:"Photoshop / Post-processing",pts:1.0,category:"3D / Visualization"},
+  {label:"Presentation Deck",pts:1.5,category:"3D / Visualization"},
+  {label:"Coordination \u2014 Consultant",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Approval / Liaison \u2014 Corporation",pts:2.0,category:"Coordination / Approvals"},
+  {label:"Sale / Corporation Drawing",pts:2.0,category:"Construction Documents"},
+  {label:"Area Statement / BOQ",pts:1.5,category:"Coordination / Approvals"},
+  {label:"Procurement \u2014 Vendor Coordination",pts:1.0,category:"Coordination / Approvals"}
+];
+      VISITS = [
+  {duration:"Under 1 hour",pts:0.5},
+  {duration:"1\u20132 hours",pts:1.0},
+  {duration:"2\u20133 hours",pts:1.5},
+  {duration:"3-4 hours",pts:2.0},
+  {duration:"Half Day",pts:3.0},
+  {duration:"Full Day",pts:6.0}
+];
     } else {
-      // Fetch both in parallel
-      const [listsRes, configRes] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=getLists`),
-        fetch(`${APPS_SCRIPT_URL}?action=getConfig`)
+      const [l,c] = await Promise.all([
+        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
+        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
       ]);
-      const lists  = await listsRes.json();
-      const config = await configRes.json();
-
-      if (lists.error)  throw new Error('Lists: ' + lists.error);
-      if (config.error) throw new Error('Config: ' + config.error);
-
-      TEAM          = lists.team      || [];
-      PROJECTS      = lists.projects  || [];
-      window._EMAILS = lists.emails   || [];
-      STAGES   = config.stages   || [];
-      DISCS    = config.disciplines || [];
-      VISITS   = config.visits   || [];
+      TEAM     = l.team     || [];
+      PROJECTS = l.projects || [];
+      STAGES   = (c.stages  || []).filter(s=>s.pts>0);
+      VISITS   = c.visits   || [];
+      window._EMAILS = l.emails || [];
+      TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
+    } else {
+      // Demo fallback email map
+      EMAIL_MAP = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"};
     }
-
-    onReady();
-
-  } catch(err) {
-    document.getElementById('member-wrap').innerHTML =
-      `<div style="font-size:12px;color:var(--red);padding:8px 0">
-        Could not load data: ${err.message}<br>
-        Check your Apps Script URL and LISTS / CONFIG tabs.
-       </div>`;
-    document.getElementById('sbar-name').textContent = 'Failed to load';
-    document.getElementById('sbar-pts').textContent  = 'refresh and try again';
+    buildMemberDropdown();
+    addProject(false);
+    document.getElementById('add-proj-btn').disabled=false;
+  } catch(e) {
+    document.getElementById('sbar-name').textContent='Failed to load: '+e.message;
   }
 }
 
-function onReady() {
-  const sel = document.createElement('select');
-  sel.id = 'member-name';
-  sel.onchange = () => { updateSubmitBar(); fetchAssignedTasks(); };
-  sel.innerHTML = '<option value="">— select your name —</option>' +
-    TEAM.map(m => `<option>${m}</option>`).join('');
-  // Build email map: name → email
-  if (Array.isArray(window._EMAILS)) {
-    TEAM.forEach((name, i) => {
-      if (window._EMAILS[i]) EMAIL_MAP[name] = window._EMAILS[i];
-    });
-  }
-  // Google Sign-In handled by rendered button (g_id_onload + g_id_signin)
-  document.getElementById('member-wrap').innerHTML = '';
+function buildMemberDropdown() {
+  const sel=document.createElement('select');
+  sel.id='member-name'; sel.onchange=()=>{updateSubmitBar();fetchAssignedTasks();};
+  sel.innerHTML='<option value="">— select your name —</option>'+TEAM.map(m=>`<option>${m}</option>`).join('');
+  document.getElementById('member-wrap').innerHTML='';
   document.getElementById('member-wrap').appendChild(sel);
-
-  document.getElementById('add-proj-btn').disabled = false;
-  document.getElementById('submit-btn').disabled   = false;
-  document.getElementById('sbar-name').textContent = 'Sign in with Google to begin';
-  document.getElementById('sbar-pts').textContent  = '— pts today';
-  document.getElementById('submit-btn').disabled   = true; // disabled until Google sign-in
-
-  addProject(false);
 }
 
-// ── Fetch open assigned tasks for selected member ──────────────
-let assignedTasks = [];
+// ── Google Sign-In ────────────────────────────────────────────
+function onGoogleSignIn(response) {
+  const payload = parseJwt(response.credential);
+  handleGoogleCredential(payload);
+}
 
+function handleGoogleCredential(payload) {
+  const email   = (payload.email||'').toLowerCase();
+  const name    = payload.name||'';
+  const picture = payload.picture||'';
+  let matchedName = null;
+  Object.entries(EMAIL_MAP).forEach(([n,e])=>{ if(e.toLowerCase()===email) matchedName=n; });
+
+  if (!matchedName) {
+    document.getElementById('gsignin-confirmed').innerHTML=`
+      <div class="gblocked">✗ <strong>${email}</strong> is not registered. Contact Siddharth to get added.</div>`;
+    document.getElementById('submit-btn').disabled=true;
+    return;
+  }
+
+  googleUser={name:matchedName,email,picture};
+  const sel=document.getElementById('member-name');
+  if(sel) sel.value=matchedName;
+
+  document.getElementById('gsignin-confirmed').innerHTML=`
+    <div class="guser-confirmed">
+      ${picture?`<img class="guser-avatar" src="${picture}" alt="">`:''}
+      <div class="guser-info">
+        <div class="guser-name">${matchedName}</div>
+        <div class="guser-email">${email}</div>
+        <div class="guser-verified">✓ Verified via Google</div>
+      </div>
+      <button class="gsignout-btn" onclick="signOut()">Sign out</button>
+    </div>`;
+
+  document.getElementById('submit-btn').disabled=false;
+  updateSubmitBar();
+  fetchAssignedTasks();
+}
+
+function signOut() {
+  googleUser=null;
+  document.getElementById('gsignin-confirmed').innerHTML='';
+  document.getElementById('assigned-tasks-list').innerHTML='<div class="assigned-loading">Sign in to load your assigned tasks…</div>';
+  document.getElementById('assigned-count').textContent='sign in first';
+  document.getElementById('sbar-name').textContent='Sign in with Google to begin';
+  document.getElementById('submit-btn').disabled=true;
+  location.reload();
+}
+
+function parseJwt(token) {
+  const base64=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(atob(base64));
+}
+
+// ── Assigned Tasks ────────────────────────────────────────────
 async function fetchAssignedTasks() {
-  const member = document.getElementById('member-name')?.value;
+  const member=googleUser?googleUser.name:(document.getElementById('member-name')?.value||'');
   if (!member) return;
+  document.getElementById('assigned-tasks-list').innerHTML='<div class="assigned-loading">Loading your tasks…</div>';
+  document.getElementById('assigned-count').textContent='loading…';
 
-  document.getElementById('assigned-tasks-list').innerHTML =
-    '<div class="assigned-loading">Fetching your tasks…</div>';
-  document.getElementById('assigned-count').textContent = 'loading…';
-
-  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
-    if (demo) {
-      assignedTasks = [
-        {row:2, taskType:'Interior Design — concept', project:'Tarun Maheshwari', discipline:'Luxury Residential', units:2, weightedPts:6, targetDate:'2026-05-03', priority:'High', status:'Ongoing', notes:'Client presentation on 4th'},
-        {row:3, taskType:'Construction Documents (CD)', project:'Rohit Jain', discipline:'Luxury Residential', units:1, weightedPts:5, targetDate:'2026-05-05', priority:'Medium', status:'Upcoming', notes:''},
+    if (APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      assignedTasks=[
+        {row:2,taskType:'ID Working Drawing — False Ceiling',project:'Ajay Chordia',area:'Drawing Room',drawing:'False Ceiling Plan v1',units:1,weightedPts:2.25,targetDate:'2026-05-10',priority:'High',status:'Ongoing',notes:'Check light positions',revisionTag:'',revisionType:''},
+        {row:3,taskType:'Working Drawing — Floor Plan',project:'Multani Jewellers',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'R1',revisionType:'Internal'},
       ];
     } else {
       const res  = await fetch(`${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`);
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
       assignedTasks = data.tasks || [];
     }
     renderAssignedTasks();
   } catch(e) {
-    document.getElementById('assigned-tasks-list').innerHTML =
-      `<div class="no-tasks">Could not load tasks: ${e.message}</div>`;
-    document.getElementById('assigned-count').textContent = 'error';
+    document.getElementById('assigned-tasks-list').innerHTML=`<div class="no-tasks">Could not load tasks: ${e.message}</div>`;
+    document.getElementById('assigned-count').textContent='error';
   }
 }
 
 function renderAssignedTasks() {
-  const today = new Date().toISOString().substring(0,10);
-  document.getElementById('assigned-count').textContent =
-    assignedTasks.length ? `${assignedTasks.length} open` : 'none today';
+  const today=new Date().toISOString().substring(0,10);
+  document.getElementById('assigned-count').textContent=
+    assignedTasks.length?`${assignedTasks.length} open`:'none today ✓';
 
   if (!assignedTasks.length) {
-    document.getElementById('assigned-tasks-list').innerHTML =
-      '<div class="no-tasks">No open tasks assigned to you ✓</div>';
+    document.getElementById('assigned-tasks-list').innerHTML='<div class="no-tasks">No open tasks assigned to you ✓</div>';
     return;
   }
 
-  document.getElementById('assigned-tasks-list').innerHTML = assignedTasks.map((t,i) => {
-    const isOverdue = t.targetDate < today;
+  document.getElementById('assigned-tasks-list').innerHTML=assignedTasks.map((t,i)=>{
+    const isOverdue = t.targetDate && t.targetDate<today;
+    const isRevision = t.revisionTag || t.status==='Revision Required';
+    const defaultStatus = t.status==='Ongoing'?'Ongoing':t.status==='Revision Required'?'Ongoing':'Not Started';
     return `
-    <div class="assigned-task-card">
+    <div class="assigned-task-card${isRevision?' revision':''}">
       <div class="atc-head">
-        <div>
-          <div class="atc-type">${t.taskType}</div>
-          <div class="atc-project">${t.project}</div>
-          <div class="atc-meta" style="margin-top:5px">
-            <div class="atc-m ${isOverdue?'overdue':''}">Due: <span>${t.targetDate}${isOverdue?' ⚠':''}</span></div>
-            <div class="atc-m">Units: <span>${t.units}</span></div>
-            <div class="atc-m">Pts: <span>${t.weightedPts}</span></div>
-            <div class="atc-m">Priority: <span>${t.priority}</span></div>
-          </div>
-          ${t.notes?`<div style="font-size:11px;color:var(--text3);margin-top:5px;font-style:italic">${t.notes}</div>`:''}
+        <div class="atc-type">${t.taskType}</div>
+        <div class="atc-project">${t.project}</div>
+        ${t.area||t.drawing?`<div class="atc-area">${t.area?t.area:''}${t.area&&t.drawing?' · ':''}${t.drawing?t.drawing:''}</div>`:''}
+        ${isRevision?`<div class="atc-revision">🔴 ${t.revisionTag||'Revision Required'}${t.revisionType?' — '+t.revisionType:''}</div>`:''}
+        ${t.notes?`<div style="font-size:11px;color:var(--text3);margin-top:4px;font-style:italic">${t.notes}</div>`:''}
+        <div class="atc-meta" style="margin-top:5px">
+          <div class="atc-m ${isOverdue?'overdue':''}">Due: <span>${t.targetDate}${isOverdue?' ⚠':''}</span></div>
+          <div class="atc-m">Units: <span>${t.units}</span></div>
+          <div class="atc-m">Pts: <span>${t.weightedPts}</span></div>
+          <div class="atc-m">Priority: <span>${t.priority}</span></div>
         </div>
       </div>
       <div class="atc-status-row">
-        <label class="atc-opt">
-          <input type="radio" name="atc-${i}" value="Not Started" ${t.status==='Upcoming'?'checked':''}>
-          <span class="atc-btn ns">Not Started</span>
-        </label>
-        <label class="atc-opt">
-          <input type="radio" name="atc-${i}" value="Ongoing" ${t.status==='Ongoing'?'checked':''}>
-          <span class="atc-btn ip">Ongoing</span>
-        </label>
-        <label class="atc-opt">
-          <input type="radio" name="atc-${i}" value="Done">
-          <span class="atc-btn dn">Done</span>
-        </label>
-        <label class="atc-opt">
-          <input type="radio" name="atc-${i}" value="Blocked">
-          <span class="atc-btn bl">Blocked</span>
-        </label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Not Started" ${defaultStatus==='Not Started'?'checked':''}><span class="atc-btn ns">Not Started</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Ongoing" ${defaultStatus==='Ongoing'?'checked':''}><span class="atc-btn ip">Ongoing</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Done"><span class="atc-btn dn">Done ✓</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Blocked"><span class="atc-btn bl">Blocked</span></label>
       </div>
     </div>`;
   }).join('');
 }
 
-// ── Build option strings from loaded data ──────────────────────
+// ── Project blocks (unplanned work) ──────────────────────────
+function projOptions() {
+  return '<option value="">— select project —</option>'+
+    PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
+}
 function stageOptions() {
-  return '<option value="">— select task type —</option>' +
-    STAGES.map((s,i) => `<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
+  return '<option value="">— select task type —</option>'+
+    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
 }
-
-function discOptions() {
-  return '<option value="">— select discipline —</option>' +
-    DISCS.map((d,i) => `<option value="${i}">${d.label}</option>`).join('');
-}
-
 function visitDurOptions() {
-  return VISITS.map(v =>
-    `<option value="${v.duration}">${v.duration} · ${v.pts}pts</option>`
-  ).join('');
+  return VISITS.map(v=>`<option value="${v.duration}">${v.duration} · ${v.pts}pts</option>`).join('');
 }
 
-// ── Project block ──────────────────────────────────────────────
-function addProject(removable = true) {
-  if (projCount >= 3) return;
+function addProject(removable=true) {
+  if (projCount>=3) return;
   projCount++;
-  const id = `pb${projCount}`;
-
-  const projOpts = '<option value="">— select project —</option>' +
-    PROJECTS.map(p => `<option>${p}</option>`).join('');
-
-  const div = document.createElement('div');
-  div.className = 'proj-block';
-  div.id = id;
-  div.innerHTML = `
+  const id=`pb${projCount}`;
+  const div=document.createElement('div');
+  div.className='proj-block'; div.id=id;
+  div.innerHTML=`
     <div class="proj-head">
       <div class="proj-title">PROJECT ${projCount}</div>
-      ${removable ? `<button class="proj-remove" onclick="removeProject('${id}')">✕ Remove</button>` : ''}
+      ${removable?`<button class="proj-remove" onclick="removeProject('${id}')">✕ Remove</button>`:''}
     </div>
     <div class="proj-body">
       <div class="field">
-        <div class="lbl">Project name <span class="req">*</span></div>
-        <select class="p-name" onchange="calcScore()">${projOpts}</select>
+        <div class="lbl">Project <span class="req">*</span></div>
+        <select class="p-name" onchange="onProjSelect(this)">${projOptions()}</select>
       </div>
       <div class="field">
-        <div class="lbl">Discipline &amp; scale <span class="req">*</span></div>
-        <select class="p-disc" onchange="calcScore()">${discOptions()}</select>
+        <div class="lbl">Discipline <span style="font-size:10px;color:var(--text3)">auto from project</span></div>
+        <div class="auto-disc p-disc-display">— select project first —</div>
       </div>
       <div class="divider"></div>
       <div class="field">
         <div class="lbl">Tasks completed on this project</div>
         <div class="task-thead">
-          <div class="task-th">Task type</div>
-          <div class="task-th">Units</div>
-          <div class="task-th">Pts</div>
-          <div></div>
+          <div class="task-th">Task type</div><div class="task-th">Units</div>
+          <div class="task-th">Pts</div><div></div>
         </div>
         <div class="task-rows" id="${id}-tasks"></div>
         <button class="add-task" onclick="addTask('${id}-tasks')">
@@ -614,8 +680,7 @@ function addProject(removable = true) {
             <div class="field" style="margin-bottom:0">
               <div class="lbl">Visit type</div>
               <select class="p-vtype">
-                <option>Client meeting</option>
-                <option>Site visit</option>
+                <option>Client meeting</option><option>Site visit</option>
                 <option>Client meeting + site visit</option>
               </select>
             </div>
@@ -630,39 +695,47 @@ function addProject(removable = true) {
           </div>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('proj-blocks').appendChild(div);
   addTask(`${id}-tasks`);
-  if (projCount >= 3) document.getElementById('add-proj-btn').disabled = true;
+  if (projCount>=3) document.getElementById('add-proj-btn').disabled=true;
   calcScore();
 }
 
 function removeProject(id) {
   document.getElementById(id).remove();
   projCount--;
-  document.getElementById('add-proj-btn').disabled = false;
+  document.getElementById('add-proj-btn').disabled=false;
   calcScore();
 }
 
 function addTask(containerId) {
-  const row = document.createElement('div');
-  row.className = 'task-row';
-  row.innerHTML = `
+  const row=document.createElement('div');
+  row.className='task-row';
+  row.innerHTML=`
     <select class="t-type" onchange="refreshTaskPts(this);calcScore()">${stageOptions()}</select>
     <input type="number" class="t-units" min="1" max="30" value="1" oninput="calcScore()">
     <div class="task-pts">—</div>
-    <button class="rm-task" type="button" onclick="this.closest('.task-row').remove();calcScore()">×</button>
-  `;
+    <button class="rm-task" type="button" onclick="this.closest('.task-row').remove();calcScore()">×</button>`;
   document.getElementById(containerId).appendChild(row);
 }
 
 function refreshTaskPts(sel) {
-  const idx  = parseInt(sel.value);
-  const pts  = STAGES[idx] ? STAGES[idx].pts : 0;
-  const disp = sel.closest('.task-row').querySelector('.task-pts');
-  disp.textContent = pts ? pts + 'p' : '—';
-  disp.className   = pts ? 'task-pts lit' : 'task-pts';
+  const idx=parseInt(sel.value), pts=STAGES[idx]?.pts||0;
+  const disp=sel.closest('.task-row').querySelector('.task-pts');
+  disp.textContent=pts?pts+'p':'—'; disp.className=pts?'task-pts lit':'task-pts';
+}
+
+function onProjSelect(sel) {
+  const idx=parseInt(sel.value);
+  const proj=(!isNaN(idx)&&PROJECTS[idx])?PROJECTS[idx]:null;
+  const pb=sel.closest('.proj-block');
+  const disp=pb?pb.querySelector('.p-disc-display'):null;
+  if (disp) {
+    if (proj){ disp.textContent=proj.discipline+' · '+proj.multiplier+'x'; disp.style.color='var(--accent)'; }
+    else { disp.textContent='— select project first —'; disp.style.color='var(--text2)'; }
+  }
+  calcScore();
 }
 
 function toggleVisit(id) {
@@ -670,222 +743,116 @@ function toggleVisit(id) {
   document.getElementById(`${id}-vd`).classList.toggle('open');
 }
 
-// ── Score calculation ──────────────────────────────────────────
 function calcScore() {
-  let totalPts = 0, totalUnits = 0, projTouched = 0;
-
-  document.querySelectorAll('.proj-block').forEach(pb => {
-    const discIdx = parseInt(pb.querySelector('.p-disc')?.value);
-    const mult    = (!isNaN(discIdx) && DISCS[discIdx]) ? DISCS[discIdx].multiplier : 1;
-    const hasProj = pb.querySelector('.p-name')?.value;
-    if (hasProj) projTouched++;
-
-    // task pts
-    pb.querySelectorAll('.task-row').forEach(tr => {
-      const idx   = parseInt(tr.querySelector('.t-type')?.value);
-      const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
-      const units = parseFloat(tr.querySelector('.t-units')?.value) || 1;
-      if (stage && stage.pts) {
-        const earned = stage.pts * mult * units;
-        totalPts  += earned;
-        totalUnits += units;
-        const disp = tr.querySelector('.task-pts');
-        disp.textContent = earned.toFixed(1) + 'p';
-        disp.className   = 'task-pts lit';
+  let totalPts=0, totalUnits=0, projTouched=0;
+  document.querySelectorAll('.proj-block').forEach(pb=>{
+    const pnIdx=parseInt(pb.querySelector('.p-name')?.value);
+    const proj=(!isNaN(pnIdx)&&PROJECTS[pnIdx])?PROJECTS[pnIdx]:null;
+    const mult=proj?proj.multiplier:1;
+    if (proj) projTouched++;
+    pb.querySelectorAll('.task-row').forEach(tr=>{
+      const idx=parseInt(tr.querySelector('.t-type')?.value);
+      const stage=(!isNaN(idx)&&STAGES[idx])?STAGES[idx]:null;
+      const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
+      if (stage&&stage.pts){
+        const earned=stage.pts*mult*units; totalPts+=earned; totalUnits+=units;
+        const disp=tr.querySelector('.task-pts');
+        disp.textContent=earned.toFixed(1)+'p'; disp.className='task-pts lit';
       }
     });
-
-    // visit pts — read live from VISITS array by selected duration
-    const tog = document.getElementById(`${pb.id}-tog`);
-    if (tog && tog.classList.contains('on')) {
-      const vdurSel = pb.querySelector('.p-vdur');
-      const vdur    = vdurSel ? vdurSel.value : '';
-      const vEntry  = VISITS.find(v => v.duration === vdur);
-      if (vEntry) {
-        totalPts += vEntry.pts;
-        totalUnits += 1;
-      }
+    const tog=document.getElementById(`${pb.id}-tog`);
+    if (tog&&tog.classList.contains('on')){
+      const vdur=pb.querySelector('.p-vdur')?.value||'';
+      const vEntry=VISITS.find(v=>v.duration===vdur);
+      if (vEntry){ totalPts+=vEntry.pts; totalUnits+=1; }
     }
   });
-
-  document.getElementById('sc-pts').textContent   = totalPts.toFixed(1);
-  document.getElementById('sc-units').textContent = totalUnits;
-  document.getElementById('sc-proj').textContent  = projTouched;
-  document.getElementById('sbar-pts').textContent = `${totalPts.toFixed(1)} weighted pts today`;
-}
-
-// ── Google Sign-In ────────────────────────────────────────────
-// Called by Google's rendered button — global scope required
-function onGoogleSignIn(response) {
-  const payload = parseJwt(response.credential);
-  handleGoogleCredential(payload);
-}
-
-function handleGoogleCredential(payload) {
-  const email   = (payload.email || '').toLowerCase();
-  const name    = payload.name  || '';
-  const picture = payload.picture || '';
-
-  // Match email against LISTS tab EMAIL_MAP
-  let matchedName = null;
-  Object.entries(EMAIL_MAP).forEach(([n, e]) => {
-    if (e.toLowerCase() === email) matchedName = n;
-  });
-
-  if (!matchedName) {
-    const conf = document.getElementById('gsignin-confirmed');
-    conf.style.display = 'block';
-    conf.innerHTML = `
-      <div class="gblocked" style="margin-top:8px">
-        ✗ <strong>${email}</strong> is not registered in the system.<br>
-        Contact Siddharth to get added to the team list.
-      </div>`;
-    document.getElementById('submit-btn').disabled = true;
-    return;
-  }
-
-  // Set verified user
-  googleUser = {name: matchedName, email, picture};
-
-  // Auto-select name in hidden dropdown
-  const sel = document.getElementById('member-name');
-  sel.value = matchedName;
-
-  // Show verified user card below the Google button
-  const confirmed = document.getElementById('gsignin-confirmed');
-  confirmed.style.display = 'block';
-  confirmed.innerHTML = `
-    <div class="guser-confirmed" style="margin-top:8px">
-      ${picture ? `<img class="guser-avatar" src="${picture}" alt="">` : ''}
-      <div class="guser-info">
-        <div class="guser-name">${matchedName}</div>
-        <div class="guser-email">${email}</div>
-        <div class="guser-verified">✓ Verified via Google</div>
-      </div>
-      <button class="gsignout-btn" onclick="signOut()">Sign out</button>
-    </div>`;
-
-  document.getElementById('submit-btn').disabled = false;
-  updateSubmitBar();
-  fetchAssignedTasks();
-}
-
-function signOut() {
-  googleUser = null;
-  document.getElementById('gsignin-confirmed').style.display = 'none';
-  document.getElementById('gsignin-confirmed').innerHTML = '';
-  // Reload page to reset Google button state cleanly
-  location.reload();
-  document.getElementById('assigned-tasks-list').innerHTML =
-    '<div class="assigned-loading">Select your name to load tasks…</div>';
-  document.getElementById('assigned-count').textContent = 'loading…';
-  document.getElementById('sbar-name').textContent = 'Sign in to begin';
-  document.getElementById('submit-btn').disabled = true;
-}
-
-function parseJwt(token) {
-  const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-  return JSON.parse(atob(base64));
+  document.getElementById('sc-pts').textContent=totalPts.toFixed(1);
+  document.getElementById('sc-units').textContent=totalUnits;
+  document.getElementById('sc-proj').textContent=projTouched;
+  document.getElementById('sbar-pts').textContent=`${totalPts.toFixed(1)} weighted pts today`;
 }
 
 function updateSubmitBar() {
-  const name = googleUser ? googleUser.name : (document.getElementById('member-name')?.value || '');
-  document.getElementById('sbar-name').textContent = name || 'Sign in with Google to begin';
+  const name=googleUser?googleUser.name:(document.getElementById('member-name')?.value||'');
+  document.getElementById('sbar-name').textContent=name||'Sign in with Google to begin';
 }
 
-// ── Collect & flatten ──────────────────────────────────────────
 function collectData() {
-  // Collect assigned task statuses
-  const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value || '');
-  const assignedStatuses = assignedTasks.map((t,i) => ({
-    row      : t.row,
-    member   : member,
-    taskType : t.taskType,
-    project  : t.project,
-    status   : document.querySelector(`input[name="atc-${i}"]:checked`)?.value || 'Not Started',
+  const member=googleUser?googleUser.name:(document.getElementById('member-name')?.value||'');
+  const assignedStatuses=assignedTasks.map((t,i)=>({
+    row:t.row, member:member, taskType:t.taskType, project:t.project,
+    area:t.area||'', drawing:t.drawing||'',
+    status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
   }));
 
-  const data = {
+  const data={
     'Timestamp'         : new Date().toISOString(),
-    'Member'            : document.getElementById('member-name')?.value || '',
-    'Member Email'      : googleUser ? googleUser.email : '',
+    'Member'            : member,
+    'Member Email'      : googleUser?googleUser.email:'',
     'Assigned Statuses' : JSON.stringify(assignedStatuses),
-    'Arrived on Time'   : document.querySelector('input[name=ontime]:checked')?.value || '',
-    'Referrals Today'   : parseInt(document.getElementById('referrals').value) || 0,
+    'Arrived on Time'   : document.querySelector('input[name=ontime]:checked')?.value||'',
+    'Referrals Today'   : parseInt(document.getElementById('referrals').value)||0,
     'Deliverables List' : document.getElementById('deliverables').value.trim(),
     'Blockers'          : document.getElementById('blockers').value.trim(),
-    'Mood Score'        : document.querySelector('input[name=mood]:checked')?.value || '3',
-    'Total Weighted Pts': parseFloat(document.getElementById('sc-pts').textContent) || 0,
-    'Total Task Units'  : parseInt(document.getElementById('sc-units').textContent)  || 0,
-    'Projects Count'    : parseInt(document.getElementById('sc-proj').textContent)   || 0,
+    'Mood Score'        : document.querySelector('input[name=mood]:checked')?.value||'3',
+    'Total Weighted Pts': parseFloat(document.getElementById('sc-pts').textContent)||0,
+    'Total Task Units'  : parseInt(document.getElementById('sc-units').textContent)||0,
+    'Projects Count'    : parseInt(document.getElementById('sc-proj').textContent)||0,
   };
 
-  let pi = 0;
-  document.querySelectorAll('.proj-block').forEach(pb => {
-    const pname = pb.querySelector('.p-name')?.value;
-    if (!pname) return;
+  let pi=0;
+  document.querySelectorAll('.proj-block').forEach(pb=>{
+    const pnIdx=parseInt(pb.querySelector('.p-name')?.value);
+    const proj=(!isNaN(pnIdx)&&PROJECTS[pnIdx])?PROJECTS[pnIdx]:null;
+    if (!proj) return;
     pi++;
-
-    const discIdx = parseInt(pb.querySelector('.p-disc')?.value);
-    const disc    = (!isNaN(discIdx) && DISCS[discIdx]) ? DISCS[discIdx] : {label:'', multiplier:1};
-    const tasks   = [];
-
-    pb.querySelectorAll('.task-row').forEach(tr => {
-      const idx   = parseInt(tr.querySelector('.t-type')?.value);
-      const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
-      if (!stage || !stage.pts) return;
-      const units  = parseFloat(tr.querySelector('.t-units')?.value) || 1;
-      const earned = (stage.pts * disc.multiplier * units).toFixed(1);
+    const tasks=[];
+    pb.querySelectorAll('.task-row').forEach(tr=>{
+      const idx=parseInt(tr.querySelector('.t-type')?.value);
+      const stage=(!isNaN(idx)&&STAGES[idx])?STAGES[idx]:null;
+      if (!stage||!stage.pts) return;
+      const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
+      const earned=(stage.pts*proj.multiplier*units).toFixed(1);
       tasks.push(`${stage.label} ×${units} = ${earned}pts`);
     });
-
-    const hasVisit = document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
-    const vdur     = pb.querySelector('.p-vdur')?.value || '';
-    const vtype    = pb.querySelector('.p-vtype')?.value || '';
-
-    data[`P${pi} Name`]        = pname;
-    data[`P${pi} Discipline`]  = disc.label;
-    data[`P${pi} Multiplier`]  = disc.multiplier;
+    const hasVisit=document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
+    const vdur=pb.querySelector('.p-vdur')?.value||'';
+    const vtype=pb.querySelector('.p-vtype')?.value||'';
+    data[`P${pi} Name`]        = proj.name;
+    data[`P${pi} Discipline`]  = proj.discipline;
+    data[`P${pi} Multiplier`]  = proj.multiplier;
     data[`P${pi} Tasks`]       = tasks.join(' | ');
-    data[`P${pi} Visit`]       = hasVisit ? `${vtype} · ${vdur}` : 'No';
-    data[`P${pi} Visit Notes`] = hasVisit ? pb.querySelector('.p-vnotes')?.value || '' : '';
+    data[`P${pi} Visit`]       = hasVisit?`${vtype} · ${vdur}`:'No';
+    data[`P${pi} Visit Notes`] = hasVisit?pb.querySelector('.p-vnotes')?.value||'':'';
   });
-
   return data;
 }
 
-// ── Validate ───────────────────────────────────────────────────
 function validate(d) {
-  if (!googleUser && GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com') {
-    toast('Please sign in with Google first'); return false;
-  }
-  if (!d['Member'])            { toast('Please select your name');             return false; }
-  if (!d['Arrived on Time'])   { toast('Please mark your arrival time');       return false; }
-  if (!d['Deliverables List']) { toast("Fill in today's deliverables");        return false; }
-  if (!d['Projects Count'])    { toast('Add at least one project with tasks'); return false; }
+  if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
+  if (!d['Member'])            { toast('Please select your name');              return false; }
+  if (!d['Arrived on Time'])   { toast('Please mark your arrival time');        return false; }
+  if (!d['Deliverables List']) { toast("Fill in today's deliverables");         return false; }
   return true;
 }
 
-// ── Submit ─────────────────────────────────────────────────────
 async function submitForm() {
-  const data = collectData();
+  const data=collectData();
   if (!validate(data)) return;
   document.getElementById('sending').classList.add('show');
   try {
-    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', APPS_SCRIPT_URL, true);
-        xhr.setRequestHeader('Content-Type', 'text/plain');
-        xhr.onload  = () => resolve();
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(JSON.stringify(data));
+    if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      await new Promise((res,rej)=>{
+        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
+        xhr.setRequestHeader('Content-Type','text/plain');
+        xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(data));
       });
     }
     document.getElementById('sending').classList.remove('show');
-    document.getElementById('fin-pts').textContent   = data['Total Weighted Pts'].toFixed(1);
-    document.getElementById('fin-units').textContent = data['Total Task Units'];
-    document.getElementById('fin-proj').textContent  = data['Projects Count'];
+    document.getElementById('fin-pts').textContent=data['Total Weighted Pts'].toFixed(1);
+    document.getElementById('fin-units').textContent=data['Total Task Units'];
+    document.getElementById('fin-proj').textContent=data['Projects Count'];
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
@@ -894,10 +861,9 @@ async function submitForm() {
 }
 
 function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2800);
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2800);
 }
 </script>
 </body>
