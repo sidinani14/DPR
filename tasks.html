@@ -6,62 +6,32 @@
 <title>IDS · Task Assignment</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#0F0F0F;--surface:#1A1A1A;--surface2:#222;--surface3:#2A2A2A;
-  --border:#2E2E2E;--border2:#3A3A3A;
-  --text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;
-  --accent:#C8A96E;--accent-light:rgba(200,169,110,.1);
-  --green:#4A9B6F;--green-light:rgba(74,155,111,.12);
-  --red:#C05050;--red-light:rgba(192,80,80,.12);
-  --amber:#C8863A;--amber-light:rgba(200,134,58,.12);
-  --radius:10px;--radius-sm:6px;
-}
+:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#222;--surface3:#2A2A2A;--border:#2E2E2E;--border2:#3A3A3A;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--accent-light:rgba(200,169,110,.1);--green:#4A9B6F;--green-light:rgba(74,155,111,.12);--red:#C05050;--red-light:rgba(192,80,80,.12);--amber:#C8863A;--amber-light:rgba(200,134,58,.12);--radius:10px;--radius-sm:6px}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px}
-
 .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px;position:sticky;top:0;z-index:100}
 .header-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
 .logo-text{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--accent)}
 .logo-sub{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px}
-.header-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-align:right}
-
+.header-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
 .page{max-width:640px;margin:0 auto;padding:20px}
-
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
 .card-head{padding:13px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text)}
 .card-sub{font-size:11px;color:var(--text3);margin-left:auto;font-family:'DM Mono',monospace}
 .card-body{padding:16px 18px}
-
 .field{margin-bottom:12px}.field:last-child{margin-bottom:0}
 .lbl{font-size:10px;color:var(--text2);margin-bottom:5px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:4px}
 .req{color:var(--red)}.opt{color:var(--text3)}
-
-select,input[type=text],input[type=date],input[type=number],textarea{
-  width:100%;font-family:'DM Sans',sans-serif;font-size:13px;
-  color:var(--text);background:var(--surface2);
-  border:1px solid var(--border);border-radius:var(--radius-sm);
-  padding:9px 12px;outline:none;appearance:none;-webkit-appearance:none;
-  transition:border-color .15s;
-}
+select,input[type=text],input[type=date],input[type=number],textarea{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .15s}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235A5652' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 select:focus,input:focus,textarea:focus{border-color:var(--accent);background:var(--surface3)}
 input[type=date]{color-scheme:dark}
 textarea{resize:vertical;min-height:60px;line-height:1.5}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.row3{display:grid;grid-template-columns:1fr 1fr 80px;gap:10px}
-.divider{height:1px;background:var(--border);margin:14px 0}
-
-/* priority */
-.pri-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:5px}
-.pri-opt{cursor:pointer;text-align:center}
-.pri-opt input{display:none}
-.pri-btn{display:block;padding:8px 4px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s}
-.pri-opt input:checked+.pri-btn.low{border-color:var(--green);background:var(--green-light);color:var(--green);font-weight:500}
-.pri-opt input:checked+.pri-btn.med{border-color:var(--amber);background:var(--amber-light);color:var(--amber);font-weight:500}
-.pri-opt input:checked+.pri-btn.high{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
-
-/* task block */
+.row3{display:grid;grid-template-columns:1fr 1fr 80px;gap:8px}
+.divider{height:1px;background:var(--border);margin:13px 0}
+.auto-display{font-size:13px;color:var(--accent);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Mono',monospace}
 .task-block{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden}
 .task-block:last-child{margin-bottom:0}
 .task-block-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
@@ -69,28 +39,25 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 .task-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .task-remove:hover{color:var(--red);border-color:var(--red)}
 .task-block-body{padding:13px 14px}
-
-/* pts preview */
 .pts-preview{background:var(--accent-light);border:1px solid rgba(200,169,110,.2);border-radius:var(--radius-sm);padding:8px 12px;margin-top:10px;display:flex;align-items:center;justify-content:space-between}
 .pts-label{font-size:11px;color:var(--accent);font-family:'DM Mono',monospace}
-.pts-value{font-size:16px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
-
-/* add task btn */
+.pts-val{font-size:16px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
+.rev-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.rev-opt{cursor:pointer}
+.rev-opt input{display:none}
+.rev-btn{display:block;padding:8px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;text-align:center}
+.rev-opt input:checked+.rev-btn.orig{border-color:var(--green);background:var(--green-light);color:var(--green);font-weight:500}
+.rev-opt input:checked+.rev-btn.int{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
+.rev-opt input:checked+.rev-btn.cli{border-color:var(--amber);background:var(--amber-light);color:var(--amber);font-weight:500}
 .add-task-btn{width:100%;padding:11px;font-size:13px;color:var(--accent);background:var(--accent-light);border:1px dashed rgba(200,169,110,.3);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
 .add-task-btn:hover{background:rgba(200,169,110,.18)}
 .add-task-btn:disabled{opacity:.35;cursor:not-allowed}
-
-/* total strip */
-.total-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.total-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;display:none}
 .total-label{font-size:12px;color:var(--text2);font-family:'DM Mono',monospace}
 .total-value{font-size:20px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
 .total-count{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;text-align:right}
-
-/* skeleton */
 .skeleton{height:40px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm)}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-/* submit bar */
 .submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;z-index:100}
 .submit-bar-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:12px}
 .sbar-info{flex:1}
@@ -99,8 +66,6 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 .submit-btn{padding:11px 28px;background:var(--accent);color:#0F0F0F;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;white-space:nowrap;transition:opacity .15s;flex-shrink:0}
 .submit-btn:hover{opacity:.85}
 .submit-btn:disabled{opacity:.3;cursor:not-allowed}
-
-/* overlays */
 .sending{display:none;position:fixed;inset:0;background:rgba(15,15,15,.92);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px}
 .sending.show{display:flex}
 .spinner{width:34px;height:34px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
@@ -111,34 +76,23 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 .success-icon{width:56px;height:56px;border-radius:50%;background:var(--green-light);border:1.5px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
 .success-icon svg{width:24px;height:24px;stroke:var(--green)}
 .success-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px}
-.success-sub{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px;max-width:340px}
+.success-sub{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px;max-width:360px}
 .close-btn{padding:10px 24px;background:var(--accent);color:#0F0F0F;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
 .toast.show{opacity:1}
-
 @media(max-width:420px){.row2,.row3{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
 <header class="header">
   <div class="header-inner">
-    <div>
-      <div class="logo-text">Ideaform Design Studio</div>
-      <div class="logo-sub">Task Assignment</div>
-    </div>
+    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Task Assignment</div></div>
     <div class="header-date" id="header-date"></div>
   </div>
 </header>
-
 <div class="page">
-
-  <!-- Who is assigning + who to -->
   <div class="card">
-    <div class="card-head">
-      <div class="card-title">Assignment details</div>
-      <div class="card-sub">required</div>
-    </div>
+    <div class="card-head"><div class="card-title">Assignment details</div><div class="card-sub">required</div></div>
     <div class="card-body">
       <div class="row2">
         <div class="field">
@@ -161,18 +115,14 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
         </div>
       </div>
       <div class="field">
-        <div class="lbl">Discipline <span class="req">*</span></div>
-        <div id="disc-wrap"><div class="skeleton"></div></div>
+        <div class="lbl">Discipline <span style="font-size:10px;color:var(--text3)">auto from project</span></div>
+        <div class="auto-display" id="disc-display">— select project first —</div>
       </div>
     </div>
   </div>
 
-  <!-- Tasks -->
   <div class="card">
-    <div class="card-head">
-      <div class="card-title">Tasks</div>
-      <div class="card-sub" id="task-count">0 tasks</div>
-    </div>
+    <div class="card-head"><div class="card-title">Tasks</div><div class="card-sub" id="task-count">0 tasks</div></div>
     <div class="card-body">
       <div id="task-blocks"></div>
       <button class="add-task-btn" id="add-task-btn" onclick="addTask()" disabled>
@@ -182,21 +132,16 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
     </div>
   </div>
 
-  <!-- Total -->
-  <div class="total-strip" id="total-strip" style="display:none">
-    <div>
-      <div class="total-label">Total weighted points</div>
-      <div class="total-count" id="total-count"></div>
-    </div>
+  <div class="total-strip" id="total-strip">
+    <div><div class="total-label">Total weighted points</div><div class="total-count" id="total-count"></div></div>
     <div class="total-value" id="total-pts">0.0</div>
   </div>
-
 </div>
 
 <div class="submit-bar">
   <div class="submit-bar-inner">
     <div class="sbar-info">
-      <div class="sbar-name" id="sbar-name">Loading team list…</div>
+      <div class="sbar-name" id="sbar-name">Loading…</div>
       <div class="sbar-sub" id="sbar-sub">fill all required fields</div>
     </div>
     <button class="submit-btn" id="submit-btn" onclick="submitTasks()" disabled>Assign Tasks</button>
@@ -204,26 +149,22 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 </div>
 
 <div class="sending" id="sending"><div class="spinner"></div><div class="sending-txt">Saving tasks…</div></div>
-
 <div class="success" id="success">
   <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 7"/></svg></div>
   <div class="success-title">Tasks Assigned!</div>
   <div class="success-sub" id="success-sub"></div>
   <button class="close-btn" onclick="resetForm()">Assign More Tasks</button>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+let TEAM=[], PROJECTS=[], STAGES=[];
+let taskCount=0;
 
-let TEAM = [], PROJECTS = [], STAGES = [], DISCS = [];
-let taskCount = 0;
-
-// ── Init ───────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-date').textContent =
-    new Date().toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'});
+    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
   fetchAll();
 });
 
@@ -231,79 +172,155 @@ async function fetchAll() {
   const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
-      TEAM     = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Minakshi Gokhale','Himanshu Malviya','Muskan Jain','Monika Bhartiya','Sahil Maurya','Yash Sahu','Aman Raghuvanshi','Tanish Tukdiya'];
-      PROJECTS = ['Sharma Grand Residence','Kapoor Farmhouse','Bhopal IT Tower A','Indore Skyline Residences','Taj Convention Centre','La Maison Boutique','Grand Meridian Hotel','Narmada Greens Township'];
-      STAGES   = [{label:'Concept / Schematic',pts:3},{label:'Design Development (DD)',pts:4},{label:'Construction Documents (CD)',pts:5},{label:'Interior Design (ID)',pts:3},{label:'3D / Visualization',pts:2},{label:'Coordination / Approvals',pts:2},{label:'Site Supervision',pts:1},{label:'Client Meeting',pts:1},{label:'Site Visit',pts:1}];
-      DISCS    = [{label:'Luxury Residential — small (<10k sft)',multiplier:1.0},{label:'Luxury Residential — large (>10k sft)',multiplier:1.5},{label:'High-rise Commercial',multiplier:2.0},{label:'High-rise Residential',multiplier:1.8},{label:'Township / Plotted Dev.',multiplier:1.8},{label:'Hospitality Boutique (<50 keys)',multiplier:1.2},{label:'Hospitality Mid (50-150 keys)',multiplier:1.8},{label:'Hospitality 5-star (150+ keys)',multiplier:2.5}];
+      TEAM     = ['Achal Rathore','Deepak Soni','Bhavesh Bhagwat','Sahil Maurya','Aman Raghuvanshi'];
+      PROJECTS = [
+        {id:'P001',name:'Ajay Chordia',discipline:'Luxury Residential (Large >8k sft)',multiplier:1.5,status:'Ongoing'},
+        {id:'P002',name:'Rohit Jain',discipline:'Premium Residential (Small <8k sft)',multiplier:1.0,status:'Ongoing'},
+        {id:'P011',name:'Multani Jewellers',discipline:'Commercial (Small <5k sft)',multiplier:1.0,status:'Ongoing'},
+      ];
+      STAGES = [
+        {label:'Concept / Schematic — Layout',pts:3,category:'Concept / Schematic'},
+        {label:'Design Development — Plan',pts:4,category:'Design Development'},
+        {label:'Construction Documents — Architectural',pts:5,category:'Construction Documents'},
+        {label:'ID Working Drawing — False Ceiling',pts:1.5,category:'Interior Design'},
+        {label:'3D Rendering — Interior View',pts:1.5,category:'3D / Visualization'},
+      ];
     } else {
-      const [l, c] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r => r.json()),
-        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r => r.json()),
+      const [l,c] = await Promise.all([
+        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
+        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
       ]);
-      if (l.error) throw new Error(l.error);
-      if (c.error) throw new Error(c.error);
-      TEAM     = l.team        || [];
-      PROJECTS = l.projects    || [];
-      STAGES   = c.stages      || [];
-      DISCS    = c.disciplines || [];
+      TEAM     = l.team     || [];
+      PROJECTS = l.projects || [];
+      STAGES   = (c.stages  || []).filter(s => s.pts > 0);
+    } else {
+      STAGES   = [
+  {label:"Concept / Schematic \u2014 Layout",pts:3.0,category:"Concept / Schematic"},
+  {label:"Concept / Schematic \u2014 3D Massing",pts:2.0,category:"Concept / Schematic"},
+  {label:"Design Development \u2014 Plan",pts:4.0,category:"Design Development"},
+  {label:"Design Development \u2014 Elevation",pts:3.0,category:"Design Development"},
+  {label:"Design Development \u2014 Section",pts:3.0,category:"Design Development"},
+  {label:"Working Drawing \u2014 Floor Plan",pts:2.0,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Reflected Ceiling Plan",pts:2.0,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 External Elevation",pts:2.0,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Section Detail",pts:1.5,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Door / Window Schedule",pts:1.5,category:"Construction Documents"},
+  {label:"Working Drawing \u2014 Toilet Detail",pts:1.5,category:"Construction Documents"},
+  {label:"Structural \u2014 Foundation Layout",pts:3.0,category:"Construction Documents"},
+  {label:"Structural \u2014 Beam & Slab",pts:3.0,category:"Construction Documents"},
+  {label:"Structural \u2014 Lintel & Staircase",pts:2.5,category:"Construction Documents"},
+  {label:"Structural \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Electrical \u2014 Slab Drawing",pts:2.0,category:"Construction Documents"},
+  {label:"Electrical \u2014 Wall Drawing",pts:2.0,category:"Construction Documents"},
+  {label:"Electrical \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Plumbing \u2014 Underground Sanitation",pts:2.5,category:"Construction Documents"},
+  {label:"Plumbing \u2014 Per Floor",pts:2.0,category:"Construction Documents"},
+  {label:"Plumbing \u2014 Rainwater Disposal",pts:1.5,category:"Construction Documents"},
+  {label:"Plumbing \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Firefighting / HVAC Layout",pts:2.0,category:"Construction Documents"},
+  {label:"Firefighting / HVAC Layout \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
+  {label:"ID Concept \u2014 Mood Board",pts:2.0,category:"Interior Design"},
+  {label:"ID Concept \u2014 Space Planning",pts:3.0,category:"Interior Design"},
+  {label:"ID Design \u2014 2D Layout per Room",pts:2.0,category:"Interior Design"},
+  {label:"ID Design \u2014 Elevation per Room",pts:2.0,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Furniture Layout",pts:2.0,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 False Ceiling",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Flooring Pattern",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Wall Panelling",pts:2.0,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Electrical Layout",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Plumbing Layout",pts:1.5,category:"Interior Design"},
+  {label:"ID Working Drawing \u2014 Joinery Detail",pts:2.0,category:"Interior Design"},
+  {label:"Material Selection \u2014 Finishes",pts:1.5,category:"Interior Design"},
+  {label:"Material Selection \u2014 Furniture",pts:1.5,category:"Interior Design"},
+  {label:"BOQ \u2014 Interior",pts:2.0,category:"Interior Design"},
+  {label:"3D Modelling \u2014 Exterior",pts:3.0,category:"3D / Visualization"},
+  {label:"3D Modelling \u2014 Interior per Room",pts:2.0,category:"3D / Visualization"},
+  {label:"3D Rendering \u2014 Exterior View",pts:2.0,category:"3D / Visualization"},
+  {label:"3D Rendering \u2014 Interior View",pts:1.5,category:"3D / Visualization"},
+  {label:"3D Rendering \u2014 Aerial / Bird's Eye",pts:2.5,category:"3D / Visualization"},
+  {label:"Walkthrough / Animation",pts:4.0,category:"3D / Visualization"},
+  {label:"Photoshop / Post-processing",pts:1.0,category:"3D / Visualization"},
+  {label:"Presentation Deck",pts:1.5,category:"3D / Visualization"},
+  {label:"Coordination \u2014 Consultant",pts:1.0,category:"Coordination / Approvals"},
+  {label:"Approval / Liaison \u2014 Corporation",pts:2.0,category:"Coordination / Approvals"},
+  {label:"Sale / Corporation Drawing",pts:2.0,category:"Construction Documents"},
+  {label:"Area Statement / BOQ",pts:1.5,category:"Coordination / Approvals"},
+  {label:"Procurement \u2014 Vendor Coordination",pts:1.0,category:"Coordination / Approvals"}
+];
     }
-    buildSelects();
-  } catch(err) {
-    document.getElementById('sbar-name').textContent = 'Failed to load: ' + err.message;
+    buildForm();
+  } catch(e) {
+    document.getElementById('sbar-name').textContent = 'Failed to load: '+e.message;
   }
 }
 
-function buildSelects() {
-  const teamOpts = '<option value="">— select —</option>' + TEAM.map(t => `<option>${t}</option>`).join('');
-  const projOpts = '<option value="">— select —</option>' + PROJECTS.map(p => `<option>${p}</option>`).join('');
-  const discOpts = '<option value="">— select discipline —</option>' + DISCS.map((d,i) => `<option value="${i}">${d.label}</option>`).join('');
+function buildForm() {
+  const teamOpts = '<option value="">— select —</option>'+TEAM.map(t=>`<option>${t}</option>`).join('');
+  const projOpts = '<option value="">— select —</option>'+PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
 
   ['assigner','assignee'].forEach(id => {
-    const s = document.createElement('select'); s.id = id; s.onchange = updateBar;
-    s.innerHTML = teamOpts;
-    document.getElementById(`${id}-wrap`).innerHTML = '';
+    const s=document.createElement('select'); s.id=id; s.onchange=updateBar;
+    s.innerHTML=teamOpts;
+    document.getElementById(`${id}-wrap`).innerHTML='';
     document.getElementById(`${id}-wrap`).appendChild(s);
   });
 
-  const ps = document.createElement('select'); ps.id = 'project'; ps.onchange = updateBar;
-  ps.innerHTML = projOpts;
-  document.getElementById('project-wrap').innerHTML = '';
+  const ps=document.createElement('select'); ps.id='project'; ps.onchange=onProjectChange;
+  ps.innerHTML=projOpts;
+  document.getElementById('project-wrap').innerHTML='';
   document.getElementById('project-wrap').appendChild(ps);
 
-  const ds = document.createElement('select'); ds.id = 'discipline'; ds.onchange = () => { updateBar(); recalcAll(); };
-  ds.innerHTML = discOpts;
-  document.getElementById('disc-wrap').innerHTML = '';
-  document.getElementById('disc-wrap').appendChild(ds);
-
-  document.getElementById('add-task-btn').disabled  = false;
-  document.getElementById('submit-btn').disabled    = false;
-  document.getElementById('sbar-name').textContent  = 'Select assigner and assignee';
-
-  addTask(); // add first task block
+  document.getElementById('add-task-btn').disabled=false;
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('sbar-name').textContent='Select assigner and assignee';
+  addTask();
 }
 
-// ── Task block ─────────────────────────────────────────────────
+function onProjectChange() {
+  const idx  = parseInt(document.getElementById('project')?.value);
+  const proj = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
+  const disp = document.getElementById('disc-display');
+  if (proj && disp) {
+    disp.textContent = proj.discipline + '  ·  ' + proj.multiplier + 'x';
+    disp.style.color = 'var(--accent)';
+    document.getElementById('project-id').value = proj.id || '';
+  } else if (disp) {
+    disp.textContent = '— select project first —';
+    disp.style.color = 'var(--text2)';
+  }
+  updateBar(); recalcAll();
+}
+
 function stageOptions() {
-  return '<option value="">— select task type —</option>' +
-    STAGES.map((s,i) => `<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
+  return '<option value="">— select task type —</option>'+
+    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
 }
 
 function addTask() {
   taskCount++;
   const id  = `tb${taskCount}`;
   const today = new Date().toISOString().split('T')[0];
-
   const div = document.createElement('div');
-  div.className = 'task-block'; div.id = id;
-  div.innerHTML = `
+  div.className='task-block'; div.id=id;
+  div.innerHTML=`
     <div class="task-block-head">
       <div class="task-block-title">TASK ${taskCount}</div>
-      ${taskCount > 1 ? `<button class="task-remove" onclick="removeTask('${id}')">✕ Remove</button>` : ''}
+      ${taskCount>1?`<button class="task-remove" onclick="removeTask('${id}')">✕ Remove</button>`:''}
     </div>
     <div class="task-block-body">
       <div class="field">
         <div class="lbl">Task type / stage <span class="req">*</span></div>
         <select class="t-stage" onchange="recalcAll()">${stageOptions()}</select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="lbl">Area / Space <span class="opt">optional</span></div>
+          <input type="text" class="t-area" placeholder="e.g. Drawing Room, Master Bedroom">
+        </div>
+        <div class="field">
+          <div class="lbl">Drawing name <span class="opt">optional</span></div>
+          <input type="text" class="t-drawing" placeholder="e.g. First Floor Plan, False Ceiling">
+        </div>
       </div>
       <div class="row3">
         <div class="field">
@@ -324,133 +341,121 @@ function addTask() {
         </div>
       </div>
       <div class="field">
+        <div class="lbl">Type <span class="opt">optional</span></div>
+        <div class="rev-row">
+          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="" checked><span class="rev-btn orig">Original Task</span></label>
+          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="Internal"><span class="rev-btn int">Internal Revision</span></label>
+          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="Client"><span class="rev-btn cli">Client Revision</span></label>
+        </div>
+      </div>
+      <div class="field">
         <div class="lbl">Instructions <span class="opt">optional</span></div>
         <textarea class="t-notes" placeholder="What needs to be done, references, quality expectations..."></textarea>
       </div>
       <div class="pts-preview">
         <div class="pts-label">Weighted points for this task</div>
-        <div class="pts-value t-pts-display">—</div>
+        <div class="pts-val t-pts-display">—</div>
       </div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('task-blocks').appendChild(div);
-  updateTaskCount();
-  recalcAll();
+  updateTaskCount(); recalcAll();
 }
 
 function removeTask(id) {
   document.getElementById(id).remove();
-  taskCount = document.querySelectorAll('.task-block').length;
-  // Renumber
-  document.querySelectorAll('.task-block-title').forEach((el,i) => el.textContent = `TASK ${i+1}`);
-  updateTaskCount();
-  recalcAll();
+  taskCount=document.querySelectorAll('.task-block').length;
+  document.querySelectorAll('.task-block-title').forEach((el,i)=>el.textContent=`TASK ${i+1}`);
+  updateTaskCount(); recalcAll();
 }
 
 function updateTaskCount() {
-  const n = document.querySelectorAll('.task-block').length;
-  document.getElementById('task-count').textContent = `${n} task${n!==1?'s':''}`;
+  const n=document.querySelectorAll('.task-block').length;
+  document.getElementById('task-count').textContent=`${n} task${n!==1?'s':''}`;
 }
 
-// ── Calculate pts ──────────────────────────────────────────────
 function recalcAll() {
-  const discIdx = parseInt(document.getElementById('discipline')?.value);
-  const mult    = (!isNaN(discIdx) && DISCS[discIdx]) ? DISCS[discIdx].multiplier : 1;
-  let total = 0;
-
+  const projIdx = parseInt(document.getElementById('project')?.value);
+  const proj    = (!isNaN(projIdx) && PROJECTS[projIdx]) ? PROJECTS[projIdx] : null;
+  const mult    = proj ? proj.multiplier : 1;
+  let total=0;
   document.querySelectorAll('.task-block').forEach(tb => {
     const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
     const stage    = (!isNaN(stageIdx) && STAGES[stageIdx]) ? STAGES[stageIdx] : null;
-    const units    = parseFloat(tb.querySelector('.t-units')?.value) || 1;
+    const units    = parseFloat(tb.querySelector('.t-units')?.value)||1;
     const disp     = tb.querySelector('.t-pts-display');
-
     if (stage && stage.pts) {
-      const pts = parseFloat((stage.pts * mult * units).toFixed(2));
-      disp.textContent = pts + ' pts';
-      total += pts;
-    } else {
-      disp.textContent = '—';
-    }
+      const pts = parseFloat((stage.pts*mult*units).toFixed(2));
+      disp.textContent = pts+' pts'; total+=pts;
+    } else { disp.textContent='—'; }
   });
-
-  const n = document.querySelectorAll('.task-block').length;
-  document.getElementById('total-pts').textContent = total.toFixed(1);
-  document.getElementById('total-count').textContent = `across ${n} task${n!==1?'s':''}`;
-  document.getElementById('total-strip').style.display = total > 0 ? 'flex' : 'none';
+  const n=document.querySelectorAll('.task-block').length;
+  document.getElementById('total-pts').textContent=total.toFixed(1);
+  document.getElementById('total-count').textContent=`across ${n} task${n!==1?'s':''}`;
+  document.getElementById('total-strip').style.display=total>0?'flex':'none';
 }
 
 function updateBar() {
-  const assigner = document.getElementById('assigner')?.value;
-  const assignee = document.getElementById('assignee')?.value;
-  const project  = document.getElementById('project')?.value;
-  document.getElementById('sbar-name').textContent = assigner ? `Assigning as ${assigner}` : 'Select your name';
-  document.getElementById('sbar-sub').textContent  =
-    assignee && project ? `→ ${assignee} · ${project}` : 'select assignee and project';
+  const assigner=document.getElementById('assigner')?.value;
+  const assignee=document.getElementById('assignee')?.value;
+  const projIdx=parseInt(document.getElementById('project')?.value);
+  const proj=(!isNaN(projIdx)&&PROJECTS[projIdx])?PROJECTS[projIdx]:null;
+  document.getElementById('sbar-name').textContent=assigner?`Assigning as ${assigner}`:'Select your name';
+  document.getElementById('sbar-sub').textContent=assignee&&proj?`→ ${assignee} · ${proj.name}`:'select assignee and project';
 }
 
-// ── Submit ─────────────────────────────────────────────────────
 async function submitTasks() {
   const assigner = document.getElementById('assigner')?.value;
   const assignee = document.getElementById('assignee')?.value;
-  const project  = document.getElementById('project')?.value;
-  const discIdx  = parseInt(document.getElementById('discipline')?.value);
+  const projIdx  = parseInt(document.getElementById('project')?.value);
+  if (!assigner)                  { toast('Select your name');        return; }
+  if (!assignee)                  { toast('Select who to assign to'); return; }
+  if (isNaN(projIdx)||projIdx<0)  { toast('Select a project');        return; }
 
-  if (!assigner)             { toast('Select your name');           return; }
-  if (!assignee)             { toast('Select who to assign to');    return; }
-  if (!project)              { toast('Select a project');           return; }
-  if (isNaN(discIdx)||discIdx<0) { toast('Select discipline');      return; }
-
-  const disc  = DISCS[discIdx];
+  const proj  = PROJECTS[projIdx];
   const today = new Date().toISOString().substring(0,10);
   const tasks = [];
   let valid   = true;
 
-  document.querySelectorAll('.task-block').forEach((tb, i) => {
+  document.querySelectorAll('.task-block').forEach((tb,i) => {
     const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-    if (isNaN(stageIdx) || stageIdx < 0) { toast(`Select task type for Task ${i+1}`); valid = false; return; }
-    const stage   = STAGES[stageIdx];
-    const units   = parseInt(tb.querySelector('.t-units')?.value) || 1;
-    const tDate   = tb.querySelector('.t-date')?.value || today;
-    const priority= tb.querySelector('.t-priority')?.value || 'Medium';
-    const notes   = tb.querySelector('.t-notes')?.value.trim() || '';
-    const pts     = parseFloat((stage.pts * disc.multiplier * units).toFixed(2));
-    tasks.push({ taskType: stage.label, basePts: stage.pts, units, weightedPts: pts, targetDate: tDate, priority, notes });
+    if (isNaN(stageIdx)||stageIdx<0) { toast(`Select task type for Task ${i+1}`); valid=false; return; }
+    const stage    = STAGES[stageIdx];
+    const units    = parseInt(tb.querySelector('.t-units')?.value)||1;
+    const tDate    = tb.querySelector('.t-date')?.value||today;
+    const priority = tb.querySelector('.t-priority')?.value||'Medium';
+    const area     = tb.querySelector('.t-area')?.value.trim()||'';
+    const drawing  = tb.querySelector('.t-drawing')?.value.trim()||'';
+    const notes    = tb.querySelector('.t-notes')?.value.trim()||'';
+    const revType  = tb.querySelector(`input[name="revtype-${i+1}"]:checked`)?.value||'';
+    const pts      = parseFloat((stage.pts*proj.multiplier*units).toFixed(2));
+    tasks.push({taskType:stage.label,basePts:stage.pts,units,weightedPts:pts,
+                targetDate:tDate,priority,area,drawing,notes,revisionType:revType});
   });
 
-  if (!valid) return;
-  if (!tasks.length) { toast('Add at least one task'); return; }
-
-  const projectId = document.getElementById('project-id')?.value.trim() || '';
+  if (!valid||!tasks.length) return;
 
   const payload = {
-    action      : 'assignTasks',
-    assignedBy  : assigner,
-    assignedTo  : assignee,
-    project     : project,
-    projectId   : projectId,
-    discipline  : disc.label,
-    multiplier  : disc.multiplier,
-    dateAssigned: today,
-    tasks       : tasks,
+    action:'assignTasks', assignedBy:assigner, assignedTo:assignee,
+    project:proj.name, projectId:proj.id||document.getElementById('project-id')?.value||'',
+    discipline:proj.discipline, multiplier:proj.multiplier,
+    dateAssigned:today, tasks,
   };
 
   document.getElementById('sending').classList.add('show');
   try {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await new Promise((res, rej) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', APPS_SCRIPT_URL, true);
-        xhr.setRequestHeader('Content-Type', 'text/plain');
-        xhr.onload = res; xhr.onerror = rej;
-        xhr.send(JSON.stringify(payload));
+      await new Promise((res,rej) => {
+        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
+        xhr.setRequestHeader('Content-Type','text/plain');
+        xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(payload));
       });
     }
     document.getElementById('sending').classList.remove('show');
-    const totalPts = tasks.reduce((s,t) => s + t.weightedPts, 0).toFixed(1);
-    document.getElementById('success-sub').innerHTML =
-      `<strong>${tasks.length} task${tasks.length!==1?'s':''}</strong> assigned to <strong>${assignee}</strong><br>` +
-      `Project: ${project}<br>Total: ${totalPts} weighted pts<br><br>` +
-      tasks.map(t => `· ${t.taskType} — due ${t.targetDate}`).join('<br>');
+    const totalPts=tasks.reduce((s,t)=>s+t.weightedPts,0).toFixed(1);
+    document.getElementById('success-sub').innerHTML=
+      `<strong>${tasks.length} task${tasks.length!==1?'s':''}</strong> assigned to <strong>${assignee}</strong><br>`+
+      `Project: ${proj.name}<br>Total: ${totalPts} weighted pts<br><br>`+
+      tasks.map(t=>`· ${t.taskType}${t.area?' — '+t.area:''}${t.drawing?' ('+t.drawing+')':''} — due ${t.targetDate}`).join('<br>');
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
@@ -460,22 +465,20 @@ async function submitTasks() {
 
 function resetForm() {
   document.getElementById('success').classList.remove('show');
-  document.getElementById('assigner').value    = '';
-  document.getElementById('assignee').value    = '';
-  document.getElementById('project').value     = '';
-  document.getElementById('project-id').value  = '';
-  document.getElementById('discipline').value  = '';
-  document.getElementById('task-blocks').innerHTML = '';
-  taskCount = 0;
-  addTask();
-  updateBar();
-  recalcAll();
+  document.getElementById('assigner').value='';
+  document.getElementById('assignee').value='';
+  document.getElementById('project').value='';
+  document.getElementById('project-id').value='';
+  document.getElementById('disc-display').textContent='— select project first —';
+  document.getElementById('disc-display').style.color='var(--text2)';
+  document.getElementById('task-blocks').innerHTML='';
+  taskCount=0; addTask(); updateBar(); recalcAll();
 }
 
 function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2800);
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2800);
 }
 </script>
 </body>
