@@ -149,7 +149,16 @@ function updateMetrics() {
   let tasks=allTasks;
   if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
-  if (dateFilter)            tasks=tasks.filter(t=>t.targetDate===dateFilter);
+  if (dateFilter) {
+    const today2 = new Date().toISOString().substring(0,10);
+    tasks = tasks.filter(t => {
+      // Always show tasks due on the selected date
+      if (t.targetDate === dateFilter) return true;
+      // If filtering for today or a past date, also show all delayed (overdue) tasks
+      if (dateFilter <= today2 && t.status === 'Delayed') return true;
+      return false;
+    });
+  }
   document.getElementById('m-upcoming').textContent  = tasks.filter(t=>t.status==='Upcoming').length;
   document.getElementById('m-ongoing').textContent   = tasks.filter(t=>t.status==='Ongoing').length;
   document.getElementById('m-completed').textContent = tasks.filter(t=>t.status==='Completed').length;
@@ -176,6 +185,7 @@ function setDueToday() {
   dateFilter = today;
   document.getElementById('due-today-btn').classList.add('on');
   document.getElementById('due-week-btn').classList.remove('on');
+  // Show tasks due today + all delayed tasks
   updateMetrics(); renderTasks();
 }
 
@@ -193,7 +203,11 @@ function setDueWeek() {
   if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
   if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
-  tasks = tasks.filter(t=>t.targetDate>=today && t.targetDate<=weekEnd);
+  // Include tasks due this week + all delayed tasks
+  tasks = tasks.filter(t=>
+    (t.targetDate>=today && t.targetDate<=weekEnd) ||
+    t.status === 'Delayed'
+  );
   renderTaskList(tasks);
   return;
 }
@@ -205,7 +219,16 @@ function renderTasks() {
   if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
   if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
-  if (dateFilter)            tasks=tasks.filter(t=>t.targetDate===dateFilter);
+  if (dateFilter) {
+    const today2 = new Date().toISOString().substring(0,10);
+    tasks = tasks.filter(t => {
+      // Always show tasks due on the selected date
+      if (t.targetDate === dateFilter) return true;
+      // If filtering for today or a past date, also show all delayed (overdue) tasks
+      if (dateFilter <= today2 && t.status === 'Delayed') return true;
+      return false;
+    });
+  }
   renderTaskList(tasks);
 }
 
