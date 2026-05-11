@@ -203,7 +203,10 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     <div class="card-head"><div class="card-num">2</div><div class="card-title">Your assigned tasks</div><div class="card-sub" id="assigned-count">sign in first</div></div>
     <div class="card-body">
       <div id="assigned-tasks-list"><div class="assigned-loading">Sign in to load your assigned tasks…</div></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:10px">Mark each task — updates the Task Dashboard automatically.</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+        <div style="font-size:11px;color:var(--text3)">Mark each task — updates the Task Dashboard automatically.</div>
+        <button onclick="fetchAssignedTasks()" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0">↻ Refresh tasks</button>
+      </div>
     </div>
   </div>
 
@@ -803,6 +806,7 @@ function collectData() {
     row:t.row, member:member, taskType:t.taskType, project:t.project,
     area:t.area||'', drawing:t.drawing||'',
     status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
+    note:document.querySelector(`.atc-note-${i}`)?.value.trim()||'',
   }));
 
   const data={
