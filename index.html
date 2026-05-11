@@ -301,7 +301,7 @@ const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6C
 const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 
 let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[];
-let EMAIL_MAP  = {};
+let EMAIL_MAP  = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"}; // hardcoded fallback — overridden by live data
 let googleUser = null;
 let assignedTasks = [];
 let projCount  = 0;
@@ -486,7 +486,11 @@ async function fetchAll() {
       STAGES   = (c.stages  || []).filter(s=>s.pts>0);
       VISITS   = c.visits   || [];
       window._EMAILS = l.emails || [];
-      TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
+      window._EMAILS = l.emails || [];
+      // Rebuild EMAIL_MAP from live data (overrides hardcoded fallback)
+      if (window._EMAILS.length > 0) {
+        TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
+      }
     }
     buildMemberDropdown();
     addProject(false);
@@ -518,8 +522,12 @@ function handleGoogleCredential(payload) {
   Object.entries(EMAIL_MAP).forEach(([n,e])=>{ if(e.toLowerCase()===email) matchedName=n; });
 
   if (!matchedName) {
+    const knownEmails = Object.values(EMAIL_MAP).join(', ');
     document.getElementById('gsignin-confirmed').innerHTML=`
-      <div class="gblocked">✗ <strong>${email}</strong> is not registered. Contact Siddharth to get added.</div>`;
+      <div class="gblocked">
+        ✗ <strong>${email}</strong> is not registered.<br>
+        <span style="font-size:10px;opacity:.7">Known emails: ${knownEmails.substring(0,80)}…</span>
+      </div>`;
     document.getElementById('submit-btn').disabled=true;
     return;
   }
