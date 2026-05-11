@@ -75,6 +75,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="header-controls">
       <select class="filter-sel" id="member-filter" onchange="applyFilters()"><option value="all">All team</option></select>
       <select class="filter-sel" id="project-filter" onchange="applyFilters()"><option value="all">All projects</option></select>
+      <input type="date" id="date-filter" onchange="applyFilters()" title="Filter by due date"
+        style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;outline:none;color-scheme:dark">
+      <button class="refresh-btn" onclick="document.getElementById('date-filter').value='';applyFilters()" title="Clear date filter" style="padding:7px 8px">✕ Date</button>
       <button class="refresh-btn" onclick="loadTasks()">↻ Refresh</button>
     </div>
   </div>
@@ -97,6 +100,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="fb green" onclick="filterStatus('Completed',this)">Completed</div>
   <div class="fb red" onclick="filterStatus('Delayed',this)">Delayed</div>
   <div class="fb purple" onclick="filterStatus('Revision Required',this)">Revision Required</div>
+  <div class="fb" onclick="setDueToday()" id="due-today-btn" style="margin-left:auto">📅 Due Today</div>
+  <div class="fb" onclick="setDueWeek()" id="due-week-btn">📅 Due This Week</div>
 </div>
 
 <div class="page"><div id="task-list">
@@ -105,7 +110,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
-let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all';
+let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='';
 
 window.addEventListener('DOMContentLoaded', loadTasks);
 
@@ -142,8 +147,9 @@ async function loadTasks() {
 
 function updateMetrics() {
   let tasks=allTasks;
-  if (memberFilter!=='all') tasks=tasks.filter(t=>t.assignedTo===memberFilter);
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
+  if (dateFilter)            tasks=tasks.filter(t=>t.targetDate===dateFilter);
   document.getElementById('m-upcoming').textContent  = tasks.filter(t=>t.status==='Upcoming').length;
   document.getElementById('m-ongoing').textContent   = tasks.filter(t=>t.status==='Ongoing').length;
   document.getElementById('m-completed').textContent = tasks.filter(t=>t.status==='Completed').length;
@@ -160,14 +166,50 @@ function filterStatus(s,btn) {
 function applyFilters() {
   memberFilter  = document.getElementById('member-filter').value;
   projectFilter = document.getElementById('project-filter').value;
+  dateFilter    = document.getElementById('date-filter').value || '';
   updateMetrics(); renderTasks();
 }
 
+function setDueToday() {
+  const today = new Date().toISOString().substring(0,10);
+  document.getElementById('date-filter').value = today;
+  dateFilter = today;
+  document.getElementById('due-today-btn').classList.add('on');
+  document.getElementById('due-week-btn').classList.remove('on');
+  updateMetrics(); renderTasks();
+}
+
+function setDueWeek() {
+  // Clear date filter and show all this week's tasks
+  const today = new Date().toISOString().substring(0,10);
+  const endOfWeek = new Date(); endOfWeek.setDate(endOfWeek.getDate() + (6-endOfWeek.getDay()));
+  document.getElementById('date-filter').value = '';
+  dateFilter = '';
+  // Filter tasks where targetDate is between today and end of week
+  document.getElementById('due-today-btn').classList.remove('on');
+  document.getElementById('due-week-btn').classList.add('on');
+  const weekEnd = endOfWeek.toISOString().substring(0,10);
+  let tasks = allTasks;
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
+  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
+  if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
+  tasks = tasks.filter(t=>t.targetDate>=today && t.targetDate<=weekEnd);
+  renderTaskList(tasks);
+  return;
+}
+
 function renderTasks() {
+  document.getElementById('due-today-btn')?.classList.remove('on');
+  document.getElementById('due-week-btn')?.classList.remove('on');
   let tasks=allTasks;
   if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
   if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
+  if (dateFilter)            tasks=tasks.filter(t=>t.targetDate===dateFilter);
+  renderTaskList(tasks);
+}
+
+function renderTaskList(tasks) {
 
   const order={'Delayed':0,'Revision Required':1,'Ongoing':2,'Upcoming':3,'Completed':4};
   tasks.sort((a,b)=>(order[a.status]??5)-(order[b.status]??5));
