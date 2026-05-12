@@ -159,7 +159,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
-let TEAM=[], PROJECTS=[], STAGES=[];
+let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
 let taskCount=0;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -172,7 +172,8 @@ async function fetchAll() {
   const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
-      TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
+      TEAM       = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
+      ALL_MEMBERS = ["Aaditya Koshti", "Aashi Agrawal", "Achal Rathore", "Aman Raghuwanshi", "Astha Inani", "Bhavesh Bhagwat", "Deepak Soni", "Himanshu Malviya", "Khushi Agrawal", "Poorvi Goyal", "Sahil Maurya", "Siddharth Inani", "Simi"];
       PROJECTS = [
   {id:"P001",name:"Ajay Chordia",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
   {id:"P002",name:"Rohit Jain",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
@@ -318,8 +319,9 @@ async function fetchAll() {
       ]);
       if (l.error) throw new Error('Lists: '+l.error);
       if (c.error) throw new Error('Config: '+c.error);
-      TEAM     = l.team     || [];
-      PROJECTS = l.projects || [];
+      TEAM        = l.team       || [];
+      ALL_MEMBERS = l.allMembers || l.team || []; // fallback to team if allMembers not present
+      PROJECTS    = l.projects   || [];
       STAGES   = (c.stages  || []).filter(s => s.pts > 0); // skip category headers
     }
     buildForm();
@@ -329,7 +331,7 @@ async function fetchAll() {
 }
 
 function buildForm() {
-  const teamOpts = '<option value="">— select —</option>'+TEAM.map(t=>`<option>${t}</option>`).join('');
+  const teamOpts = '<option value="">— select —</option>'+ALL_MEMBERS.map(t=>`<option>${t}</option>`).join('');
   const projOpts = '<option value="">— select —</option>'+PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
 
   ['assigner','assignee'].forEach(id => {
