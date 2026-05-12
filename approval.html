@@ -370,15 +370,18 @@ function updateSummary() {
 
 function updateBar() {
   const leadName = document.getElementById('lead-name').value;
-  const reviewed = Object.keys(decisions).length;
+  const reviewed = Object.values(decisions).filter(d => d.decision === 'Yes' || d.decision === 'No').length;
   const total    = tasks.length;
-  const allDone  = reviewed === total && total > 0 && leadName;
+  const canSubmit= reviewed > 0 && leadName;
 
   document.getElementById('sbar-reviewed').textContent =
     `${reviewed} of ${total} reviewed`;
   document.getElementById('sbar-sub').textContent =
-    allDone ? 'ready to submit' : leadName ? `${total - reviewed} tasks remaining` : 'select your name first';
-  document.getElementById('submit-btn').disabled = !allDone;
+    !leadName          ? 'select your name first' :
+    reviewed === total ? 'all reviewed — ready to submit' :
+    reviewed > 0       ? `${reviewed} reviewed · ${total - reviewed} remaining · can submit now` :
+                         'approve or reject at least one task';
+  document.getElementById('submit-btn').disabled = !canSubmit;
 }
 
 // ── Submit approvals ───────────────────────────────────────────
