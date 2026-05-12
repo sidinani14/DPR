@@ -133,11 +133,17 @@ async function loadTasks() {
       allTasks=data.tasks||[];
     }
 
-    // Populate member + project filters
+    // Populate member filter (preserve current selection if possible)
+    const prevMember = document.getElementById('member-filter').value;
     const members=[...new Set(allTasks.map(t=>t.assignedTo))].sort();
-    const projects=[...new Set(allTasks.map(t=>t.project))].sort();
-    document.getElementById('member-filter').innerHTML='<option value="all">All team</option>'+members.map(m=>`<option>${m}</option>`).join('');
-    document.getElementById('project-filter').innerHTML='<option value="all">All projects</option>'+projects.map(p=>`<option>${p}</option>`).join('');
+    document.getElementById('member-filter').innerHTML='<option value="all">All team</option>'+members.map(m=>`<option value="${m}">${m}</option>`).join('');
+    // Restore previous member selection if still valid
+    if (prevMember && prevMember !== 'all' && members.includes(prevMember)) {
+      document.getElementById('member-filter').value = prevMember;
+      memberFilter = prevMember;
+    }
+    // Build project filter based on current member selection
+    rebuildProjectFilter();
 
     updateMetrics(); renderTasks();
   } catch(e) {
@@ -172,18 +178,30 @@ function filterStatus(s,btn) {
   btn.classList.add('on'); renderTasks();
 }
 
-function onMemberChange() {
+function rebuildProjectFilter() {
   const member = document.getElementById('member-filter').value;
-  // Rebuild project dropdown based on selected member
+  const prevProject = document.getElementById('project-filter').value;
   const relevantTasks = member === 'all'
     ? allTasks
     : allTasks.filter(t => t.assignedTo === member);
   const projects = [...new Set(relevantTasks.map(t => t.project))].sort();
   const projSel  = document.getElementById('project-filter');
-  // Reset project selection when member changes
   projSel.innerHTML = '<option value="all">All projects</option>' +
-    projects.map(p => `<option>${p}</option>`).join('');
-  projectFilter = 'all';
+    projects.map(p => `<option value="${p}">${p}</option>`).join('');
+  // Restore project if still valid for this member
+  if (prevProject && prevProject !== 'all' && projects.includes(prevProject)) {
+    projSel.value = prevProject;
+    projectFilter = prevProject;
+  } else {
+    projectFilter = 'all';
+  }
+}
+
+function onMemberChange() {
+  memberFilter = document.getElementById('member-filter').value;
+  rebuildProjectFilter();
+  projectFilter = 'all'; // always reset project when member changes
+  document.getElementById('project-filter').value = 'all';
   applyFilters();
 }
 
