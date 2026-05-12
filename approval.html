@@ -386,21 +386,27 @@ async function submitApprovals() {
   const leadName = document.getElementById('lead-name').value;
   if (!leadName) { toast('Please select your name'); return; }
 
-  const reviewed = Object.keys(decisions).length;
-  if (reviewed < tasks.length) {
-    toast(`Please review all ${tasks.length} tasks before submitting`);
+  // Only submit tasks that have been explicitly reviewed (Approved or Rejected)
+  // Unreviewed tasks are skipped — lead can come back and review them later
+  const reviewedItems = tasks
+    .map((t, i) => ({t, i, d: decisions[i]}))
+    .filter(x => x.d && (x.d.decision === 'Yes' || x.d.decision === 'No'));
+
+  if (reviewedItems.length === 0) {
+    toast('Please approve or reject at least one task');
     return;
   }
 
+  const skipped = tasks.length - reviewedItems.length;
   document.getElementById('sending').classList.add('show');
 
-  // Build payload — array of decisions
-  const payload = tasks.map((t, i) => ({
+  // Build payload — only reviewed tasks
+  const payload = reviewedItems.map(({t, i, d}) => ({
     row           : t.row,
     source        : t.source || 'TASK_LOG',
     taskAssignRow : t.taskAssignRow || null,
-    decision      : decisions[i]?.decision || 'Pending',
-    note          : decisions[i]?.note     || '',
+    decision      : d.decision,
+    note          : d.note || '',
     leadName      : leadName,
     date          : new Date().toISOString(),
   }));
