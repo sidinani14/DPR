@@ -295,7 +295,12 @@ function renderTasks() {
     <div class="task-card" id="tc-${i}">
       <div class="task-head">
         <div>
-          <div class="task-member">${t.member}</div>
+          <div class="task-member">
+            ${t.member}
+            <span style="font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;${t.source==='TASK_ASSIGNMENTS'?'background:#E8EDF4;color:#1F3A5F':'background:#F1F1F1;color:#888888'}">
+              ${t.source==='TASK_ASSIGNMENTS'?'Assigned task':'DPR task'}
+            </span>
+          </div>
           <div class="task-project">${t.project} · ${t.discipline}</div>
         </div>
         <div class="task-status st-pending" id="st-${i}">Pending</div>
@@ -392,6 +397,7 @@ async function submitApprovals() {
   // Build payload — array of decisions
   const payload = tasks.map((t, i) => ({
     row           : t.row,
+    source        : t.source || 'TASK_LOG',
     taskAssignRow : t.taskAssignRow || null,
     decision      : decisions[i]?.decision || 'Pending',
     note          : decisions[i]?.note     || '',
