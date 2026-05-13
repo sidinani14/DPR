@@ -104,33 +104,16 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
           <div id="assignee-wrap"><div class="skeleton"></div></div>
         </div>
       </div>
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Project <span class="req">*</span></div>
-          <div id="project-wrap"><div class="skeleton"></div></div>
-        </div>
-        <div class="field">
-          <div class="lbl">Project ID <span class="opt">optional</span></div>
-          <input type="text" id="project-id" placeholder="e.g. P001">
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Discipline <span style="font-size:10px;color:var(--text3)">auto from project</span></div>
-        <div class="auto-display" id="disc-display">— select project first —</div>
-      </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-head"><div class="card-title">Tasks</div><div class="card-sub" id="task-count">0 tasks</div></div>
-    <div class="card-body">
-      <div id="task-blocks"></div>
-      <button class="add-task-btn" id="add-task-btn" onclick="addTask()" disabled>
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
-        Add another task
-      </button>
-    </div>
-  </div>
+  <!-- Project blocks — one per project -->
+  <div id="project-blocks"></div>
+
+  <button class="add-task-btn" id="add-proj-btn" onclick="addProjectBlock()" disabled style="margin-bottom:14px">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+    Add another project
+  </button>
 
   <div class="total-strip" id="total-strip">
     <div><div class="total-label">Total weighted points</div><div class="total-count" id="total-count"></div></div>
@@ -160,6 +143,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
 let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
+let projBlockCount = 0;
 let taskCount=0;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -332,7 +316,6 @@ async function fetchAll() {
 
 function buildForm() {
   const teamOpts = '<option value="">— select —</option>'+ALL_MEMBERS.map(t=>`<option>${t}</option>`).join('');
-  const projOpts = '<option value="">— select —</option>'+PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
 
   ['assigner','assignee'].forEach(id => {
     const s=document.createElement('select'); s.id=id; s.onchange=updateBar;
@@ -341,31 +324,146 @@ function buildForm() {
     document.getElementById(`${id}-wrap`).appendChild(s);
   });
 
-  const ps=document.createElement('select'); ps.id='project'; ps.onchange=onProjectChange;
-  ps.innerHTML=projOpts;
-  document.getElementById('project-wrap').innerHTML='';
-  document.getElementById('project-wrap').appendChild(ps);
-
-  document.getElementById('add-task-btn').disabled=false;
+  document.getElementById('add-proj-btn').disabled=false;
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('sbar-name').textContent='Select assigner and assignee';
-  addTask();
+  addProjectBlock(); // add first project block
 }
 
-function onProjectChange() {
-  const idx  = parseInt(document.getElementById('project')?.value);
+function projOptions() {
+  return '<option value="">— select project —</option>'+
+    PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
+}
+
+function stageOpts() {
+  return '<option value="">— select task type —</option>'+
+    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
+}
+
+function addProjectBlock() {
+  projBlockCount++;
+  const pid = `pb${projBlockCount}`;
+  const div = document.createElement('div');
+  div.className = 'card'; div.id = pid;
+  div.style.marginBottom = '14px';
+  div.innerHTML = `
+    <div class="card-head">
+      <div class="card-title">Project ${projBlockCount}</div>
+      ${projBlockCount > 1 ? `<button onclick="removeProjBlock('${pid}')" style="margin-left:auto;font-size:11px;color:var(--red);background:none;border:1px solid var(--red);border-radius:4px;padding:2px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Remove</button>` : ''}
+    </div>
+    <div class="card-body">
+      <div class="row2">
+        <div class="field">
+          <div class="lbl">Project <span class="req">*</span></div>
+          <select class="pb-project" onchange="onProjBlockChange(this)">${projOptions()}</select>
+        </div>
+        <div class="field">
+          <div class="lbl">Project ID <span class="opt">optional</span></div>
+          <input type="text" class="pb-proj-id" placeholder="e.g. P001">
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">Discipline <span style="font-size:10px;color:var(--text3)">auto from project</span></div>
+        <div class="auto-display pb-disc-display">— select project first —</div>
+      </div>
+      <div class="divider"></div>
+      <div class="pb-tasks"></div>
+      <button class="add-task-btn" onclick="addTaskToBlock('${pid}')" style="margin-top:8px">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+        Add task to this project
+      </button>
+    </div>`;
+  document.getElementById('project-blocks').appendChild(div);
+  addTaskToBlock(pid);
+  recalcAll();
+}
+
+function removeProjBlock(pid) {
+  document.getElementById(pid).remove();
+  recalcAll();
+}
+
+function onProjBlockChange(sel) {
+  const idx  = parseInt(sel.value);
   const proj = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
-  const disp = document.getElementById('disc-display');
-  if (proj && disp) {
-    disp.textContent = proj.discipline + '  ·  ' + proj.multiplier + 'x';
-    disp.style.color = 'var(--accent)';
-    document.getElementById('project-id').value = proj.id || '';
-  } else if (disp) {
-    disp.textContent = '— select project first —';
-    disp.style.color = 'var(--text2)';
+  const card = sel.closest('.card-body');
+  const disp = card?.querySelector('.pb-disc-display');
+  const idIn = card?.querySelector('.pb-proj-id');
+  if (disp) {
+    if (proj) { disp.textContent = proj.discipline + '  ·  ' + proj.multiplier + 'x'; disp.style.color = 'var(--accent)'; }
+    else { disp.textContent = '— select project first —'; disp.style.color = 'var(--text2)'; }
   }
+  if (idIn && proj?.id) idIn.value = proj.id;
   updateBar(); recalcAll();
 }
+
+function addTaskToBlock(pid) {
+  const container = document.querySelector(`#${pid} .pb-tasks`);
+  if (!container) return;
+  const taskId = `${pid}-t${Date.now()}`;
+  const today  = new Date().toISOString().split('T')[0];
+  const div = document.createElement('div');
+  div.className = 'task-block'; div.id = taskId;
+  div.innerHTML = `
+    <div class="task-block-head">
+      <div class="task-block-title">TASK</div>
+      <button class="task-remove" onclick="document.getElementById('${taskId}').remove();recalcAll()">✕ Remove</button>
+    </div>
+    <div class="task-block-body">
+      <div class="field">
+        <div class="lbl">Task type / stage <span class="req">*</span></div>
+        <select class="t-stage" onchange="recalcAll()">${stageOpts()}</select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="lbl">Area / Space <span class="opt">optional</span></div>
+          <input type="text" class="t-area" placeholder="e.g. Drawing Room">
+        </div>
+        <div class="field">
+          <div class="lbl">Drawing name <span class="opt">optional</span></div>
+          <input type="text" class="t-drawing" placeholder="e.g. Floor Plan v2">
+        </div>
+      </div>
+      <div class="row3">
+        <div class="field">
+          <div class="lbl">Units <span class="req">*</span></div>
+          <input type="number" class="t-units" min="1" max="50" value="1" oninput="recalcAll()">
+        </div>
+        <div class="field">
+          <div class="lbl">Target date <span class="req">*</span></div>
+          <input type="date" class="t-date" value="${today}">
+        </div>
+        <div class="field">
+          <div class="lbl">Priority</div>
+          <select class="t-priority">
+            <option value="Low">Low</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">Revision Type <span class="opt">optional</span></div>
+        <div class="rev-row">
+          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="" checked><span class="rev-btn orig">Original Task</span></label>
+          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="Internal"><span class="rev-btn int">Internal Revision</span></label>
+          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="Client"><span class="rev-btn cli">Client Revision</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">Instructions <span class="opt">optional</span></div>
+        <textarea class="t-notes" placeholder="What needs to be done..."></textarea>
+      </div>
+      <div class="pts-preview">
+        <div class="pts-label">Weighted points</div>
+        <div class="pts-val t-pts-display">—</div>
+      </div>
+    </div>`;
+  container.appendChild(div);
+  recalcAll();
+}
+
+// onProjectChange replaced by onProjBlockChange in multi-project mode
 
 function stageOptions() {
   return '<option value="">— select task type —</option>'+
@@ -450,88 +548,101 @@ function updateTaskCount() {
 }
 
 function recalcAll() {
-  const projIdx = parseInt(document.getElementById('project')?.value);
-  const proj    = (!isNaN(projIdx) && PROJECTS[projIdx]) ? PROJECTS[projIdx] : null;
-  const mult    = proj ? proj.multiplier : 1;
-  let total=0;
-  document.querySelectorAll('.task-block').forEach(tb => {
-    const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-    const stage    = (!isNaN(stageIdx) && STAGES[stageIdx]) ? STAGES[stageIdx] : null;
-    const units    = parseFloat(tb.querySelector('.t-units')?.value)||1;
-    const disp     = tb.querySelector('.t-pts-display');
-    if (stage && stage.pts) {
-      const pts = parseFloat((stage.pts*mult*units).toFixed(2));
-      disp.textContent = pts+' pts'; total+=pts;
-    } else { disp.textContent='—'; }
+  let total=0, taskCount=0;
+  document.querySelectorAll('.card[id^="pb"]').forEach(pb => {
+    const projSel = pb.querySelector('.pb-project');
+    const idx     = parseInt(projSel?.value);
+    const proj    = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
+    const mult    = proj ? proj.multiplier : 1;
+    pb.querySelectorAll('.task-block').forEach(tb => {
+      const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
+      const stage    = (!isNaN(stageIdx) && STAGES[stageIdx]) ? STAGES[stageIdx] : null;
+      const units    = parseFloat(tb.querySelector('.t-units')?.value)||1;
+      const disp     = tb.querySelector('.t-pts-display');
+      if (stage && stage.pts) {
+        const pts = parseFloat((stage.pts*mult*units).toFixed(2));
+        if(disp) disp.textContent = pts+' pts';
+        total+=pts; taskCount++;
+      } else { if(disp) disp.textContent='—'; }
+    });
   });
-  const n=document.querySelectorAll('.task-block').length;
   document.getElementById('total-pts').textContent=total.toFixed(1);
-  document.getElementById('total-count').textContent=`across ${n} task${n!==1?'s':''}`;
+  document.getElementById('total-count').textContent=`across ${taskCount} task${taskCount!==1?'s':''}`;
   document.getElementById('total-strip').style.display=total>0?'flex':'none';
 }
 
 function updateBar() {
   const assigner=document.getElementById('assigner')?.value;
   const assignee=document.getElementById('assignee')?.value;
-  const projIdx=parseInt(document.getElementById('project')?.value);
-  const proj=(!isNaN(projIdx)&&PROJECTS[projIdx])?PROJECTS[projIdx]:null;
   document.getElementById('sbar-name').textContent=assigner?`Assigning as ${assigner}`:'Select your name';
-  document.getElementById('sbar-sub').textContent=assignee&&proj?`→ ${assignee} · ${proj.name}`:'select assignee and project';
+  document.getElementById('sbar-sub').textContent=assignee?`→ ${assignee}`:'select assignee first';
 }
 
 async function submitTasks() {
   const assigner = document.getElementById('assigner')?.value;
   const assignee = document.getElementById('assignee')?.value;
-  const projIdx  = parseInt(document.getElementById('project')?.value);
-  if (!assigner)                  { toast('Select your name');        return; }
-  if (!assignee)                  { toast('Select who to assign to'); return; }
-  if (isNaN(projIdx)||projIdx<0)  { toast('Select a project');        return; }
+  if (!assigner) { toast('Select your name');        return; }
+  if (!assignee) { toast('Select who to assign to'); return; }
 
-  const proj  = PROJECTS[projIdx];
   const today = new Date().toISOString().substring(0,10);
-  const tasks = [];
-  let valid   = true;
+  const allPayloads = [];
+  let valid = true, totalTasks = 0, totalPts = 0;
 
-  document.querySelectorAll('.task-block').forEach((tb,i) => {
-    const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-    if (isNaN(stageIdx)||stageIdx<0) { toast(`Select task type for Task ${i+1}`); valid=false; return; }
-    const stage    = STAGES[stageIdx];
-    const units    = parseInt(tb.querySelector('.t-units')?.value)||1;
-    const tDate    = tb.querySelector('.t-date')?.value||today;
-    const priority = tb.querySelector('.t-priority')?.value||'Medium';
-    const area     = tb.querySelector('.t-area')?.value.trim()||'';
-    const drawing  = tb.querySelector('.t-drawing')?.value.trim()||'';
-    const notes    = tb.querySelector('.t-notes')?.value.trim()||'';
-    const revType  = tb.querySelector(`input[name="revtype-${i+1}"]:checked`)?.value||'';
-    const pts      = parseFloat((stage.pts*proj.multiplier*units).toFixed(2));
-    tasks.push({taskType:stage.label,basePts:stage.pts,units,weightedPts:pts,
-                targetDate:tDate,priority,area,drawing,notes,revisionType:revType});
+  document.querySelectorAll('.card[id^="pb"]').forEach((pb, pi) => {
+    if (!valid) return;
+    const projSel = pb.querySelector('.pb-project');
+    const projIdx = parseInt(projSel?.value);
+    if (isNaN(projIdx) || projIdx < 0) { toast(`Select project for block ${pi+1}`); valid=false; return; }
+    const proj   = PROJECTS[projIdx];
+    const projId = pb.querySelector('.pb-proj-id')?.value.trim() || proj.id || '';
+    const tasks  = [];
+
+    pb.querySelectorAll('.task-block').forEach((tb, ti) => {
+      if (!valid) return;
+      const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
+      if (isNaN(stageIdx)||stageIdx<0) { toast(`Select task type in project ${pi+1}`); valid=false; return; }
+      const stage   = STAGES[stageIdx];
+      const units   = parseInt(tb.querySelector('.t-units')?.value)||1;
+      const tDate   = tb.querySelector('.t-date')?.value||today;
+      const priority= tb.querySelector('.t-priority')?.value||'Medium';
+      const area    = tb.querySelector('.t-area')?.value.trim()||'';
+      const drawing = tb.querySelector('.t-drawing')?.value.trim()||'';
+      const notes   = tb.querySelector('.t-notes')?.value.trim()||'';
+      const revType = Array.from(tb.querySelectorAll('input[type=radio]')).find(r=>r.checked&&r.name.startsWith('rev-'))?.value||'';
+      const pts     = parseFloat((stage.pts*proj.multiplier*units).toFixed(2));
+      tasks.push({taskType:stage.label,basePts:stage.pts,units,weightedPts:pts,
+                  targetDate:tDate,priority,area,drawing,notes,revisionType:revType});
+      totalPts += pts; totalTasks++;
+    });
+
+    if (tasks.length > 0) {
+      allPayloads.push({
+        action:'assignTasks', assignedBy:assigner, assignedTo:assignee,
+        project:proj.name, projectId:projId,
+        discipline:proj.discipline, multiplier:proj.multiplier,
+        dateAssigned:today, tasks,
+      });
+    }
   });
 
-  if (!valid||!tasks.length) return;
-
-  const payload = {
-    action:'assignTasks', assignedBy:assigner, assignedTo:assignee,
-    project:proj.name, projectId:proj.id||document.getElementById('project-id')?.value||'',
-    discipline:proj.discipline, multiplier:proj.multiplier,
-    dateAssigned:today, tasks,
-  };
+  if (!valid || allPayloads.length === 0) { if(valid) toast('Add at least one task'); return; }
 
   document.getElementById('sending').classList.add('show');
   try {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await new Promise((res,rej) => {
-        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
-        xhr.setRequestHeader('Content-Type','text/plain');
-        xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(payload));
-      });
+      for (let pi=0; pi<allPayloads.length; pi++) {
+        await new Promise((res,rej) => {
+          const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
+          xhr.setRequestHeader('Content-Type','text/plain');
+          xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(allPayloads[pi]));
+        });
+      }
     }
     document.getElementById('sending').classList.remove('show');
-    const totalPts=tasks.reduce((s,t)=>s+t.weightedPts,0).toFixed(1);
+    const projNames = allPayloads.map(p=>p.project).join(', ');
     document.getElementById('success-sub').innerHTML=
-      `<strong>${tasks.length} task${tasks.length!==1?'s':''}</strong> assigned to <strong>${assignee}</strong><br>`+
-      `Project: ${proj.name}<br>Total: ${totalPts} weighted pts<br><br>`+
-      tasks.map(t=>`· ${t.taskType}${t.area?' — '+t.area:''}${t.drawing?' ('+t.drawing+')':''} — due ${t.targetDate}`).join('<br>');
+      `<strong>${totalTasks} task${totalTasks!==1?'s':''}</strong> assigned to <strong>${assignee}</strong><br>`+
+      `Projects: ${projNames}<br>Total: ${totalPts.toFixed(1)} weighted pts`;
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
@@ -543,12 +654,8 @@ function resetForm() {
   document.getElementById('success').classList.remove('show');
   document.getElementById('assigner').value='';
   document.getElementById('assignee').value='';
-  document.getElementById('project').value='';
-  document.getElementById('project-id').value='';
-  document.getElementById('disc-display').textContent='— select project first —';
-  document.getElementById('disc-display').style.color='var(--text2)';
-  document.getElementById('task-blocks').innerHTML='';
-  taskCount=0; addTask(); updateBar(); recalcAll();
+  document.getElementById('project-blocks').innerHTML='';
+  projBlockCount=0; addProjectBlock(); updateBar(); recalcAll();
 }
 
 function toast(msg) {
