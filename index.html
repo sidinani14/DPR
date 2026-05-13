@@ -53,6 +53,20 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .gsignout-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;font-family:'DM Sans',sans-serif}
 .gsignout-btn:hover{color:var(--red)}
 .gblocked{padding:10px 12px;background:var(--red-light);border:1px solid rgba(192,80,80,.3);border-radius:var(--radius-sm);font-size:12px;color:var(--red);margin-top:8px}
+/* Notifications */
+.notif-section{margin-bottom:12px}
+.notif-card{background:var(--surface);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;border-left:3px solid var(--red)}
+.notif-card.correction{border-left-color:var(--amber)}
+.notif-head{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between}
+.notif-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;font-family:'DM Mono',monospace;background:var(--red-light);color:var(--red)}
+.notif-badge.correction{background:var(--amber-light);color:var(--amber)}
+.notif-body{padding:0 14px 10px}
+.notif-task{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px}
+.notif-project{font-size:11px;color:var(--text3);margin-bottom:6px}
+.notif-note{font-size:12px;color:var(--text2);padding:7px 10px;background:var(--surface2);border-radius:4px;line-height:1.5;margin-bottom:8px}
+.notif-change{font-size:11px;color:var(--amber);font-family:'DM Mono',monospace;margin-bottom:6px}
+.notif-seen-btn{font-size:11px;color:var(--green);background:var(--green-light);border:1px solid rgba(74,155,111,.3);border-radius:4px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+
 /* Assigned tasks */
 .assigned-task-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden}
 .assigned-task-card.revision{border-left:3px solid var(--red)}
@@ -174,6 +188,9 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 </div>
 
 <div class="page">
+
+  <!-- Section 0: Notifications (shown only if unseen notifications exist) -->
+  <div id="notif-section" style="display:none" class="notif-section"></div>
 
   <!-- Section 1: Sign In -->
   <div class="card">
@@ -553,6 +570,75 @@ function handleGoogleCredential(payload) {
   document.getElementById('submit-btn').disabled=false;
   updateSubmitBar();
   fetchAssignedTasks();
+  fetchNotifications();
+}
+
+async function fetchNotifications() {
+  const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
+  if (!member || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  try {
+    const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`);
+    const data = await res.json();
+    const notifs = data.notifications || [];
+    renderNotifications(notifs);
+  } catch(e) { console.log('Notifications fetch error:', e); }
+}
+
+function renderNotifications(notifs) {
+  const section = document.getElementById('notif-section');
+  if (!notifs.length) { section.style.display='none'; return; }
+  section.style.display='block';
+
+  const seenRows = [];
+  section.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num" style="background:var(--red)">!</div>
+        <div class="card-title">${notifs.length} update${notifs.length!==1?'s':''} from your lead</div>
+        <button onclick="markAllSeen()" style="margin-left:auto;font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif">Mark all seen</button>
+      </div>
+      <div class="card-body">
+        ${notifs.map(n => {
+          const isCorrection = n.taskTypeCorrected || n.ptsCorrected;
+          return `
+          <div class="notif-card ${isCorrection?'correction':''}">
+            <div class="notif-head">
+              <span class="notif-badge ${isCorrection?'correction':''}">${isCorrection?'Corrected':'Rejected'}</span>
+              <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">${n.date} · ${n.leadName}</span>
+            </div>
+            <div class="notif-body">
+              <div class="notif-task">${n.taskType}</div>
+              <div class="notif-project">${n.project}</div>
+              ${n.note ? `<div class="notif-note">"${n.note}"</div>` : ''}
+              ${n.taskTypeCorrected ? `<div class="notif-change">Task type changed → ${n.taskTypeCorrected}</div>` : ''}
+              ${n.ptsCorrected ? `<div class="notif-change">Points corrected: ${n.ptsOriginal} → ${n.ptsCorrected} pts</div>` : ''}
+              <button class="notif-seen-btn" onclick="markOneSeen(${n.row}, this)">✓ Mark as seen</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+async function markOneSeen(row, btn) {
+  btn.textContent = '✓ Seen'; btn.disabled = true;
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'markNotifSeen', rows:[row]})});
+}
+
+async function markAllSeen() {
+  const section = document.getElementById('notif-section');
+  const rows = [];
+  section.querySelectorAll('.notif-seen-btn').forEach(btn => {
+    const match = btn.getAttribute('onclick')?.match(/markOneSeen\((\d+)/);
+    if (match) rows.push(parseInt(match[1]));
+    btn.textContent='✓ Seen'; btn.disabled=true;
+  });
+  if (!rows.length || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'markNotifSeen', rows})});
+  setTimeout(()=>{ section.style.display='none'; }, 1000);
 }
 
 function signOut() {
@@ -625,10 +711,15 @@ function renderAssignedTasks() {
         </div>
       </div>
       <div class="atc-status-row">
-        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Not Started" ${defaultStatus==='Not Started'?'checked':''}><span class="atc-btn ns">Not Started</span></label>
-        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Ongoing" ${defaultStatus==='Ongoing'?'checked':''}><span class="atc-btn ip">Ongoing</span></label>
-        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Done"><span class="atc-btn dn">Done ✓</span></label>
-        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Blocked"><span class="atc-btn bl">Blocked</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Not Started" ${defaultStatus==='Not Started'?'checked':''} onchange="toggleDoneDate(${i},this)"><span class="atc-btn ns">Not Started</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Ongoing" ${defaultStatus==='Ongoing'?'checked':''} onchange="toggleDoneDate(${i},this)"><span class="atc-btn ip">Ongoing</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Done" onchange="toggleDoneDate(${i},this)"><span class="atc-btn dn">Done ✓</span></label>
+        <label class="atc-opt"><input type="radio" name="atc-${i}" value="Blocked" onchange="toggleDoneDate(${i},this)"><span class="atc-btn bl">Blocked</span></label>
+      </div>
+      <div id="done-date-${i}" style="display:none;padding:0 13px 10px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">ACTUAL COMPLETION DATE</div>
+        <input type="date" class="atc-done-date-${i}" value="${new Date().toISOString().substring(0,10)}"
+          style="font-size:12px;padding:7px 10px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);color-scheme:dark">
       </div>
     </div>`;
   }).join('');
@@ -730,9 +821,18 @@ function addTask(containerId) {
       <div class="task-pts t-pts-display" style="font-size:11px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace">—</div>
       <button class="rm-task" type="button" onclick="this.closest('.task-entry').remove();calcScore()">×</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px">
       <input type="text" class="t-area" placeholder="Area / Space (e.g. Drawing Room)" style="font-size:12px;padding:6px 10px">
       <input type="text" class="t-drawing" placeholder="Drawing name (e.g. False Ceiling Plan)" style="font-size:12px;padding:6px 10px">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">Status:</span>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
+        <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Done" checked style="accent-color:var(--green)"> Done
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
+        <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Ongoing" style="accent-color:var(--amber)"> Ongoing
+      </label>
     </div>`;
   document.getElementById(containerId).appendChild(row);
 }
@@ -744,6 +844,12 @@ function refreshTaskPts(sel) {
   if(!disp) return;
   if(stage?.pts){ disp.textContent=stage.pts+'p'; disp.style.color='var(--green)'; }
   else { disp.textContent='—'; disp.style.color='var(--text3)'; }
+}
+
+function toggleDoneDate(i, radio) {
+  const div = document.getElementById('done-date-'+i);
+  if (!div) return;
+  div.style.display = radio.value === 'Done' ? 'block' : 'none';
 }
 
 function onProjSelect(sel) {
@@ -807,6 +913,7 @@ function collectData() {
     area:t.area||'', drawing:t.drawing||'',
     status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
     note:document.querySelector(`.atc-note-${i}`)?.value.trim()||'',
+    actualCompletionDate:document.querySelector(`.atc-done-date-${i}`)?.value||'',
   }));
 
   const data={
@@ -824,6 +931,7 @@ function collectData() {
     'Projects Count'    : parseInt(document.getElementById('sc-proj').textContent)||0,
   };
 
+  const ongoingTasks = []; // Section 3 ongoing tasks → self-assigned
   let pi=0;
   document.querySelectorAll('.proj-block').forEach(pb=>{
     const pnIdx=parseInt(pb.querySelector('.p-name')?.value);
@@ -838,13 +946,23 @@ function collectData() {
       const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
       const area=tr.querySelector('.t-area')?.value.trim()||'';
       const drawing=tr.querySelector('.t-drawing')?.value.trim()||'';
+      const taskStatus=tr.querySelector('.t-status:checked')?.value||'Done';
       const earned=(stage.pts*proj.multiplier*units).toFixed(1);
-      // Encode area+drawing into the task string for script parsing
-      let taskStr=`${stage.label}`;
-      if(area)    taskStr+=` [Area: ${area}]`;
-      if(drawing) taskStr+=` [Drawing: ${drawing}]`;
-      taskStr+=` ×${units} = ${earned}pts`;
-      tasks.push(taskStr);
+      if (taskStatus === 'Done') {
+        // Done → goes to TASK_LOG for approval
+        let taskStr=stage.label;
+        if(area)    taskStr+=` [Area: ${area}]`;
+        if(drawing) taskStr+=` [Drawing: ${drawing}]`;
+        taskStr+=` ×${units} = ${earned}pts`;
+        tasks.push(taskStr);
+      } else {
+        // Ongoing → create self-assigned task in TASK_ASSIGNMENTS (handled in doPost)
+        ongoingTasks.push({
+          taskType:stage.label, area, drawing, units,
+          basePts:stage.pts, project:proj.name, member:member,
+          discipline:proj.discipline, date:new Date().toISOString().substring(0,10),
+        });
+      }
     });
     const hasVisit=document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
     const vdur=pb.querySelector('.p-vdur')?.value||'';
@@ -856,6 +974,7 @@ function collectData() {
     data[`P${pi} Visit`]       = hasVisit?`${vtype} · ${vdur}`:'No';
     data[`P${pi} Visit Notes`] = hasVisit?pb.querySelector('.p-vnotes')?.value||'':'';
   });
+  data['Ongoing Tasks'] = JSON.stringify(ongoingTasks);
   return data;
 }
 
