@@ -142,8 +142,11 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
     </div>
   </div>
 <div style="max-width:700px;margin:0 auto;padding:10px 20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-  <select id="appr-member-filter" onchange="applyApprFilters()" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 28px 7px 10px;outline:none;appearance:none">
+  <select id="appr-member-filter" onchange="onApprMemberChange()" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 28px 7px 10px;outline:none;appearance:none">
     <option value="all">All team members</option>
+  </select>
+  <select id="appr-project-filter" onchange="applyApprFilters()" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 28px 7px 10px;outline:none;appearance:none">
+    <option value="all">All projects</option>
   </select>
   <input type="date" id="appr-date-filter" onchange="applyApprFilters()"
     style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;outline:none;color-scheme:dark">
@@ -255,6 +258,11 @@ async function fetchAll() {
       const mSel = document.getElementById('appr-member-filter');
       mSel.innerHTML = '<option value="all">All team members</option>' +
         members.map(m => `<option value="${m}">${m}</option>`).join('');
+      // Populate project filter
+      const projects = [...new Set(tasks.map(t => t.project))].sort();
+      const pSel2 = document.getElementById('appr-project-filter');
+      if(pSel2) pSel2.innerHTML = '<option value="all">All projects</option>' +
+        projects.map(p => `<option value="${p}">${p}</option>`).join('');
       LEADS = (configData.leads || []).map(l => l.name);
     }
 
@@ -362,21 +370,37 @@ function renderTasks() {
 }
 
 // ── Decision handling ──────────────────────────────────────────
-function applyApprFilters() {
+function onApprMemberChange() {
   const member = document.getElementById('appr-member-filter').value;
-  const date   = document.getElementById('appr-date-filter').value;
-  let filtered = allTasksRaw;
-  if (member !== 'all') filtered = filtered.filter(t => t.member === member);
-  if (date)             filtered = filtered.filter(t => t.date === date);
+  // Rebuild project filter based on selected member
+  const relevant = member === 'all' ? allTasksRaw : allTasksRaw.filter(t => t.member === member);
+  const projects = [...new Set(relevant.map(t => t.project))].sort();
+  const pSel = document.getElementById('appr-project-filter');
+  pSel.innerHTML = '<option value="all">All projects</option>' +
+    projects.map(p => `<option value="${p}">${p}</option>`).join('');
+  applyApprFilters();
+}
+
+function applyApprFilters() {
+  const member  = document.getElementById('appr-member-filter').value;
+  const project = document.getElementById('appr-project-filter').value;
+  const date    = document.getElementById('appr-date-filter').value;
+  let filtered  = allTasksRaw;
+  if (member  !== 'all') filtered = filtered.filter(t => t.member  === member);
+  if (project !== 'all') filtered = filtered.filter(t => t.project === project);
+  if (date)              filtered = filtered.filter(t => t.date    === date);
   tasks = filtered;
   const fc = document.getElementById('appr-filter-count');
-  if(fc) fc.textContent = filtered.length !== allTasksRaw.length ? `${filtered.length} of ${allTasksRaw.length} shown` : '';
+  if(fc) fc.textContent = filtered.length !== allTasksRaw.length ?
+    `${filtered.length} of ${allTasksRaw.length} shown` : '';
   updateBar(); renderTasks();
 }
 
 function clearApprFilters() {
   document.getElementById('appr-member-filter').value = 'all';
   document.getElementById('appr-date-filter').value = '';
+  const pSel = document.getElementById('appr-project-filter');
+  if(pSel) pSel.value = 'all';
   tasks = allTasksRaw;
   const fc = document.getElementById('appr-filter-count');
   if(fc) fc.textContent = '';
