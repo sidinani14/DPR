@@ -97,6 +97,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="fb on blue" onclick="filterStatus('all',this)">All</div>
   <div class="fb blue" onclick="filterStatus('Upcoming',this)">Upcoming</div>
   <div class="fb amber" onclick="filterStatus('Ongoing',this)">Ongoing</div>
+  <div class="fb orange" onclick="filterStatus('Approval Pending',this)" id="pill-approval" style="background:rgba(234,150,50,.15);color:#EA9632;border-color:rgba(234,150,50,.3)">Approval Pending</div>
   <div class="fb green" onclick="filterStatus('Completed',this)">Completed</div>
   <div class="fb red" onclick="filterStatus('Delayed',this)">Delayed</div>
   <div class="fb purple" onclick="filterStatus('Revision Required',this)">Revision Required</div>
@@ -169,6 +170,8 @@ function updateMetrics() {
   document.getElementById('m-ongoing').textContent   = tasks.filter(t=>t.status==='Ongoing').length;
   document.getElementById('m-completed').textContent = tasks.filter(t=>t.status==='Completed').length;
   document.getElementById('m-delayed').textContent   = tasks.filter(t=>t.status==='Delayed').length;
+  const apEl = document.getElementById('m-approval');
+  if(apEl) apEl.textContent = tasks.filter(t=>t.status==='Approval Pending').length;
   document.getElementById('m-revision').textContent  = tasks.filter(t=>t.status==='Revision Required').length;
 }
 
@@ -276,8 +279,16 @@ function renderTaskList(tasks) {
   }
 
   const today=new Date().toISOString().substring(0,10);
-  const pillMap={'Upcoming':'sp-upcoming','Ongoing':'sp-ongoing','Completed':'sp-completed','Delayed':'sp-delayed','Revision Required':'sp-revision'};
-  const cardMap={'Upcoming':'upcoming','Ongoing':'ongoing','Completed':'completed','Delayed':'delayed','Revision Required':'revision'};
+  const pillMap={
+    'Upcoming':'sp-upcoming','Ongoing':'sp-ongoing','Completed':'sp-completed',
+    'Delayed':'sp-delayed','Revision Required':'sp-revision',
+    'Approval Pending':'sp-approval'
+  };
+  const cardMap={
+    'Upcoming':'upcoming','Ongoing':'ongoing','Completed':'completed',
+    'Delayed':'delayed','Revision Required':'revision',
+    'Approval Pending':'approval'
+  };
   const priMap={'Low':'p-low','Medium':'p-med','High':'p-high'};
 
   document.getElementById('task-list').innerHTML=tasks.map(t=>{
