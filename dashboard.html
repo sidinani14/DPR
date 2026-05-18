@@ -115,32 +115,6 @@ let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', da
 
 window.addEventListener('DOMContentLoaded', loadTasks);
 
-// CORS-safe fetch for Google Apps Script
-function fetchFromScript(action, params) {
-  return new Promise(function(resolve, reject) {
-    var cbName = 'cb_' + Date.now();
-    var url = APPS_SCRIPT_URL + '?action=' + action + '&callback=' + cbName;
-    if (params) {
-      Object.keys(params).forEach(function(k) {
-        url += '&' + k + '=' + encodeURIComponent(params[k]);
-      });
-    }
-    window[cbName] = function(data) {
-      delete window[cbName];
-      document.head.removeChild(script);
-      resolve(data);
-    };
-    var script = document.createElement('script');
-    script.src = url;
-    script.onerror = function() {
-      delete window[cbName];
-      document.head.removeChild(script);
-      reject(new Error('Script load failed'));
-    };
-    document.head.appendChild(script);
-  });
-}
-
 async function loadTasks() {
   document.getElementById('task-list').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
   const demo=APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
@@ -154,7 +128,8 @@ async function loadTasks() {
         {row:6,assignedTo:'Deepak Soni',assignedBy:'Astha',project:'Ajay Chordia',discipline:'Luxury Residential',taskType:'3D Rendering — Interior View',area:'Living Room',drawing:'Final Render v3',units:3,weightedPts:6.75,targetDate:'2026-05-09',priority:'High',status:'Completed',notes:'',revisionTag:'',revisionType:'',completedDate:'2026-05-08'},
       ];
     } else {
-      const data = await fetchFromScript('getAllTasks');
+      const res  = await fetch(APPS_SCRIPT_URL + '?action=getAllTasks');
+      const data = await res.json();
       if (data.error) throw new Error(data.error);
       allTasks=data.tasks||[];
     }
