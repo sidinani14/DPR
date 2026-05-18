@@ -117,7 +117,7 @@ window.addEventListener('DOMContentLoaded', loadTasks);
 
 async function loadTasks() {
   document.getElementById('task-list').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
-  const demo=APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  const demo=APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
   try {
     if (demo) {
       allTasks=[
@@ -136,7 +136,12 @@ async function loadTasks() {
 
     // Populate member filter (preserve current selection if possible)
     const prevMember = document.getElementById('member-filter').value;
-    const members=[...new Set(allTasks.map(t=>t.assignedTo))].sort();
+    // Expand comma-separated assignees into individual names
+    const memberSet = new Set();
+    allTasks.forEach(t => {
+      t.assignedTo.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>memberSet.add(a));
+    });
+    const members = [...memberSet].sort();
     document.getElementById('member-filter').innerHTML='<option value="all">All team</option>'+members.map(m=>`<option value="${m}">${m}</option>`).join('');
     // Restore previous member selection if still valid
     if (prevMember && prevMember !== 'all' && members.includes(prevMember)) {
@@ -154,7 +159,7 @@ async function loadTasks() {
 
 function updateMetrics() {
   let tasks=allTasks;
-  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
   if (dateFilter) {
     const today2 = new Date().toISOString().substring(0,10);
@@ -186,7 +191,7 @@ function rebuildProjectFilter() {
   const prevProject = document.getElementById('project-filter').value;
   const relevantTasks = member === 'all'
     ? allTasks
-    : allTasks.filter(t => t.assignedTo === member);
+    : allTasks.filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(member));
   const projects = [...new Set(relevantTasks.map(t => t.project))].sort();
   const projSel  = document.getElementById('project-filter');
   projSel.innerHTML = '<option value="all">All projects</option>' +
@@ -236,7 +241,7 @@ function setDueWeek() {
   document.getElementById('due-week-btn').classList.add('on');
   const weekEnd = endOfWeek.toISOString().substring(0,10);
   let tasks = allTasks;
-  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
   if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
   // Include tasks due this week + all delayed tasks
@@ -252,7 +257,7 @@ function renderTasks() {
   document.getElementById('due-today-btn')?.classList.remove('on');
   document.getElementById('due-week-btn')?.classList.remove('on');
   let tasks=allTasks;
-  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo===memberFilter);
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
   if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
   if (dateFilter) {
