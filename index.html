@@ -166,6 +166,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 </style>
 </head>
 <body>
+<div id="debug-status" style="display:none;position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#F5A623;padding:8px 12px;font-size:11px;font-family:monospace;z-index:9999;border-bottom:1px solid #F5A623"></div>
 
 <header class="app-header">
   <div class="app-header-inner">
@@ -506,7 +507,13 @@ async function fetchAll() {
       STAGES   = (c.stages  || []).filter(s=>s.pts>0);
       VISITS   = c.visits   || [];
       console.log('Lists loaded — TEAM:', TEAM.length, 'PROJECTS:', PROJECTS.length, 'STAGES:', STAGES.length);
-      if (PROJECTS.length === 0) console.warn('WARNING: No projects returned from getLists', l);
+      // Show status visibly on page
+      const statusDiv = document.getElementById('debug-status');
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = 'TEAM: '+TEAM.length+' | PROJECTS: '+PROJECTS.length+' | STAGES: '+STAGES.length+
+          '<br>Projects: '+PROJECTS.map(function(p){return p.name;}).join(', ');
+      }
       window._EMAILS = l.emails || [];
       window._EMAILS = l.emails || [];
       // Rebuild EMAIL_MAP from live data (overrides hardcoded fallback)
