@@ -141,7 +141,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
 let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
 let projBlockCount = 0;
 let taskCount=0;
@@ -153,7 +153,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function fetchAll() {
-  const demo = APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
       TEAM       = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
@@ -629,10 +629,10 @@ async function submitTasks() {
 
   document.getElementById('sending').classList.add('show');
   try {
-    if (APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
+    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       for (let pi=0; pi<allPayloads.length; pi++) {
         await new Promise((res,rej) => {
-          const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
+          const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
           xhr.setRequestHeader('Content-Type','text/plain');
           xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(allPayloads[pi]));
         });
