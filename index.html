@@ -345,6 +345,9 @@ function setDeadlineBanner() {
 
 async function fetchAll() {
   const demo = APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  // Show loading indicator immediately
+  const statusDiv = document.getElementById('debug-status');
+  if (statusDiv) { statusDiv.style.display='block'; statusDiv.textContent='Loading form data...'; }
   try {
     if (demo) {
       TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
@@ -496,30 +499,35 @@ async function fetchAll() {
   {duration:"Full Day",pts:6.0}
 ];
     } else {
-      const [l,c] = await Promise.all([
-        fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'getLists'})}).then(r=>r.json()),
-        fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'getConfig'})}).then(r=>r.json()),
-      ]);
-      if (l.error) throw new Error('Lists: '+l.error);
-      if (c.error) throw new Error('Config: '+c.error);
+      const sd = document.getElementById('debug-status');
+      // Fetch with 15 second timeout
+      function fetchWithTimeout(url, opts, ms) {
+        return Promise.race([
+          fetch(url, opts).then(r=>r.json()),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout after '+ms+'ms')),ms))
+        ]);
+      }
+      if(sd) sd.textContent = 'Fetching lists...';
+      const l = await fetchWithTimeout(APPS_SCRIPT_URL,
+        {method:'POST', body:JSON.stringify({action:'getLists'})}, 15000);
+      if(sd) sd.textContent = 'Lists OK, fetching config...';
+      if (l.error || l.status==='error') throw new Error('Lists error: '+(l.error||l.message));
+
+      const c = await fetchWithTimeout(APPS_SCRIPT_URL,
+        {method:'POST', body:JSON.stringify({action:'getConfig'})}, 15000);
+      if(sd) sd.textContent = 'Config OK, building form...';
+      if (c.error || c.status==='error') throw new Error('Config error: '+(c.error||c.message));
+
       TEAM     = l.team     || [];
       PROJECTS = l.projects || [];
       STAGES   = (c.stages  || []).filter(s=>s.pts>0);
       VISITS   = c.visits   || [];
-      console.log('Lists loaded — TEAM:', TEAM.length, 'PROJECTS:', PROJECTS.length, 'STAGES:', STAGES.length);
-      // Show status visibly on page
-      const statusDiv = document.getElementById('debug-status');
-      if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.innerHTML = 'TEAM: '+TEAM.length+' | PROJECTS: '+PROJECTS.length+' | STAGES: '+STAGES.length+
-          '<br>Projects: '+PROJECTS.map(function(p){return p.name;}).join(', ');
-      }
       window._EMAILS = l.emails || [];
-      window._EMAILS = l.emails || [];
-      // Rebuild EMAIL_MAP from live data (overrides hardcoded fallback)
       if (window._EMAILS.length > 0) {
         TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
       }
+      if(sd) sd.innerHTML = 'TEAM:'+TEAM.length+' | PROJECTS:'+PROJECTS.length+' | STAGES:'+STAGES.length+
+        '<br>'+PROJECTS.map(function(p){return p.name;}).slice(0,5).join(', ');
     }
     buildMemberDropdown();
     addProject(false);
