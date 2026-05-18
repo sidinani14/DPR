@@ -632,7 +632,7 @@ async function submitTasks() {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       for (let pi=0; pi<allPayloads.length; pi++) {
         await new Promise((res,rej) => {
-          const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
+          const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); 
           xhr.setRequestHeader('Content-Type','text/plain');
           xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(allPayloads[pi]));
         });
