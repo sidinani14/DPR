@@ -110,7 +110,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
 let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='';
 
 window.addEventListener('DOMContentLoaded', loadTasks);
@@ -143,7 +143,7 @@ function fetchFromScript(action, params) {
 
 async function loadTasks() {
   document.getElementById('task-list').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
-  const demo=APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+  const demo=APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
   try {
     if (demo) {
       allTasks=[
