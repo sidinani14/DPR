@@ -317,7 +317,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
 const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 
 let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[];
@@ -343,7 +343,7 @@ function setDeadlineBanner() {
 }
 
 async function fetchAll() {
-  const demo = APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
+  const demo = APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
       TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
@@ -575,9 +575,9 @@ function handleGoogleCredential(payload) {
 
 async function fetchNotifications() {
   const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
-  if (!member || APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') return;
+  if (!member || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
   try {
-    const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`);
+    const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`, {redirect:'follow', mode:'cors', credentials:'omit'});
     const data = await res.json();
     const notifs = data.notifications || [];
     renderNotifications(notifs);
@@ -622,7 +622,7 @@ function renderNotifications(notifs) {
 
 async function markOneSeen(row, btn) {
   btn.textContent = '✓ Seen'; btn.disabled = true;
-  if (APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') return;
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
   await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'markNotifSeen', rows:[row]})});
 }
@@ -635,7 +635,7 @@ async function markAllSeen() {
     if (match) rows.push(parseInt(match[1]));
     btn.textContent='✓ Seen'; btn.disabled=true;
   });
-  if (!rows.length || APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') return;
+  if (!rows.length || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
   await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'markNotifSeen', rows})});
   setTimeout(()=>{ section.style.display='none'; }, 1000);
@@ -664,13 +664,13 @@ async function fetchAssignedTasks() {
   document.getElementById('assigned-count').textContent='loading…';
 
   try {
-    if (APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
+    if (APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       assignedTasks=[
         {row:2,taskType:'ID Working Drawing — False Ceiling',project:'Ajay Chordia',area:'Drawing Room',drawing:'False Ceiling Plan v1',units:1,weightedPts:2.25,targetDate:'2026-05-10',priority:'High',status:'Ongoing',notes:'Check light positions',revisionTag:'',revisionType:''},
         {row:3,taskType:'Working Drawing — Floor Plan',project:'Multani Jewellers',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'R1',revisionType:'Internal'},
       ];
     } else {
-      const res  = await fetch(`${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`);
+      const res  = await fetch(`${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`, {redirect:'follow', mode:'cors', credentials:'omit'});
       const data = await res.json();
       assignedTasks = data.tasks || [];
     }
@@ -991,9 +991,9 @@ async function submitForm() {
   if (!validate(data)) return;
   document.getElementById('sending').classList.add('show');
   try {
-    if (APPS_SCRIPT_URL!=='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
+    if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       await new Promise((res,rej)=>{
-        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
+        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
         xhr.setRequestHeader('Content-Type','text/plain');
         xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(data));
       });
