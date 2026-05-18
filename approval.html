@@ -229,7 +229,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ── Fetch leads + tasks in parallel ──────────────────────────
 async function fetchAll() {
-  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  const demo = APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
   try {
     if (demo) {
       LEADS = ['Siddharth Inani', 'Astha Inani'];
@@ -496,7 +496,7 @@ async function submitApprovals() {
   }));
 
   try {
-    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    if (APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
       // Use XMLHttpRequest with text/plain to bypass CORS preflight
       // Apps Script accepts this and parses the JSON body correctly
       await new Promise((resolve, reject) => {
