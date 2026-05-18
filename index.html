@@ -998,10 +998,9 @@ async function submitForm() {
   document.getElementById('sending').classList.add('show');
   try {
     if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await new Promise((res,rej)=>{
-        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); 
-        xhr.setRequestHeader('Content-Type','text/plain');
-        xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(data));
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(data),
       });
     }
     document.getElementById('sending').classList.remove('show');
