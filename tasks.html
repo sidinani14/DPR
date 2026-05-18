@@ -629,7 +629,7 @@ async function submitTasks() {
 
   document.getElementById('sending').classList.add('show');
   try {
-    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    if (APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
       for (let pi=0; pi<allPayloads.length; pi++) {
         await new Promise((res,rej) => {
           const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
