@@ -3,665 +3,328 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>IDS · Task Assignment</title>
+<title>IDS · Task Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#222;--surface3:#2A2A2A;--border:#2E2E2E;--border2:#3A3A3A;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--accent-light:rgba(200,169,110,.1);--green:#4A9B6F;--green-light:rgba(74,155,111,.12);--red:#C05050;--red-light:rgba(192,80,80,.12);--amber:#C8863A;--amber-light:rgba(200,134,58,.12);--radius:10px;--radius-sm:6px}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px}
+:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#222;--surface3:#2A2A2A;--border:#2E2E2E;--border2:#3A3A3A;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--accent-light:rgba(200,169,110,.1);--green:#4A9B6F;--green-light:rgba(74,155,111,.12);--red:#C05050;--red-light:rgba(192,80,80,.12);--amber:#C8863A;--amber-light:rgba(200,134,58,.12);--blue:#4A7FC8;--blue-light:rgba(74,127,200,.12);--purple:#8B6FC8;--purple-light:rgba(139,111,200,.12);--radius:10px;--radius-sm:6px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px;position:sticky;top:0;z-index:100}
-.header-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.header-inner{max-width:700px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .logo-text{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--accent)}
 .logo-sub{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px}
-.header-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
-.page{max-width:640px;margin:0 auto;padding:20px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
-.card-head{padding:13px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
-.card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text)}
-.card-sub{font-size:11px;color:var(--text3);margin-left:auto;font-family:'DM Mono',monospace}
-.card-body{padding:16px 18px}
-.field{margin-bottom:12px}.field:last-child{margin-bottom:0}
-.lbl{font-size:10px;color:var(--text2);margin-bottom:5px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:4px}
-.req{color:var(--red)}.opt{color:var(--text3)}
-select,input[type=text],input[type=date],input[type=number],textarea{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .15s}
-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235A5652' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-select:focus,input:focus,textarea:focus{border-color:var(--accent);background:var(--surface3)}
-input[type=date]{color-scheme:dark}
-textarea{resize:vertical;min-height:60px;line-height:1.5}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.row3{display:grid;grid-template-columns:1fr 1fr 80px;gap:8px}
-.divider{height:1px;background:var(--border);margin:13px 0}
-.auto-display{font-size:13px;color:var(--accent);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Mono',monospace}
-.task-block{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden}
-.task-block:last-child{margin-bottom:0}
-.task-block-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.task-block-title{font-size:11px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace;letter-spacing:.05em}
-.task-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-family:'DM Sans',sans-serif}
-.task-remove:hover{color:var(--red);border-color:var(--red)}
-.task-block-body{padding:13px 14px}
-.pts-preview{background:var(--accent-light);border:1px solid rgba(200,169,110,.2);border-radius:var(--radius-sm);padding:8px 12px;margin-top:10px;display:flex;align-items:center;justify-content:space-between}
-.pts-label{font-size:11px;color:var(--accent);font-family:'DM Mono',monospace}
-.pts-val{font-size:16px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
-.rev-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.rev-opt{cursor:pointer}
-.rev-opt input{display:none}
-.rev-btn{display:block;padding:8px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;text-align:center}
-.rev-opt input:checked+.rev-btn.orig{border-color:var(--green);background:var(--green-light);color:var(--green);font-weight:500}
-.rev-opt input:checked+.rev-btn.int{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
-.rev-opt input:checked+.rev-btn.cli{border-color:var(--amber);background:var(--amber-light);color:var(--amber);font-weight:500}
-.add-task-btn{width:100%;padding:11px;font-size:13px;color:var(--accent);background:var(--accent-light);border:1px dashed rgba(200,169,110,.3);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
-.add-task-btn:hover{background:rgba(200,169,110,.18)}
-.add-task-btn:disabled{opacity:.35;cursor:not-allowed}
-.total-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;display:none}
-.total-label{font-size:12px;color:var(--text2);font-family:'DM Mono',monospace}
-.total-value{font-size:20px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
-.total-count{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;text-align:right}
-.skeleton{height:40px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm)}
+.header-controls{display:flex;align-items:center;gap:8px}
+.filter-sel{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 28px 7px 10px;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235A5652' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.refresh-btn{padding:7px 12px;font-size:11px;color:var(--accent);background:var(--accent-light);border:1px solid var(--accent-light);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif}
+.metrics{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px}
+.metrics-inner{max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden}
+.met-cell{background:var(--surface2);padding:10px 14px;text-align:center}
+.met-val{font-size:20px;font-weight:500;color:var(--text);line-height:1;font-family:'DM Mono',monospace}
+.met-val.green{color:var(--green)}.met-val.red{color:var(--red)}.met-val.amber{color:var(--amber)}.met-val.blue{color:var(--blue)}.met-val.purple{color:var(--purple)}
+.met-lbl{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+.filter-row{max-width:700px;margin:0 auto;padding:14px 20px;display:flex;gap:6px;flex-wrap:wrap}
+.fb{font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.fb.on{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:500}
+.fb.green.on{background:var(--green-light);border-color:var(--green);color:var(--green)}
+.fb.red.on{background:var(--red-light);border-color:var(--red);color:var(--red)}
+.fb.amber.on{background:var(--amber-light);border-color:var(--amber);color:var(--amber)}
+.fb.blue.on{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+.fb.purple.on{background:var(--purple-light);border-color:var(--purple);color:var(--purple)}
+.page{max-width:700px;margin:0 auto;padding:0 20px 20px}
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;transition:border-color .2s}
+.task-card.upcoming{border-left:3px solid var(--blue)}
+.task-card.ongoing{border-left:3px solid var(--amber)}
+.task-card.completed{border-left:3px solid var(--green)}
+.task-card.delayed{border-left:3px solid var(--red)}
+.task-card.revision{border-left:3px solid var(--purple)}
+.task-head{padding:12px 16px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+.task-member{font-size:13px;font-weight:500;color:var(--text)}
+.task-project{font-size:11px;color:var(--text3);margin-top:2px}
+.status-pill{font-size:10px;padding:3px 9px;border-radius:10px;font-weight:500;white-space:nowrap;font-family:'DM Mono',monospace}
+.sp-upcoming{background:var(--blue-light);color:var(--blue)}
+.sp-ongoing{background:var(--amber-light);color:var(--amber)}
+.sp-completed{background:var(--green-light);color:var(--green)}
+.sp-delayed{background:var(--red-light);color:var(--red)}
+.sp-revision{background:var(--purple-light);color:var(--purple)}
+.task-body{padding:0 16px 14px}
+.task-type{font-size:14px;font-weight:500;color:var(--text);margin-bottom:4px}
+.task-area{font-size:12px;color:var(--accent);margin-bottom:6px;font-family:'DM Mono',monospace}
+.task-drawing{font-size:11px;color:var(--text3);margin-bottom:6px}
+.task-meta{display:flex;flex-wrap:wrap;gap:12px}
+.tm{font-size:11px;color:var(--text3)}
+.tm span{color:var(--text2);font-weight:500}
+.tm.overdue span{color:var(--red)}
+.priority-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.p-low{background:var(--green)}.p-med{background:var(--amber)}.p-high{background:var(--red)}
+.task-notes{font-size:11px;color:var(--text3);margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:4px;line-height:1.5;font-style:italic}
+.revision-badge{font-size:11px;color:var(--purple);margin-top:6px;padding:4px 8px;background:var(--purple-light);border-radius:4px;display:inline-block}
+.task-done-date{font-size:11px;color:var(--green);margin-top:6px;font-family:'DM Mono',monospace}
+.empty{text-align:center;padding:60px 20px}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--text2)}
+.skeleton{height:100px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius);margin-bottom:10px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;z-index:100}
-.submit-bar-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:12px}
-.sbar-info{flex:1}
-.sbar-name{font-size:13px;font-weight:500;color:var(--text)}
-.sbar-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
-.submit-btn{padding:11px 28px;background:var(--accent);color:#0F0F0F;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;white-space:nowrap;transition:opacity .15s;flex-shrink:0}
-.submit-btn:hover{opacity:.85}
-.submit-btn:disabled{opacity:.3;cursor:not-allowed}
-.sending{display:none;position:fixed;inset:0;background:rgba(15,15,15,.92);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px}
-.sending.show{display:flex}
-.spinner{width:34px;height:34px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.sending-txt{font-size:13px;color:var(--text2)}
-.success{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px}
-.success.show{display:flex}
-.success-icon{width:56px;height:56px;border-radius:50%;background:var(--green-light);border:1.5px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
-.success-icon svg{width:24px;height:24px;stroke:var(--green)}
-.success-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px}
-.success-sub{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px;max-width:360px}
-.close-btn{padding:10px 24px;background:var(--accent);color:#0F0F0F;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
-.toast.show{opacity:1}
-@media(max-width:420px){.row2,.row3{grid-template-columns:1fr}}
+@media(max-width:500px){.metrics-inner{grid-template-columns:repeat(3,1fr)}.met-cell:nth-child(4),.met-cell:nth-child(5){display:none}}
 </style>
 </head>
 <body>
 <header class="header">
   <div class="header-inner">
-    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Task Assignment</div></div>
-    <div class="header-date" id="header-date"></div>
+    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Task Dashboard</div></div>
+    <div class="header-controls">
+      <select class="filter-sel" id="member-filter" onchange="onMemberChange()"><option value="all">All team</option></select>
+      <select class="filter-sel" id="project-filter" onchange="applyFilters()"><option value="all">All projects</option></select>
+      <input type="date" id="date-filter" onchange="applyFilters()" title="Filter by due date"
+        style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;outline:none;color-scheme:dark">
+      <button class="refresh-btn" onclick="document.getElementById('date-filter').value='';applyFilters()" title="Clear date filter" style="padding:7px 8px">✕ Date</button>
+      <button class="refresh-btn" onclick="loadTasks()">↻ Refresh</button>
+    </div>
   </div>
 </header>
-<div class="page">
-  <div class="card">
-    <div class="card-head"><div class="card-title">Assignment details</div><div class="card-sub">required</div></div>
-    <div class="card-body">
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Assigned by <span class="req">*</span></div>
-          <div id="assigner-wrap"><div class="skeleton"></div></div>
-        </div>
-        <div class="field">
-          <div class="lbl">Assign to <span class="req">*</span></div>
-          <div id="assignee-wrap"><div class="skeleton"></div></div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Project blocks — one per project -->
-  <div id="project-blocks"></div>
-
-  <button class="add-task-btn" id="add-proj-btn" onclick="addProjectBlock()" disabled style="margin-bottom:14px">
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
-    Add another project
-  </button>
-
-  <div class="total-strip" id="total-strip">
-    <div><div class="total-label">Total weighted points</div><div class="total-count" id="total-count"></div></div>
-    <div class="total-value" id="total-pts">0.0</div>
+<div class="metrics">
+  <div class="metrics-inner">
+    <div class="met-cell"><div class="met-val blue" id="m-upcoming">—</div><div class="met-lbl">Upcoming</div></div>
+    <div class="met-cell"><div class="met-val amber" id="m-ongoing">—</div><div class="met-lbl">Ongoing</div></div>
+    <div class="met-cell"><div class="met-val green" id="m-completed">—</div><div class="met-lbl">Completed</div></div>
+    <div class="met-cell"><div class="met-val red" id="m-delayed">—</div><div class="met-lbl">Delayed</div></div>
+    <div class="met-cell"><div class="met-val purple" id="m-revision">—</div><div class="met-lbl">Revision</div></div>
   </div>
 </div>
 
-<div class="submit-bar">
-  <div class="submit-bar-inner">
-    <div class="sbar-info">
-      <div class="sbar-name" id="sbar-name">Loading…</div>
-      <div class="sbar-sub" id="sbar-sub">fill all required fields</div>
-    </div>
-    <button class="submit-btn" id="submit-btn" onclick="submitTasks()" disabled>Assign Tasks</button>
-  </div>
+<div class="filter-row">
+  <div class="fb on blue" onclick="filterStatus('all',this)">All</div>
+  <div class="fb blue" onclick="filterStatus('Upcoming',this)">Upcoming</div>
+  <div class="fb amber" onclick="filterStatus('Ongoing',this)">Ongoing</div>
+  <div class="fb orange" onclick="filterStatus('Approval Pending',this)" id="pill-approval" style="background:rgba(234,150,50,.15);color:#EA9632;border-color:rgba(234,150,50,.3)">Approval Pending</div>
+  <div class="fb green" onclick="filterStatus('Completed',this)">Completed</div>
+  <div class="fb red" onclick="filterStatus('Delayed',this)">Delayed</div>
+  <div class="fb purple" onclick="filterStatus('Revision Required',this)">Revision Required</div>
+  <div class="fb" onclick="setDueToday()" id="due-today-btn" style="margin-left:auto">📅 Due Today</div>
+  <div class="fb" onclick="setDueWeek()" id="due-week-btn">📅 Due This Week</div>
 </div>
 
-<div class="sending" id="sending"><div class="spinner"></div><div class="sending-txt">Saving tasks…</div></div>
-<div class="success" id="success">
-  <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 7"/></svg></div>
-  <div class="success-title">Tasks Assigned!</div>
-  <div class="success-sub" id="success-sub"></div>
-  <button class="close-btn" onclick="resetForm()">Assign More Tasks</button>
-</div>
-<div class="toast" id="toast"></div>
+<div class="page"><div id="task-list">
+  <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+</div></div>
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
-let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
-let projBlockCount = 0;
-let taskCount=0;
+let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='';
 
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('header-date').textContent =
-    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
-  fetchAll();
-});
+window.addEventListener('DOMContentLoaded', loadTasks);
 
-async function fetchAll() {
-  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+async function loadTasks() {
+  document.getElementById('task-list').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+  const demo=APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
   try {
     if (demo) {
-      TEAM       = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
-      ALL_MEMBERS = ["Aaditya Koshti", "Aashi Agrawal", "Achal Rathore", "Aman Raghuwanshi", "Astha Inani", "Bhavesh Bhagwat", "Deepak Soni", "Himanshu Malviya", "Khushi Agrawal", "Poorvi Goyal", "Sahil Maurya", "Siddharth Inani", "Simi"];
-      PROJECTS = [
-  {id:"P001",name:"Ajay Chordia",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P002",name:"Rohit Jain",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P003",name:"Tarun Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P004",name:"Vishal Gautam",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P005",name:"Dr. Aalok Somani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P006",name:"Yuga Doshi",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P007",name:"Amit Maheshwari",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P008",name:"Tulsivanam",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"P009",name:"Naman Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P010",name:"Bhandari Furnitures",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P011",name:"Multani Jewellers",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P012",name:"Abhay Nagar",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P013",name:"Agrawal House Harda",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P014",name:"Harsh Gupta",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P015",name:"Krishna Mandowara",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P016",name:"Sanjay Chauhan",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P017",name:"Simrol Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
-  {id:"P018",name:"Venkatesh Mandir",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P019",name:"Bhopal Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
-  {id:"P020",name:"Abhay Dhoot",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P021",name:"Madhur Business Park",discipline:"High-rise Commercial",multiplier:1.0,status:""},
-  {id:"P022",name:"Ratnesh Agrawal - Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P023",name:"Sawariya Enclave Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P024",name:"Sawariya Hills",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P025",name:"Aditya Jhawar",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P026",name:"Shrijii Township Narmadapuram",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P027",name:"Ritesh Somani",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P028",name:"Sameer Yadav",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P029",name:"Hemant kakani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P030",name:"Nilesh Lathi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"P031",name:"BBM Indore",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P032",name:"BBM Mhow",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P033",name:"Param - 40' x 60' Ratnesh",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P034",name:"Sai Kripa Biaora",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P035",name:"Chaman Rai",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Aditya Modi",discipline:"Hospitality 5-star (150+ keys)",multiplier:2.5,status:""},
-  {id:"",name:"Sonu Sengar",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
-  {id:"",name:"Nikhar Garg Farm house",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
-  {id:"",name:"Satnam Bagga Commercial",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Kunjan Anil Mittal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Vikas Gupta",discipline:"High-rise Commercial",multiplier:1.0,status:""},
-  {id:"",name:"Shivesh Kanadiya",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"",name:"140 Mittal",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"",name:"Tinu Doshi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"",name:"Deedwaniya Parisar",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Alankar Wadhwani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"",name:"Pradeep Sodani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Payal Khandelwal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Bhavesh Kothari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Shubham Samriddhi",discipline:"Township / Plotted Dev. (> 10 acre)",multiplier:1.8,status:""},
-  {id:"",name:"SBRE Mhow",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"",name:"SBRE Budni",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"",name:"SBRE HGB",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"",name:"Deokar Hospital",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Pratik Jain",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Mayank Makhija",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Shubham Samridddhi Self Residence",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Girish Laddha",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Gagan Beesani 2 Projects",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Anand Shah 2bhk",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Nakoda Estate",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Shaily Farm House",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"KK Farm House",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Anand Beesani",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Govind Laddha",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Narmada House Biaora - Lakshya",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Laabham Housing",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Rajpal Bhati Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Pradeep Mundra",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Gurudwara",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"SBRE Row Housing",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Anand Malviya",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Tarun Maheshwari Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Dinesh Maheshwari",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"SBRE Itarsi",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"SBRE Babai",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"AD Fefartal Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Sampat Demo Flats",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Vaibhav Beesani",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Apex Pools",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Navneet Palrecha",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Kurawar Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Shaily Ahuja",discipline:"",multiplier:1.0,status:""}
-];
-      STAGES   = [
-  {label:"Concept / Schematic \u2014 Layout",pts:3.0,category:"Concept / Schematic"},
-  {label:"Concept / Schematic \u2014 3D Massing",pts:2.0,category:"Concept / Schematic"},
-  {label:"Design Development \u2014 Plan",pts:4.0,category:"Design Development"},
-  {label:"Design Development \u2014 Elevation",pts:3.0,category:"Design Development"},
-  {label:"Design Development \u2014 Section",pts:3.0,category:"Design Development"},
-  {label:"Working Drawing \u2014 Floor Plan",pts:2.0,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Reflected Ceiling Plan",pts:2.0,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 External Elevation",pts:2.0,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Section Detail",pts:1.5,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Door / Window Schedule",pts:1.5,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Toilet Detail",pts:1.5,category:"Construction Documents"},
-  {label:"Structural \u2014 Foundation Layout",pts:3.0,category:"Construction Documents"},
-  {label:"Structural \u2014 Beam & Slab",pts:3.0,category:"Construction Documents"},
-  {label:"Structural \u2014 Lintel & Staircase",pts:2.5,category:"Construction Documents"},
-  {label:"Structural \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Electrical \u2014 Slab Drawing",pts:2.0,category:"Construction Documents"},
-  {label:"Electrical \u2014 Wall Drawing",pts:2.0,category:"Construction Documents"},
-  {label:"Electrical \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Plumbing \u2014 Underground Sanitation",pts:2.5,category:"Construction Documents"},
-  {label:"Plumbing \u2014 Per Floor",pts:2.0,category:"Construction Documents"},
-  {label:"Plumbing \u2014 Rainwater Disposal",pts:1.5,category:"Construction Documents"},
-  {label:"Plumbing \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Firefighting / HVAC Layout",pts:2.0,category:"Construction Documents"},
-  {label:"Firefighting / HVAC Layout \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"ID Concept \u2014 Mood Board",pts:2.0,category:"Interior Design"},
-  {label:"ID Concept \u2014 Space Planning",pts:3.0,category:"Interior Design"},
-  {label:"ID Design \u2014 2D Layout per Room",pts:2.0,category:"Interior Design"},
-  {label:"ID Design \u2014 Elevation per Room",pts:2.0,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Furniture Layout",pts:2.0,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 False Ceiling",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Flooring Pattern",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Wall Panelling",pts:2.0,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Electrical Layout",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Plumbing Layout",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Joinery Detail",pts:2.0,category:"Interior Design"},
-  {label:"Material Selection \u2014 Finishes",pts:1.5,category:"Interior Design"},
-  {label:"Material Selection \u2014 Furniture",pts:1.5,category:"Interior Design"},
-  {label:"BOQ \u2014 Interior",pts:2.0,category:"Interior Design"},
-  {label:"3D Modelling \u2014 Exterior",pts:3.0,category:"3D / Visualization"},
-  {label:"3D Modelling \u2014 Interior per Room",pts:2.0,category:"3D / Visualization"},
-  {label:"3D Rendering \u2014 Exterior View",pts:2.0,category:"3D / Visualization"},
-  {label:"3D Rendering \u2014 Interior View",pts:1.5,category:"3D / Visualization"},
-  {label:"3D Rendering \u2014 Aerial / Bird's Eye",pts:2.5,category:"3D / Visualization"},
-  {label:"Walkthrough / Animation",pts:4.0,category:"3D / Visualization"},
-  {label:"Photoshop / Post-processing",pts:1.0,category:"3D / Visualization"},
-  {label:"Presentation Deck",pts:1.5,category:"3D / Visualization"},
-  {label:"Coordination \u2014 Consultant",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Approval / Liaison \u2014 Corporation",pts:2.0,category:"Coordination / Approvals"},
-  {label:"Sale / Corporation Drawing",pts:2.0,category:"Construction Documents"},
-  {label:"Area Statement / BOQ",pts:1.5,category:"Coordination / Approvals"},
-  {label:"Procurement \u2014 Vendor Coordination",pts:1.0,category:"Coordination / Approvals"}
-];
+      allTasks=[
+        {row:2,assignedTo:'Bhavesh Bhagwat',assignedBy:'Siddharth',project:'Ajay Chordia',discipline:'Luxury Residential',taskType:'ID Working Drawing — False Ceiling',area:'Drawing Room',drawing:'False Ceiling Plan v1',units:1,weightedPts:2.25,targetDate:'2026-05-10',priority:'High',status:'Ongoing',notes:'Check light positions',revisionTag:'',revisionType:'',completedDate:''},
+        {row:3,assignedTo:'Bhavesh Bhagwat',assignedBy:'Astha',project:'Multani Jewellers',discipline:'Commercial',taskType:'Working Drawing — Floor Plan',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Revision Required',notes:'',revisionTag:'R1',revisionType:'Internal',completedDate:''},
+        {row:4,assignedTo:'Sahil Maurya',assignedBy:'Siddharth',project:'Rohit Jain',discipline:'Premium Residential',taskType:'ID Design — Elevation per Room',area:'Master Bedroom',drawing:'North Elevation',units:2,weightedPts:4.0,targetDate:'2026-05-12',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'',revisionType:'',completedDate:''},
+        {row:5,assignedTo:'Aman Raghuvanshi',assignedBy:'Siddharth',project:'Multani Jewellers',discipline:'Commercial',taskType:'Coordination — Consultant',area:'',drawing:'',units:1,weightedPts:2.0,targetDate:'2026-05-06',priority:'High',status:'Delayed',notes:'',revisionTag:'',revisionType:'',completedDate:''},
+        {row:6,assignedTo:'Deepak Soni',assignedBy:'Astha',project:'Ajay Chordia',discipline:'Luxury Residential',taskType:'3D Rendering — Interior View',area:'Living Room',drawing:'Final Render v3',units:3,weightedPts:6.75,targetDate:'2026-05-09',priority:'High',status:'Completed',notes:'',revisionTag:'',revisionType:'',completedDate:'2026-05-08'},
+      ];
     } else {
-      const [l,c] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
-        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
-      ]);
-      if (l.error) throw new Error('Lists: '+l.error);
-      if (c.error) throw new Error('Config: '+c.error);
-      TEAM        = l.team       || [];
-      ALL_MEMBERS = l.allMembers || l.team || []; // fallback to team if allMembers not present
-      PROJECTS    = l.projects   || [];
-      STAGES   = (c.stages  || []).filter(s => s.pts > 0); // skip category headers
+      const res=await fetch(`${APPS_SCRIPT_URL}?action=getAllTasks`);
+      const data=await res.json();
+      if (data.error) throw new Error(data.error);
+      allTasks=data.tasks||[];
     }
-    buildForm();
+
+    // Populate member filter (preserve current selection if possible)
+    const prevMember = document.getElementById('member-filter').value;
+    // Expand comma-separated assignees into individual names
+    const memberSet = new Set();
+    allTasks.forEach(t => {
+      t.assignedTo.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>memberSet.add(a));
+    });
+    const members = [...memberSet].sort();
+    document.getElementById('member-filter').innerHTML='<option value="all">All team</option>'+members.map(m=>`<option value="${m}">${m}</option>`).join('');
+    // Restore previous member selection if still valid
+    if (prevMember && prevMember !== 'all' && members.includes(prevMember)) {
+      document.getElementById('member-filter').value = prevMember;
+      memberFilter = prevMember;
+    }
+    // Build project filter based on current member selection
+    rebuildProjectFilter();
+
+    updateMetrics(); renderTasks();
   } catch(e) {
-    document.getElementById('sbar-name').textContent = 'Failed to load: '+e.message;
+    document.getElementById('task-list').innerHTML=`<div style="color:var(--red);padding:20px;font-size:13px">Failed: ${e.message}</div>`;
   }
 }
 
-function buildForm() {
-  const teamOpts = '<option value="">— select —</option>'+ALL_MEMBERS.map(t=>`<option>${t}</option>`).join('');
-
-  ['assigner','assignee'].forEach(id => {
-    const s=document.createElement('select'); s.id=id; s.onchange=updateBar;
-    s.innerHTML=teamOpts;
-    document.getElementById(`${id}-wrap`).innerHTML='';
-    document.getElementById(`${id}-wrap`).appendChild(s);
-  });
-
-  document.getElementById('add-proj-btn').disabled=false;
-  document.getElementById('submit-btn').disabled=false;
-  document.getElementById('sbar-name').textContent='Select assigner and assignee';
-  addProjectBlock(); // add first project block
-}
-
-function projOptions() {
-  return '<option value="">— select project —</option>'+
-    PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
-}
-
-function stageOpts() {
-  return '<option value="">— select task type —</option>'+
-    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
-}
-
-function addProjectBlock() {
-  projBlockCount++;
-  const pid = `pb${projBlockCount}`;
-  const div = document.createElement('div');
-  div.className = 'card'; div.id = pid;
-  div.style.marginBottom = '14px';
-  div.innerHTML = `
-    <div class="card-head">
-      <div class="card-title">Project ${projBlockCount}</div>
-      ${projBlockCount > 1 ? `<button onclick="removeProjBlock('${pid}')" style="margin-left:auto;font-size:11px;color:var(--red);background:none;border:1px solid var(--red);border-radius:4px;padding:2px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Remove</button>` : ''}
-    </div>
-    <div class="card-body">
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Project <span class="req">*</span></div>
-          <select class="pb-project" onchange="onProjBlockChange(this)">${projOptions()}</select>
-        </div>
-        <div class="field">
-          <div class="lbl">Project ID <span class="opt">optional</span></div>
-          <input type="text" class="pb-proj-id" placeholder="e.g. P001">
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Discipline <span style="font-size:10px;color:var(--text3)">auto from project</span></div>
-        <div class="auto-display pb-disc-display">— select project first —</div>
-      </div>
-      <div class="divider"></div>
-      <div class="pb-tasks"></div>
-      <button class="add-task-btn" onclick="addTaskToBlock('${pid}')" style="margin-top:8px">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
-        Add task to this project
-      </button>
-    </div>`;
-  document.getElementById('project-blocks').appendChild(div);
-  addTaskToBlock(pid);
-  recalcAll();
-}
-
-function removeProjBlock(pid) {
-  document.getElementById(pid).remove();
-  recalcAll();
-}
-
-function onProjBlockChange(sel) {
-  const idx  = parseInt(sel.value);
-  const proj = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
-  const card = sel.closest('.card-body');
-  const disp = card?.querySelector('.pb-disc-display');
-  const idIn = card?.querySelector('.pb-proj-id');
-  if (disp) {
-    if (proj) { disp.textContent = proj.discipline + '  ·  ' + proj.multiplier + 'x'; disp.style.color = 'var(--accent)'; }
-    else { disp.textContent = '— select project first —'; disp.style.color = 'var(--text2)'; }
-  }
-  if (idIn && proj?.id) idIn.value = proj.id;
-  updateBar(); recalcAll();
-}
-
-function addTaskToBlock(pid) {
-  const container = document.querySelector(`#${pid} .pb-tasks`);
-  if (!container) return;
-  const taskId = `${pid}-t${Date.now()}`;
-  const today  = new Date().toISOString().split('T')[0];
-  const div = document.createElement('div');
-  div.className = 'task-block'; div.id = taskId;
-  div.innerHTML = `
-    <div class="task-block-head">
-      <div class="task-block-title">TASK</div>
-      <button class="task-remove" onclick="document.getElementById('${taskId}').remove();recalcAll()">✕ Remove</button>
-    </div>
-    <div class="task-block-body">
-      <div class="field">
-        <div class="lbl">Task type / stage <span class="req">*</span></div>
-        <select class="t-stage" onchange="recalcAll()">${stageOpts()}</select>
-      </div>
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Area / Space <span class="opt">optional</span></div>
-          <input type="text" class="t-area" placeholder="e.g. Drawing Room">
-        </div>
-        <div class="field">
-          <div class="lbl">Drawing name <span class="opt">optional</span></div>
-          <input type="text" class="t-drawing" placeholder="e.g. Floor Plan v2">
-        </div>
-      </div>
-      <div class="row3">
-        <div class="field">
-          <div class="lbl">Units <span class="req">*</span></div>
-          <input type="number" class="t-units" min="1" max="50" value="1" oninput="recalcAll()">
-        </div>
-        <div class="field">
-          <div class="lbl">Target date <span class="req">*</span></div>
-          <input type="date" class="t-date" value="${today}">
-        </div>
-        <div class="field">
-          <div class="lbl">Priority</div>
-          <select class="t-priority">
-            <option value="Low">Low</option>
-            <option value="Medium" selected>Medium</option>
-            <option value="High">High</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Revision Type <span class="opt">optional</span></div>
-        <div class="rev-row">
-          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="" checked><span class="rev-btn orig">Original Task</span></label>
-          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="Internal"><span class="rev-btn int">Internal Revision</span></label>
-          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="Client"><span class="rev-btn cli">Client Revision</span></label>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Instructions <span class="opt">optional</span></div>
-        <textarea class="t-notes" placeholder="What needs to be done..."></textarea>
-      </div>
-      <div class="pts-preview">
-        <div class="pts-label">Weighted points</div>
-        <div class="pts-val t-pts-display">—</div>
-      </div>
-    </div>`;
-  container.appendChild(div);
-  recalcAll();
-}
-
-// onProjectChange replaced by onProjBlockChange in multi-project mode
-
-function stageOptions() {
-  return '<option value="">— select task type —</option>'+
-    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
-}
-
-function addTask() {
-  taskCount++;
-  const id  = `tb${taskCount}`;
-  const today = new Date().toISOString().split('T')[0];
-  const div = document.createElement('div');
-  div.className='task-block'; div.id=id;
-  div.innerHTML=`
-    <div class="task-block-head">
-      <div class="task-block-title">TASK ${taskCount}</div>
-      ${taskCount>1?`<button class="task-remove" onclick="removeTask('${id}')">✕ Remove</button>`:''}
-    </div>
-    <div class="task-block-body">
-      <div class="field">
-        <div class="lbl">Task type / stage <span class="req">*</span></div>
-        <select class="t-stage" onchange="recalcAll()">${stageOptions()}</select>
-      </div>
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Area / Space <span class="opt">optional</span></div>
-          <input type="text" class="t-area" placeholder="e.g. Drawing Room, Master Bedroom">
-        </div>
-        <div class="field">
-          <div class="lbl">Drawing name <span class="opt">optional</span></div>
-          <input type="text" class="t-drawing" placeholder="e.g. First Floor Plan, False Ceiling">
-        </div>
-      </div>
-      <div class="row3">
-        <div class="field">
-          <div class="lbl">Units <span class="req">*</span></div>
-          <input type="number" class="t-units" min="1" max="50" value="1" oninput="recalcAll()">
-        </div>
-        <div class="field">
-          <div class="lbl">Target date <span class="req">*</span></div>
-          <input type="date" class="t-date" value="${today}">
-        </div>
-        <div class="field">
-          <div class="lbl">Priority</div>
-          <select class="t-priority">
-            <option value="Low">Low</option>
-            <option value="Medium" selected>Medium</option>
-            <option value="High">High</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Type <span class="opt">optional</span></div>
-        <div class="rev-row">
-          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="" checked><span class="rev-btn orig">Original Task</span></label>
-          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="Internal"><span class="rev-btn int">Internal Revision</span></label>
-          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="Client"><span class="rev-btn cli">Client Revision</span></label>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Instructions <span class="opt">optional</span></div>
-        <textarea class="t-notes" placeholder="What needs to be done, references, quality expectations..."></textarea>
-      </div>
-      <div class="pts-preview">
-        <div class="pts-label">Weighted points for this task</div>
-        <div class="pts-val t-pts-display">—</div>
-      </div>
-    </div>`;
-  document.getElementById('task-blocks').appendChild(div);
-  updateTaskCount(); recalcAll();
-}
-
-function removeTask(id) {
-  document.getElementById(id).remove();
-  taskCount=document.querySelectorAll('.task-block').length;
-  document.querySelectorAll('.task-block-title').forEach((el,i)=>el.textContent=`TASK ${i+1}`);
-  updateTaskCount(); recalcAll();
-}
-
-function updateTaskCount() {
-  const n=document.querySelectorAll('.task-block').length;
-  document.getElementById('task-count').textContent=`${n} task${n!==1?'s':''}`;
-}
-
-function recalcAll() {
-  let total=0, taskCount=0;
-  document.querySelectorAll('.card[id^="pb"]').forEach(pb => {
-    const projSel = pb.querySelector('.pb-project');
-    const idx     = parseInt(projSel?.value);
-    const proj    = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
-    const mult    = proj ? proj.multiplier : 1;
-    pb.querySelectorAll('.task-block').forEach(tb => {
-      const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-      const stage    = (!isNaN(stageIdx) && STAGES[stageIdx]) ? STAGES[stageIdx] : null;
-      const units    = parseFloat(tb.querySelector('.t-units')?.value)||1;
-      const disp     = tb.querySelector('.t-pts-display');
-      if (stage && stage.pts) {
-        const pts = parseFloat((stage.pts*mult*units).toFixed(2));
-        if(disp) disp.textContent = pts+' pts';
-        total+=pts; taskCount++;
-      } else { if(disp) disp.textContent='—'; }
+function updateMetrics() {
+  let tasks=allTasks;
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
+  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
+  if (dateFilter) {
+    const today2 = new Date().toISOString().substring(0,10);
+    tasks = tasks.filter(t => {
+      // Always show tasks due on the selected date
+      if (t.targetDate === dateFilter) return true;
+      // If filtering for today or a past date, also show all delayed (overdue) tasks
+      if (dateFilter <= today2 && t.status === 'Delayed') return true;
+      return false;
     });
-  });
-  document.getElementById('total-pts').textContent=total.toFixed(1);
-  document.getElementById('total-count').textContent=`across ${taskCount} task${taskCount!==1?'s':''}`;
-  document.getElementById('total-strip').style.display=total>0?'flex':'none';
+  }
+  document.getElementById('m-upcoming').textContent  = tasks.filter(t=>t.status==='Upcoming').length;
+  document.getElementById('m-ongoing').textContent   = tasks.filter(t=>t.status==='Ongoing').length;
+  document.getElementById('m-completed').textContent = tasks.filter(t=>t.status==='Completed').length;
+  document.getElementById('m-delayed').textContent   = tasks.filter(t=>t.status==='Delayed').length;
+  const apEl = document.getElementById('m-approval');
+  if(apEl) apEl.textContent = tasks.filter(t=>t.status==='Approval Pending').length;
+  document.getElementById('m-revision').textContent  = tasks.filter(t=>t.status==='Revision Required').length;
 }
 
-function updateBar() {
-  const assigner=document.getElementById('assigner')?.value;
-  const assignee=document.getElementById('assignee')?.value;
-  document.getElementById('sbar-name').textContent=assigner?`Assigning as ${assigner}`:'Select your name';
-  document.getElementById('sbar-sub').textContent=assignee?`→ ${assignee}`:'select assignee first';
+function filterStatus(s,btn) {
+  statusFilter=s;
+  document.querySelectorAll('.filter-row .fb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); renderTasks();
 }
 
-async function submitTasks() {
-  const assigner = document.getElementById('assigner')?.value;
-  const assignee = document.getElementById('assignee')?.value;
-  if (!assigner) { toast('Select your name');        return; }
-  if (!assignee) { toast('Select who to assign to'); return; }
+function rebuildProjectFilter() {
+  const member = document.getElementById('member-filter').value;
+  const prevProject = document.getElementById('project-filter').value;
+  const relevantTasks = member === 'all'
+    ? allTasks
+    : allTasks.filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(member));
+  const projects = [...new Set(relevantTasks.map(t => t.project))].sort();
+  const projSel  = document.getElementById('project-filter');
+  projSel.innerHTML = '<option value="all">All projects</option>' +
+    projects.map(p => `<option value="${p}">${p}</option>`).join('');
+  // Restore project if still valid for this member
+  if (prevProject && prevProject !== 'all' && projects.includes(prevProject)) {
+    projSel.value = prevProject;
+    projectFilter = prevProject;
+  } else {
+    projectFilter = 'all';
+  }
+}
 
+function onMemberChange() {
+  memberFilter = document.getElementById('member-filter').value;
+  rebuildProjectFilter();
+  projectFilter = 'all'; // always reset project when member changes
+  document.getElementById('project-filter').value = 'all';
+  applyFilters();
+}
+
+function applyFilters() {
+  memberFilter  = document.getElementById('member-filter').value;
+  projectFilter = document.getElementById('project-filter').value;
+  dateFilter    = document.getElementById('date-filter').value || '';
+  updateMetrics(); renderTasks();
+}
+
+function setDueToday() {
   const today = new Date().toISOString().substring(0,10);
-  const allPayloads = [];
-  let valid = true, totalTasks = 0, totalPts = 0;
+  document.getElementById('date-filter').value = today;
+  dateFilter = today;
+  document.getElementById('due-today-btn').classList.add('on');
+  document.getElementById('due-week-btn').classList.remove('on');
+  // Show tasks due today + all delayed tasks
+  updateMetrics(); renderTasks();
+}
 
-  document.querySelectorAll('.card[id^="pb"]').forEach((pb, pi) => {
-    if (!valid) return;
-    const projSel = pb.querySelector('.pb-project');
-    const projIdx = parseInt(projSel?.value);
-    if (isNaN(projIdx) || projIdx < 0) { toast(`Select project for block ${pi+1}`); valid=false; return; }
-    const proj   = PROJECTS[projIdx];
-    const projId = pb.querySelector('.pb-proj-id')?.value.trim() || proj.id || '';
-    const tasks  = [];
+function setDueWeek() {
+  // Clear date filter and show all this week's tasks
+  const today = new Date().toISOString().substring(0,10);
+  const endOfWeek = new Date(); endOfWeek.setDate(endOfWeek.getDate() + (6-endOfWeek.getDay()));
+  document.getElementById('date-filter').value = '';
+  dateFilter = '';
+  // Filter tasks where targetDate is between today and end of week
+  document.getElementById('due-today-btn').classList.remove('on');
+  document.getElementById('due-week-btn').classList.add('on');
+  const weekEnd = endOfWeek.toISOString().substring(0,10);
+  let tasks = allTasks;
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
+  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
+  if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
+  // Include tasks due this week + all delayed tasks
+  tasks = tasks.filter(t=>
+    (t.targetDate>=today && t.targetDate<=weekEnd) ||
+    t.status === 'Delayed'
+  );
+  renderTaskList(tasks);
+  return;
+}
 
-    pb.querySelectorAll('.task-block').forEach((tb, ti) => {
-      if (!valid) return;
-      const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-      if (isNaN(stageIdx)||stageIdx<0) { toast(`Select task type in project ${pi+1}`); valid=false; return; }
-      const stage   = STAGES[stageIdx];
-      const units   = parseInt(tb.querySelector('.t-units')?.value)||1;
-      const tDate   = tb.querySelector('.t-date')?.value||today;
-      const priority= tb.querySelector('.t-priority')?.value||'Medium';
-      const area    = tb.querySelector('.t-area')?.value.trim()||'';
-      const drawing = tb.querySelector('.t-drawing')?.value.trim()||'';
-      const notes   = tb.querySelector('.t-notes')?.value.trim()||'';
-      const revType = Array.from(tb.querySelectorAll('input[type=radio]')).find(r=>r.checked&&r.name.startsWith('rev-'))?.value||'';
-      const pts     = parseFloat((stage.pts*proj.multiplier*units).toFixed(2));
-      tasks.push({taskType:stage.label,basePts:stage.pts,units,weightedPts:pts,
-                  targetDate:tDate,priority,area,drawing,notes,revisionType:revType});
-      totalPts += pts; totalTasks++;
+function renderTasks() {
+  document.getElementById('due-today-btn')?.classList.remove('on');
+  document.getElementById('due-week-btn')?.classList.remove('on');
+  let tasks=allTasks;
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
+  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
+  if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
+  if (dateFilter) {
+    const today2 = new Date().toISOString().substring(0,10);
+    tasks = tasks.filter(t => {
+      // Always show tasks due on the selected date
+      if (t.targetDate === dateFilter) return true;
+      // If filtering for today or a past date, also show all delayed (overdue) tasks
+      if (dateFilter <= today2 && t.status === 'Delayed') return true;
+      return false;
     });
-
-    if (tasks.length > 0) {
-      allPayloads.push({
-        action:'assignTasks', assignedBy:assigner, assignedTo:assignee,
-        project:proj.name, projectId:projId,
-        discipline:proj.discipline, multiplier:proj.multiplier,
-        dateAssigned:today, tasks,
-      });
-    }
-  });
-
-  if (!valid || allPayloads.length === 0) { if(valid) toast('Add at least one task'); return; }
-
-  document.getElementById('sending').classList.add('show');
-  try {
-    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      for (let pi=0; pi<allPayloads.length; pi++) {
-        await new Promise((res,rej) => {
-          const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
-          xhr.setRequestHeader('Content-Type','text/plain');
-          xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(allPayloads[pi]));
-        });
-      }
-    }
-    document.getElementById('sending').classList.remove('show');
-    const projNames = allPayloads.map(p=>p.project).join(', ');
-    document.getElementById('success-sub').innerHTML=
-      `<strong>${totalTasks} task${totalTasks!==1?'s':''}</strong> assigned to <strong>${assignee}</strong><br>`+
-      `Projects: ${projNames}<br>Total: ${totalPts.toFixed(1)} weighted pts`;
-    document.getElementById('success').classList.add('show');
-  } catch(err) {
-    document.getElementById('sending').classList.remove('show');
-    toast('Submission failed — check connection');
   }
+  renderTaskList(tasks);
 }
 
-function resetForm() {
-  document.getElementById('success').classList.remove('show');
-  document.getElementById('assigner').value='';
-  document.getElementById('assignee').value='';
-  document.getElementById('project-blocks').innerHTML='';
-  projBlockCount=0; addProjectBlock(); updateBar(); recalcAll();
-}
+function renderTaskList(tasks) {
 
-function toast(msg) {
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),2800);
+  const order={'Delayed':0,'Revision Required':1,'Ongoing':2,'Upcoming':3,'Completed':4};
+  tasks.sort((a,b)=>(order[a.status]??5)-(order[b.status]??5));
+
+  if (!tasks.length) {
+    document.getElementById('task-list').innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No tasks found</div><div class="empty-sub">No tasks match the current filter.</div></div>`;
+    return;
+  }
+
+  const today=new Date().toISOString().substring(0,10);
+  const pillMap={
+    'Upcoming':'sp-upcoming','Ongoing':'sp-ongoing','Completed':'sp-completed',
+    'Delayed':'sp-delayed','Revision Required':'sp-revision',
+    'Approval Pending':'sp-approval'
+  };
+  const cardMap={
+    'Upcoming':'upcoming','Ongoing':'ongoing','Completed':'completed',
+    'Delayed':'delayed','Revision Required':'revision',
+    'Approval Pending':'approval'
+  };
+  const priMap={'Low':'p-low','Medium':'p-med','High':'p-high'};
+
+  document.getElementById('task-list').innerHTML=tasks.map(t=>{
+    const isOverdue = t.targetDate && t.targetDate<today && t.status!=='Completed';
+    const daysOvd   = isOverdue ? Math.floor((new Date(today)-new Date(t.targetDate))/(1000*60*60*24)) : 0;
+    return `
+    <div class="task-card ${cardMap[t.status]||'upcoming'}">
+      <div class="task-head">
+        <div>
+          <div class="task-member">${t.assignedTo}</div>
+          <div class="task-project">${t.project} · ${t.discipline}</div>
+        </div>
+        <div class="status-pill ${pillMap[t.status]||'sp-upcoming'}">${t.status}</div>
+      </div>
+      <div class="task-body">
+        <div class="task-type">${t.taskType}</div>
+        ${t.area?`<div class="task-area">${t.area}</div>`:''}
+        ${t.drawing?`<div class="task-drawing">Drawing: ${t.drawing}</div>`:''}
+        ${t.revisionTag?`<div class="revision-badge">🔴 ${t.revisionTag}${t.revisionType?' — '+t.revisionType:''}</div>`:''}
+        <div class="task-meta">
+          <div class="tm">Units: <span>${t.units}</span></div>
+          <div class="tm">Pts: <span>${t.weightedPts}</span></div>
+          <div class="tm ${isOverdue?'overdue':''}">Due: <span>${t.targetDate}${isOverdue?' ('+daysOvd+'d overdue)':''}</span></div>
+          <div class="tm">By: <span>${t.assignedBy}</span></div>
+          <div class="tm">Priority: <span><span class="priority-dot ${priMap[t.priority]||'p-med'}"></span>${t.priority}</span></div>
+        </div>
+        ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
+        ${t.completedDate?`<div class="task-done-date">✓ Completed ${t.completedDate}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
 </script>
 </body>
