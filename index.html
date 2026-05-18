@@ -508,23 +508,13 @@ async function fetchAll() {
         ]);
       }
       if(sd) sd.textContent = 'Fetching lists...';
-      const lRaw = await Promise.race([
-        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})}),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout')),15000))
+      const [l, c] = await Promise.all([
+        fetch(APPS_SCRIPT_URL + '?action=getLists').then(r=>r.json()),
+        fetch(APPS_SCRIPT_URL + '?action=getConfig').then(r=>r.json()),
       ]);
-      const lText = await lRaw.text();
-      if(sd) sd.textContent = 'Lists raw: '+lText.substring(0,100);
-      await new Promise(r=>setTimeout(r,3000)); // pause to read
-      let l;
-      try { l = JSON.parse(lText); } catch(pe) { throw new Error('Lists JSON parse failed: '+lText.substring(0,100)); }
-      if(sd) sd.textContent = 'Lists parsed — team:'+( l.team||[]).length+' projects:'+(l.projects||[]).length;
-      await new Promise(r=>setTimeout(r,2000));
-      if (l.error || l.status==='error') throw new Error('Lists error: '+(l.error||l.message));
-
-      const c = await fetchWithTimeout(APPS_SCRIPT_URL,
-        {method:'POST', body:JSON.stringify({action:'getConfig'})}, 15000);
-      if(sd) sd.textContent = 'Config OK, building form...';
-      if (c.error || c.status==='error') throw new Error('Config error: '+(c.error||c.message));
+      if(sd) sd.textContent = 'Lists OK — team:'+( l.team||[]).length+' projects:'+(l.projects||[]).length;
+      if (l.error) throw new Error('Lists error: '+l.error);
+      if (c.error) throw new Error('Config error: '+c.error);
 
       TEAM     = l.team     || [];
       PROJECTS = l.projects || [];
@@ -602,7 +592,7 @@ async function fetchNotifications() {
   const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
   if (!member || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
   try {
-    const res  = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getNotifications', member:member})});
+    const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`);
     const data = await res.json();
     const notifs = data.notifications || [];
     renderNotifications(notifs);
@@ -695,10 +685,7 @@ async function fetchAssignedTasks() {
         {row:3,taskType:'Working Drawing — Floor Plan',project:'Multani Jewellers',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'R1',revisionType:'Internal'},
       ];
     } else {
-      const res  = await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({action:'getOpenTasksForMember', member:member}),
-      });
+      const res  = await fetch(`${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`);
       if (!res.ok) throw new Error('HTTP ' + res.status + ' from script');
       const text = await res.text();
       let data;
