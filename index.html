@@ -502,9 +502,11 @@ async function fetchAll() {
       if (l.error) throw new Error('Lists: '+l.error);
       if (c.error) throw new Error('Config: '+c.error);
       TEAM     = l.team     || [];
-      PROJECTS = l.projects || [];  // [{id,name,discipline,multiplier,status}]
+      PROJECTS = l.projects || [];
       STAGES   = (c.stages  || []).filter(s=>s.pts>0);
       VISITS   = c.visits   || [];
+      console.log('Lists loaded — TEAM:', TEAM.length, 'PROJECTS:', PROJECTS.length, 'STAGES:', STAGES.length);
+      if (PROJECTS.length === 0) console.warn('WARNING: No projects returned from getLists', l);
       window._EMAILS = l.emails || [];
       window._EMAILS = l.emails || [];
       // Rebuild EMAIL_MAP from live data (overrides hardcoded fallback)
