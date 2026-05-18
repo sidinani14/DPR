@@ -577,7 +577,7 @@ async function fetchNotifications() {
   const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
   if (!member || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
   try {
-    const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`, {redirect:'follow', mode:'cors', credentials:'omit'});
+    const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`);
     const data = await res.json();
     const notifs = data.notifications || [];
     renderNotifications(notifs);
@@ -670,9 +670,15 @@ async function fetchAssignedTasks() {
         {row:3,taskType:'Working Drawing — Floor Plan',project:'Multani Jewellers',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'R1',revisionType:'Internal'},
       ];
     } else {
-      const res  = await fetch(`${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`, {redirect:'follow', mode:'cors', credentials:'omit'});
-      const data = await res.json();
+      const url  = `${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`;
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' from script');
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch(pe) { throw new Error('Invalid JSON: ' + text.substring(0,100)); }
       assignedTasks = data.tasks || [];
+      console.log('Tasks loaded for', member, ':', assignedTasks.length);
     }
     renderAssignedTasks();
   } catch(e) {
@@ -993,7 +999,7 @@ async function submitForm() {
   try {
     if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       await new Promise((res,rej)=>{
-        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
+        const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true); 
         xhr.setRequestHeader('Content-Type','text/plain');
         xhr.onload=res; xhr.onerror=rej; xhr.send(JSON.stringify(data));
       });
