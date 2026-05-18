@@ -343,7 +343,7 @@ function setDeadlineBanner() {
 }
 
 async function fetchAll() {
-  const demo = APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+  const demo = APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec';
   try {
     if (demo) {
       TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
@@ -575,7 +575,7 @@ function handleGoogleCredential(payload) {
 
 async function fetchNotifications() {
   const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
-  if (!member || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  if (!member || APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') return;
   try {
     const res  = await fetch(`${APPS_SCRIPT_URL}?action=getNotifications&member=${encodeURIComponent(member)}`);
     const data = await res.json();
@@ -622,7 +622,7 @@ function renderNotifications(notifs) {
 
 async function markOneSeen(row, btn) {
   btn.textContent = '✓ Seen'; btn.disabled = true;
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  if (APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') return;
   await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'markNotifSeen', rows:[row]})});
 }
@@ -635,7 +635,7 @@ async function markAllSeen() {
     if (match) rows.push(parseInt(match[1]));
     btn.textContent='✓ Seen'; btn.disabled=true;
   });
-  if (!rows.length || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  if (!rows.length || APPS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') return;
   await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'markNotifSeen', rows})});
   setTimeout(()=>{ section.style.display='none'; }, 1000);
@@ -664,7 +664,7 @@ async function fetchAssignedTasks() {
   document.getElementById('assigned-count').textContent='loading…';
 
   try {
-    if (APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    if (APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
       assignedTasks=[
         {row:2,taskType:'ID Working Drawing — False Ceiling',project:'Ajay Chordia',area:'Drawing Room',drawing:'False Ceiling Plan v1',units:1,weightedPts:2.25,targetDate:'2026-05-10',priority:'High',status:'Ongoing',notes:'Check light positions',revisionTag:'',revisionType:''},
         {row:3,taskType:'Working Drawing — Floor Plan',project:'Multani Jewellers',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'R1',revisionType:'Internal'},
@@ -991,7 +991,7 @@ async function submitForm() {
   if (!validate(data)) return;
   document.getElementById('sending').classList.add('show');
   try {
-    if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    if (APPS_SCRIPT_URL!=='https://script.google.com/macros/s/AKfycbxWnvC1dYaJY6CsTSWPv2FzVx5fk-_Gu2H3mLsm8GQjCYMNlJ1tAt2XbSYqrVMc9U0Akg/exec') {
       await new Promise((res,rej)=>{
         const xhr=new XMLHttpRequest(); xhr.open('POST',APPS_SCRIPT_URL,true);
         xhr.setRequestHeader('Content-Type','text/plain');
