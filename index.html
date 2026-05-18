@@ -670,8 +670,10 @@ async function fetchAssignedTasks() {
         {row:3,taskType:'Working Drawing — Floor Plan',project:'Multani Jewellers',area:'Ground Floor',drawing:'Floor Plan',units:1,weightedPts:2.0,targetDate:'2026-05-08',priority:'Medium',status:'Upcoming',notes:'',revisionTag:'R1',revisionType:'Internal'},
       ];
     } else {
-      const url  = `${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(member)}`;
-      const res  = await fetch(url);
+      const res  = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({action:'getOpenTasksForMember', member:member}),
+      });
       if (!res.ok) throw new Error('HTTP ' + res.status + ' from script');
       const text = await res.text();
       let data;
