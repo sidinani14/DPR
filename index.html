@@ -680,7 +680,21 @@ async function fetchAssignedTasks() {
       try { data = JSON.parse(text); }
       catch(pe) { throw new Error('Invalid JSON: ' + text.substring(0,100)); }
       assignedTasks = data.tasks || [];
-      console.log('Tasks loaded for', member, ':', assignedTasks.length);
+      // Show debug info prominently
+      if (data.debug) {
+        const d = data.debug;
+        const dbg = document.createElement('div');
+        dbg.style.cssText = 'background:#1a1a2e;color:#fff;padding:12px;margin:10px 0;border-radius:8px;font-size:12px;font-family:monospace;border:1px solid #F5A623';
+        dbg.innerHTML = '<b style="color:#F5A623">DEBUG INFO</b><br>' +
+          'Google name: "' + d.googleName + '"<br>' +
+          'Resolved to: "' + d.resolvedName + '"<br>' +
+          'Total tasks in sheet: ' + d.totalTasks + '<br>' +
+          'Tasks with your name: ' + d.myTasks + '<br>' +
+          'Their statuses: ' + JSON.stringify(d.myStatuses) + '<br>' +
+          'Open tasks shown: ' + d.matchedTasks + '<br>' +
+          'Sample assignees in sheet: ' + JSON.stringify(d.sampleAssignees);
+        document.getElementById('assigned-tasks-list').prepend(dbg);
+      }
     }
     renderAssignedTasks();
   } catch(e) {
