@@ -515,6 +515,9 @@ async function fetchAll() {
       }
     }
     buildMemberDropdown();
+    // Reset project blocks before adding first one
+    projCount = 0;
+    document.getElementById('proj-blocks').innerHTML = '';
     addProject(false);
     document.getElementById('add-proj-btn').disabled=false;
   } catch(e) {
