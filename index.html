@@ -345,8 +345,6 @@ function setDeadlineBanner() {
 
 async function fetchAll() {
   const demo = APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
-  // Show loading indicator immediately
-  if (statusDiv) { statusDiv.style.display='block'; statusDiv.textContent='Loading form data...'; }
   try {
     if (demo) {
       TEAM     = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Khushi Agrawal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani", "Simi"];
@@ -715,7 +713,7 @@ function renderAssignedTasks() {
         ${t.notes?`<div style="font-size:11px;color:var(--text3);margin-top:4px;font-style:italic">${t.notes}</div>`:''}
         <div class="atc-meta" style="margin-top:5px">
           <div class="atc-m ${isOverdue?'overdue':''}">Due: <span>${t.targetDate}${isOverdue?' ⚠':''}</span></div>
-          <div class="atc-m">Units: <span>${t.units}</span></div>
+          <div class="atc-m">Units: <span>${t.units||1}</span></div>
           <div class="atc-m">Pts: <span>${t.weightedPts}</span></div>
           <div class="atc-m">Priority: <span>${t.priority}</span></div>
         </div>
