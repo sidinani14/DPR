@@ -512,7 +512,7 @@ async function fetchAll() {
       window._EMAILS = l.emails || [];
       if (window._EMAILS.length > 0) {
         TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
-      }}).slice(0,5).join(', ');
+      }
     }
     buildMemberDropdown();
     addProject(false);
