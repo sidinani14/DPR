@@ -1021,7 +1021,9 @@ function collectData() {
     pb.querySelectorAll('.task-entry').forEach(tr=>{
       const idx=parseInt(tr.querySelector('.t-type')?.value);
       const stage=(!isNaN(idx)&&STAGES[idx])?STAGES[idx]:null;
-      if (!stage||!stage.pts) return;
+      // Allow visit/meeting tasks even if stage.pts=0 — their pts come from hours
+      if (!stage) return;
+      if (!stage.pts && !isVisitType(stage.label)) return;
       const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
       const area=tr.querySelector('.t-area')?.value.trim()||'';
       const drawing=tr.querySelector('.t-drawing')?.value.trim()||'';
