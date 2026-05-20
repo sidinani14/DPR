@@ -1058,7 +1058,7 @@ function collectData() {
     data[`P${pi} Discipline`]  = proj.discipline;
     data[`P${pi} Multiplier`]  = proj.multiplier;
     data[`P${pi} Tasks`]       = tasks.join(' | ');
-    data[`P${pi} Visit`]       = hasVisit?`${vtype} · ${vdur}`:'No';
+    data[`P${pi} Visit`]       = hasVisit?`${vtype} · ${vhrs_collect}hrs`:'No';
     data[`P${pi} Visit Notes`] = hasVisit?pb.querySelector('.p-vnotes')?.value||'':'';
   });
   data['Ongoing Tasks'] = JSON.stringify(ongoingTasks);
