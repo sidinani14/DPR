@@ -731,8 +731,10 @@ function renderAssignedTasks() {
       <div id="visit-hrs-${i}" style="padding:8px 13px 4px;display:none">
         <div style="font-size:11px;color:var(--accent);margin-bottom:4px;font-family:'DM Mono',monospace">HOURS SPENT (for points calculation)</div>
         <input type="number" class="atc-visit-hrs-${i}" min="0.5" max="12" step="0.5" placeholder="e.g. 2.5"
-          style="font-size:13px;padding:7px 10px;width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
-        <span style="font-size:11px;color:var(--text3);margin-left:8px">${VISIT_TYPES_ARCH.indexOf(t.taskType)>-1?'pts = hours × 2':'pts = hours × 1'}</span>
+          oninput="calcScore()"
+          style="font-size:13px;padding:7px 10px;width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+        <span id="atc-pts-${i}" style="font-size:12px;color:var(--accent);font-weight:600;margin-left:8px"></span>
+        <span style="font-size:10px;color:var(--text3);margin-left:4px">${VISIT_TYPES_ARCH.indexOf(t.taskType)>-1?'hrs × 2':'hrs × 1'}</span>
       </div>` : ''}
       <div id="done-date-${i}" style="display:none;padding:0 13px 10px">
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">ACTUAL COMPLETION DATE</div>
@@ -752,9 +754,7 @@ function stageOptions() {
   return '<option value="">— select task type —</option>'+
     STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
 }
-function visitDurOptions() {
-  return VISITS.map(v=>`<option value="${v.duration}">${v.duration} · ${v.pts}pts</option>`).join('');
-}
+// visitDurOptions removed — replaced by hours number input
 
 function addProject(removable=true) {
   if (projCount>=3) return;
@@ -804,8 +804,13 @@ function addProject(removable=true) {
               </select>
             </div>
             <div class="field" style="margin-bottom:0">
-              <div class="lbl">Duration</div>
-              <select class="p-vdur">${visitDurOptions()}</select>
+              <div class="lbl">Hours spent</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <input type="number" class="p-vdur" min="0.5" max="12" step="0.5" placeholder="e.g. 2.5"
+                  oninput="calcScore()"
+                  style="width:90px;font-size:13px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+                <span class="p-vpts-display" style="font-size:12px;color:var(--accent);font-weight:600"></span>
+              </div>
             </div>
           </div>
           <div class="field" style="margin-bottom:0">
@@ -887,6 +892,7 @@ function toggleDoneDate(i, radio) {
   const visitDiv = document.getElementById('visit-hrs-'+i);
   if (doneDiv)  doneDiv.style.display  = radio.value === 'Done' ? 'block' : 'none';
   if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
+  calcScore(); // recalculate when status changes
 }
 
 function onProjSelect(sel) {
@@ -908,6 +914,31 @@ function toggleVisit(id) {
 
 function calcScore() {
   let totalPts=0, totalUnits=0, projTouched=0;
+
+  // Section 2: assigned tasks pts
+  assignedTasks.forEach((t, i) => {
+    const statusEl = document.querySelector(`input[name="atc-${i}"]:checked`);
+    const status   = statusEl ? statusEl.value : 'Not Started';
+    // Only count tasks that are Done or Ongoing
+    if (status === 'Not Started' || status === 'Blocked') return;
+    if (isVisitType(t.taskType)) {
+      // Visit task: use hours input if Done, else 0
+      if (status === 'Done') {
+        const hrs = parseFloat(document.querySelector(`.atc-visit-hrs-${i}`)?.value) || 0;
+        const rate = VISIT_TYPES_ARCH.indexOf(t.taskType) > -1 ? 2 : 1;
+        totalPts += hrs * rate;
+        if (hrs > 0) totalUnits += 1;
+        // Update displayed pts on card
+        const ptsDisplay = document.querySelector(`#atc-pts-${i}`);
+        if (ptsDisplay) ptsDisplay.textContent = (hrs * rate).toFixed(1) + 'p';
+      }
+    } else {
+      // Normal task: use weightedPts
+      totalPts  += t.weightedPts || 0;
+      totalUnits += t.units || 1;
+    }
+  });
+
   document.querySelectorAll('.proj-block').forEach(pb=>{
     const pnIdx=parseInt(pb.querySelector('.p-name')?.value);
     const proj=(!isNaN(pnIdx)&&PROJECTS[pnIdx])?PROJECTS[pnIdx]:null;
@@ -927,9 +958,18 @@ function calcScore() {
     });
     const tog=document.getElementById(`${pb.id}-tog`);
     if (tog&&tog.classList.contains('on')){
-      const vdur=pb.querySelector('.p-vdur')?.value||'';
-      const vEntry=VISITS.find(v=>v.duration===vdur);
-      if (vEntry){ totalPts+=vEntry.pts; totalUnits+=1; }
+      const vtype = pb.querySelector('.p-vtype')?.value||'';
+      const vhrs  = parseFloat(pb.querySelector('.p-vdur')?.value)||0;
+      let vpts = 0;
+      if (vhrs > 0) {
+        // Site visit = hours×2, Client meeting = hours×1
+        const isSiteVisit = vtype.toLowerCase().includes('site visit');
+        vpts = isSiteVisit ? vhrs * 2 : vhrs * 1;
+        totalPts += vpts; totalUnits += 1;
+      }
+      // Update pts display next to hours input
+      const vdisp = pb.querySelector('.p-vpts-display');
+      if (vdisp) vdisp.textContent = vpts > 0 ? vpts.toFixed(1) + ' pts' : '';
     }
   });
   document.getElementById('sc-pts').textContent=totalPts.toFixed(1);
@@ -1011,8 +1051,9 @@ function collectData() {
       }
     });
     const hasVisit=document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
-    const vdur=pb.querySelector('.p-vdur')?.value||'';
+    const vhrs_collect=parseFloat(pb.querySelector('.p-vdur')?.value)||0;
     const vtype=pb.querySelector('.p-vtype')?.value||'';
+    data[`P${pi} Visit Hours`] = vhrs_collect;
     data[`P${pi} Name`]        = proj.name;
     data[`P${pi} Discipline`]  = proj.discipline;
     data[`P${pi} Multiplier`]  = proj.multiplier;
