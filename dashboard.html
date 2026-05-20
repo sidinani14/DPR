@@ -22,6 +22,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .met-val{font-size:20px;font-weight:500;color:var(--text);line-height:1;font-family:'DM Mono',monospace}
 .met-val.green{color:var(--green)}.met-val.red{color:var(--red)}.met-val.amber{color:var(--amber)}.met-val.blue{color:var(--blue)}.met-val.purple{color:var(--purple)}
 .met-lbl{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+/* ── Heatmap ── */
+.heatmap-section{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.06);}
+.heatmap-title{font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;display:flex;align-items:center;gap:10px;}
+.heatmap-view-btns{display:flex;gap:6px;margin-left:auto;}
+.hm-view-btn{font-size:10px;padding:3px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:none;color:rgba(255,255,255,0.5);cursor:pointer;font-family:inherit;}
+.hm-view-btn.on{background:rgba(245,166,35,0.15);color:#F5A623;border-color:rgba(245,166,35,0.4);}
+.heatmap-grid{width:100%;border-collapse:collapse;}
+.heatmap-grid th{font-size:9px;font-weight:600;color:rgba(255,255,255,0.4);text-align:center;padding:4px 6px;text-transform:uppercase;letter-spacing:.5px;}
+.heatmap-grid th:first-child{text-align:left;width:130px;}
+.heatmap-grid td{padding:3px 4px;text-align:center;}
+.hm-name{font-size:11px;font-weight:600;color:#fff;text-align:left;padding:4px 8px 4px 0;}
+.hm-cell{border-radius:5px;padding:5px 4px;font-size:10px;font-weight:700;min-width:44px;display:inline-block;cursor:default;}
+.hm-green{background:rgba(46,213,115,0.2);color:#2ED573;}
+.hm-amber{background:rgba(251,188,4,0.2);color:#FBBC04;}
+.hm-red{background:rgba(234,67,53,0.2);color:#EA4335;}
+.hm-empty{background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.2);}
+.hm-total{background:rgba(255,255,255,0.06);color:#fff;font-size:11px;}
+.unassigned-section{padding:10px 18px;background:rgba(245,166,35,0.05);border-bottom:1px solid rgba(245,166,35,0.15);}
+.unassigned-title{font-size:10px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.unassigned-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.unassigned-chip{font-size:10px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.25);color:#F5A623;border-radius:6px;padding:3px 10px;cursor:pointer;}
+.unassigned-chip:hover{background:rgba(245,166,35,0.2);}
+
 .filter-row{max-width:700px;margin:0 auto;padding:14px 20px;display:flex;gap:6px;flex-wrap:wrap}
 .fb{font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
 .fb.on{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:500}
@@ -93,6 +116,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
+<!-- Heatmap section -->
+<div class="heatmap-section" id="heatmap-section">
+  <div class="heatmap-title">
+    Workload Heatmap — Open Tasks
+    <div class="heatmap-view-btns">
+      <button class="hm-view-btn on" onclick="setHmView('total',this)">Total</button>
+      <button class="hm-view-btn" onclick="setHmView('week',this)">This Week</button>
+      <button class="hm-view-btn" onclick="setHmView('daily',this)">Per Day</button>
+    </div>
+  </div>
+  <div id="heatmap-body"></div>
+</div>
+<!-- Unassigned tasks pool -->
+<div class="unassigned-section" id="unassigned-section" style="display:none">
+  <div class="unassigned-title">⬦ Unassigned Task Pool</div>
+  <div class="unassigned-chips" id="unassigned-chips"></div>
+</div>
+
 <div class="filter-row">
   <div class="fb on blue" onclick="filterStatus('all',this)">All</div>
   <div class="fb blue" onclick="filterStatus('Upcoming',this)">Upcoming</div>
@@ -110,10 +151,129 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
 let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='';
 
 window.addEventListener('DOMContentLoaded', loadTasks);
+
+// ── HEATMAP ──────────────────────────────────────────────────
+let hmView = 'total';
+
+const TEAM_TARGETS = {
+  'Aaditya Koshti':48,'Aashi Agrawal':48,'Achal Rathore':72,
+  'Bhavesh Bhagwat':72,'Himanshu Malviya':72,'Khushi Agrawal':48,
+  'Poorvi Goyal':48,'Sahil Maurya':48,'Simi':48,
+  'Aman Raghuwanshi':24,'Deepak Soni':72,
+};
+const DAILY_TARGETS = Object.fromEntries(
+  Object.entries(TEAM_TARGETS).map(([k,v])=>[k, Math.round(v/6*10)/10])
+);
+
+function setHmView(view, btn) {
+  hmView = view;
+  document.querySelectorAll('.hm-view-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderHeatmap();
+}
+
+function getWeekDays() {
+  const days=[], now=new Date();
+  const mon=new Date(now); mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  for(let i=0;i<6;i++){
+    const d=new Date(mon); d.setDate(mon.getDate()+i);
+    days.push(d.toISOString().substring(0,10));
+  }
+  return days;
+}
+
+function hmColor(pts, target) {
+  if (!target || pts===0) return 'hm-empty';
+  const pct = pts/target;
+  if (pct >= 1.0)  return 'hm-red';
+  if (pct >= 0.8)  return 'hm-green';
+  return 'hm-amber'; // < 80% = under loaded
+}
+
+function renderHeatmap() {
+  const body = document.getElementById('heatmap-body');
+  if (!body || !allTasks.length) return;
+
+  const openTasks = allTasks.filter(t=>
+    ['Upcoming','Ongoing','Delayed','Approval Pending'].includes(t.status) &&
+    t.assignedTo && t.assignedTo !== 'Unassigned'
+  );
+
+  // Get unique team members (exclude Unassigned)
+  const members = [...new Set(openTasks.map(t=>
+    t.assignedTo.split(',').map(a=>a.trim())
+  ).flat())].filter(m=>m && m!=='Unassigned').sort();
+
+  const weekDays = getWeekDays();
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let html = '<table class="heatmap-grid"><thead><tr><th>Member</th>';
+
+  if (hmView === 'daily') {
+    dayNames.forEach((d,i)=>{ html+=`<th>${d}<br><span style="font-size:8px;opacity:.5">${weekDays[i].substring(5)}</span></th>`; });
+  }
+  html += '<th>Total</th></tr></thead><tbody>';
+
+  members.forEach(name => {
+    const myTasks = openTasks.filter(t=>
+      t.assignedTo.split(',').map(a=>a.trim()).includes(name)
+    );
+    const wkTarget  = TEAM_TARGETS[name]  || 50;
+    const dayTarget = DAILY_TARGETS[name] || Math.round(wkTarget/6*10)/10;
+
+    let totalPts = myTasks.reduce((s,t)=>s+(t.weightedPts||0),0);
+
+    html += `<tr><td class="hm-name">${name}</td>`;
+
+    if (hmView === 'daily') {
+      weekDays.forEach(day=>{
+        const dayPts = myTasks
+          .filter(t=>t.targetDate===day)
+          .reduce((s,t)=>s+(t.weightedPts||0),0);
+        const cls = dayPts===0 ? 'hm-empty' : hmColor(dayPts, dayTarget);
+        html += `<td><span class="hm-cell ${cls}">${dayPts>0?dayPts.toFixed(1):'—'}</span></td>`;
+      });
+    } else if (hmView === 'week') {
+      const wkPts = myTasks
+        .filter(t=>t.targetDate>=weekDays[0]&&t.targetDate<=weekDays[5])
+        .reduce((s,t)=>s+(t.weightedPts||0),0);
+      const cls = hmColor(wkPts, wkTarget);
+      html += `<td colspan="6"><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;position:relative">
+        <div style="height:100%;width:${Math.min(100,wkPts/wkTarget*100)}%;background:${wkPts/wkTarget>=1?'#EA4335':wkPts/wkTarget>=0.8?'#2ED573':'#FBBC04'};border-radius:4px;transition:width .3s"></div>
+        <span style="position:absolute;left:8px;top:3px;font-size:10px;font-weight:700;color:#fff">${wkPts.toFixed(1)} / ${wkTarget} pts</span>
+      </div></td>`;
+      totalPts = wkPts;
+    }
+
+    const totCls = hmColor(totalPts, hmView==='week'?wkTarget:wkTarget*2);
+    html += `<td><span class="hm-cell hm-total">${totalPts.toFixed(1)}</span></td></tr>`;
+  });
+
+  html += '</tbody></table>';
+  body.innerHTML = html;
+
+  // Render unassigned pool
+  const unassigned = allTasks.filter(t=>
+    t.assignedTo==='Unassigned' &&
+    ['Upcoming','Ongoing','Delayed'].includes(t.status)
+  );
+  const uSection = document.getElementById('unassigned-section');
+  const uChips   = document.getElementById('unassigned-chips');
+  if (unassigned.length > 0) {
+    uSection.style.display='block';
+    uChips.innerHTML = unassigned.map(t=>
+      `<span class="unassigned-chip" onclick="filterStatus('all',document.querySelector('.fb.on'))">
+        ${t.project} — ${t.taskType} (${t.weightedPts}pts) due ${t.targetDate}
+      </span>`
+    ).join('');
+  } else {
+    uSection.style.display='none';
+  }
+}
 
 async function loadTasks() {
   document.getElementById('task-list').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
@@ -128,7 +288,7 @@ async function loadTasks() {
         {row:6,assignedTo:'Deepak Soni',assignedBy:'Astha',project:'Ajay Chordia',discipline:'Luxury Residential',taskType:'3D Rendering — Interior View',area:'Living Room',drawing:'Final Render v3',units:3,weightedPts:6.75,targetDate:'2026-05-09',priority:'High',status:'Completed',notes:'',revisionTag:'',revisionType:'',completedDate:'2026-05-08'},
       ];
     } else {
-      const res  = await fetch(APPS_SCRIPT_URL + '?action=getAllTasks');
+      const res  = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getAllTasks'})});
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       allTasks=data.tasks||[];
