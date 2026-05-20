@@ -141,7 +141,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
 let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
 let projBlockCount = 0;
 let taskCount=0;
@@ -298,8 +298,8 @@ async function fetchAll() {
 ];
     } else {
       const [l,c] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=getLists`).then(r=>r.json()),
-        fetch(`${APPS_SCRIPT_URL}?action=getConfig`).then(r=>r.json()),
+        fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'getLists'})}).then(r=>r.json()),
+        fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'getConfig'})}).then(r=>r.json()),
       ]);
       if (l.error) throw new Error('Lists: '+l.error);
       if (c.error) throw new Error('Config: '+c.error);
@@ -319,7 +319,13 @@ function buildForm() {
 
   ['assigner','assignee'].forEach(id => {
     const s=document.createElement('select'); s.id=id; s.onchange=updateBar;
-    s.innerHTML=teamOpts;
+    // Assignee gets an "Unassigned" option; assigner does not
+    if (id === 'assignee') {
+      s.innerHTML = '<option value="">— Unassigned (fill later) —</option>' +
+        ALL_MEMBERS.map(t=>`<option>${t}</option>`).join('');
+    } else {
+      s.innerHTML = teamOpts;
+    }
     document.getElementById(`${id}-wrap`).innerHTML='';
     document.getElementById(`${id}-wrap`).appendChild(s);
   });
@@ -582,7 +588,7 @@ async function submitTasks() {
   const assigner = document.getElementById('assigner')?.value;
   const assignee = document.getElementById('assignee')?.value;
   if (!assigner) { toast('Select your name');        return; }
-  if (!assignee) { toast('Select who to assign to'); return; }
+  // assignee is optional — if blank task is created as Unassigned
 
   const today = new Date().toISOString().substring(0,10);
   const allPayloads = [];
@@ -617,7 +623,7 @@ async function submitTasks() {
 
     if (tasks.length > 0) {
       allPayloads.push({
-        action:'assignTasks', assignedBy:assigner, assignedTo:assignee,
+        action:'assignTasks', assignedBy:assigner, assignedTo:assignee||'Unassigned',
         project:proj.name, projectId:projId,
         discipline:proj.discipline, multiplier:proj.multiplier,
         dateAssigned:today, tasks,
@@ -640,7 +646,7 @@ async function submitTasks() {
     document.getElementById('sending').classList.remove('show');
     const projNames = allPayloads.map(p=>p.project).join(', ');
     document.getElementById('success-sub').innerHTML=
-      `<strong>${totalTasks} task${totalTasks!==1?'s':''}</strong> assigned to <strong>${assignee}</strong><br>`+
+      `<strong>${totalTasks} task${totalTasks!==1?'s':''}</strong> assigned to <strong>${assignee||'Unassigned pool'}</strong><br>`+
       `Projects: ${projNames}<br>Total: ${totalPts.toFixed(1)} weighted pts`;
     document.getElementById('success').classList.add('show');
   } catch(err) {
