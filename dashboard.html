@@ -196,67 +196,188 @@ function hmColor(pts, target) {
 
 function renderHeatmap() {
   const body = document.getElementById('heatmap-body');
-  if (!body || !allTasks.length) return;
+  if (!body) return;
 
+  const today    = new Date().toISOString().substring(0,10);
+  const weekDays = getWeekDays();
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // Open tasks — for pending workload
   const openTasks = allTasks.filter(t=>
     ['Upcoming','Ongoing','Delayed','Approval Pending'].includes(t.status) &&
     t.assignedTo && t.assignedTo !== 'Unassigned'
   );
 
-  // Get unique team members (exclude Unassigned)
-  const members = [...new Set(openTasks.map(t=>
-    t.assignedTo.split(',').map(a=>a.trim())
-  ).flat())].filter(m=>m && m!=='Unassigned').sort();
+  // Approved tasks — for completed pts
+  const doneTasks = allTasks.filter(t=>
+    t.status === 'Completed' &&
+    t.assignedTo && t.assignedTo !== 'Unassigned'
+  );
 
-  const weekDays = getWeekDays();
-  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+  // Team members
+  const members = [...new Set(
+    [...openTasks, ...doneTasks].map(t=>
+      t.assignedTo.split(',').map(a=>a.trim())
+    ).flat()
+  )].filter(m=>m && m!=='Unassigned').sort();
 
-  let html = '<table class="heatmap-grid"><thead><tr><th>Member</th>';
-
-  if (hmView === 'daily') {
-    dayNames.forEach((d,i)=>{ html+=`<th>${d}<br><span style="font-size:8px;opacity:.5">${weekDays[i].substring(5)}</span></th>`; });
+  function hmColor(pts, target) {
+    if (!target || pts === 0) return 'hm-empty';
+    const pct = pts / target;
+    if (pct > 1.2)  return 'hm-red';    // >120% overloaded
+    if (pct >= 0.8) return 'hm-green';  // 80-120% healthy
+    return 'hm-amber';                   // <80% under-loaded
   }
-  html += '<th>Total</th></tr></thead><tbody>';
 
-  members.forEach(name => {
-    const myTasks = openTasks.filter(t=>
-      t.assignedTo.split(',').map(a=>a.trim()).includes(name)
-    );
-    const wkTarget  = TEAM_TARGETS[name]  || 50;
-    const dayTarget = DAILY_TARGETS[name] || Math.round(wkTarget/6*10)/10;
+  function getPts(taskList, name, dateField, dateVal) {
+    return taskList
+      .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                  t[dateField] === dateVal)
+      .reduce((s,t)=>s+(t.weightedPts||0), 0);
+  }
 
-    let totalPts = myTasks.reduce((s,t)=>s+(t.weightedPts||0),0);
+  function getOpenPts(name, dateVal) {
+    return openTasks
+      .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                  t.targetDate === dateVal)
+      .reduce((s,t)=>s+(t.weightedPts||0), 0);
+  }
 
-    html += `<tr><td class="hm-name">${name}</td>`;
+  function getDonePts(name, dateVal) {
+    return doneTasks
+      .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                  t.selfStatusDate === dateVal)
+      .reduce((s,t)=>s+(t.weightedPts||0), 0);
+  }
 
-    if (hmView === 'daily') {
-      weekDays.forEach(day=>{
-        const dayPts = myTasks
-          .filter(t=>t.targetDate===day)
-          .reduce((s,t)=>s+(t.weightedPts||0),0);
-        const cls = dayPts===0 ? 'hm-empty' : hmColor(dayPts, dayTarget);
-        html += `<td><span class="hm-cell ${cls}">${dayPts>0?dayPts.toFixed(1):'—'}</span></td>`;
+  let html = '';
+
+  if (hmView === 'total') {
+    // ── TOTAL: weekly progress bar per person ──────────────────
+    html = '<table class="heatmap-grid"><thead><tr>' +
+      '<th style="width:130px">Member</th>' +
+      '<th>Workload (Total Open)</th>' +
+      '<th style="width:80px">Open Pts</th>' +
+      '<th style="width:60px">Tasks</th>' +
+      '</tr></thead><tbody>';
+
+    members.forEach(name => {
+      const wkTgt   = TEAM_TARGETS[name] || 50;
+      const myOpen  = openTasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(name));
+      const openPts = myOpen.reduce((s,t)=>s+(t.weightedPts||0), 0);
+      const pct     = Math.min(120, Math.round(openPts / wkTgt * 100));
+      const barColor = openPts/wkTgt > 1.2 ? '#EA4335' : openPts/wkTgt >= 0.8 ? '#2ED573' : '#FBBC04';
+      html += `<tr>
+        <td class="hm-name">${name}</td>
+        <td><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:20px;position:relative">
+          <div style="height:100%;width:${Math.min(100,pct)}%;background:${barColor};border-radius:4px;transition:width .3s"></div>
+          <span style="position:absolute;left:8px;top:2px;font-size:10px;font-weight:700;color:#fff">${pct}% of weekly target (${wkTgt}pts)</span>
+        </div></td>
+        <td style="text-align:center"><span class="hm-cell ${hmColor(openPts,wkTgt)}">${openPts.toFixed(1)}</span></td>
+        <td style="text-align:center;font-size:11px;color:rgba(255,255,255,0.5)">${myOpen.length}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+
+  } else if (hmView === 'week') {
+    // ── THIS WEEK: progress bar showing done + pending ──────────
+    html = '<table class="heatmap-grid"><thead><tr>' +
+      '<th style="width:130px">Member</th>' +
+      '<th>This Week Progress</th>' +
+      '<th style="width:60px">Done</th>' +
+      '<th style="width:60px">Open</th>' +
+      '<th style="width:60px">Target</th>' +
+      '</tr></thead><tbody>';
+
+    members.forEach(name => {
+      const wkTgt  = TEAM_TARGETS[name] || 50;
+      const donePts = doneTasks
+        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                    t.selfStatusDate >= weekDays[0] && t.selfStatusDate <= weekDays[5])
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
+      const pendPts = openTasks
+        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                    t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5])
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
+      const openCount = openTasks
+        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                    t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5]).length;
+      const donePct  = Math.min(100, Math.round(donePts / wkTgt * 100));
+      const pendPct  = Math.min(100 - donePct, Math.round(pendPts / wkTgt * 100));
+      const pctLabel = Math.round(donePts/wkTgt*100);
+
+      html += `<tr>
+        <td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${pctLabel}% complete</span></td>
+        <td><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;display:flex">
+          <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done"></div>
+          <div style="height:100%;width:${pendPct}%;background:#4A9EFF;transition:width .3s" title="${pendPts.toFixed(1)} pts pending"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:2px;font-size:9px">
+          <span style="color:#2ED573">■ Done: ${donePts.toFixed(1)}</span>
+          <span style="color:#4A9EFF">■ Pending: ${pendPts.toFixed(1)}</span>
+          <span style="color:rgba(255,255,255,0.3)">■ Open tasks: ${openCount}</span>
+        </div></td>
+        <td style="text-align:center"><span class="hm-cell hm-green">${donePts.toFixed(1)}</span></td>
+        <td style="text-align:center"><span class="hm-cell ${hmColor(pendPts, wkTgt - donePts > 0 ? wkTgt - donePts : wkTgt)}">${pendPts.toFixed(1)}</span></td>
+        <td style="text-align:center;font-size:11px;color:rgba(255,255,255,0.4)">${wkTgt}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+
+  } else {
+    // ── PER DAY: past=done pts, today+future=open pts by deadline ─
+    html = '<table class="heatmap-grid"><thead><tr><th style="width:130px">Member</th>';
+    weekDays.forEach((d,i)=>{
+      const isPast   = d < today;
+      const isToday  = d === today;
+      const dayStyle = isToday ? 'color:#F5A623;font-weight:700' : isPast ? 'color:rgba(255,255,255,0.35)' : '';
+      html += `<th style="${dayStyle}">${dayNames[i]}<br><span style="font-size:8px;opacity:.6">${d.substring(5)}</span>${isToday?'<br><span style="font-size:7px;background:#F5A623;color:#000;border-radius:3px;padding:1px 4px">TODAY</span>':''}</th>`;
+    });
+    html += '<th>Week Total</th></tr></thead><tbody>';
+
+    members.forEach(name => {
+      const wkTgt  = TEAM_TARGETS[name] || 50;
+      const dayTgt = Math.round(wkTgt / 6 * 10) / 10;
+      let weekTotal = 0;
+      html += `<tr><td class="hm-name">${name}</td>`;
+
+      weekDays.forEach(d => {
+        const isPast  = d < today;
+        let pts = 0;
+        let cls = '';
+        let label = '';
+
+        if (isPast) {
+          // Past: show approved/done pts earned on this day
+          pts = doneTasks
+            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                        t.selfStatusDate === d)
+            .reduce((s,t)=>s+(t.weightedPts||0), 0);
+          cls = pts === 0 ? 'hm-empty' : 'hm-green';
+          label = pts > 0 ? pts.toFixed(1) : '—';
+        } else {
+          // Today + future: open pts due on this day
+          pts = openTasks
+            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                        t.targetDate === d)
+            .reduce((s,t)=>s+(t.weightedPts||0), 0);
+          cls = hmColor(pts, dayTgt);
+          label = pts > 0 ? pts.toFixed(1) : '—';
+        }
+        weekTotal += pts;
+        html += `<td><span class="hm-cell ${cls}" title="${isPast?'Approved pts earned':'Open pts due on this day'}">${label}</span></td>`;
       });
-    } else if (hmView === 'week') {
-      const wkPts = myTasks
-        .filter(t=>t.targetDate>=weekDays[0]&&t.targetDate<=weekDays[5])
-        .reduce((s,t)=>s+(t.weightedPts||0),0);
-      const cls = hmColor(wkPts, wkTarget);
-      html += `<td colspan="6"><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;position:relative">
-        <div style="height:100%;width:${Math.min(100,wkPts/wkTarget*100)}%;background:${wkPts/wkTarget>=1?'#EA4335':wkPts/wkTarget>=0.8?'#2ED573':'#FBBC04'};border-radius:4px;transition:width .3s"></div>
-        <span style="position:absolute;left:8px;top:3px;font-size:10px;font-weight:700;color:#fff">${wkPts.toFixed(1)} / ${wkTarget} pts</span>
-      </div></td>`;
-      totalPts = wkPts;
-    }
 
-    const totCls = hmColor(totalPts, hmView==='week'?wkTarget:wkTarget*2);
-    html += `<td><span class="hm-cell hm-total">${totalPts.toFixed(1)}</span></td></tr>`;
-  });
+      // Week total cell
+      const totCls = hmColor(weekTotal, wkTgt);
+      html += `<td><span class="hm-cell ${totCls}">${weekTotal.toFixed(1)}</span></td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
 
-  html += '</tbody></table>';
   body.innerHTML = html;
 
-  // Render unassigned pool
+  // Unassigned pool
   const unassigned = allTasks.filter(t=>
     t.assignedTo==='Unassigned' &&
     ['Upcoming','Ongoing','Delayed'].includes(t.status)
@@ -266,9 +387,7 @@ function renderHeatmap() {
   if (unassigned.length > 0) {
     uSection.style.display='block';
     uChips.innerHTML = unassigned.map(t=>
-      `<span class="unassigned-chip" onclick="filterStatus('all',document.querySelector('.fb.on'))">
-        ${t.project} — ${t.taskType} (${t.weightedPts}pts) due ${t.targetDate}
-      </span>`
+      `<span class="unassigned-chip">${t.project} — ${t.taskType} (${t.weightedPts}pts) due ${t.targetDate}</span>`
     ).join('');
   } else {
     uSection.style.display='none';
