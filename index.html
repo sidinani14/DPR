@@ -326,6 +326,9 @@ let EMAIL_MAP  = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviy
 let googleUser = null;
 let assignedTasks = [];
 let projCount  = 0;
+const VISIT_TYPES_ARCH = ['Site Visit (Architecture)', 'Site Visit (Interiors)'];
+const VISIT_TYPES_MTG  = ['Client Meeting (Regular)', 'Client Meeting'];
+function isVisitType(t) { return VISIT_TYPES_ARCH.indexOf(t)>-1 || VISIT_TYPES_MTG.indexOf(t)>-1; }
 
 window.addEventListener('DOMContentLoaded', () => {
   setHeaderDate(); setDeadlineBanner(); fetchAll();
@@ -724,6 +727,13 @@ function renderAssignedTasks() {
         <label class="atc-opt"><input type="radio" name="atc-${i}" value="Done" onchange="toggleDoneDate(${i},this)"><span class="atc-btn dn">Done ✓</span></label>
         <label class="atc-opt"><input type="radio" name="atc-${i}" value="Blocked" onchange="toggleDoneDate(${i},this)"><span class="atc-btn bl">Blocked</span></label>
       </div>
+      ${isVisitType(t.taskType) ? `
+      <div id="visit-hrs-${i}" style="padding:8px 13px 4px;display:none">
+        <div style="font-size:11px;color:var(--accent);margin-bottom:4px;font-family:'DM Mono',monospace">HOURS SPENT (for points calculation)</div>
+        <input type="number" class="atc-visit-hrs-${i}" min="0.5" max="12" step="0.5" placeholder="e.g. 2.5"
+          style="font-size:13px;padding:7px 10px;width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+        <span style="font-size:11px;color:var(--text3);margin-left:8px">${VISIT_TYPES_ARCH.indexOf(t.taskType)>-1?'pts = hours × 2':'pts = hours × 1'}</span>
+      </div>` : ''}
       <div id="done-date-${i}" style="display:none;padding:0 13px 10px">
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">ACTUAL COMPLETION DATE</div>
         <input type="date" class="atc-done-date-${i}" value="${new Date().toISOString().substring(0,10)}"
@@ -833,14 +843,19 @@ function addTask(containerId) {
       <input type="text" class="t-area" placeholder="Area / Space (e.g. Drawing Room)" style="font-size:12px;padding:6px 10px">
       <input type="text" class="t-drawing" placeholder="Drawing name (e.g. False Ceiling Plan)" style="font-size:12px;padding:6px 10px">
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">Status:</span>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
-        <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Done" checked style="accent-color:var(--green)"> Done
+        <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Done" checked style="accent-color:var(--green)" onchange="toggleVisitHrs(this)"> Done
       </label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
-        <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Ongoing" style="accent-color:var(--amber)"> Ongoing
+        <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Ongoing" style="accent-color:var(--amber)" onchange="toggleVisitHrs(this)"> Ongoing
       </label>
+      <span class="visit-hrs-wrap" style="display:none;align-items:center;gap:6px">
+        <input type="number" class="t-visit-hrs" min="0.5" max="12" step="0.5" placeholder="hours"
+          style="width:70px;font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+        <span style="font-size:10px;color:var(--accent)">hrs (visit pts)</span>
+      </span>
     </div>`;
   document.getElementById(containerId).appendChild(row);
 }
@@ -854,10 +869,24 @@ function refreshTaskPts(sel) {
   else { disp.textContent='—'; disp.style.color='var(--text3)'; }
 }
 
+function toggleVisitHrs(radio) {
+  // Show hours input for visit/meeting tasks when Done is selected
+  const row = radio.closest('.task-entry');
+  if (!row) return;
+  const typeVal = row.querySelector('.t-type')?.value;
+  const idx = parseInt(typeVal);
+  const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
+  const wrap = row.querySelector('.visit-hrs-wrap');
+  if (!wrap || !stage) return;
+  const isVisit2 = isVisitType(stage.label);
+  wrap.style.display = (isVisit2 && radio.value === 'Done') ? 'flex' : 'none';
+}
+
 function toggleDoneDate(i, radio) {
-  const div = document.getElementById('done-date-'+i);
-  if (!div) return;
-  div.style.display = radio.value === 'Done' ? 'block' : 'none';
+  const doneDiv  = document.getElementById('done-date-'+i);
+  const visitDiv = document.getElementById('visit-hrs-'+i);
+  if (doneDiv)  doneDiv.style.display  = radio.value === 'Done' ? 'block' : 'none';
+  if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
 }
 
 function onProjSelect(sel) {
@@ -922,6 +951,7 @@ function collectData() {
     status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
     note:document.querySelector(`.atc-note-${i}`)?.value.trim()||'',
     actualCompletionDate:document.querySelector(`.atc-done-date-${i}`)?.value||'',
+    visitHours:parseFloat(document.querySelector(`.atc-visit-hrs-${i}`)?.value)||null,
   }));
 
   const data={
@@ -939,7 +969,8 @@ function collectData() {
     'Projects Count'    : parseInt(document.getElementById('sc-proj').textContent)||0,
   };
 
-  const ongoingTasks = []; // Section 3 ongoing tasks → self-assigned
+  const ongoingTasks = []; // Section 3 ongoing tasks → TASK_ASSIGNMENTS
+  const doneTasks    = []; // Section 3 done tasks → TASK_ASSIGNMENTS via createDoneTask
   let pi=0;
   document.querySelectorAll('.proj-block').forEach(pb=>{
     const pnIdx=parseInt(pb.querySelector('.p-name')?.value);
@@ -955,16 +986,23 @@ function collectData() {
       const area=tr.querySelector('.t-area')?.value.trim()||'';
       const drawing=tr.querySelector('.t-drawing')?.value.trim()||'';
       const taskStatus=tr.querySelector('.t-status:checked')?.value||'Done';
-      const earned=(stage.pts*proj.multiplier*units).toFixed(1);
+      // Check if it's a visit type — get hours if so
+      const isVisit = isVisitType(stage.label);
+      const visitHrs = isVisit ? (parseFloat(tr.querySelector('.t-visit-hrs')?.value)||null) : null;
+      const earned = isVisit && visitHrs
+        ? (VISIT_TYPES_ARCH.indexOf(stage.label)>-1 ? visitHrs*2 : visitHrs).toFixed(1)
+        : (stage.pts*proj.multiplier*units).toFixed(1);
+
       if (taskStatus === 'Done') {
-        // Done → goes to TASK_LOG for approval
-        let taskStr=stage.label;
-        if(area)    taskStr+=` [Area: ${area}]`;
-        if(drawing) taskStr+=` [Drawing: ${drawing}]`;
-        taskStr+=` ×${units} = ${earned}pts`;
-        tasks.push(taskStr);
+        // Done → createDoneTask → goes to TASK_ASSIGNMENTS for approval
+        doneTasks.push({
+          taskType:stage.label, area, drawing, units,
+          basePts:stage.pts, project:proj.name, member:member,
+          discipline:proj.discipline, date:new Date().toISOString().substring(0,10),
+          visitHours: visitHrs,
+        });
       } else {
-        // Ongoing → create self-assigned task in TASK_ASSIGNMENTS (handled in doPost)
+        // Ongoing → self-assigned task in TASK_ASSIGNMENTS
         ongoingTasks.push({
           taskType:stage.label, area, drawing, units,
           basePts:stage.pts, project:proj.name, member:member,
@@ -983,6 +1021,7 @@ function collectData() {
     data[`P${pi} Visit Notes`] = hasVisit?pb.querySelector('.p-vnotes')?.value||'':'';
   });
   data['Ongoing Tasks'] = JSON.stringify(ongoingTasks);
+  data['Done Tasks']    = JSON.stringify(doneTasks);
   return data;
 }
 
