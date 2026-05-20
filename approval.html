@@ -209,7 +209,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6yI8jrfLOxOygzmgy8WTrCINvKnYX0jaT0_UvqVmPVtqSAqe4pkCnYsFK5d1gXr8A6w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
 
 // Leads loaded from CONFIG via getConfig
 let LEADS = [];
@@ -244,8 +244,8 @@ async function fetchAll() {
       ];
     } else {
       const [taskRes, configRes] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=getPendingTasks`),
-        fetch(`${APPS_SCRIPT_URL}?action=getConfig`)
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getPendingTasks'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})})
       ]);
       const taskData   = await taskRes.json();
       const configData = await configRes.json();
@@ -497,15 +497,9 @@ async function submitApprovals() {
 
   try {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      // Use XMLHttpRequest with text/plain to bypass CORS preflight
-      // Apps Script accepts this and parses the JSON body correctly
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', APPS_SCRIPT_URL, true);
-        xhr.setRequestHeader('Content-Type', 'text/plain');
-        xhr.onload  = () => resolve();
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(JSON.stringify({action: 'submitApprovals', approvals: payload}));
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({action: 'submitApprovals', approvals: payload}),
       });
     }
 
