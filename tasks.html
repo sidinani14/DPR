@@ -298,8 +298,8 @@ async function fetchAll() {
 ];
     } else {
       const [l,c] = await Promise.all([
-        fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'getLists'})}).then(r=>r.json()),
-        fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'getConfig'})}).then(r=>r.json()),
+        fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})}).then(r=>r.json()),
+        fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getConfig'})}).then(r=>r.json()),
       ]);
       if (l.error) throw new Error('Lists: '+l.error);
       if (c.error) throw new Error('Config: '+c.error);
