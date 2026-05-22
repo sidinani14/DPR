@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Projects Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0F1923; --surface:#182130; --surface2:#1E2A3A; --surface3:#243346;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --text:#F0EDE8; --text2:rgba(240,237,232,0.6); --text3:rgba(240,237,232,0.35);
+  --accent:#F5A623; --accent2:#E8890A;
+  --green:#2ED573; --amber:#FBBC04; --red:#EA4335; --blue:#4A9EFF;
+  --orange:#FF6B35; --purple:#A855F7;
+  --radius:12px; --radius-sm:8px; --radius-lg:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px;}
+
+/* ── HEADER ── */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.logo{height:32px;filter:brightness(0) invert(1);}
+.header-title{font-size:13px;font-weight:600;color:var(--text2);margin-left:4px;}
+.header-title span{color:var(--accent);}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.tab-nav{display:flex;gap:2px;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:3px;}
+.tab-btn{padding:6px 16px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);font-family:inherit;transition:all .15s;}
+.tab-btn.on{background:var(--surface3);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+
+/* ── FILTERS ── */
+.filters{padding:12px 24px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.filter-select{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:12px;padding:6px 10px;cursor:pointer;outline:none;}
+.filter-select:focus{border-color:var(--accent);}
+.search-input{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:12px;padding:6px 12px;outline:none;width:200px;}
+.search-input::placeholder{color:var(--text3);}
+.search-input:focus{border-color:var(--accent);}
+.filter-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;}
+.refresh-btn{margin-left:auto;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);color:var(--accent);border-radius:var(--radius-sm);padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+.refresh-btn:hover{background:rgba(245,166,35,0.2);}
+
+/* ── MAIN CONTENT ── */
+.main{padding:20px 24px;}
+
+/* ── SUMMARY STATS ── */
+.summary-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.stat-val{font-size:28px;font-weight:700;line-height:1;}
+.stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+
+/* ── PROJECT GRID ── */
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
+.proj-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:border-color .2s;cursor:pointer;}
+.proj-card:hover{border-color:rgba(245,166,35,0.3);}
+.proj-card.has-delay{border-color:rgba(234,67,53,0.3);}
+
+.proj-header{padding:16px 18px 12px;display:flex;align-items:flex-start;gap:12px;}
+.proj-disc-badge{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.disc-res{background:rgba(74,158,255,0.15);color:#4A9EFF;}
+.disc-com{background:rgba(245,166,35,0.15);color:#F5A623;}
+.disc-tow{background:rgba(46,213,115,0.15);color:#2ED573;}
+.disc-hos{background:rgba(168,85,247,0.15);color:#A855F7;}
+.disc-mix{background:rgba(255,107,53,0.15);color:#FF6B35;}
+
+.proj-info{flex:1;min-width:0;}
+.proj-name{font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-meta{font-size:11px;color:var(--text3);margin-top:3px;display:flex;gap:8px;align-items:center;}
+.proj-lead{font-size:11px;color:var(--text2);}
+.proj-status-pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;}
+.ps-ongoing{background:rgba(46,213,115,0.1);color:#2ED573;}
+.ps-hold{background:rgba(251,188,4,0.1);color:#FBBC04;}
+.ps-complete{background:rgba(255,255,255,0.06);color:var(--text3);}
+
+/* Progress bar */
+.proj-progress{padding:0 18px 10px;}
+.prog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.prog-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+.prog-pct{font-size:12px;font-weight:700;}
+.prog-bar-wrap{height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;display:flex;}
+.prog-done{height:100%;background:linear-gradient(90deg,var(--green),#00B894);border-radius:3px;transition:width .4s;}
+.prog-pend{height:100%;background:linear-gradient(90deg,var(--blue),#2979FF);}
+
+/* Task stats */
+.proj-stats{padding:8px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;border-top:1px solid var(--border);}
+.pstat{text-align:center;padding:6px 4px;}
+.pstat-val{font-size:16px;font-weight:700;line-height:1;}
+.pstat-lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+
+/* Visit section */
+.proj-visits{padding:8px 18px;border-top:1px solid var(--border);}
+.visit-row{display:flex;align-items:center;gap:8px;padding:3px 0;}
+.visit-type{font-size:10px;color:var(--text3);width:110px;flex-shrink:0;}
+.visit-last{font-size:10px;font-family:'DM Mono',monospace;}
+.visit-next{font-size:10px;font-family:'DM Mono',monospace;font-weight:600;}
+.visit-status{font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto;}
+.vs-sched{background:rgba(46,213,115,0.1);color:#2ED573;}
+.vs-over{background:rgba(234,67,53,0.1);color:#EA4335;}
+.vs-miss{background:rgba(234,67,53,0.15);color:#EA4335;}
+.vs-none{background:rgba(255,255,255,0.05);color:var(--text3);}
+
+/* Members chips */
+.proj-members{padding:8px 18px 14px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px;}
+.member-chip{font-size:10px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--text2);}
+
+/* ── DRILL-DOWN PANEL ── */
+.panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;backdrop-filter:blur(4px);}
+.panel-overlay.show{display:flex;justify-content:flex-end;}
+.side-panel{width:720px;background:var(--bg);border-left:1px solid var(--border2);height:100%;overflow-y:auto;display:flex;flex-direction:column;}
+.panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;position:sticky;top:0;background:var(--bg);z-index:10;}
+.panel-close{margin-left:auto;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit;}
+.panel-close:hover{background:rgba(255,255,255,0.1);}
+.panel-body{padding:20px 24px;flex:1;}
+
+/* Task list in panel */
+.task-filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.task-filter-btn{font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;}
+.task-filter-btn.on{background:rgba(245,166,35,0.1);border-color:rgba(245,166,35,0.4);color:var(--accent);}
+
+.task-table{width:100%;border-collapse:collapse;}
+.task-table thead th{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;padding:6px 8px;text-align:left;border-bottom:1px solid var(--border);}
+.task-table tbody tr{border-bottom:1px solid rgba(255,255,255,0.03);transition:background .1s;}
+.task-table tbody tr:hover{background:rgba(255,255,255,0.02);}
+.task-table tbody td{padding:7px 8px;font-size:11px;vertical-align:top;}
+.task-type-cell{font-weight:500;color:var(--text);line-height:1.3;}
+.task-area{font-size:10px;color:var(--text3);margin-top:1px;}
+.assignee-cell{font-size:11px;color:var(--text2);}
+.deadline-cell{font-family:'DM Mono',monospace;font-size:10px;}
+.deadline-late{color:var(--red);}
+.pts-cell{font-size:11px;font-weight:700;text-align:right;}
+
+.status-pill{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+.sp-completed{background:rgba(46,213,115,0.12);color:#2ED573;}
+.sp-approval{background:rgba(74,158,255,0.12);color:#4A9EFF;}
+.sp-progress{background:rgba(74,158,255,0.1);color:#4A9EFF;}
+.sp-notstart{background:rgba(251,188,4,0.1);color:#FBBC04;}
+.sp-delayed{background:rgba(234,67,53,0.12);color:#EA4335;}
+.sp-revision{background:rgba(255,107,53,0.12);color:#FF6B35;}
+
+/* ── CALENDAR VIEW ── */
+.calendar-wrap{overflow-x:auto;}
+.calendar-grid{min-width:700px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.cal-header{display:grid;background:var(--surface2);border-bottom:1px solid var(--border);}
+.cal-time-col{width:60px;}
+.cal-day-header{padding:10px 8px;font-size:11px;font-weight:600;text-align:center;border-left:1px solid var(--border);}
+.cal-day-today{color:var(--accent);}
+.cal-body{position:relative;}
+.cal-row{display:grid;min-height:30px;border-bottom:1px solid rgba(255,255,255,0.03);}
+.cal-time-label{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;padding:0 8px;display:flex;align-items:flex-start;padding-top:4px;width:60px;}
+.cal-cell{border-left:1px solid rgba(255,255,255,0.03);position:relative;min-height:30px;}
+.cal-event{position:absolute;left:2px;right:2px;border-radius:5px;padding:4px 6px;font-size:9px;font-weight:600;overflow:hidden;cursor:pointer;transition:opacity .15s;z-index:2;}
+.cal-event:hover{opacity:.85;z-index:10;}
+.cal-event-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-event-type{font-size:8px;opacity:.7;margin-top:1px;}
+
+.no-data{text-align:center;padding:40px;color:var(--text3);font-size:13px;}
+.issue-row{display:grid;grid-template-columns:80px 100px 1fr 130px 60px 90px 100px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;}
+.issue-row:last-child{border-bottom:none;}
+.issue-header{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;padding:5px 0 8px;border-bottom:1px solid var(--border);}
+.issue-type-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;}
+.it-design{background:rgba(74,158,255,0.12);color:#4A9EFF;}
+.it-procurement{background:rgba(245,166,35,0.12);color:#F5A623;}
+.it-contractor{background:rgba(255,107,53,0.12);color:#FF6B35;}
+.it-client{background:rgba(168,85,247,0.12);color:#A855F7;}
+.it-site{background:rgba(251,188,4,0.12);color:#FBBC04;}
+.issue-status-open{color:var(--red);font-weight:700;}
+.issue-status-progress{color:var(--amber);font-weight:700;}
+.issue-status-resolved{color:var(--green);}
+.priority-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;text-align:center;}
+.pri-1{background:rgba(46,213,115,0.12);color:#2ED573;}
+.pri-2{background:rgba(251,188,4,0.12);color:#FBBC04;}
+.pri-3{background:rgba(234,67,53,0.12);color:#EA4335;}
+.issues-badge{background:rgba(234,67,53,0.15);color:#EA4335;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px;}
+.loading{text-align:center;padding:40px;color:var(--text3);}
+.loading::after{content:'';display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-left:8px;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Section title */
+.section-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Visit table in panel */
+.visit-panel-table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+.visit-panel-table th{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;}
+.visit-panel-table td{padding:6px 8px;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.03);}
+
+/* Responsive */
+@media(max-width:900px){
+  .summary-row{grid-template-columns:repeat(3,1fr);}
+  .projects-grid{grid-template-columns:1fr;}
+  .side-panel{width:100%;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img class="logo" src="https://sidinani14.github.io/DPR/ideaform-logo.png" alt="Ideaform" onerror="this.style.display='none';document.getElementById('logo-text').style.display='block'">
+  <span id="logo-text" style="display:none;font-size:16px;font-weight:700;color:var(--accent)">IDEAFORM</span>
+  <span class="header-title">Projects <span>Dashboard</span></span>
+  <div class="header-right">
+    <div class="tab-nav">
+      <button class="tab-btn on" onclick="switchTab('projects',this)">Projects</button>
+      <button class="tab-btn" onclick="switchTab('calendar',this)">Calendar</button>
+    </div>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="filter-label">Filter:</span>
+  <select class="filter-select" id="filter-status" onchange="applyFilters()">
+    <option value="all">All Status</option>
+    <option value="Ongoing">Ongoing</option>
+    <option value="On Hold">On Hold</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <select class="filter-select" id="filter-disc" onchange="applyFilters()">
+    <option value="all">All Types</option>
+    <option value="Luxury Residential">Luxury Residential</option>
+    <option value="Premium Residential">Premium Residential</option>
+    <option value="Commercial">Commercial</option>
+    <option value="Township">Township</option>
+    <option value="Hospitality">Hospitality</option>
+  </select>
+  <select class="filter-select" id="filter-lead" onchange="applyFilters()">
+    <option value="all">All Leads</option>
+  </select>
+  <input class="search-input" id="search-input" placeholder="Search project…" oninput="applyFilters()">
+
+  <!-- Calendar filters (hidden by default) -->
+  <select class="filter-select" id="cal-member" style="display:none" onchange="renderCalendar()">
+    <option value="all">All Team</option>
+  </select>
+  <select class="filter-select" id="cal-project" style="display:none" onchange="renderCalendar()">
+    <option value="all">All Projects</option>
+  </select>
+  <select class="filter-select" id="cal-week" style="display:none" onchange="renderCalendar()">
+    <option value="0">This Week</option>
+    <option value="1">Next Week</option>
+    <option value="-1">Last Week</option>
+  </select>
+
+  <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+</div>
+
+<!-- Projects Tab -->
+<div id="tab-projects" class="main">
+  <div id="summary-row" class="summary-row"></div>
+  <div id="projects-grid" class="projects-grid"><div class="loading">Loading projects</div></div>
+</div>
+
+<!-- Calendar Tab -->
+<div id="tab-calendar" class="main" style="display:none">
+  <div id="calendar-container"><div class="loading">Loading calendar</div></div>
+</div>
+
+<!-- Side Panel -->
+<div class="panel-overlay" id="panel-overlay" onclick="closePanel(event)">
+  <div class="side-panel" id="side-panel">
+    <div class="panel-header" id="panel-header"></div>
+    <div class="panel-body" id="panel-body"></div>
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
+
+// Project colour map
+const DISC_COLORS = [
+  '#4A9EFF','#F5A623','#2ED573','#A855F7','#FF6B35',
+  '#E91E8C','#00BCD4','#8BC34A','#FF5722','#9C27B0'
+];
+const PROJECT_COLORS = {};
+let colorIdx = 0;
+function projColor(name) {
+  if (!PROJECT_COLORS[name]) PROJECT_COLORS[name] = DISC_COLORS[colorIdx++ % DISC_COLORS.length];
+  return PROJECT_COLORS[name];
+}
+
+function discBadge(disc) {
+  const d = (disc||'').toLowerCase();
+  if (d.includes('luxury') || d.includes('premium') || d.includes('residential')) return ['RES','disc-res'];
+  if (d.includes('commercial')) return ['COM','disc-com'];
+  if (d.includes('township') || d.includes('plotted')) return ['TWN','disc-tow'];
+  if (d.includes('hospitality')) return ['HOS','disc-hos'];
+  return ['MIX','disc-mix'];
+}
+
+function statusPillClass(s) {
+  switch(s) {
+    case 'Completed': return 'sp-completed';
+    case 'Approval Pending': return 'sp-approval';
+    case 'In Progress': return 'sp-progress';
+    case 'Not Started': return 'sp-notstart';
+    case 'Delayed': return 'sp-delayed';
+    case 'Revision Required': return 'sp-revision';
+    default: return 'sp-notstart';
+  }
+}
+
+let allProjects = [], allEvents = [], allIssues = [];
+
+async function loadAll() {
+  try {
+    const [ps, cs, iss] = await Promise.all([
+      fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getProjectStats'})}).then(r=>r.json()),
+      fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getCalendarData'})}).then(r=>r.json()),
+      fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getSiteIssues',project:''})}).then(r=>r.json()),
+    ]);
+    allProjects = ps.projects  || [];
+    allEvents   = cs.events    || [];
+    allIssues   = iss.issues   || [];
+    populateLeadFilter();
+    populateCalendarFilters();
+    applyFilters();
+    renderCalendar();
+  } catch(e) {
+    document.getElementById('projects-grid').innerHTML =
+      `<div class="no-data">Failed to load: ${e.message}<br>Check Apps Script URL</div>`;
+  }
+}
+
+function populateLeadFilter() {
+  const leads = [...new Set(allProjects.map(p=>p.lead).filter(Boolean))].sort();
+  const sel = document.getElementById('filter-lead');
+  sel.innerHTML = '<option value="all">All Leads</option>' +
+    leads.map(l=>`<option>${l}</option>`).join('');
+}
+
+function populateCalendarFilters() {
+  const members = [...new Set(allEvents.map(e=>e.assignee.split(',').map(a=>a.trim())).flat().filter(Boolean))].sort();
+  const projects= [...new Set(allEvents.map(e=>e.project).filter(Boolean))].sort();
+  document.getElementById('cal-member').innerHTML =
+    '<option value="all">All Team</option>' + members.map(m=>`<option>${m}</option>`).join('');
+  document.getElementById('cal-project').innerHTML =
+    '<option value="all">All Projects</option>' + projects.map(p=>`<option>${p}</option>`).join('');
+}
+
+function applyFilters() {
+  const status = document.getElementById('filter-status').value;
+  const disc   = document.getElementById('filter-disc').value;
+  const lead   = document.getElementById('filter-lead').value;
+  const search = document.getElementById('search-input').value.toLowerCase();
+
+  const filtered = allProjects.filter(p => {
+    if (status !== 'all' && p.status !== status) return false;
+    if (disc   !== 'all' && !p.discipline.includes(disc)) return false;
+    if (lead   !== 'all' && p.lead !== lead) return false;
+    if (search && !p.name.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  renderSummary(filtered);
+  renderProjects(filtered);
+}
+
+function renderSummary(projects) {
+  const total     = projects.length;
+  const delayed   = projects.filter(p=>p.delayedTasks>0).length;
+  const totalTasks= projects.reduce((s,p)=>s+p.totalTasks,0);
+  const doneTasks = projects.reduce((s,p)=>s+p.completedTasks,0);
+  const approvedPts = projects.reduce((s,p)=>s+p.approvedPts,0);
+  const pendingTasks= projects.reduce((s,p)=>s+p.approvalPending,0);
+
+  document.getElementById('summary-row').innerHTML = [
+    {val:total, lbl:'Total Projects', sub:'', col:'var(--accent)'},
+    {val:delayed, lbl:'With Delays', sub:'Need attention', col:delayed>0?'var(--red)':'var(--green)'},
+    {val:totalTasks, lbl:'Total Tasks', sub:'Across all projects', col:'var(--blue)'},
+    {val:doneTasks, lbl:'Completed', sub:totalTasks>0?Math.round(doneTasks/totalTasks*100)+'% done':'', col:'var(--green)'},
+    {val:pendingTasks, lbl:'Pending Approval', sub:'Awaiting review', col:'var(--amber)'},
+    {val:approvedPts.toFixed(0), lbl:'Approved Pts', sub:'Total earned', col:'var(--accent)'},
+  ].map(s=>`<div class="stat-card">
+    <div class="stat-val" style="color:${s.col}">${s.val}</div>
+    <div class="stat-lbl">${s.lbl}</div>
+    ${s.sub?`<div class="stat-sub">${s.sub}</div>`:''}
+  </div>`).join('');
+}
+
+function renderProjects(projects) {
+  if (!projects.length) {
+    document.getElementById('projects-grid').innerHTML = '<div class="no-data">No projects match filters</div>';
+    return;
+  }
+
+  document.getElementById('projects-grid').innerHTML = projects.map(p => {
+    const [badge, cls] = discBadge(p.discipline);
+    const pct = p.completionPct;
+    const pendPct = p.totalTasks > 0 ? Math.round(p.approvalPending/p.totalTasks*100) : 0;
+    const psClass = p.status==='Ongoing'?'ps-ongoing':p.status==='Completed'?'ps-complete':'ps-hold';
+    const hasDelay = p.delayedTasks > 0;
+    const color = projColor(p.name);
+
+    // Visit rows
+    const visitRows = (p.visits||[]).slice(0,3).map(v=>{
+      const isMissed   = v.status==='Missed';
+      const isOverdue  = v.status==='Overdue';
+      const vsClass    = isMissed?'vs-miss':isOverdue?'vs-over':v.nextDate?'vs-sched':'vs-none';
+      const vsLabel    = isMissed?'Missed':isOverdue?'Overdue':v.nextDate?'Scheduled':'No schedule';
+      return `<div class="visit-row">
+        <span class="visit-type">${v.type.replace('Site Visit ','SV ').replace('Client Meeting','Meeting')}</span>
+        <span class="visit-last" style="color:var(--text3)">${v.lastDate||'—'}</span>
+        <span style="color:var(--text3);margin:0 4px">→</span>
+        <span class="visit-next" style="color:${isOverdue||isMissed?'var(--red)':'var(--text)'}">${v.nextDate||'—'}</span>
+        <span class="visit-status ${vsClass}">${vsLabel}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="proj-card ${hasDelay?'has-delay':''}" onclick="openPanel('${p.name.replace(/'/g,"\\'")}')">
+      <div class="proj-header">
+        <div class="proj-disc-badge ${cls}">${badge}</div>
+        <div class="proj-info">
+          <div class="proj-name" title="${p.name}">${p.name}</div>
+          <div class="proj-meta">
+            <span class="proj-status-pill ${psClass}">${p.status}</span>
+            <span class="proj-lead">Lead: ${p.lead||'—'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="proj-progress">
+        <div class="prog-header">
+          <span class="prog-label">Completion</span>
+          <span class="prog-pct" style="color:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'}">${pct}%</span>
+        </div>
+        <div class="prog-bar-wrap">
+          <div class="prog-done" style="width:${pct}%"></div>
+          <div class="prog-pend" style="width:${pendPct}%"></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:5px;font-size:9px;color:var(--text3)">
+          <span style="color:var(--green)">■ Done: ${p.approvedPts}pts</span>
+          <span style="color:var(--blue)">■ Pending: ${p.pendingPts}pts</span>
+        </div>
+      </div>
+
+      <div class="proj-stats">
+        <div class="pstat"><div class="pstat-val" style="color:var(--text)">${p.totalTasks}</div><div class="pstat-lbl">Total</div></div>
+        <div class="pstat"><div class="pstat-val" style="color:var(--green)">${p.completedTasks}</div><div class="pstat-lbl">Done</div></div>
+        <div class="pstat"><div class="pstat-val" style="color:${p.delayedTasks>0?'var(--red)':'var(--text3)'}">${p.delayedTasks}</div><div class="pstat-lbl">Delayed</div></div>
+        <div class="pstat"><div class="pstat-val" style="color:${p.approvalPending>0?'var(--amber)':'var(--text3)'}">${p.approvalPending}</div><div class="pstat-lbl">Approval</div></div>
+        <div class="pstat"><div class="pstat-val" style="color:${(()=>{const c=allIssues.filter(i=>i.project===p.name&&i.status!=='Resolved').length;return c>0?'var(--red)':'var(--text3)'})()}">${allIssues.filter(i=>i.project===p.name&&i.status!=='Resolved').length}</div><div class="pstat-lbl">Issues</div></div>
+      </div>
+
+      ${visitRows ? `<div class="proj-visits">${visitRows}</div>` : ''}
+
+      ${p.members.length ? `<div class="proj-members">
+        ${p.members.slice(0,6).map(m=>`<span class="member-chip">${m}</span>`).join('')}
+        ${p.members.length>6?`<span class="member-chip">+${p.members.length-6}</span>`:''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── PANEL ──────────────────────────────────────────────────────
+let panelFilter = 'all';
+
+function openPanel(name) {
+  const proj = allProjects.find(p=>p.name===name);
+  if (!proj) return;
+  panelFilter = 'all';
+
+  const [badge, cls] = discBadge(proj.discipline);
+  const color = projColor(proj.name);
+
+  document.getElementById('panel-header').innerHTML = `
+    <div class="proj-disc-badge ${cls}" style="width:44px;height:44px;font-size:13px">${badge}</div>
+    <div>
+      <div style="font-size:18px;font-weight:700">${proj.name}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px">${proj.discipline} · Lead: ${proj.lead||'—'} · ${proj.totalTasks} tasks · ${proj.approvedPts}pts approved</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-left:auto;align-items:center">
+      <button class="task-filter-btn on" id="panel-tab-tasks" onclick="switchPanelTab('tasks','${proj.name.replace(/'/g,"\\'")}')">Tasks</button>
+      <button class="task-filter-btn" id="panel-tab-issues" onclick="switchPanelTab('issues','${proj.name.replace(/'/g,"\\'")}')">Issues <span class="issues-badge" id="issues-badge-count"></span></button>
+      <button class="panel-close" onclick="closePanel()">✕ Close</button>
+    </div>`;
+
+  renderPanelBody(proj);
+  document.getElementById('panel-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function renderPanelBody(proj) {
+  const tasks = proj.tasks || [];
+  const statuses = ['all','Delayed','In Progress','Approval Pending','Not Started','Completed','Revision Required'];
+  const counts = {};
+  statuses.forEach(s => counts[s] = s==='all' ? tasks.length : tasks.filter(t=>t.status===s).length);
+
+  const filtered = panelFilter==='all' ? tasks : tasks.filter(t=>t.status===panelFilter);
+  const sorted = [...filtered].sort((a,b)=>{
+    const order = {Delayed:0,'Revision Required':1,'Approval Pending':2,'In Progress':3,'Not Started':4,Completed:5};
+    return (order[a.status]||9) - (order[b.status]||9);
+  });
+
+  const today = new Date().toISOString().substring(0,10);
+
+  const taskRows = sorted.length ? sorted.map((t,i) => {
+    const isLate = t.deadline && t.deadline < today && t.status !== 'Completed';
+    return `<tr>
+      <td>${i+1}</td>
+      <td><div class="task-type-cell">${t.taskType}</div>${t.area?`<div class="task-area">${t.area}${t.drawing?' · '+t.drawing:''}</div>`:''}</td>
+      <td class="assignee-cell">${t.assignee}</td>
+      <td class="deadline-cell ${isLate?'deadline-late':''}">${t.deadline||'—'}</td>
+      <td><span class="status-pill ${statusPillClass(t.status)}">${t.status}</span></td>
+      <td class="pts-cell" style="color:${t.pts>0?'var(--accent)':'var(--text3)'}">${t.pts}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" class="no-data">No tasks</td></tr>`;
+
+  // Visit schedule
+  const visitRows = (proj.visits||[]).map(v=>{
+    const isOv = v.status==='Overdue'||v.status==='Missed';
+    return `<tr>
+      <td>${v.type}</td>
+      <td>${v.assignee}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px">${v.lastDate||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:${isOv?'var(--red)':'var(--text)'};font-weight:600">${v.nextDate||'—'}</td>
+      <td><span class="status-pill ${isOv?'sp-delayed':'sp-completed'}">${v.status||'Scheduled'}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div class="section-title">Task Summary</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+      ${[
+        {v:proj.completedTasks,l:'Done',c:'var(--green)'},
+        {v:proj.approvalPending,l:'Approval Pending',c:'var(--blue)'},
+        {v:proj.delayedTasks,l:'Delayed',c:'var(--red)'},
+        {v:proj.inProgressTasks,l:'In Progress',c:'var(--amber)'},
+      ].map(s=>`<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center">
+        <div style="font-size:22px;font-weight:700;color:${s.c}">${s.v}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px">${s.l}</div>
+      </div>`).join('')}
+    </div>
+
+    <div class="task-filter-row">
+      ${statuses.map(s=>`<button class="task-filter-btn ${panelFilter===s?'on':''}"
+        onclick="setPanelFilter('${proj.name.replace(/'/g,"\\'")}','${s}')">
+        ${s==='all'?'All':s} <span style="opacity:.6">(${counts[s]})</span>
+      </button>`).join('')}
+    </div>
+
+    <table class="task-table">
+      <thead><tr>
+        <th style="width:28px">#</th>
+        <th>Task / Area / Drawing</th>
+        <th style="width:110px">Assigned To</th>
+        <th style="width:80px">Deadline</th>
+        <th style="width:110px">Status</th>
+        <th style="width:45px;text-align:right">Pts</th>
+      </tr></thead>
+      <tbody>${taskRows}</tbody>
+    </table>
+
+    ${proj.visits&&proj.visits.length ? `
+    <div class="section-title" style="margin-top:20px">Visit Schedule</div>
+    <table class="visit-panel-table">
+      <thead><tr><th>Type</th><th>Assignee</th><th>Last Visit</th><th>Next Planned</th><th>Status</th></tr></thead>
+      <tbody>${visitRows}</tbody>
+    </table>` : ''}
+  `;
+}
+
+function switchPanelTab(tab, name) {
+  document.getElementById('panel-tab-tasks').classList.toggle('on', tab==='tasks');
+  document.getElementById('panel-tab-issues').classList.toggle('on', tab==='issues');
+  const proj = allProjects.find(p=>p.name===name);
+  if (!proj) return;
+  if (tab==='tasks') {
+    renderPanelBody(proj);
+  } else {
+    renderIssuesPanel(proj);
+  }
+}
+
+function renderIssuesPanel(proj) {
+  const projIssues = allIssues.filter(i=>i.project===proj.name);
+  const open       = projIssues.filter(i=>i.status!=='Resolved');
+  const badge      = document.getElementById('issues-badge-count');
+  if (badge) badge.textContent = open.length || '';
+
+  function typeClass(t) {
+    const map={'Design':'it-design','Procurement':'it-procurement',
+               'Contractor':'it-contractor','Client':'it-client','Site Condition':'it-site'};
+    return map[t]||'it-site';
+  }
+  function priClass(p) { return p===3?'pri-3':p===1?'pri-1':'pri-2'; }
+  function priLabel(p) { return p===3?'High':p===1?'Low':'Med'; }
+  function statusClass(s) {
+    return s==='Resolved'?'issue-status-resolved':s==='In Progress'?'issue-status-progress':'issue-status-open';
+  }
+
+  const today = new Date().toISOString().substring(0,10);
+
+  let html = `<div style="display:flex;gap:8px;margin-bottom:12px">
+    <span style="font-size:12px;color:var(--text2)">${open.length} open issue${open.length!==1?'s':''}</span>
+    ${projIssues.length-open.length > 0 ? `<span style="font-size:12px;color:var(--green)">${projIssues.length-open.length} resolved</span>` : ''}
+  </div>`;
+
+  if (!projIssues.length) {
+    html += '<div class="no-data">No issues recorded for this project</div>';
+  } else {
+    html += `<div class="issue-row issue-header">
+      <span>Date</span><span>Type</span><span>Description</span>
+      <span>Assigned To</span><span>Priority</span><span>Target</span><span>Status</span>
+    </div>`;
+    // Sort: open first, then by date desc
+    const sorted = [...projIssues].sort((a,b)=>{
+      if (a.status!=='Resolved' && b.status==='Resolved') return -1;
+      if (a.status==='Resolved' && b.status!=='Resolved') return 1;
+      return b.date.localeCompare(a.date);
+    });
+    sorted.forEach(iss=>{
+      const isOverdue = iss.targetDate && iss.targetDate < today && iss.status !== 'Resolved';
+      html += `<div class="issue-row">
+        <span style="font-family:'DM Mono',monospace;color:var(--text3)">${iss.date.substring(5)}</span>
+        <span><span class="issue-type-badge ${typeClass(iss.issueType)}">${iss.issueType}</span></span>
+        <span style="color:var(--text);line-height:1.3">${iss.description}</span>
+        <span style="color:var(--text2)">${iss.assignedTo}</span>
+        <span><span class="priority-badge ${priClass(iss.priority)}">${priLabel(iss.priority)}</span></span>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:${isOverdue?'var(--red)':'var(--text3)'}">${iss.targetDate||'—'}</span>
+        <span class="${statusClass(iss.status)}">${iss.status}</span>
+      </div>`;
+    });
+  }
+  document.getElementById('panel-body').innerHTML = html;
+}
+
+function setPanelFilter(name, status) {
+  panelFilter = status;
+  const proj = allProjects.find(p=>p.name===name);
+  if (proj) renderPanelBody(proj);
+}
+
+function closePanel(e) {
+  if (e && e.target !== document.getElementById('panel-overlay')) return;
+  document.getElementById('panel-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// ── CALENDAR ──────────────────────────────────────────────────
+function getWeekDays(offset) {
+  const days = [], now = new Date();
+  now.setDate(now.getDate() + (offset||0)*7);
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+  for (let i=0; i<6; i++) {
+    const d = new Date(mon); d.setDate(mon.getDate()+i);
+    days.push(d.toISOString().substring(0,10));
+  }
+  return days;
+}
+
+function renderCalendar() {
+  const memberFilter  = document.getElementById('cal-member')?.value || 'all';
+  const projectFilter = document.getElementById('cal-project')?.value || 'all';
+  const weekOffset    = parseInt(document.getElementById('cal-week')?.value || '0');
+  const weekDays      = getWeekDays(weekOffset);
+  const today         = new Date().toISOString().substring(0,10);
+  const dayNames      = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  let events = allEvents.filter(e => {
+    if (memberFilter !== 'all') {
+      if (!e.assignee.split(',').map(a=>a.trim()).includes(memberFilter)) return false;
+    }
+    if (projectFilter !== 'all' && e.project !== projectFilter) return false;
+    return weekDays.includes(e.date);
+  });
+
+  // Time slots 8:00 to 20:00 in 30-min increments
+  const slots = [];
+  for (let h=8; h<20; h++) { slots.push({h, m:0}); slots.push({h, m:30}); }
+  const SLOT_H = 30; // px per 30-min slot
+
+  // Group events by day and find overlaps
+  const byDay = {};
+  weekDays.forEach(d => byDay[d] = []);
+  events.forEach(e => { if (byDay[e.date]) byDay[e.date].push(e); });
+
+  // Build column widths for header
+  const colW = `repeat(${weekDays.length},1fr)`;
+
+  let html = `<div class="calendar-wrap"><div class="calendar-grid">
+    <div class="cal-header" style="grid-template-columns:60px ${colW}">
+      <div class="cal-time-col"></div>
+      ${weekDays.map((d,i)=>`<div class="cal-day-header ${d===today?'cal-day-today':''}">
+        ${dayNames[i]}<br><span style="font-size:10px;opacity:.6">${d.substring(5)}</span>
+        ${d===today?'<br><span style="font-size:8px;background:var(--accent);color:#000;border-radius:3px;padding:1px 4px">TODAY</span>':''}
+      </div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:60px ${colW}">
+      <!-- Time labels -->
+      <div>${slots.map(s=>`<div class="cal-time-label" style="height:${SLOT_H}px">${s.m===0?String(s.h).padStart(2,'0')+':00':''}</div>`).join('')}</div>
+      <!-- Day columns -->
+      ${weekDays.map(d=>{
+        const dayEvents = byDay[d]||[];
+        // Sort and assign columns for overlaps
+        dayEvents.sort((a,b)=>a.hour*60+a.minute - (b.hour*60+b.minute));
+        // Find overlapping groups
+        const assigned = dayEvents.map((_,i)=>0);
+        const maxCols  = dayEvents.map((_,i)=>1);
+        for (let i=0;i<dayEvents.length;i++) {
+          const ea=dayEvents[i];
+          const ea_end=(ea.hour*60+ea.minute+ea.duration*60);
+          let col=0;
+          const usedCols=[];
+          for (let j=0;j<i;j++) {
+            const eb=dayEvents[j];
+            const eb_end=(eb.hour*60+eb.minute+eb.duration*60);
+            if (ea.hour*60+ea.minute < eb_end && ea_end > eb.hour*60+eb.minute) {
+              usedCols.push(assigned[j]);
+            }
+          }
+          while(usedCols.includes(col)) col++;
+          assigned[i]=col;
+          // Update maxCols for all overlapping events
+          for (let j=0;j<i;j++) {
+            const eb=dayEvents[j];
+            const eb_end=(eb.hour*60+eb.minute+eb.duration*60);
+            if (ea.hour*60+ea.minute < eb_end) {
+              const m=Math.max(maxCols[j],col+1);
+              maxCols[j]=m; maxCols[i]=m;
+            }
+          }
+        }
+        const totalH = slots.length * SLOT_H;
+        return `<div style="position:relative;height:${totalH}px;border-left:1px solid var(--border)">
+          ${slots.map(s=>`<div style="position:absolute;left:0;right:0;top:${((s.h-8)*2+(s.m/30))*SLOT_H}px;height:${SLOT_H}px;border-bottom:1px solid rgba(255,255,255,0.02)"></div>`).join('')}
+          ${dayEvents.map((e,idx)=>{
+            const topPx=((e.hour-8)*2+(e.minute/30))*SLOT_H;
+            const htPx=e.duration*2*SLOT_H;
+            const color=projColor(e.project);
+            const totalC=maxCols[idx]||1;
+            const col=assigned[idx];
+            const w=`calc((100% - 4px) / ${totalC})`;
+            const l=`calc(2px + ${col} * (100% - 4px) / ${totalC})`;
+            return `<div class="cal-event" style="top:${topPx}px;height:${htPx}px;width:${w};left:${l};background:${color}22;border-left:3px solid ${color};color:${color}"
+              title="${e.project} — ${e.taskType} (${e.assignee}) ${e.hour}:${String(e.minute).padStart(2,'0')}">
+              <div class="cal-event-name">${e.project}</div>
+              <div class="cal-event-type">${e.taskType.replace('Site Visit (','SV(').replace('Client Meeting','Meeting')} · ${e.assignee.split(',')[0].trim()}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+  </div></div>`;
+
+  document.getElementById('calendar-container').innerHTML = html ||
+    '<div class="no-data">No visits scheduled this week</div>';
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('tab-projects').style.display = tab==='projects' ? '' : 'none';
+  document.getElementById('tab-calendar').style.display = tab==='calendar' ? '' : 'none';
+  // Toggle filters
+  ['filter-status','filter-disc','filter-lead','search-input'].forEach(id=>{
+    const el=document.getElementById(id);
+    if (el) el.style.display = tab==='projects' ? '' : 'none';
+  });
+  ['cal-member','cal-project','cal-week'].forEach(id=>{
+    const el=document.getElementById(id);
+    if (el) el.style.display = tab==='calendar' ? '' : 'none';
+  });
+  if (tab==='calendar') renderCalendar();
+}
+
+// Init
+loadAll();
+</script>
+</body>
+</html>
