@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · Daily Project Execution Report</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;--border:#E2DFD8;--border2:#CBC7BC;
+  --text:#1A1917;--text2:#6B6860;--text3:#9E9B94;
+  --accent:#1F3A5F;--accent-light:#E8EEF5;
+  --green:#1B7A3E;--green-bg:#E8F5EE;
+  --amber:#7A5000;--amber-bg:#FFF8E1;
+  --red:#8B2020;--red-bg:#FFEBEE;
+  --blue:#1565C0;--blue-bg:#E3F2FD;
+  --orange:#7A3200;--orange-bg:#FFF3E0;
+  --radius:12px;--radius-sm:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px;}
+
+/* Header */
+.header{background:var(--accent);padding:16px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;}
+.header-title{color:rgba(255,255,255,0.9);font-size:13px;font-weight:600;}
+.header-title span{color:#F5A623;}
+.login-area{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.user-pill{background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 12px;font-size:12px;color:#fff;display:flex;align-items:center;gap:6px;}
+.user-dot{width:8px;height:8px;border-radius:50%;background:#2ED573;}
+
+/* Sections */
+.form-wrap{max-width:640px;margin:0 auto;padding:16px;}
+.section{background:var(--surface);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;border:1px solid var(--border);}
+.section-head{background:var(--accent);padding:12px 18px;display:flex;align-items:center;gap:10px;}
+.section-num{width:22px;height:22px;border-radius:50%;background:rgba(245,166,35,0.3);color:#F5A623;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.section-title{color:#fff;font-size:13px;font-weight:600;}
+.section-body{padding:16px 18px;}
+
+/* Fields */
+.field{margin-bottom:14px;}
+.field:last-child{margin-bottom:0;}
+.lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.lbl .req{color:var(--red);font-size:10px;}
+.lbl .opt{font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  width:100%;padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:var(--radius-sm);font-family:inherit;font-size:13px;color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+textarea{min-height:70px;resize:vertical;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* Chips multi-select */
+.chips{display:flex;flex-wrap:wrap;gap:7px;}
+.chip{padding:6px 13px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;user-select:none;}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* Track toggle */
+.track-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.track-btn{padding:10px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;transition:all .15s;}
+.track-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.track-btn.on-risk{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
+.track-btn.on-delay{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+
+/* Slider */
+.slider-wrap{display:flex;align-items:center;gap:12px;}
+.slider-wrap input[type=range]{flex:1;accent-color:var(--accent);height:4px;}
+.slider-val{font-size:16px;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace;min-width:40px;text-align:right;}
+
+/* Yes/No toggle */
+.yn-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:200px;}
+.yn-btn{padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+.yn-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.yn-btn.on-no{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
+
+/* Issue blocks */
+.issue-block{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;position:relative;}
+.issue-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.issue-num-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:12px;}
+.remove-btn{background:var(--red-bg);border:none;color:var(--red);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;}
+
+/* Priority */
+.pri-btns{display:flex;gap:8px;}
+.pri-btn{flex:1;padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);text-align:center;transition:all .15s;}
+.pri-btn.on-1{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.pri-btn.on-2{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
+.pri-btn.on-3{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+
+/* Add buttons */
+.add-btn{width:100%;padding:10px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:1.5px dashed var(--border2);background:transparent;color:var(--text2);font-family:inherit;transition:all .15s;}
+.add-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+
+/* Decision blocks */
+.decision-block{background:var(--blue-bg);border:1.5px solid #BBDEFB;border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;position:relative;}
+
+/* WhatsApp message box */
+.wa-box{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius);padding:14px 16px;}
+.wa-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.wa-icon{font-size:20px;}
+.wa-title{font-size:13px;font-weight:700;color:#1B5E20;}
+.wa-text{font-size:12px;color:#2E7D32;font-family:'DM Mono',monospace;white-space:pre-wrap;line-height:1.6;background:#fff;border-radius:8px;padding:12px;border:1px solid #C8E6C9;max-height:250px;overflow-y:auto;}
+.copy-btn{width:100%;margin-top:10px;padding:10px;background:#2E7D32;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.copy-btn:active{background:#1B5E20;}
+
+/* Submit */
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;display:flex;gap:12px;align-items:center;z-index:50;}
+.submit-btn{flex:1;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed;}
+.submit-status{font-size:12px;color:var(--text2);}
+
+/* Success screen */
+.success-screen{display:none;text-align:center;padding:40px 20px;}
+.success-icon{font-size:56px;margin-bottom:16px;}
+.success-title{font-size:22px;font-weight:700;margin-bottom:8px;color:var(--accent);}
+.success-sub{font-size:14px;color:var(--text2);}
+.new-btn{margin-top:24px;padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+
+.hidden{display:none;}
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;display:none;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="https://sidinani14.github.io/DPR/ideaform-logo.png" style="height:28px;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
+  <span class="header-title">Daily Project <span>Execution Report</span></span>
+  <div class="login-area" id="login-area">
+    <div id="g_id_onload" data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
+      data-callback="onGoogleSignIn" data-auto_select="true"></div>
+    <div class="g_id_signin" data-type="standard" data-size="small" data-theme="outline"
+      data-text="sign_in_with" data-shape="pill" data-logo_alignment="left"></div>
+  </div>
+  <div id="user-pill" class="user-pill hidden">
+    <span class="user-dot"></span>
+    <span id="user-name-display">—</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="form-wrap">
+
+  <!-- Success screen -->
+  <div class="success-screen" id="success-screen">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Report Submitted</div>
+    <div class="success-sub" id="success-sub"></div>
+    <button class="new-btn" onclick="resetForm()">Submit Another Report</button>
+  </div>
+
+  <!-- Form sections -->
+  <div id="form-body">
+
+  <!-- S1: Project & Date -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">1</span><span class="section-title">Project & Date</span></div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field">
+          <div class="lbl">Date <span class="req">*</span></div>
+          <input type="date" id="f-date">
+        </div>
+        <div class="field">
+          <div class="lbl">Site Visit Today?</div>
+          <div class="yn-btns">
+            <div class="yn-btn" id="sv-yes" onclick="setYN('sv','yes')">Yes</div>
+            <div class="yn-btn on-no" id="sv-no" onclick="setYN('sv','no')">No</div>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">Project Name <span class="req">*</span></div>
+        <select id="f-project" onchange="onProjectChange()">
+          <option value="">Select project…</option>
+        </select>
+      </div>
+      <div class="field hidden" id="lead-field">
+        <div class="lbl">Execution Lead</div>
+        <div id="lead-display" style="font-size:13px;padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);color:var(--accent);font-weight:600"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S2: Site Status -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">2</span><span class="section-title">Site Status</span></div>
+    <div class="section-body">
+      <div class="field">
+        <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
+        <div class="chips" id="stage-chips">
+          <div class="chip" onclick="toggleChip(this,'stage')">Design Finalization</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Civil Work</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Plaster</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Electrical</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Plumbing</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Fabrication</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Carpentry</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Finishing</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Procurement</div>
+          <div class="chip" onclick="toggleChip(this,'stage')">Handover</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">Works Completed Today</div>
+        <textarea id="f-works" placeholder="Describe work done today…"></textarea>
+      </div>
+      <div class="field">
+        <div class="lbl">% Works Completed as per Plan</div>
+        <div class="slider-wrap">
+          <input type="range" min="0" max="100" step="5" value="0" id="sl-plan"
+            oninput="document.getElementById('sv-plan').textContent=this.value+'%'">
+          <span class="slider-val" id="sv-plan">0%</span>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">% Overall Project Completion</div>
+        <div class="slider-wrap">
+          <input type="range" min="0" max="100" step="5" value="0" id="sl-overall"
+            oninput="document.getElementById('sv-overall').textContent=this.value+'%'">
+          <span class="slider-val" id="sv-overall">0%</span>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lbl">Work Planned for Tomorrow</div>
+        <textarea id="f-tomorrow" placeholder="What is planned for tomorrow?"></textarea>
+      </div>
+      <div class="field">
+        <div class="lbl">Is Work on Track?</div>
+        <div class="track-btns">
+          <div class="track-btn on-yes" id="tr-yes" onclick="setTrack('Yes')">✅ On Track</div>
+          <div class="track-btn" id="tr-risk" onclick="setTrack('At Risk')">⚠️ At Risk</div>
+          <div class="track-btn" id="tr-delay" onclick="setTrack('Delayed')">🔴 Delayed</div>
+        </div>
+      </div>
+      <div class="field hidden" id="delay-reason-field">
+        <div class="lbl">Reason for Delay / Risk <span class="req">*</span></div>
+        <textarea id="f-delay-reason" placeholder="Specify reason…"></textarea>
+      </div>
+      <div class="field">
+        <div class="lbl">Idle Time Observed?</div>
+        <div class="yn-btns">
+          <div class="yn-btn" id="idle-yes" onclick="setYN('idle','yes');document.getElementById('idle-reason-field').classList.toggle('hidden',false)">Yes</div>
+          <div class="yn-btn on-no" id="idle-no" onclick="setYN('idle','no');document.getElementById('idle-reason-field').classList.add('hidden')">No</div>
+        </div>
+      </div>
+      <div class="field hidden" id="idle-reason-field">
+        <div class="lbl">Reason for Idle Time</div>
+        <input type="text" id="f-idle-reason" placeholder="Describe reason…">
+      </div>
+    </div>
+  </div>
+
+  <!-- S3: Issues -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">3</span><span class="section-title">Issues on Site</span></div>
+    <div class="section-body">
+      <div class="field">
+        <div class="lbl">Were there any issues today?</div>
+        <div class="yn-btns">
+          <div class="yn-btn" id="issues-yes" onclick="setYN('issues','yes');document.getElementById('issues-body').classList.remove('hidden')">Yes</div>
+          <div class="yn-btn on-no" id="issues-no" onclick="setYN('issues','no');document.getElementById('issues-body').classList.add('hidden')">No</div>
+        </div>
+      </div>
+      <div class="hidden" id="issues-body">
+        <div id="issues-list"></div>
+        <button class="add-btn" onclick="addIssue()">+ Add Issue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- S4: Procurement -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">4</span><span class="section-title">Procurement</span></div>
+    <div class="section-body">
+      <div class="field">
+        <div class="lbl">Materials Required in Next 3-5 Days <span class="opt">optional</span></div>
+        <textarea id="f-materials" placeholder="List materials needed…"></textarea>
+      </div>
+      <div class="field">
+        <div class="lbl">Material Delays Impacting Work <span class="opt">optional</span></div>
+        <textarea id="f-mat-delays" placeholder="Any procurement delays?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- S5: Client & Decisions -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">5</span><span class="section-title">Client & Decisions</span></div>
+    <div class="section-body">
+      <div class="field">
+        <div class="lbl">Was Client Updated Today?</div>
+        <div class="yn-btns">
+          <div class="yn-btn" id="client-yes" onclick="setYN('client','yes');document.getElementById('client-concerns-field').classList.remove('hidden')">Yes</div>
+          <div class="yn-btn on-no" id="client-no" onclick="setYN('client','no');document.getElementById('client-concerns-field').classList.add('hidden')">No</div>
+        </div>
+      </div>
+      <div class="field hidden" id="client-concerns-field">
+        <div class="lbl">Client Concerns / Inputs</div>
+        <textarea id="f-client-concerns" placeholder="Any concerns raised by client?"></textarea>
+      </div>
+      <div class="field">
+        <div class="lbl">Anything Blocking Tomorrow? <span class="opt">optional</span></div>
+        <textarea id="f-blocking" placeholder="What might block work tomorrow?"></textarea>
+      </div>
+      <div class="field">
+        <div class="lbl">Decisions Pending from Siddharth Sir</div>
+        <div id="decisions-list"></div>
+        <button class="add-btn" onclick="addDecision()">+ Add Pending Decision</button>
+      </div>
+      <div class="field">
+        <div class="lbl">Additional Remarks <span class="opt">optional</span></div>
+        <textarea id="f-remarks" placeholder="Any other remarks?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- WhatsApp Message -->
+  <div class="section" id="wa-section">
+    <div class="section-head" style="background:#1B5E20"><span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span><span class="section-title">WhatsApp Update Message</span></div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">This message is auto-generated based on your report. Review and send to the relevant group.</p>
+      <div class="wa-box">
+        <div class="wa-header">
+          <span class="wa-icon">💬</span>
+          <span class="wa-title">Site Update Message</span>
+        </div>
+        <div class="wa-text" id="wa-text">Fill the form above to generate the message…</div>
+        <button class="copy-btn" onclick="copyWA()">📋 Copy Message</button>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- end form-body -->
+</div>
+
+<div class="submit-bar">
+  <span class="submit-status" id="submit-status">Sign in to submit</span>
+  <button class="submit-btn" id="submit-btn" onclick="submitForm()" disabled>Submit Report</button>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
+const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
+
+// Email → Name map (same as DPR form)
+const EMAIL_MAP = {
+  'achal.rathore@ideaform.in'     : 'Achal Rathore',
+  'himanshu.malviya@ideaform.in'  : 'Himanshu Malviya',
+  'ar.deepaksoni@gmail.com'       : 'Deepak Soni',
+  'poorvi.goyal@ideaform.in'      : 'Poorvi Goyal',
+  'khushi.agrawal@ideaform.in'    : 'Khushi Agrawal',
+  'sahil.maurya@ideaform.in'      : 'Sahil Maurya',
+  'aaditya.koshti@ideaform.in'    : 'Aaditya Koshti',
+  'aman.raghuwanshi@ideaform.in'  : 'Aman Raghuwanshi',
+  'bhavesh.bhagwat@ideaform.in'   : 'Bhavesh Bhagwat',
+  'aashi.agrawal@ideaform.in'     : 'Aashi Agrawal',
+  'siddharth@ideaform.in'         : 'Siddharth Inani',
+  'astha@ideaform.in'             : 'Astha Inani',
+  'simi@ideaform.in'              : 'Simi',
+  'minakshi@ideaform.in'          : 'Minakshi Gokhale',
+};
+
+const TEAM_MEMBERS = [
+  'Achal Rathore','Himanshu Malviya','Deepak Soni','Poorvi Goyal',
+  'Khushi Agrawal','Sahil Maurya','Aaditya Koshti','Aman Raghuwanshi',
+  'Bhavesh Bhagwat','Aashi Agrawal','Siddharth Inani','Astha Inani',
+  'Simi','Minakshi Gokhale',
+];
+
+let googleUser = null;
+let leadName   = '';
+let projects   = [];
+let trackVal   = 'Yes';
+let issueCount = 0;
+let decCount   = 0;
+
+// ── Google Sign In ─────────────────────────────────────────
+function onGoogleSignIn(resp) {
+  const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+  const email   = payload.email || '';
+  leadName = EMAIL_MAP[email] || payload.name || email;
+  googleUser = {name: leadName, email};
+  document.getElementById('user-pill').classList.remove('hidden');
+  document.getElementById('user-name-display').textContent = leadName;
+  document.querySelector('.g_id_signin')?.parentElement?.classList?.add('hidden');
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-status').textContent = leadName;
+  loadProjects();
+}
+
+// ── Load projects from script ──────────────────────────────
+async function loadProjects() {
+  try {
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'getLists'})
+    });
+    const data = await r.json();
+    projects = (data.projects||[]).filter(p=>
+      (p.status||'').toLowerCase().includes('ongoing') ||
+      (p.status||'').toLowerCase().includes('active')
+    );
+    const sel = document.getElementById('f-project');
+    sel.innerHTML = '<option value="">Select project…</option>' +
+      projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  } catch(e) {
+    toast('Could not load projects — check connection');
+  }
+}
+
+function onProjectChange() {
+  const name = document.getElementById('f-project').value;
+  document.getElementById('lead-field').classList.toggle('hidden', !name);
+  document.getElementById('lead-display').textContent = leadName || '—';
+  generateWA();
+}
+
+// ── Toggle helpers ─────────────────────────────────────────
+function toggleChip(el, group) {
+  el.classList.toggle('on');
+  generateWA();
+}
+
+function setTrack(val) {
+  trackVal = val;
+  document.getElementById('tr-yes').className   = 'track-btn' + (val==='Yes'?     ' on-yes':'');
+  document.getElementById('tr-risk').className  = 'track-btn' + (val==='At Risk'? ' on-risk':'');
+  document.getElementById('tr-delay').className = 'track-btn' + (val==='Delayed'? ' on-delay':'');
+  document.getElementById('delay-reason-field').classList.toggle('hidden', val==='Yes');
+  generateWA();
+}
+
+function setYN(group, val) {
+  document.getElementById(group+'-yes').className = 'yn-btn' + (val==='yes'?' on-yes':'');
+  document.getElementById(group+'-no').className  = 'yn-btn' + (val==='no'?' on-no':'');
+  generateWA();
+}
+
+// ── Issue blocks ───────────────────────────────────────────
+const ISSUE_TYPES = ['Design','Procurement','Contractor','Client','Site Condition'];
+
+function addIssue() {
+  issueCount++;
+  const id  = issueCount;
+  const div = document.createElement('div');
+  div.className = 'issue-block';
+  div.id = `issue-block-${id}`;
+  div.innerHTML = `
+    <div class="issue-block-header">
+      <span class="issue-num-badge">Issue ${id}</span>
+      <button class="remove-btn" onclick="removeBlock('issue-block-${id}');generateWA()">✕ Remove</button>
+    </div>
+    <div class="field">
+      <div class="lbl">Issue Type</div>
+      <div class="chips">
+        ${ISSUE_TYPES.map(t=>`<div class="chip issue-type-chip" data-type="${t}" onclick="selectIssueType(this,${id})">${t}</div>`).join('')}
+      </div>
+      <input type="hidden" id="iss-type-${id}" value="">
+    </div>
+    <div class="field">
+      <div class="lbl">Description <span class="req">*</span></div>
+      <textarea id="iss-desc-${id}" placeholder="Describe the issue in detail…" oninput="generateWA()"></textarea>
+    </div>
+    <div class="field">
+      <div class="lbl">Assigned To <span class="req">*</span></div>
+      <select id="iss-assign-${id}" onchange="generateWA()">
+        <option value="">Select team member…</option>
+        ${TEAM_MEMBERS.map(m=>`<option value="${m}" ${m===leadName?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <div class="lbl">Priority</div>
+        <div class="pri-btns">
+          <div class="pri-btn" id="pri-1-${id}" onclick="setPri(${id},1)">1 Low</div>
+          <div class="pri-btn on-2" id="pri-2-${id}" onclick="setPri(${id},2)">2 Med</div>
+          <div class="pri-btn" id="pri-3-${id}" onclick="setPri(${id},3)">3 High</div>
+        </div>
+        <input type="hidden" id="iss-pri-${id}" value="2">
+      </div>
+      <div class="field">
+        <div class="lbl">Target Resolution Date</div>
+        <input type="date" id="iss-date-${id}" onchange="generateWA()">
+      </div>
+    </div>`;
+  document.getElementById('issues-list').appendChild(div);
+  // Default assign to lead
+  const assign = document.getElementById(`iss-assign-${id}`);
+  if (assign && leadName) assign.value = leadName;
+}
+
+function selectIssueType(el, id) {
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById(`iss-type-${id}`).value = el.dataset.type;
+  generateWA();
+}
+
+function setPri(id, val) {
+  [1,2,3].forEach(n=>{
+    const btn = document.getElementById(`pri-${n}-${id}`);
+    if (btn) btn.className = 'pri-btn' + (n===val?` on-${n}`:'');
+  });
+  document.getElementById(`iss-pri-${id}`).value = val;
+  generateWA();
+}
+
+// ── Decision blocks ────────────────────────────────────────
+function addDecision() {
+  decCount++;
+  const id  = decCount;
+  const div = document.createElement('div');
+  div.className = 'decision-block';
+  div.id = `dec-block-${id}`;
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--blue)">Decision ${id}</span>
+      <button class="remove-btn" style="background:rgba(21,101,192,0.1);color:var(--blue);border-color:#BBDEFB"
+        onclick="removeBlock('dec-block-${id}')">✕</button>
+    </div>
+    <textarea id="dec-desc-${id}" placeholder="What decision is needed from Siddharth sir?" style="min-height:55px;border-color:#BBDEFB"></textarea>`;
+  document.getElementById('decisions-list').appendChild(div);
+}
+
+function removeBlock(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// ── Collect issues ─────────────────────────────────────────
+function collectIssues() {
+  const blocks = document.querySelectorAll('.issue-block');
+  const issues = [];
+  blocks.forEach(b => {
+    const id   = b.id.replace('issue-block-','');
+    const desc = (document.getElementById(`iss-desc-${id}`)?.value||'').trim();
+    if (!desc) return;
+    issues.push({
+      issueType : document.getElementById(`iss-type-${id}`)?.value || 'General',
+      description: desc,
+      assignedTo: document.getElementById(`iss-assign-${id}`)?.value || leadName,
+      priority  : parseInt(document.getElementById(`iss-pri-${id}`)?.value||2),
+      targetDate: document.getElementById(`iss-date-${id}`)?.value || '',
+      reportedBy: leadName,
+    });
+  });
+  return issues;
+}
+
+function collectDecisions() {
+  const blocks = document.querySelectorAll('.decision-block');
+  const decs   = [];
+  blocks.forEach(b => {
+    const id   = b.id.replace('dec-block-','');
+    const desc = (document.getElementById(`dec-desc-${id}`)?.value||'').trim();
+    if (desc) decs.push({description:desc});
+  });
+  return decs;
+}
+
+// ── Generate WhatsApp message ──────────────────────────────
+function generateWA() {
+  const project  = document.getElementById('f-project').value;
+  const works    = (document.getElementById('f-works')?.value||'').trim();
+  const tomorrow = (document.getElementById('f-tomorrow')?.value||'').trim();
+  const delay    = (document.getElementById('f-delay-reason')?.value||'').trim();
+  const materials= (document.getElementById('f-materials')?.value||'').trim();
+  const matDelay = (document.getElementById('f-mat-delays')?.value||'').trim();
+  const blocking = (document.getElementById('f-blocking')?.value||'').trim();
+  const remarks  = (document.getElementById('f-remarks')?.value||'').trim();
+  const date     = document.getElementById('f-date')?.value || new Date().toISOString().substring(0,10);
+  const dateStr  = new Date(date+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+  const statusEmoji = trackVal==='Yes'?'✅ On Track':trackVal==='At Risk'?'⚠️ At Risk':'🔴 Delayed';
+
+  // Non-design issues only
+  const issues = collectIssues().filter(i=>i.issueType !== 'Design');
+
+  let msg = `*Project Update — ${project||'[Project]'}*\n`;
+  msg += `*Date:* ${dateStr} | *Lead:* ${leadName||'—'}\n\n`;
+
+  if (works) msg += `*Today\'s Progress:*\n${works}\n\n`;
+  msg += `*Site Status:* ${statusEmoji}\n`;
+  if (delay) msg += `*Reason:* ${delay}\n`;
+  msg += '\n';
+
+  if (tomorrow) msg += `*Work Planned Tomorrow:*\n${tomorrow}\n\n`;
+
+  if (issues.length > 0) {
+    msg += `*Issues Requiring Attention:*\n`;
+    issues.forEach((iss,i) => {
+      const pri = iss.priority===3?'🔴 High':iss.priority===1?'🟢 Low':'🟡 Med';
+      msg += `${i+1}. [${iss.issueType}] ${iss.description}`;
+      if (iss.targetDate) msg += ` — Resolve by: ${iss.targetDate}`;
+      msg += ` (${pri})\n`;
+    });
+    msg += '\n';
+  }
+
+  if (materials) msg += `*Materials Required (3-5 days):*\n${materials}\n\n`;
+  if (matDelay)  msg += `*Material Delays:*\n${matDelay}\n\n`;
+  if (blocking)  msg += `*Blocking Tomorrow:*\n${blocking}\n\n`;
+  if (remarks)   msg += `*Additional Remarks:*\n${remarks}\n\n`;
+
+  msg += `— Ideaform Design Studio`;
+
+  document.getElementById('wa-text').textContent = msg;
+  return msg;
+}
+
+function copyWA() {
+  const text = document.getElementById('wa-text').textContent;
+  navigator.clipboard.writeText(text).then(()=>toast('Message copied!')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Message copied!');
+  });
+}
+
+// ── Submit ─────────────────────────────────────────────────
+async function submitForm() {
+  if (!googleUser) { toast('Please sign in first'); return; }
+  const project = document.getElementById('f-project').value;
+  if (!project)  { toast('Please select a project'); return; }
+
+  const stages  = [...document.querySelectorAll('#stage-chips .chip.on')].map(c=>c.textContent).join(', ');
+  const issues  = collectIssues();
+  const decs    = collectDecisions();
+  const waMsg   = generateWA();
+
+  const data = {
+    action        : 'submitDPER',
+    date          : document.getElementById('f-date').value,
+    time          : new Date().toTimeString().substring(0,5),
+    project       : project,
+    lead          : leadName,
+    siteVisit     : document.getElementById('sv-yes').classList.contains('on-yes')?'Yes':'No',
+    stage         : stages,
+    worksToday    : document.getElementById('f-works').value.trim(),
+    pctPlan       : parseInt(document.getElementById('sl-plan').value)||0,
+    pctOverall    : parseInt(document.getElementById('sl-overall').value)||0,
+    workTomorrow  : document.getElementById('f-tomorrow').value.trim(),
+    onTrack       : trackVal,
+    delayReason   : document.getElementById('f-delay-reason').value.trim(),
+    idleTime      : document.getElementById('idle-yes').classList.contains('on-yes')?'Yes':'No',
+    idleReason    : document.getElementById('f-idle-reason').value.trim(),
+    materials     : document.getElementById('f-materials').value.trim(),
+    materialDelays: document.getElementById('f-mat-delays').value.trim(),
+    clientUpdated : document.getElementById('client-yes').classList.contains('on-yes')?'Yes':'No',
+    clientConcerns: document.getElementById('f-client-concerns').value.trim(),
+    blocking      : document.getElementById('f-blocking').value.trim(),
+    remarks       : document.getElementById('f-remarks').value.trim(),
+    issues        : JSON.stringify(issues),
+    decisionItems : JSON.stringify(decs),
+    whatsappMsg   : waMsg,
+  };
+
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('submit-status').textContent = 'Submitting…';
+
+  try {
+    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      const r = await fetch(APPS_SCRIPT_URL, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify(data),
+      });
+      const result = await r.json();
+      if (result.status !== 'ok') throw new Error(result.message||'Submit failed');
+    }
+    // Show success
+    document.getElementById('form-body').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'block';
+    document.querySelector('.submit-bar').style.display = 'none';
+    const issCount = issues.length;
+    const decCount2= decs.length;
+    document.getElementById('success-sub').innerHTML =
+      `<strong>${project}</strong> report submitted by ${leadName}<br>` +
+      (issCount?`${issCount} issue${issCount!==1?'s':''} logged and tasks created<br>`:'') +
+      (decCount2?`${decCount2} decision${decCount2!==1?'s':''} flagged for Siddharth sir`:'');
+  } catch(e) {
+    toast('Error: ' + e.message);
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-status').textContent = leadName;
+  }
+}
+
+function resetForm() {
+  document.getElementById('form-body').style.display = '';
+  document.getElementById('success-screen').style.display = 'none';
+  document.querySelector('.submit-bar').style.display = '';
+  document.getElementById('f-project').value = '';
+  document.getElementById('f-works').value = '';
+  document.getElementById('f-tomorrow').value = '';
+  document.getElementById('f-materials').value = '';
+  document.getElementById('f-mat-delays').value = '';
+  document.getElementById('f-blocking').value = '';
+  document.getElementById('f-remarks').value = '';
+  document.getElementById('f-delay-reason').value = '';
+  document.getElementById('f-idle-reason').value = '';
+  document.getElementById('f-client-concerns').value = '';
+  document.getElementById('sl-plan').value = 0;
+  document.getElementById('sv-plan').textContent = '0%';
+  document.getElementById('sl-overall').value = 0;
+  document.getElementById('sv-overall').textContent = '0%';
+  document.getElementById('issues-list').innerHTML = '';
+  document.getElementById('decisions-list').innerHTML = '';
+  issueCount = 0; decCount = 0;
+  setTrack('Yes');
+  setYN('sv','no'); setYN('idle','no'); setYN('issues','no'); setYN('client','no');
+  document.querySelectorAll('.chip.on').forEach(c=>c.classList.remove('on'));
+  document.getElementById('issues-body').classList.add('hidden');
+  document.getElementById('lead-field').classList.add('hidden');
+  document.getElementById('wa-text').textContent = 'Fill the form above to generate the message…';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-status').textContent = leadName;
+}
+
+function toast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', dur);
+}
+
+// ── Init ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('f-date').value = new Date().toISOString().substring(0,10);
+});
+</script>
+</body>
+</html>
