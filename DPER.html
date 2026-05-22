@@ -397,10 +397,14 @@ async function loadProjects() {
       body: JSON.stringify({action:'getLists'})
     });
     const data = await r.json();
-    projects = (data.projects||[]).filter(p=>
-      (p.status||'').toLowerCase().includes('ongoing') ||
-      (p.status||'').toLowerCase().includes('active')
-    );
+    // Show all projects — exclude only clearly closed/dead ones
+    // getLists reads status from col L which may be blank for ongoing projects
+    const EXCLUDE = ['completed','closed','dead','cancelled','proposal','new lead'];
+    projects = (data.projects||[]).filter(p=>{
+      const st = (p.status||'').toLowerCase();
+      // If status is blank or doesn't match exclude list — show it
+      return !EXCLUDE.some(x => st.includes(x));
+    });
     const sel = document.getElementById('f-project');
     sel.innerHTML = '<option value="">Select project…</option>' +
       projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
@@ -590,10 +594,7 @@ function generateWA() {
   if (issues.length > 0) {
     msg += `*Issues Requiring Attention:*\n`;
     issues.forEach((iss,i) => {
-      const pri = iss.priority===3?'🔴 High':iss.priority===1?'🟢 Low':'🟡 Med';
-      msg += `${i+1}. [${iss.issueType}] ${iss.description}`;
-      if (iss.targetDate) msg += ` — Resolve by: ${iss.targetDate}`;
-      msg += ` (${pri})\n`;
+      msg += `${i+1}. [${iss.issueType}] ${iss.description}\n`;
     });
     msg += '\n';
   }
