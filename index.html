@@ -163,6 +163,11 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
 .toast.show{opacity:1}
 @media(max-width:400px){.task-thead,.task-row{grid-template-columns:1fr 58px 42px 20px}.row2{grid-template-columns:1fr}}
+
+.rejected-banner{background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:8px;padding:10px 14px;margin-bottom:10px;}
+.rejected-title{font-size:11px;font-weight:700;color:#B71C1C;margin-bottom:4px;}
+.rejected-note{font-size:12px;color:#C62828;font-style:italic;margin-bottom:2px;}
+.rejected-meta{font-size:10px;color:#E57373;}
 </style>
 </head>
 <body>
@@ -626,12 +631,7 @@ function renderNotifications(notifs) {
     </div>`;
 }
 
-async function markOneSeen(row, btn) {
-  btn.textContent = '✓ Seen'; btn.disabled = true;
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
-  await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'markNotifSeen', rows:[row]})});
-}
+// markOneSeen removed — notifications now shown as banners
 
 async function markAllSeen() {
   const section = document.getElementById('notif-section');
@@ -682,7 +682,10 @@ async function fetchAssignedTasks() {
       let data;
       try { data = JSON.parse(text); }
       catch(pe) { throw new Error('Invalid JSON: ' + text.substring(0,100)); }
-      assignedTasks = data.tasks || [];
+      // Separate rejected tasks (last 24h) from open tasks
+    const allFetched = data.tasks || [];
+    window._rejectedTasks = allFetched.filter(t => t.isRejected || t.leadApproved === 'No');
+    assignedTasks = allFetched.filter(t => !t.isRejected && t.leadApproved !== 'No');
 
     }
     renderAssignedTasks();
@@ -702,7 +705,21 @@ function renderAssignedTasks() {
     return;
   }
 
-  document.getElementById('assigned-tasks-list').innerHTML=assignedTasks.map((t,i)=>{
+  // Rejected banners — shown above task cards
+  const rejBanners = (window._rejectedTasks||[]).map(t=>
+    `<div class="rejected-banner">
+      <div class="rejected-title">✗ REJECTED — ${t.project||''} · ${t.taskType||''}</div>
+      ${t.rejectionNote?`<div class="rejected-note">"${t.rejectionNote}"</div>`:''}
+      <div class="rejected-meta">${t.pts||0} pts · Rejected by lead · No action required</div>
+    </div>`
+  ).join('');
+  document.getElementById('assigned-tasks-list').innerHTML =
+    rejBanners +
+    (assignedTasks.length ? '' : '<p style="color:var(--text3);font-size:13px;padding:10px 0">No tasks assigned for today.</p>');
+  if (!assignedTasks.length && !window._rejectedTasks?.length) return;
+
+  // Append task cards
+  const taskCards = assignedTasks.map((t,i)=>{
     const isOverdue = t.targetDate && t.targetDate<today;
     const isRevision = t.revisionTag || t.status==='Revision Required';
     const defaultStatus = t.status==='Ongoing'?'Ongoing':t.status==='Revision Required'?'Ongoing':'Not Started';
@@ -743,6 +760,7 @@ function renderAssignedTasks() {
       </div>
     </div>`;
   }).join('');
+  document.getElementById('assigned-tasks-list').innerHTML += taskCards;
 }
 
 // ── Project blocks (unplanned work) ──────────────────────────
