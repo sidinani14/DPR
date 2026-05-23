@@ -413,10 +413,21 @@ async function loadProjects() {
   }
 }
 
+let projectDesignLead = ''; // Design lead from PROJECTS tab col F
+
 function onProjectChange() {
   const name = document.getElementById('f-project').value;
   document.getElementById('lead-field').classList.toggle('hidden', !name);
   document.getElementById('lead-display').textContent = leadName || '—';
+  // Look up design lead for this project
+  const proj = projects.find(p => p.name === name);
+  projectDesignLead = (proj && proj.lead) ? proj.lead : '';
+  // Update any existing issue assignee dropdowns to new project lead
+  document.querySelectorAll('[id^="iss-assign-"]').forEach(sel => {
+    if (!sel.dataset.manuallyChanged) {
+      sel.value = projectDesignLead || leadName || '';
+    }
+  });
   generateWA();
 }
 
@@ -468,9 +479,9 @@ function addIssue() {
     </div>
     <div class="field">
       <div class="lbl">Assigned To <span class="req">*</span></div>
-      <select id="iss-assign-${id}" onchange="generateWA()">
+      <select id="iss-assign-${id}" onchange="this.dataset.manuallyChanged='1';generateWA()">
         <option value="">Select team member…</option>
-        ${TEAM_MEMBERS.map(m=>`<option value="${m}" ${m===leadName?'selected':''}>${m}</option>`).join('')}
+        ${TEAM_MEMBERS.map(m=>`<option value="${m}" ${m===(projectDesignLead||leadName)?'selected':''}>${m}</option>`).join('')}
       </select>
     </div>
     <div class="field-row">
