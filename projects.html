@@ -174,6 +174,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .pri-2{background:rgba(251,188,4,0.12);color:#FBBC04;}
 .pri-3{background:rgba(234,67,53,0.12);color:#EA4335;}
 .issues-badge{background:rgba(234,67,53,0.15);color:#EA4335;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px;}
+.resolve-btn{font-size:9px;padding:2px 8px;border-radius:6px;border:1px solid rgba(46,213,115,0.4);background:rgba(46,213,115,0.08);color:#2ED573;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;}
+.resolve-btn:hover{background:rgba(46,213,115,0.2);}
+.resolve-btn:disabled{opacity:.4;cursor:not-allowed;}
+.resolved-section{margin-top:14px;border-top:1px solid var(--border);padding-top:10px;}
+.resolved-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
 .loading{text-align:center;padding:40px;color:var(--text3);}
 .loading::after{content:'';display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-left:8px;vertical-align:middle;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -576,6 +581,7 @@ function switchPanelTab(tab, name) {
 function renderIssuesPanel(proj) {
   const projIssues = allIssues.filter(i=>i.project===proj.name);
   const open       = projIssues.filter(i=>i.status!=='Resolved');
+  const resolved   = projIssues.filter(i=>i.status==='Resolved');
   const badge      = document.getElementById('issues-badge-count');
   if (badge) badge.textContent = open.length || '';
 
@@ -586,15 +592,38 @@ function renderIssuesPanel(proj) {
   }
   function priClass(p) { return p===3?'pri-3':p===1?'pri-1':'pri-2'; }
   function priLabel(p) { return p===3?'High':p===1?'Low':'Med'; }
-  function statusClass(s) {
-    return s==='Resolved'?'issue-status-resolved':s==='In Progress'?'issue-status-progress':'issue-status-open';
-  }
 
   const today = new Date().toISOString().substring(0,10);
 
-  let html = `<div style="display:flex;gap:8px;margin-bottom:12px">
-    <span style="font-size:12px;color:var(--text2)">${open.length} open issue${open.length!==1?'s':''}</span>
-    ${projIssues.length-open.length > 0 ? `<span style="font-size:12px;color:var(--green)">${projIssues.length-open.length} resolved</span>` : ''}
+  // Determine if issue can be manually resolved
+  // Design issues auto-resolve via task approval — show resolve button for non-design only
+  function canResolve(iss) {
+    return iss.status !== 'Resolved' && iss.issueType !== 'Design';
+  }
+
+  function issueRow(iss, showResolve) {
+    const isOverdue = iss.targetDate && iss.targetDate < today && iss.status !== 'Resolved';
+    const isResolved = iss.status === 'Resolved';
+    return `<div class="issue-row" data-proj="${proj.name}" style="${isResolved?'opacity:.55':''}">
+      <span style="font-family:'DM Mono',monospace;color:var(--text3)">${iss.date.substring(5)}</span>
+      <span><span class="issue-type-badge ${typeClass(iss.issueType)}">${iss.issueType}</span></span>
+      <span style="color:${isResolved?'var(--text3)':'var(--text)'};line-height:1.3;${isResolved?'text-decoration:line-through':''}">${iss.description}</span>
+      <span style="color:var(--text2)">${iss.assignedTo}</span>
+      <span><span class="priority-badge ${priClass(iss.priority)}">${priLabel(iss.priority)}</span></span>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:${isOverdue?'var(--red)':'var(--text3)'}">${iss.targetDate||'—'}</span>
+      <span>${isResolved
+        ? `<span class="issue-status-resolved">✓ Resolved${iss.resolvedDate?' '+iss.resolvedDate.substring(5):''}</span>`
+        : showResolve && canResolve(iss)
+          ? `<button class="resolve-btn" data-proj="${proj.name}" onclick="resolveIssue('${iss.issueId}',this)">✓ Resolve</button>`
+          : `<span class="issue-status-open">${iss.status}</span>`
+      }</span>
+    </div>`;
+  }
+
+  let html = `<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+    <span style="font-size:12px;color:var(--text2)">${open.length} open</span>
+    ${resolved.length?`<span style="font-size:12px;color:var(--green)">${resolved.length} resolved (last 7 days)</span>`:''}
+    <span style="font-size:10px;color:var(--text3);margin-left:auto">Design issues auto-resolve on task approval</span>
   </div>`;
 
   if (!projIssues.length) {
@@ -602,28 +631,58 @@ function renderIssuesPanel(proj) {
   } else {
     html += `<div class="issue-row issue-header">
       <span>Date</span><span>Type</span><span>Description</span>
-      <span>Assigned To</span><span>Priority</span><span>Target</span><span>Status</span>
+      <span>Assigned To</span><span>Priority</span><span>Target</span><span>Action</span>
     </div>`;
-    // Sort: open first, then by date desc
-    const sorted = [...projIssues].sort((a,b)=>{
-      if (a.status!=='Resolved' && b.status==='Resolved') return -1;
-      if (a.status==='Resolved' && b.status!=='Resolved') return 1;
-      return b.date.localeCompare(a.date);
-    });
-    sorted.forEach(iss=>{
-      const isOverdue = iss.targetDate && iss.targetDate < today && iss.status !== 'Resolved';
-      html += `<div class="issue-row">
-        <span style="font-family:'DM Mono',monospace;color:var(--text3)">${iss.date.substring(5)}</span>
-        <span><span class="issue-type-badge ${typeClass(iss.issueType)}">${iss.issueType}</span></span>
-        <span style="color:var(--text);line-height:1.3">${iss.description}</span>
-        <span style="color:var(--text2)">${iss.assignedTo}</span>
-        <span><span class="priority-badge ${priClass(iss.priority)}">${priLabel(iss.priority)}</span></span>
-        <span style="font-family:'DM Mono',monospace;font-size:10px;color:${isOverdue?'var(--red)':'var(--text3)'}">${iss.targetDate||'—'}</span>
-        <span class="${statusClass(iss.status)}">${iss.status}</span>
+
+    // Open issues first — sorted by date desc
+    const openSorted = [...open].sort((a,b)=>b.date.localeCompare(a.date));
+    openSorted.forEach(iss => { html += issueRow(iss, true); });
+
+    // Resolved issues — collapsed section
+    if (resolved.length) {
+      const resSorted = [...resolved].sort((a,b)=>(b.resolvedDate||b.date).localeCompare(a.resolvedDate||a.date));
+      html += `<div class="resolved-section">
+        <div class="resolved-label">Resolved (last 7 days)</div>
+        ${resSorted.map(iss=>issueRow(iss, false)).join('')}
       </div>`;
-    });
+    }
   }
   document.getElementById('panel-body').innerHTML = html;
+}
+
+async function resolveIssue(issueId, btn) {
+  if (!issueId) return;
+  btn.disabled = true;
+  btn.textContent = 'Resolving…';
+  try {
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'resolveIssue', issueId})
+    });
+    const data = await r.json();
+    if (data.status === 'ok') {
+      // Update local allIssues
+      const iss = allIssues.find(i=>i.issueId===issueId);
+      if (iss) {
+        iss.status = 'Resolved';
+        iss.resolvedDate = data.resolvedDate || new Date().toISOString().substring(0,10);
+      }
+      btn.textContent = '✓ Resolved';
+      btn.style.opacity = '.5';
+      // Re-render the issues panel for the current project
+      const panelTitle = document.querySelector('#panel-header .proj-name, #panel-header div div');
+      const projName = btn.closest('[data-proj]')?.dataset.proj || '';
+      const currentProj = allProjects.find(p=>p.name===projName);
+      if (currentProj) renderIssuesPanel(currentProj);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '✓ Resolve';
+      alert('Error: ' + (data.message||'Could not resolve'));
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '✓ Resolve';
+  }
 }
 
 function setPanelFilter(name, status) {
