@@ -173,8 +173,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
     <div class="card-body">
       <div class="lbl">Your name</div>
       <select id="lead-name" onchange="updateBar()">
-        <option value="">— select your name —</option>
-        <option>Siddharth</option>
+        <option value="">— loading leads… —</option>
       </select>
     </div>
   </div>
@@ -214,8 +213,9 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6
 // Leads loaded from CONFIG via getConfig
 let LEADS = [];
 
-let tasks     = [];   // all tasks loaded from sheet
-let decisions = {};   // {rowIndex: {decision, note}}
+let tasks       = [];   // filtered tasks shown
+let allTasksRaw = [];   // all tasks loaded from sheet
+let decisions   = {};   // {rowIndex: {decision, note}}
 
 // ── Init ───────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -408,45 +408,48 @@ function clearApprFilters() {
 }
 
 function decide(i, decision) {
-  decisions[i] = decisions[i] || {};
-  decisions[i].decision = decision;
+  // Use task row as stable key — immune to filter changes
+  const key = tasks[i] ? (tasks[i].row + '-' + (tasks[i].source||'')) : i;
+  decisions[key] = decisions[key] || {};
+  decisions[key].decision = decision;
+  decisions[key].taskIdx  = i;
 
-  // Update card styling
   const card    = document.getElementById(`tc-${i}`);
   const status  = document.getElementById(`st-${i}`);
   const btnA    = document.getElementById(`btn-approve-${i}`);
   const btnR    = document.getElementById(`btn-reject-${i}`);
   const noteDiv = document.getElementById(`note-${i}`);
 
-  card.className   = `task-card ${decision === 'Yes' ? 'approved' : 'rejected'}`;
-  status.className = `task-status ${decision === 'Yes' ? 'st-approved' : 'st-rejected'}`;
-  status.textContent = decision === 'Yes' ? 'Approved' : 'Rejected';
-
-  btnA.className = `btn-approve${decision === 'Yes' ? ' active' : ''}`;
-  btnR.className = `btn-reject${decision === 'No'  ? ' active' : ''}`;
-
-  // Always show note field
-  noteDiv.className = 'note-field open';
+  if (card) card.className   = `task-card ${decision === 'Yes' ? 'approved' : 'rejected'}`;
+  if (status) {
+    status.className   = `task-status ${decision === 'Yes' ? 'st-approved' : 'st-rejected'}`;
+    status.textContent = decision === 'Yes' ? 'Approved' : 'Rejected';
+  }
+  if (btnA) btnA.className = `btn-approve${decision === 'Yes' ? ' active' : ''}`;
+  if (btnR) btnR.className = `btn-reject${decision === 'No'  ? ' active' : ''}`;
+  if (noteDiv) noteDiv.className = 'note-field open';
 
   updateSummary();
   updateBar();
 }
 
 function updateNote(i, val) {
-  if (!decisions[i]) decisions[i] = {};
-  decisions[i].note = val;
+  const key = tasks[i] ? (tasks[i].row + '-' + (tasks[i].source||'')) : i;
+  if (!decisions[key]) decisions[key] = {};
+  decisions[key].note = val;
+  decisions[key].taskIdx = i;
 }
 
 function updateSummary() {
-  const approved = Object.values(decisions).filter(d => d.decision === 'Yes').length;
-  const rejected = Object.values(decisions).filter(d => d.decision === 'No').length;
+  const approved = Object.values(decisions).filter(d => d && d.decision === 'Yes').length;
+  const rejected = Object.values(decisions).filter(d => d && d.decision === 'No').length;
   document.getElementById('sum-approved').textContent = approved;
   document.getElementById('sum-rejected').textContent = rejected;
 }
 
 function updateBar() {
   const leadName = document.getElementById('lead-name').value;
-  const reviewed = Object.values(decisions).filter(d => d.decision === 'Yes' || d.decision === 'No').length;
+  const reviewed = Object.values(decisions).filter(d => d && (d.decision === 'Yes' || d.decision === 'No')).length;
   const total    = tasks.length;
   const canSubmit= reviewed > 0 && leadName;
 
@@ -468,7 +471,10 @@ async function submitApprovals() {
   // Only submit tasks that have been explicitly reviewed (Approved or Rejected)
   // Unreviewed tasks are skipped — lead can come back and review them later
   const reviewedItems = tasks
-    .map((t, i) => ({t, i, d: decisions[i]}))
+    .map((t, i) => {
+      const key = t.row + '-' + (t.source||'');
+      return {t, i, d: decisions[key]};
+    })
     .filter(x => x.d && (x.d.decision === 'Yes' || x.d.decision === 'No'));
 
   if (reviewedItems.length === 0) {
@@ -482,6 +488,7 @@ async function submitApprovals() {
   // Build payload — only reviewed tasks
   const payload = reviewedItems.map(({t, i, d}) => ({
     row                : t.row,
+    taskId             : t.taskId || t.subId || '',
     source             : t.source || 'TASK_LOG',
     taskAssignRow      : t.taskAssignRow || null,
     decision           : d.decision,
@@ -499,6 +506,7 @@ async function submitApprovals() {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
         body: JSON.stringify({action: 'submitApprovals', approvals: payload}),
       });
     }
