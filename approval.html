@@ -210,8 +210,12 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
 
-// Leads loaded from CONFIG via getConfig
-let LEADS = [];
+// Leads loaded from CONFIG via getConfig — fallback if CONFIG read fails
+const FALLBACK_LEADS = [
+  'Siddharth Inani',
+  'Astha Inani',
+];
+let LEADS = [...FALLBACK_LEADS]; // start with fallback, overwrite on load
 
 let tasks       = [];   // filtered tasks shown
 let allTasksRaw = [];   // all tasks loaded from sheet
@@ -263,13 +267,18 @@ async function fetchAll() {
       const pSel2 = document.getElementById('appr-project-filter');
       if(pSel2) pSel2.innerHTML = '<option value="all">All projects</option>' +
         projects.map(p => `<option value="${p}">${p}</option>`).join('');
-      LEADS = (configData.leads || []).map(l => l.name);
+      // Use leads from CONFIG tab, fallback to hardcoded list
+      const configLeads = (configData.leads || []).map(l => l.name).filter(Boolean);
+      LEADS = configLeads.length > 0 ? configLeads : FALLBACK_LEADS;
+      if (configLeads.length === 0) {
+        console.warn('No leads found in CONFIG tab — using fallback list');
+      }
     }
 
     // Build lead dropdown from loaded leads
     const sel = document.getElementById('lead-name');
     sel.innerHTML = '<option value="">— select your name —</option>' +
-      LEADS.map(l => `<option>${l}</option>`).join('');
+      LEADS.map(l => `<option value="${l}">${l}</option>`).join('');
 
     renderTasks();
 
