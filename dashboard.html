@@ -146,6 +146,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="fb" onclick="setDueWeek()" id="due-week-btn">📅 Due This Week</div>
 </div>
 
+<div class="refresh-bar" style="padding:6px 16px 2px;display:flex;align-items:center;gap:8px;">
+  <span class="refresh-status" id="refresh-status">Loading…</span>
+  <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()" title="Refresh now">↻ Refresh</button>
+</div>
 <div class="page"><div id="task-list">
   <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
 </div></div>
@@ -393,6 +397,76 @@ function renderHeatmap() {
     uSection.style.display='none';
   }
 }
+
+// ── Auto-refresh ─────────────────────────────────────────
+const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+let refreshTimer    = null;
+let lastRefreshTime = null;
+let isInteracting   = false;
+let statusTimer     = null;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(function() {
+    if (!isInteracting) silentRefresh();
+  }, REFRESH_INTERVAL);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+function updateRefreshStatus() {
+  const el = document.getElementById('refresh-status');
+  if (!el || !lastRefreshTime) return;
+  const mins = Math.floor((Date.now() - lastRefreshTime) / 60000);
+  el.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins} min ago`;
+}
+
+function setRefreshStatus(msg) {
+  const el = document.getElementById('refresh-status');
+  if (el) el.textContent = msg;
+}
+
+async function silentRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.classList.add('spinning');
+  setRefreshStatus('Refreshing…');
+  // Save current filters
+  const savedMember  = memberFilter;
+  const savedProject = projectFilter;
+  const savedStatus  = statusFilter;
+  const savedDate    = dateFilter;
+  await loadTasks().then(function() {
+  lastRefreshTime = Date.now();
+  updateRefreshStatus();
+  startAutoRefresh();
+  statusTimer = setInterval(updateRefreshStatus, 60000);
+});
+  // Restore filters
+  memberFilter  = savedMember;
+  projectFilter = savedProject;
+  statusFilter  = savedStatus;
+  dateFilter    = savedDate;
+  renderTasks();
+  lastRefreshTime = Date.now();
+  if (btn) btn.classList.remove('spinning');
+  updateRefreshStatus();
+  if (statusTimer) clearInterval(statusTimer);
+  statusTimer = setInterval(updateRefreshStatus, 60000);
+}
+
+async function manualRefresh() {
+  await silentRefresh();
+}
+
+// Pause auto-refresh during filter interaction
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.fb, select, input').forEach(function(el) {
+    el.addEventListener('mousedown', function() { isInteracting = true; });
+    el.addEventListener('blur',      function() { isInteracting = false; });
+  });
+});
 
 async function loadTasks() {
   document.getElementById('task-list').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
