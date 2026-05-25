@@ -157,6 +157,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .cal-event-type{font-size:8px;opacity:.7;margin-top:1px;}
 
 .no-data{text-align:center;padding:40px;color:var(--text3);font-size:13px;}
+.refresh-row{display:flex;align-items:center;gap:8px;padding:6px 16px 0;}
+.refresh-status{font-size:11px;color:var(--text3);}
+.refresh-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+  color:var(--text2);padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+  font-family:inherit;transition:all .15s;}
+.refresh-btn:hover{background:rgba(255,255,255,0.12);color:#fff;}
+.refresh-btn.spinning{animation:spin .6s linear infinite;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .issue-row{display:grid;grid-template-columns:80px 100px 1fr 130px 60px 90px 100px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;}
 .issue-row:last-child{border-bottom:none;}
 .issue-header{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;padding:5px 0 8px;border-bottom:1px solid var(--border);}
@@ -307,6 +315,57 @@ function statusPillClass(s) {
 }
 
 let allProjects = [], allEvents = [], allIssues = [];
+
+// ── Auto-refresh ─────────────────────────────────────────
+const REFRESH_INTERVAL = 5 * 60 * 1000;
+let refreshTimer    = null;
+let lastRefreshTime = null;
+let statusTimer     = null;
+let activePanelProj = null; // track open panel
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(silentRefresh, REFRESH_INTERVAL);
+}
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+function updateRefreshStatus() {
+  const el = document.getElementById('refresh-status');
+  if (!el || !lastRefreshTime) return;
+  const mins = Math.floor((Date.now() - lastRefreshTime) / 60000);
+  el.textContent = mins < 1 ? 'Updated just now' : `Updated ${mins} min ago`;
+}
+function setRefreshStatus(msg) {
+  const el = document.getElementById('refresh-status');
+  if (el) el.textContent = msg;
+}
+
+async function silentRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.classList.add('spinning');
+  setRefreshStatus('Refreshing…');
+  // Remember open panel
+  const openPanel = activePanelProj;
+  await loadAll().then(function() {
+  lastRefreshTime = Date.now();
+  updateRefreshStatus();
+  startAutoRefresh();
+  statusTimer = setInterval(updateRefreshStatus, 60000);
+});
+  // Re-open panel if it was open
+  if (openPanel) {
+    const proj = allProjects.find(p => p.name === openPanel);
+    if (proj) openPanel_fn(proj);
+  }
+  lastRefreshTime = Date.now();
+  if (btn) btn.classList.remove('spinning');
+  updateRefreshStatus();
+  if (statusTimer) clearInterval(statusTimer);
+  statusTimer = setInterval(updateRefreshStatus, 60000);
+}
+
+async function manualRefresh() { await silentRefresh(); }
 
 async function loadAll() {
   try {
