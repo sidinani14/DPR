@@ -312,9 +312,10 @@ function renderHeatmap() {
       const openCount = openTasks
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                     t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5]).length;
-      const donePct  = Math.min(100, Math.round(donePts / wkTgt * 100));
-      const pendPct  = Math.min(100 - donePct, Math.round(pendPts / wkTgt * 100));
-      const pctLabel = Math.round(donePts/wkTgt*100);
+      const donePct   = Math.min(100, Math.round(donePts / wkTgt * 100));
+      const pendPct   = Math.min(100 - donePct, Math.round(pendPts / wkTgt * 100));
+      const delayPct  = Math.min(100 - donePct - pendPct, Math.round(delayedPts2 / wkTgt * 100));
+      const pctLabel  = Math.round(donePts/wkTgt*100);
 
       html += `<tr>
         <td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${pctLabel}% complete</span></td>
