@@ -290,6 +290,7 @@ function renderHeatmap() {
       '<th>This Week Progress</th>' +
       '<th style="width:60px">Done</th>' +
       '<th style="width:60px">Open</th>' +
+      '<th style="width:65px;color:#EA4335">Delayed</th>' +
       '<th style="width:60px">Target</th>' +
       '</tr></thead><tbody>';
 
@@ -320,6 +321,7 @@ function renderHeatmap() {
         <td><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;display:flex">
           <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done"></div>
           <div style="height:100%;width:${pendPct}%;background:#4A9EFF;transition:width .3s" title="${pendPts.toFixed(1)} pts pending"></div>
+          <div style="height:100%;width:${delayPct}%;background:#EA4335;transition:width .3s" title="${delayedPts2.toFixed(1)} pts delayed (overdue)"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:2px;font-size:9px">
           <span style="color:#2ED573">■ Done: ${donePts.toFixed(1)}</span>
@@ -329,6 +331,7 @@ function renderHeatmap() {
         </div></td>
         <td style="text-align:center"><span class="hm-cell hm-green">${donePts.toFixed(1)}</span></td>
         <td style="text-align:center"><span class="hm-cell ${hmColor(pendPts, wkTgt - donePts > 0 ? wkTgt - donePts : wkTgt)}">${pendPts.toFixed(1)}</span></td>
+        <td style="text-align:center">${delayedPts2>0?`<span class="hm-cell hm-red">${delayedPts2.toFixed(1)}</span>`:`<span style="color:rgba(255,255,255,0.2);font-size:11px">—</span>`}</td>
         <td style="text-align:center;font-size:11px;color:rgba(255,255,255,0.4)">${wkTgt}</td>
       </tr>`;
     });
