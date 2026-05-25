@@ -330,10 +330,13 @@ function scoreCalc(m, taskData) {
   // DPR /15 — everyone gets credit for Mon 18 (form was down)
   const effectiveDprDays = Math.max(dprDays, dprDays > 0 ? dprDays : 0);
   const s_dpr      = Math.min(15, Math.round(effectiveDprDays / WEEK_DAYS * 15));
-  // Punctuality /15 — from biometric
-  const s_punct    = bio.punctScore ?? 15;
-  // Hours /10 — from biometric
-  const s_hrs      = bio.hrsScore  ?? 7;
+  // Punctuality /15 — late arrival penalty + absence deduction
+  const absentDays  = WEEK_DAYS - (bio.days || WEEK_DAYS);
+  const punctBase   = bio.punctScore ?? 15;
+  const s_punct     = Math.max(0, Math.round((punctBase - absentDays * 1.5) * 10) / 10);
+  // Hours /10 — hours bracket score + absence deduction
+  const hrsBase     = bio.hrsScore ?? 7;
+  const s_hrs       = Math.max(0, Math.round((hrsBase - absentDays * 1.0) * 10) / 10);
   // Quality /10 — 0 revisions this week → full 10
   const revPenalty = (taskData.internalRevisions || 0) * 1.5
                    + (taskData.clientRevisions   || 0) * 0.75;
@@ -496,8 +499,8 @@ function buildIndividualPage(m, taskData){
       ${paramCard('Output<br>Approved Pts',s.s_output,30,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
       ${paramCard('Delivery<br>On-Time Tasks',s.s_delivery,20,`${s.completedOT} on time<br>${s.completedL} late`)}
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${WEEK_DAYS} days filed<br>(Mon 18 counted for all)`)}
-      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late arrival${(bio.lateCount||0)!==1?'s':''}<br>Threshold: 09:10 AM${achalNote}`)}
-      ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day<br>Target: 8:00 hrs`)}
+      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${WEEK_DAYS-(bio.days||WEEK_DAYS)} absent<br>−1.5/absent · −1/late · Thr: 09:10${achalNote}`)}
+      ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${WEEK_DAYS-(bio.days||WEEK_DAYS)} absent<br>−1.0/absent · Target: 8:00 hrs`)}
       ${paramCard('Quality<br>Revisions',s.s_quality,10,`0 revisions this week<br>(editable)`)}
     </div>
 
