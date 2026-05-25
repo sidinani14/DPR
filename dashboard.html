@@ -347,6 +347,7 @@ function renderHeatmap() {
 
       weekDays.forEach(d => {
         const isPast  = d < today;
+        let todayHandled = false;
         let pts = 0;
         let cls = '';
         let label = '';
@@ -359,22 +360,50 @@ function renderHeatmap() {
             .reduce((s,t)=>s+(t.weightedPts||0), 0);
           cls = pts === 0 ? 'hm-empty' : 'hm-green';
           label = pts > 0 ? pts.toFixed(1) : '—';
+        } else if (isToday) {
+          // Today: green (done) + blue (upcoming due today) + red (all delayed)
+          const donePtsToday = doneTasks
+            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                        t.selfStatusDate === d)
+            .reduce((s,t)=>s+(t.weightedPts||0),0);
+          const upcomingPts = openTasks
+            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                        t.targetDate === d && t.status !== 'Delayed')
+            .reduce((s,t)=>s+(t.weightedPts||0),0);
+          const delayedPts = allTasks
+            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                        t.status === 'Delayed')
+            .reduce((s,t)=>s+(t.weightedPts||0),0);
+          pts = donePtsToday + upcomingPts + delayedPts;
+          const parts = [];
+          if (donePtsToday > 0) parts.push(`<span class="hm-cell hm-green" style="font-size:9px;padding:1px 4px">${donePtsToday.toFixed(1)}</span>`);
+          if (upcomingPts > 0) parts.push(`<span class="hm-cell hm-blue" style="font-size:9px;padding:1px 4px">${upcomingPts.toFixed(1)}</span>`);
+          if (delayedPts > 0) parts.push(`<span class="hm-cell hm-red" style="font-size:9px;padding:1px 4px">⚠${delayedPts.toFixed(1)}</span>`);
+          weekTotal += pts;
+          html += `<td style="min-width:60px">${parts.length ? parts.join('') : '<span class="hm-cell hm-empty">—</span>'}</td>`;
+          todayHandled = true;
         } else {
-          // Today + future: open pts due on this day
+          // Future: open pts due on this day
           pts = openTasks
             .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        t.targetDate === d)
+                        t.targetDate === d && t.status !== 'Delayed')
             .reduce((s,t)=>s+(t.weightedPts||0), 0);
           cls = hmColor(pts, dayTgt);
           label = pts > 0 ? pts.toFixed(1) : '—';
         }
-        weekTotal += pts;
-        html += `<td><span class="hm-cell ${cls}" title="${isPast?'Approved pts earned':'Open pts due on this day'}">${label}</span></td>`;
+        if (!todayHandled) {
+          weekTotal += pts;
+          html += `<td><span class="hm-cell ${cls}" title="${isPast?'Approved pts earned':'Open pts due on this day'}">${label}</span></td>`;
+        }
       });
 
-      // Week total cell
+      // Week total — show delayed pts separately in red
+      const memberDelayed = allTasks
+        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) && t.status==='Delayed')
+        .reduce((s,t)=>s+(t.weightedPts||0),0);
       const totCls = hmColor(weekTotal, wkTgt);
-      html += `<td><span class="hm-cell ${totCls}">${weekTotal.toFixed(1)}</span></td></tr>`;
+      const delLabel = memberDelayed > 0 ? ` <span style="color:#EA4335;font-size:9px">+${memberDelayed.toFixed(1)}⚠</span>` : '';
+      html += `<td><span class="hm-cell ${totCls}">${weekTotal.toFixed(1)}</span>${delLabel}</td></tr>`;
     });
     html += '</tbody></table>';
   }
