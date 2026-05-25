@@ -326,7 +326,7 @@ function scoreCalc(m, taskData) {
   // Output /30
   const s_output   = Math.min(30, Math.round(approvedPts / tgt * 30));
   // Delivery /20
-  const s_delivery = totalDone > 0 ? Math.min(20, Math.round(completedOT / totalDone * 20)) : 10;
+  const s_delivery = totalDone > 0 ? Math.min(20, Math.round(completedOT / totalDone * 20)) : 0;
   // DPR /15 — everyone gets credit for Mon 18 (form was down)
   const effectiveDprDays = Math.max(dprDays, dprDays > 0 ? dprDays : 0);
   const s_dpr      = Math.min(15, Math.round(effectiveDprDays / WEEK_DAYS * 15));
