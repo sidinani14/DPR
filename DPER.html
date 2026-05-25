@@ -325,7 +325,12 @@ textarea{min-height:70px;resize:vertical;}
           <span class="wa-icon">💬</span>
           <span class="wa-title">Site Update Message</span>
         </div>
-        <div class="wa-text" id="wa-text">Fill the form above to generate the message…</div>
+        <textarea id="wa-text" readonly
+          style="width:100%;min-height:200px;max-height:400px;resize:vertical;
+                 font-family:'DM Mono',monospace;font-size:11px;color:#2E7D32;
+                 background:#fff;border:1px solid #C8E6C9;border-radius:8px;
+                 padding:12px;line-height:1.6;white-space:pre-wrap;overflow-y:auto;"
+          onclick="this.select()">Fill the form above to generate the message…</textarea>
         <button class="copy-btn" onclick="copyWA()">📋 Copy Message</button>
       </div>
     </div>
@@ -602,10 +607,19 @@ function generateWA() {
 
   if (tomorrow) msg += `*Work Planned Tomorrow:*\n${tomorrow}\n\n`;
 
-  if (issues.length > 0) {
+  const nonDesignIssues = issues.filter(i=>i.issueType !== 'Design');
+  const designIssues    = issues.filter(i=>i.issueType === 'Design');
+  if (nonDesignIssues.length > 0) {
     msg += `*Issues Requiring Attention:*\n`;
-    issues.forEach((iss,i) => {
+    nonDesignIssues.forEach((iss,i) => {
       msg += `${i+1}. [${iss.issueType}] ${iss.description}\n`;
+    });
+    msg += '\n';
+  }
+  if (designIssues.length > 0) {
+    msg += `*Design Deliverables Required:*\n`;
+    designIssues.forEach((iss,i) => {
+      msg += `${i+1}. [Design] ${iss.description}\n`;
     });
     msg += '\n';
   }
@@ -617,12 +631,12 @@ function generateWA() {
 
   msg += `— Ideaform Design Studio`;
 
-  document.getElementById('wa-text').textContent = msg;
+  document.getElementById('wa-text').value = msg;
   return msg;
 }
 
 function copyWA() {
-  const text = document.getElementById('wa-text').textContent;
+  const text = document.getElementById('wa-text').value;
   navigator.clipboard.writeText(text).then(()=>toast('Message copied!')).catch(()=>{
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -726,7 +740,7 @@ function resetForm() {
   document.querySelectorAll('.chip.on').forEach(c=>c.classList.remove('on'));
   document.getElementById('issues-body').classList.add('hidden');
   document.getElementById('lead-field').classList.add('hidden');
-  document.getElementById('wa-text').textContent = 'Fill the form above to generate the message…';
+  document.getElementById('wa-text').value = 'Fill the form above to generate the message…';
   document.getElementById('submit-btn').disabled = false;
   document.getElementById('submit-status').textContent = leadName;
 }
