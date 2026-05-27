@@ -223,7 +223,7 @@ textarea{min-height:70px;resize:vertical;}
       </div>
       <div class="field">
         <div class="lbl">Work Planned for Tomorrow</div>
-        <textarea id="f-tomorrow" placeholder="What is planned for tomorrow?"></textarea>
+        <textarea id="f-tomorrow" oninput="generateWA()" placeholder="What is planned for tomorrow?"></textarea>
       </div>
       <div class="field">
         <div class="lbl">Is Work on Track?</div>
@@ -235,7 +235,7 @@ textarea{min-height:70px;resize:vertical;}
       </div>
       <div class="field hidden" id="delay-reason-field">
         <div class="lbl">Reason for Delay / Risk <span class="req">*</span></div>
-        <textarea id="f-delay-reason" placeholder="Specify reason…"></textarea>
+        <textarea id="f-delay-reason" oninput="generateWA()" placeholder="Specify reason…"></textarea>
       </div>
       <div class="field">
         <div class="lbl">Idle Time Observed?</div>
@@ -246,7 +246,7 @@ textarea{min-height:70px;resize:vertical;}
       </div>
       <div class="field hidden" id="idle-reason-field">
         <div class="lbl">Reason for Idle Time</div>
-        <input type="text" id="f-idle-reason" placeholder="Describe reason…">
+        <input type="text" id="f-idle-reason" oninput="generateWA()" placeholder="Describe reason…">
       </div>
     </div>
   </div>
@@ -275,11 +275,11 @@ textarea{min-height:70px;resize:vertical;}
     <div class="section-body">
       <div class="field">
         <div class="lbl">Materials Required in Next 3-5 Days <span class="opt">optional</span></div>
-        <textarea id="f-materials" placeholder="List materials needed…"></textarea>
+        <textarea id="f-materials" oninput="generateWA()" placeholder="List materials needed…"></textarea>
       </div>
       <div class="field">
         <div class="lbl">Material Delays Impacting Work <span class="opt">optional</span></div>
-        <textarea id="f-mat-delays" placeholder="Any procurement delays?"></textarea>
+        <textarea id="f-mat-delays" oninput="generateWA()" placeholder="Any procurement delays?"></textarea>
       </div>
     </div>
   </div>
@@ -297,11 +297,11 @@ textarea{min-height:70px;resize:vertical;}
       </div>
       <div class="field hidden" id="client-concerns-field">
         <div class="lbl">Client Concerns / Inputs</div>
-        <textarea id="f-client-concerns" placeholder="Any concerns raised by client?"></textarea>
+        <textarea id="f-client-concerns" oninput="generateWA()" placeholder="Any concerns raised by client?"></textarea>
       </div>
       <div class="field">
         <div class="lbl">Anything Blocking Tomorrow? <span class="opt">optional</span></div>
-        <textarea id="f-blocking" placeholder="What might block work tomorrow?"></textarea>
+        <textarea id="f-blocking" oninput="generateWA()" placeholder="What might block work tomorrow?"></textarea>
       </div>
       <div class="field">
         <div class="lbl">Decisions Pending from Siddharth Sir</div>
@@ -310,7 +310,7 @@ textarea{min-height:70px;resize:vertical;}
       </div>
       <div class="field">
         <div class="lbl">Additional Remarks <span class="opt">optional</span></div>
-        <textarea id="f-remarks" placeholder="Any other remarks?"></textarea>
+        <textarea id="f-remarks" oninput="generateWA()" placeholder="Any other remarks?"></textarea>
       </div>
     </div>
   </div>
@@ -539,13 +539,14 @@ function addDecision() {
       <button class="remove-btn" style="background:rgba(21,101,192,0.1);color:var(--blue);border-color:#BBDEFB"
         onclick="removeBlock('dec-block-${id}')">✕</button>
     </div>
-    <textarea id="dec-desc-${id}" placeholder="What decision is needed from Siddharth sir?" style="min-height:55px;border-color:#BBDEFB"></textarea>`;
+    <textarea id="dec-desc-${id}" placeholder="What decision is needed from Siddharth sir?" style="min-height:55px;border-color:#BBDEFB" oninput="generateWA()"></textarea>`;
   document.getElementById('decisions-list').appendChild(div);
 }
 
 function removeBlock(id) {
   const el = document.getElementById(id);
   if (el) el.remove();
+  generateWA();
 }
 
 // ── Collect issues ─────────────────────────────────────────
