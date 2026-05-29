@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>IDS · DPER — Deepak Soni</title>
+<title>IDS · Daily Project Execution Report</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -19,17 +19,16 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px;}
+
+/* Header */
 .header{background:var(--accent);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
 .header-title{color:rgba(255,255,255,0.9);font-size:13px;font-weight:600;}
 .header-title span{color:#F5A623;}
-.login-area{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.user-pill{background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 12px;font-size:12px;color:#fff;display:flex;align-items:center;gap:6px;}
+.user-pill{background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 12px;font-size:12px;color:#fff;display:flex;align-items:center;gap:6px;margin-left:auto;}
 .user-dot{width:8px;height:8px;border-radius:50%;background:#2ED573;}
 
-/* Form wrap */
+/* Layout */
 .form-wrap{max-width:660px;margin:0 auto;padding:14px;}
-
-/* Sections */
 .section{background:var(--surface);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;border:1px solid var(--border);}
 .section-head{background:var(--accent);padding:12px 18px;display:flex;align-items:center;gap:10px;}
 .section-num{width:22px;height:22px;border-radius:50%;background:rgba(245,166,35,0.3);color:#F5A623;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -38,98 +37,109 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .section-body{padding:16px 18px;}
 
 /* Fields */
-.field{margin-bottom:14px;}
+.field{margin-bottom:12px;}
 .field:last-child{margin-bottom:0;}
-.lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;}
 .lbl .opt{font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;}
 input[type=text],input[type=date],input[type=number],select,textarea{
-  width:100%;padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);
+  width:100%;padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);
   border-radius:var(--radius-sm);font-family:inherit;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;
 }
+input[type=number]{-moz-appearance:textfield;}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);}
-textarea{min-height:65px;resize:vertical;}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.field-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+textarea{min-height:62px;resize:vertical;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
-/* Toggle helpers */
-.yn-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:180px;}
-.yn-btn{padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+/* Toggles */
+.yn-btns{display:grid;grid-template-columns:1fr 1fr;gap:7px;max-width:170px;}
+.yn-btn{padding:7px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
 .yn-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .yn-btn.on-no{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
-.track-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-.track-btn{padding:9px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+.track-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
+.track-btn{padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
 .track-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .track-btn.on-risk{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
 .track-btn.on-delay{background:var(--red-bg);border-color:var(--red);color:var(--red);}
 
-/* Slider */
-.slider-wrap{display:flex;align-items:center;gap:12px;}
-.slider-wrap input[type=range]{flex:1;accent-color:var(--accent);}
-.slider-val{font-size:15px;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace;min-width:38px;text-align:right;}
-
 /* Chips */
-.chips{display:flex;flex-wrap:wrap;gap:7px;}
-.chip{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;user-select:none;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;user-select:none;}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 
-/* Issue cards */
-.issue-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;position:relative;}
+/* Pct inputs */
+.pct-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.pct-field{display:flex;flex-direction:column;gap:4px;}
+.pct-input-wrap{display:flex;align-items:center;gap:6px;}
+.pct-input-wrap input{width:70px;text-align:center;padding:8px 10px;}
+.pct-label{font-size:12px;color:var(--text3);}
+
+/* Issue cards — open issues panel */
+.issue-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:9px;}
 .issue-card.escalated{border-color:#D97706;background:var(--amber-bg);}
-.issue-card.resolved{border-color:var(--green);background:var(--green-bg);opacity:.7;}
-.issue-card-header{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
-.issue-type-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+.issue-card.resolved-pending{opacity:.6;}
+.ic-top{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.issue-type-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;flex-shrink:0;}
 .it-design{background:rgba(74,158,255,0.12);color:#1565C0;}
 .it-procurement{background:rgba(245,166,35,0.12);color:#7A5000;}
 .it-contractor{background:rgba(255,107,53,0.12);color:#8B2020;}
 .it-client{background:rgba(168,85,247,0.12);color:#6A1B9A;}
 .it-site{background:rgba(251,188,4,0.12);color:#5D4037;}
-.issue-proj{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;}
-.issue-desc{font-size:12px;color:var(--text);line-height:1.4;margin-bottom:10px;}
-.issue-meta{font-size:10px;color:var(--text3);margin-bottom:10px;}
-.issue-actions{display:flex;gap:8px;flex-wrap:wrap;}
-.iss-btn{font-size:11px;font-weight:700;padding:5px 12px;border-radius:6px;border:1.5px solid;cursor:pointer;font-family:inherit;transition:all .15s;}
-.iss-resolve{background:var(--green-bg);border-color:var(--green);color:var(--green);}
-.iss-escalate{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
-.iss-delay{background:var(--blue-bg);border-color:#1565C0;color:var(--blue);}
-.iss-btn:disabled{opacity:.4;cursor:not-allowed;}
-.delay-input{display:none;margin-top:8px;}
-.delay-input.open{display:flex;gap:8px;align-items:center;}
-.status-pill{font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;}
-.sp-open{background:rgba(234,67,53,0.1);color:var(--red);}
-.sp-escalated{background:var(--amber-bg);color:var(--amber);}
-.sp-resolved{background:var(--green-bg);color:var(--green);}
+.ic-proj{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;}
+.ic-status{margin-left:auto;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.ics-open{background:rgba(139,32,32,0.1);color:var(--red);}
+.ics-esc{background:var(--amber-bg);color:var(--amber);}
+.ics-res{background:var(--green-bg);color:var(--green);}
+.ic-desc{font-size:12px;color:var(--text);line-height:1.4;margin-bottom:7px;}
+.ic-meta{font-size:10px;color:var(--text3);margin-bottom:8px;}
+.ic-actions{display:flex;gap:7px;flex-wrap:wrap;}
+.ia-btn{font-size:11px;font-weight:700;padding:4px 11px;border-radius:6px;border:1.5px solid;cursor:pointer;font-family:inherit;}
+.ia-resolve{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.ia-escalate{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
+.ia-delay{background:var(--blue-bg);border-color:#1565C0;color:var(--blue);}
+.ia-btn:disabled{opacity:.4;cursor:not-allowed;}
+.delay-row{display:none;margin-top:7px;gap:7px;align-items:center;}
+.delay-row.open{display:flex;}
 
 /* Project blocks */
-.proj-block{background:var(--surface2);border:2px solid var(--accent);border-radius:var(--radius);padding:16px;margin-bottom:14px;position:relative;}
-.proj-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.proj-block-num{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;}
-.remove-proj-btn{background:var(--red-bg);border:none;color:var(--red);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;}
+.proj-block{background:var(--surface2);border:2px solid var(--accent);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;}
+.pb-header{display:flex;align-items:center;gap:10px;margin-bottom:13px;}
+.pb-num{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:3px 11px;border-radius:11px;flex-shrink:0;}
+.pb-proj-select{flex:1;padding:7px 10px;font-size:13px;}
+.pb-visit-check{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);flex-shrink:0;cursor:pointer;user-select:none;}
+.pb-visit-check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;}
+.remove-pb{background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer;font-family:inherit;flex-shrink:0;}
 
 /* Issue blocks within project */
-.iss-block{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;}
-.iss-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.iss-block-num{background:rgba(139,32,32,0.1);color:var(--red);font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
-.pri-btns{display:flex;gap:6px;}
-.pri-btn{flex:1;padding:7px;border-radius:var(--radius-sm);font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);text-align:center;}
+.iss-block{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px;margin-bottom:8px;}
+.ib-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.ib-num{background:rgba(139,32,32,0.1);color:var(--red);font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;}
+.pri-btns{display:flex;gap:5px;}
+.pri-btn{flex:1;padding:6px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);text-align:center;}
 .pri-btn.on-1{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .pri-btn.on-2{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
 .pri-btn.on-3{background:var(--red-bg);border-color:var(--red);color:var(--red);}
 
-/* WA messages */
-.wa-block{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius);padding:14px;margin-bottom:10px;}
-.wa-block-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.wa-proj-name{font-size:12px;font-weight:700;color:#1B5E20;}
-.wa-textarea{width:100%;min-height:160px;max-height:320px;resize:vertical;font-family:'DM Mono',monospace;font-size:11px;color:#2E7D32;background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:10px;line-height:1.6;overflow-y:auto;}
-.copy-btn-sm{margin-top:8px;width:100%;padding:9px;background:#2E7D32;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+/* Blocker toggle */
+.blocker-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;margin-top:6px;user-select:none;}
+.blocker-toggle input{accent-color:var(--accent);}
+.blocker-field{display:none;margin-top:7px;}
+.blocker-field.open{display:block;}
 
-/* Add project btn */
-.add-proj-btn{width:100%;padding:12px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:2px dashed var(--accent);background:var(--accent-light);color:var(--accent);font-family:inherit;transition:all .15s;}
+/* WA */
+.wa-block{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius);padding:13px;margin-bottom:10px;}
+.wa-proj-name{font-size:12px;font-weight:700;color:#1B5E20;margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+.wa-textarea{width:100%;min-height:150px;max-height:300px;resize:vertical;font-family:'DM Mono',monospace;font-size:11px;color:#2E7D32;background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:10px;line-height:1.6;overflow-y:auto;}
+.copy-btn-sm{margin-top:7px;width:100%;padding:8px;background:#2E7D32;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+
+/* Buttons */
+.add-proj-btn{width:100%;padding:11px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:2px dashed var(--accent);background:var(--accent-light);color:var(--accent);font-family:inherit;}
 .add-proj-btn:hover{background:var(--accent);color:#fff;}
-.add-btn{width:100%;padding:9px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed var(--border2);background:transparent;color:var(--text2);font-family:inherit;}
+.add-btn{width:100%;padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed var(--border2);background:transparent;color:var(--text2);font-family:inherit;}
 .add-btn:hover{border-color:var(--accent);color:var(--accent);}
 
 /* Submit */
-.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 18px;display:flex;gap:12px;align-items:center;z-index:50;}
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:11px 18px;display:flex;gap:10px;align-items:center;z-index:50;}
 .submit-btn{flex:1;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
 .submit-btn:disabled{opacity:.5;cursor:not-allowed;}
 .submit-status{font-size:12px;color:var(--text2);}
@@ -142,7 +152,8 @@ textarea{min-height:65px;resize:vertical;}
 .new-btn{margin-top:20px;padding:11px 28px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
 
 .hidden{display:none;}
-.no-issues{text-align:center;padding:24px;color:var(--text3);font-size:13px;}
+.no-issues{text-align:center;padding:20px;color:var(--text3);font-size:13px;}
+.resolved-section-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border);}
 .toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;z-index:999;display:none;}
 </style>
 </head>
@@ -151,22 +162,19 @@ textarea{min-height:65px;resize:vertical;}
 <div class="header">
   <img src="https://sidinani14.github.io/DPR/ideaform-logo.png" style="height:26px;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
   <span class="header-title">Daily Project <span>Execution Report</span></span>
-  <div class="login-area" id="login-area">
+  <div id="login-area" style="margin-left:auto">
     <div id="g_id_onload" data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
       data-callback="onGoogleSignIn" data-auto_select="true"></div>
-    <div class="g_id_signin" data-type="standard" data-size="small" data-theme="outline"
-      data-text="sign_in_with" data-shape="pill"></div>
+    <div class="g_id_signin" data-type="standard" data-size="small" data-theme="outline" data-shape="pill"></div>
   </div>
   <div id="user-pill" class="user-pill hidden">
-    <span class="user-dot"></span>
-    <span id="user-name-display">—</span>
+    <span class="user-dot"></span><span id="user-name-display">—</span>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 <div class="form-wrap">
 
-  <!-- Success -->
   <div class="success-screen" id="success-screen">
     <div class="success-icon">✅</div>
     <div class="success-title">Reports Submitted</div>
@@ -180,8 +188,8 @@ textarea{min-height:65px;resize:vertical;}
   <div class="section">
     <div class="section-head">
       <span class="section-num">!</span>
-      <span class="section-title">Open Issues — All Projects</span>
-      <span class="section-badge" id="issues-count-badge">Loading…</span>
+      <span class="section-title">Open Issues — All Your Projects</span>
+      <span class="section-badge" id="issues-badge">—</span>
     </div>
     <div class="section-body" id="issues-panel">
       <div class="no-issues">Sign in to load issues…</div>
@@ -192,23 +200,20 @@ textarea{min-height:65px;resize:vertical;}
   <div class="section">
     <div class="section-head"><span class="section-num">1</span><span class="section-title">Report Date</span></div>
     <div class="section-body">
-      <div class="field">
-        <div class="lbl">Date</div>
-        <input type="date" id="f-date">
-      </div>
+      <input type="date" id="f-date">
     </div>
   </div>
 
-  <!-- S2: Project Blocks -->
+  <!-- S2: Project Reports -->
   <div class="section">
     <div class="section-head"><span class="section-num">2</span><span class="section-title">Project Reports</span></div>
     <div class="section-body">
       <div id="proj-blocks"></div>
-      <button class="add-proj-btn" onclick="addProjectBlock()">+ Add Project Report</button>
+      <button class="add-proj-btn" id="add-proj-btn" onclick="addProjectBlock()" disabled>+ Add Project Report</button>
     </div>
   </div>
 
-  <!-- S3: Decisions Pending -->
+  <!-- S3: Decisions -->
   <div class="section">
     <div class="section-head"><span class="section-num">3</span><span class="section-title">Decisions Pending from Siddharth Sir</span></div>
     <div class="section-body">
@@ -217,18 +222,19 @@ textarea{min-height:65px;resize:vertical;}
     </div>
   </div>
 
-  <!-- S4: WhatsApp Messages -->
+  <!-- S4: WhatsApp -->
   <div class="section">
-    <div class="section-head" style="background:#1B5E20"><span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span><span class="section-title">WhatsApp Update Messages</span></div>
+    <div class="section-head" style="background:#1B5E20">
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span>
+      <span class="section-title">WhatsApp Messages</span>
+    </div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">One message generated per project. Review and send to respective groups.</p>
-      <div id="wa-messages-list">
-        <div class="no-issues">Add project reports above to generate messages…</div>
-      </div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">One message per project — review and send to each group.</p>
+      <div id="wa-list"><div class="no-issues">Add project reports above to generate messages…</div></div>
     </div>
   </div>
 
-  </div><!-- end form-body -->
+  </div>
 </div>
 
 <div class="submit-bar">
@@ -238,245 +244,235 @@ textarea{min-height:65px;resize:vertical;}
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
-// No email restriction — any team member can use this form
 const EMAIL_MAP = {
-  'ar.deepaksoni@gmail.com'     : 'Deepak Soni',
-  'achal.rathore@ideaform.in'   : 'Achal Rathore',
-  'himanshu.malviya@ideaform.in': 'Himanshu Malviya',
-  'poorvi.goyal@ideaform.in'    : 'Poorvi Goyal',
-  'khushi.agrawal@ideaform.in'  : 'Khushi Agrawal',
-  'sahil.maurya@ideaform.in'    : 'Sahil Maurya',
-  'aaditya.koshti@ideaform.in'  : 'Aaditya Koshti',
-  'aman.raghuwanshi@ideaform.in': 'Aman Raghuwanshi',
-  'bhavesh.bhagwat@ideaform.in' : 'Bhavesh Bhagwat',
-  'aashi.agrawal@ideaform.in'   : 'Aashi Agrawal',
-  'siddharth@ideaform.in'       : 'Siddharth Inani',
-  'astha@ideaform.in'           : 'Astha Inani',
-  'simi@ideaform.in'            : 'Simi',
-  'minakshi@ideaform.in'        : 'Minakshi Gokhale',
+  'ar.deepaksoni@gmail.com'     :'Deepak Soni',
+  'achal.rathore@ideaform.in'   :'Achal Rathore',
+  'himanshu.malviya@ideaform.in':'Himanshu Malviya',
+  'poorvi.goyal@ideaform.in'    :'Poorvi Goyal',
+  'khushi.agrawal@ideaform.in'  :'Khushi Agrawal',
+  'sahil.maurya@ideaform.in'    :'Sahil Maurya',
+  'aaditya.koshti@ideaform.in'  :'Aaditya Koshti',
+  'aman.raghuwanshi@ideaform.in':'Aman Raghuwanshi',
+  'bhavesh.bhagwat@ideaform.in' :'Bhavesh Bhagwat',
+  'aashi.agrawal@ideaform.in'   :'Aashi Agrawal',
+  'siddharth@ideaform.in'       :'Siddharth Inani',
+  'sidinani14@gmail.com'        :'Siddharth Inani',
+  'astha@ideaform.in'           :'Astha Inani',
+  'astha.uch@gmail.com'         :'Astha Inani',
+  'simi@ideaform.in'            :'Simi',
 };
-const TEAM_MEMBERS = [
-  'Achal Rathore','Himanshu Malviya','Deepak Soni','Poorvi Goyal',
-  'Khushi Agrawal','Sahil Maurya','Aaditya Koshti','Aman Raghuwanshi',
-  'Bhavesh Bhagwat','Aashi Agrawal','Siddharth Inani','Astha Inani','Simi',
-];
 const ISSUE_TYPES = ['Design','Procurement','Contractor','Client','Site Condition'];
-const STAGES = ['Design Finalization','Civil Work','Plaster','Electrical','Plumbing',
-  'Fabrication','Carpentry','Finishing','Procurement','Handover'];
+const STAGES = ['Design Finalization','Civil Work','Plaster','Electrical','Plumbing','Fabrication','Carpentry','Finishing','Procurement','Handover'];
 
-let googleUser    = null;
-let leadName      = 'Deepak Soni';
-let projects      = [];
-let projBlockCount= 0;
-let decCount      = 0;
-let issueActions  = {}; // issueId → {action, targetDate}
+let googleUser   = null;
+let leadName     = '';
+let projects     = [];
+let pbCount      = 0;
+let ibCount      = 0;
+let decCount     = 0;
+let issueActions = {};
 
-// ── Google Sign In ─────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────
 function onGoogleSignIn(resp) {
   const payload = JSON.parse(atob(resp.credential.split('.')[1]));
   const email   = (payload.email||'').toLowerCase();
-  leadName = EMAIL_MAP[email] || payload.name;
-  googleUser = {name: leadName, email};
+  leadName = EMAIL_MAP[email] || payload.name || email;
+  googleUser = {name:leadName, email};
   document.getElementById('user-pill').classList.remove('hidden');
   document.getElementById('user-name-display').textContent = leadName;
   document.getElementById('submit-btn').disabled = false;
+  document.getElementById('add-proj-btn').disabled = false;
   document.getElementById('submit-status').textContent = leadName;
   loadProjects();
   loadIssues();
 }
 
-// ── Load projects ──────────────────────────────────────────
+// ── Projects ──────────────────────────────────────────────
 async function loadProjects() {
   try {
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({action:'getLists'})
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getLists'})});
+    const d = await r.json();
+    const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
+    projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
+    // Refresh project dropdowns
+    document.querySelectorAll('[id^="pb-proj-"]').forEach(sel=>{
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Select project…</option>' +
+        projects.map(p=>`<option value="${p.name}"${p.name===cur?' selected':''}>${p.name}</option>`).join('');
     });
-    const data = await r.json();
-    const EXCLUDE = ['completed','closed','dead','cancelled','proposal','new lead'];
-    projects = (data.projects||[]).filter(p => {
-      const st = (p.status||'').toLowerCase();
-      return !EXCLUDE.some(x => st.includes(x));
-    });
-  } catch(e) { toast('Could not load projects'); }
+  } catch(e){ toast('Could not load projects'); }
 }
 
-// ── Load issues ────────────────────────────────────────────
+// ── Issues ────────────────────────────────────────────────
 async function loadIssues() {
-  document.getElementById('issues-panel').innerHTML = '<div class="no-issues">Loading issues…</div>';
+  document.getElementById('issues-panel').innerHTML = '<div class="no-issues">Loading…</div>';
   try {
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({action:'getDeepakIssues', lead: leadName})
-    });
-    const data = await r.json();
-    renderIssues(data.issues||[]);
-  } catch(e) {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getDeepakIssues', lead:leadName})});
+    const d = await r.json();
+    renderIssues(d.issues||[]);
+  } catch(e){
     document.getElementById('issues-panel').innerHTML = '<div class="no-issues">Could not load issues</div>';
   }
 }
 
+function typeClass(t){
+  return {Design:'it-design',Procurement:'it-procurement',Contractor:'it-contractor',
+          Client:'it-client','Site Condition':'it-site'}[t]||'it-site';
+}
+function priLabel(p){return p===3?'🔴 High':p===1?'🟢 Low':'🟡 Med';}
+
 function renderIssues(issues) {
-  const open     = issues.filter(i => i.status !== 'Resolved');
-  const resolved = issues.filter(i => i.status === 'Resolved');
-  const badge    = document.getElementById('issues-count-badge');
-  badge.textContent = open.length + ' open';
+  const open = issues.filter(i=>i.status!=='Resolved');
+  const res  = issues.filter(i=>i.status==='Resolved');
+  document.getElementById('issues-badge').textContent = open.length + ' open';
 
   if (!issues.length) {
-    document.getElementById('issues-panel').innerHTML = '<div class="no-issues">✓ No open issues across all projects</div>';
+    document.getElementById('issues-panel').innerHTML = '<div class="no-issues">✓ No open issues</div>';
     return;
   }
 
-  function typeClass(t) {
-    const map={Design:'it-design',Procurement:'it-procurement',Contractor:'it-contractor',
-               Client:'it-client','Site Condition':'it-site'};
-    return map[t]||'it-site';
-  }
-  function priLabel(p) { return p===3?'🔴 High':p===1?'🟢 Low':'🟡 Med'; }
-  function statusClass(s) {
-    return s==='Resolved'?'sp-resolved':s==='Escalated'?'sp-escalated':'sp-open';
-  }
-
   let html = '';
-  // Open issues first
-  [...open].sort((a,b)=>b.priority-a.priority).forEach(iss => {
-    const isEsc = issueActions[iss.issueId]?.action === 'escalate';
-    const isRes = issueActions[iss.issueId]?.action === 'resolve';
-    html += `<div class="issue-card${isEsc?' escalated':''}" id="ic-${iss.issueId}">
-      <div class="issue-card-header">
+  [...open].sort((a,b)=>b.priority-a.priority).forEach(iss=>{
+    const act = issueActions[iss.issueId];
+    const isRes = act?.action==='resolve';
+    const isEsc = act?.action==='escalate';
+    const statusLabel = isRes?'✓ Resolved':isEsc?'🔴 Escalated':iss.status;
+    const statusCls   = isRes?'ics-res':isEsc?'ics-esc':'ics-open';
+    html += `<div class="issue-card${isEsc?' escalated':''}${isRes?' resolved-pending':''}" id="ic-${iss.issueId}">
+      <div class="ic-top">
         <span class="issue-type-badge ${typeClass(iss.issueType)}">${iss.issueType}</span>
-        <span class="issue-proj">${iss.project}</span>
-        <span style="margin-left:auto"><span class="status-pill ${statusClass(issueActions[iss.issueId]?.action==='escalate'?'Escalated':iss.status)}">${issueActions[iss.issueId]?.action==='resolve'?'✓ Resolved':issueActions[iss.issueId]?.action==='escalate'?'🔴 Escalated':iss.status}</span></span>
+        <span class="ic-proj">${iss.project}</span>
+        <span class="ic-status ${statusCls}" style="margin-left:auto">${statusLabel}</span>
       </div>
-      <div class="issue-desc">${iss.description}</div>
-      <div class="issue-meta">${priLabel(iss.priority)} · Target: ${iss.targetDate||'—'} · ${iss.date}</div>
-      <div class="issue-actions">
-        <button class="iss-btn iss-resolve" onclick="markIssueAction('${iss.issueId}','resolve',this)" ${isRes?'disabled':''}>✓ ${isRes?'Resolved':'Resolve'}</button>
-        <button class="iss-btn iss-escalate" onclick="markIssueAction('${iss.issueId}','escalate',this)" ${isEsc?'disabled':''}>🔴 ${isEsc?'Escalated':'Escalate'}</button>
-        <button class="iss-btn iss-delay" onclick="toggleDelay('${iss.issueId}')">📅 Delay</button>
+      <div class="ic-desc">${iss.description}</div>
+      <div class="ic-meta">${priLabel(iss.priority)} · Target: ${iss.targetDate||'—'} · ${iss.date}</div>
+      <div class="ic-actions">
+        <button class="ia-btn ia-resolve" onclick="issAction('${iss.issueId}','resolve',this)" ${isRes?'disabled':''}>✓ Resolve</button>
+        <button class="ia-btn ia-escalate" onclick="issAction('${iss.issueId}','escalate',this)" ${isEsc?'disabled':''}>🔴 Escalate</button>
+        <button class="ia-btn ia-delay" onclick="toggleDelay('${iss.issueId}')">📅 Delay</button>
       </div>
-      <div class="delay-input" id="delay-${iss.issueId}">
-        <input type="date" id="delay-date-${iss.issueId}" style="flex:1;padding:7px 10px;font-size:12px">
-        <button class="iss-btn iss-delay" onclick="markIssueAction('${iss.issueId}','delay',this)">Set Date</button>
+      <div class="delay-row" id="dr-${iss.issueId}">
+        <input type="date" id="dd-${iss.issueId}" style="flex:1;padding:7px 10px;font-size:12px">
+        <button class="ia-btn ia-delay" onclick="issAction('${iss.issueId}','delay',this)">Set Date</button>
       </div>
     </div>`;
   });
 
-  // Resolved (last 7 days) — collapsed
-  if (resolved.length) {
-    html += `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Resolved (last 7 days)</div>`;
-    resolved.forEach(iss => {
-      html += `<div class="issue-card resolved">
-        <div class="issue-card-header">
+  if (res.length) {
+    html += '<div class="resolved-section-lbl">Resolved — last 7 days</div>';
+    res.forEach(iss=>{
+      html += `<div class="issue-card" style="opacity:.55">
+        <div class="ic-top">
           <span class="issue-type-badge ${typeClass(iss.issueType)}">${iss.issueType}</span>
-          <span class="issue-proj">${iss.project}</span>
-          <span style="margin-left:auto"><span class="status-pill sp-resolved">✓ Resolved</span></span>
+          <span class="ic-proj">${iss.project}</span>
+          <span class="ic-status ics-res" style="margin-left:auto">✓ Resolved</span>
         </div>
-        <div class="issue-desc" style="text-decoration:line-through;color:var(--text3)">${iss.description}</div>
+        <div class="ic-desc" style="text-decoration:line-through;color:var(--text3)">${iss.description}</div>
       </div>`;
     });
-    html += '</div>';
   }
 
   document.getElementById('issues-panel').innerHTML = html;
 }
 
-function markIssueAction(issueId, action, btn) {
-  const date = action === 'delay' ? document.getElementById('delay-date-' + issueId)?.value : '';
-  if (action === 'delay' && !date) { toast('Please select a date'); return; }
-  issueActions[issueId] = {action, targetDate: date};
-  // Visual feedback
-  const card = document.getElementById('ic-' + issueId);
-  if (action === 'resolve') {
-    card.style.opacity = '.6';
-    btn.textContent = '✓ Resolved';
-    btn.disabled = true;
-  } else if (action === 'escalate') {
+function issAction(issueId, action, btn) {
+  if (action==='delay') {
+    const date = document.getElementById('dd-'+issueId)?.value;
+    if (!date){toast('Select a date first');return;}
+    issueActions[issueId] = {action, targetDate:date};
+    toast('New target date set: '+date);
+    document.getElementById('dr-'+issueId).classList.remove('open');
+    return;
+  }
+  issueActions[issueId] = {action, targetDate:''};
+  const card = document.getElementById('ic-'+issueId);
+  if (action==='resolve'){
+    card.classList.add('resolved-pending');
+    btn.textContent='✓ Resolved'; btn.disabled=true;
+    card.querySelector('.ic-status').textContent='✓ Resolved';
+    card.querySelector('.ic-status').className='ic-status ics-res';
+  } else {
     card.classList.add('escalated');
-    btn.textContent = '🔴 Escalated';
-    btn.disabled = true;
-  } else if (action === 'delay') {
-    toast('New target date set: ' + date);
-    document.getElementById('delay-' + issueId).classList.remove('open');
+    btn.textContent='🔴 Escalated'; btn.disabled=true;
+    card.querySelector('.ic-status').textContent='🔴 Escalated';
+    card.querySelector('.ic-status').className='ic-status ics-esc';
   }
   generateAllWA();
 }
 
-function toggleDelay(issueId) {
-  const el = document.getElementById('delay-' + issueId);
-  el.classList.toggle('open');
+function toggleDelay(id){
+  document.getElementById('dr-'+id).classList.toggle('open');
 }
 
 // ── Project blocks ─────────────────────────────────────────
 function addProjectBlock() {
-  projBlockCount++;
-  const id  = projBlockCount;
+  pbCount++;
+  const id = pbCount;
   const div = document.createElement('div');
-  div.className = 'proj-block';
-  div.id = `pb-${id}`;
+  div.className='proj-block'; div.id=`pb-${id}`;
 
-  const projOptions = projects.map(p =>
-    `<option value="${p.name}">${p.name}</option>`).join('');
+  const projOpts = projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
 
   div.innerHTML = `
-    <div class="proj-block-header">
-      <span class="proj-block-num">Project ${id}</span>
-      <button class="remove-proj-btn" onclick="removeProjBlock(${id})">✕ Remove</button>
-    </div>
-
-    <div class="field">
-      <div class="lbl">Project Name</div>
-      <select id="pb-proj-${id}" onchange="onProjBlockChange(${id});generateAllWA()">
-        <option value="">Select project…</option>
-        ${projOptions}
+    <!-- Header row: number + project + site visit + remove -->
+    <div class="pb-header">
+      <span class="pb-num">${id}</span>
+      <select class="pb-proj-select" id="pb-proj-${id}" onchange="generateAllWA()">
+        <option value="">Select project…</option>${projOpts}
       </select>
+      <label class="pb-visit-check">
+        <input type="checkbox" id="pb-sv-${id}" onchange="generateAllWA()"> Site Visit
+      </label>
+      <button class="remove-pb" onclick="removePB(${id})">✕</button>
     </div>
 
-    <div class="field">
-      <div class="lbl">Site Visit Done Today?</div>
-      <div class="yn-btns">
-        <div class="yn-btn" id="pb-sv-yes-${id}" onclick="setPBYN(${id},'sv','yes')">Yes</div>
-        <div class="yn-btn on-no" id="pb-sv-no-${id}" onclick="setPBYN(${id},'sv','no')">No</div>
-      </div>
-    </div>
-
+    <!-- Stage chips -->
     <div class="field">
       <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
       <div class="chips" id="pb-stages-${id}">
-        ${STAGES.map(s=>`<div class="chip" onclick="toggleChip(this);generateAllWA()">${s}</div>`).join('')}
+        ${STAGES.map(s=>`<div class="chip" onclick="this.classList.toggle('on');generateAllWA()">${s}</div>`).join('')}
       </div>
     </div>
 
+    <!-- Works today -->
     <div class="field">
       <div class="lbl">Works Completed Today</div>
       <textarea id="pb-works-${id}" oninput="generateAllWA()" placeholder="Describe work done today…"></textarea>
     </div>
 
-    <div class="field-row">
-      <div class="field">
+    <!-- % inputs -->
+    <div class="pct-row">
+      <div class="pct-field">
         <div class="lbl">% Works per Plan</div>
-        <div class="slider-wrap">
-          <input type="range" min="0" max="100" step="5" value="0" id="pb-pctplan-${id}"
-            oninput="document.getElementById('pb-pctplan-v-${id}').textContent=this.value+'%';generateAllWA()">
-          <span class="slider-val" id="pb-pctplan-v-${id}">0%</span>
+        <div class="pct-input-wrap">
+          <input type="number" id="pb-pctplan-${id}" min="0" max="100" value="0" oninput="generateAllWA()">
+          <span class="pct-label">%</span>
         </div>
       </div>
-      <div class="field">
+      <div class="pct-field">
         <div class="lbl">% Overall Completion</div>
-        <div class="slider-wrap">
-          <input type="range" min="0" max="100" step="5" value="0" id="pb-pctover-${id}"
-            oninput="document.getElementById('pb-pctover-v-${id}').textContent=this.value+'%';generateAllWA()">
-          <span class="slider-val" id="pb-pctover-v-${id}">0%</span>
+        <div class="pct-input-wrap">
+          <input type="number" id="pb-pctover-${id}" min="0" max="100" value="0" oninput="generateAllWA()">
+          <span class="pct-label">%</span>
         </div>
       </div>
     </div>
 
+    <!-- Tomorrow + blocker toggle -->
     <div class="field">
       <div class="lbl">Work Planned for Tomorrow</div>
       <textarea id="pb-tomorrow-${id}" oninput="generateAllWA()" placeholder="What is planned for tomorrow?"></textarea>
+      <label class="blocker-toggle">
+        <input type="checkbox" id="pb-blk-chk-${id}" onchange="toggleBlocker(${id})"> Any blockers?
+      </label>
+      <div class="blocker-field" id="pb-blk-${id}">
+        <input type="text" id="pb-blocking-${id}" oninput="generateAllWA()" placeholder="What might block tomorrow's work?">
+      </div>
     </div>
 
+    <!-- On track -->
     <div class="field">
       <div class="lbl">Is Work on Track?</div>
       <div class="track-btns">
@@ -485,43 +481,34 @@ function addProjectBlock() {
         <div class="track-btn" id="pb-tr-delay-${id}" onclick="setPBTrack(${id},'Delayed')">🔴 Delayed</div>
       </div>
     </div>
-
-    <div class="field hidden" id="pb-delayreason-field-${id}">
+    <div class="field hidden" id="pb-drf-${id}">
       <div class="lbl">Reason for Delay / Risk</div>
-      <textarea id="pb-delayreason-${id}" oninput="generateAllWA()" placeholder="Specify reason…"></textarea>
+      <textarea id="pb-dr-${id}" oninput="generateAllWA()" placeholder="Specify reason…" style="min-height:50px"></textarea>
     </div>
 
+    <!-- Procurement notes (merged) -->
     <div class="field">
-      <div class="lbl">Materials Required (3-5 days) <span class="opt">optional</span></div>
-      <textarea id="pb-materials-${id}" oninput="generateAllWA()" placeholder="List materials needed…"></textarea>
+      <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
+      <textarea id="pb-proc-${id}" oninput="generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
     </div>
 
-    <div class="field">
-      <div class="lbl">Material Delays <span class="opt">optional</span></div>
-      <textarea id="pb-matdelays-${id}" oninput="generateAllWA()" placeholder="Any procurement delays?"></textarea>
-    </div>
-
+    <!-- Client updated -->
     <div class="field">
       <div class="lbl">Was Client Updated?</div>
       <div class="yn-btns">
-        <div class="yn-btn" id="pb-cl-yes-${id}" onclick="setPBYN(${id},'cl','yes');document.getElementById('pb-clconcerns-field-${id}').classList.remove('hidden')">Yes</div>
-        <div class="yn-btn on-no" id="pb-cl-no-${id}" onclick="setPBYN(${id},'cl','no');document.getElementById('pb-clconcerns-field-${id}').classList.add('hidden')">No</div>
+        <div class="yn-btn" id="pb-cl-yes-${id}" onclick="setPBYN(${id},'cl','yes')">Yes</div>
+        <div class="yn-btn on-no" id="pb-cl-no-${id}" onclick="setPBYN(${id},'cl','no')">No</div>
       </div>
     </div>
-
-    <div class="field hidden" id="pb-clconcerns-field-${id}">
+    <div class="field hidden" id="pb-clc-f-${id}">
       <div class="lbl">Client Concerns / Inputs</div>
-      <textarea id="pb-clconcerns-${id}" oninput="generateAllWA()" placeholder="Any concerns raised by client?"></textarea>
+      <textarea id="pb-clc-${id}" oninput="generateAllWA()" placeholder="Any concerns from client?" style="min-height:50px"></textarea>
     </div>
 
-    <div class="field">
-      <div class="lbl">Anything Blocking Tomorrow? <span class="opt">optional</span></div>
-      <textarea id="pb-blocking-${id}" oninput="generateAllWA()" placeholder="What might block work tomorrow?"></textarea>
-    </div>
-
+    <!-- Issues -->
     <div class="field">
       <div class="lbl">Issues on Site</div>
-      <div id="pb-issues-list-${id}"></div>
+      <div id="pb-iss-${id}"></div>
       <button class="add-btn" onclick="addIssueBlock(${id})">+ Add Issue</button>
     </div>`;
 
@@ -529,63 +516,58 @@ function addProjectBlock() {
   generateAllWA();
 }
 
-function removeProjBlock(id) {
-  const el = document.getElementById(`pb-${id}`);
-  if (el) el.remove();
+function removePB(id){
+  const el=document.getElementById(`pb-${id}`);
+  if(el) el.remove();
   generateAllWA();
 }
 
-function onProjBlockChange(id) {
-  // Update WA message label
-  generateAllWA();
-}
-
-function setPBYN(id, group, val) {
-  document.getElementById(`pb-${group}-yes-${id}`).className = 'yn-btn' + (val==='yes'?' on-yes':'');
-  document.getElementById(`pb-${group}-no-${id}`).className  = 'yn-btn' + (val==='no'?' on-no':'');
-  generateAllWA();
-}
-
-function setPBTrack(id, val) {
-  ['yes','risk','delay'].forEach(k => {
-    const key = {yes:'Yes',risk:'At Risk',delay:'Delayed'}[k];
-    document.getElementById(`pb-tr-${k}-${id}`).className = 'track-btn' + (val===key?` on-${k}`:'');
+function setPBTrack(id,val){
+  const map={yes:'Yes',risk:'At Risk',delay:'Delayed'};
+  Object.keys(map).forEach(k=>{
+    document.getElementById(`pb-tr-${k}-${id}`).className='track-btn'+(val===map[k]?` on-${k}`:'');
   });
-  const rf = document.getElementById(`pb-delayreason-field-${id}`);
-  if (rf) rf.classList.toggle('hidden', val==='Yes');
-  document.getElementById(`pb-${id}`).dataset.track = val;
+  document.getElementById(`pb-${id}`).dataset.track=val;
+  document.getElementById(`pb-drf-${id}`).classList.toggle('hidden',val==='Yes');
   generateAllWA();
 }
 
-function toggleChip(el) { el.classList.toggle('on'); }
+function setPBYN(id,group,val){
+  document.getElementById(`pb-${group}-yes-${id}`).className='yn-btn'+(val==='yes'?' on-yes':'');
+  document.getElementById(`pb-${group}-no-${id}`).className='yn-btn'+(val==='no'?' on-no':'');
+  if(group==='cl'){
+    document.getElementById(`pb-clc-f-${id}`).classList.toggle('hidden',val==='no');
+  }
+  generateAllWA();
+}
+
+function toggleBlocker(id){
+  const chk=document.getElementById(`pb-blk-chk-${id}`);
+  document.getElementById(`pb-blk-${id}`).classList.toggle('open',chk.checked);
+  generateAllWA();
+}
 
 // ── Issue blocks within project ────────────────────────────
-let issBlockCount = 0;
-function addIssueBlock(projId) {
-  issBlockCount++;
-  const id  = issBlockCount;
-  const div = document.createElement('div');
-  div.className = 'iss-block';
-  div.id = `ib-${projId}-${id}`;
-  div.innerHTML = `
-    <div class="iss-block-header">
-      <span class="iss-block-num">Issue ${id}</span>
+function addIssueBlock(projId){
+  ibCount++;
+  const id=ibCount;
+  const div=document.createElement('div');
+  div.className='iss-block'; div.id=`ib-${projId}-${id}`;
+  div.innerHTML=`
+    <div class="ib-header">
+      <span class="ib-num">Issue ${id}</span>
       <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer" onclick="this.closest('.iss-block').remove();generateAllWA()">✕</button>
     </div>
-    <div class="field">
-      <div class="lbl" style="font-size:10px">Issue Type</div>
+    <div class="field" style="margin-bottom:8px">
       <div class="chips">
-        ${ISSUE_TYPES.map(t=>`<div class="chip" data-type="${t}" onclick="selectIssType(this,${projId},${id})">${t}</div>`).join('')}
+        ${ISSUE_TYPES.map(t=>`<div class="chip" data-type="${t}" onclick="selIssType(this,${projId},${id})">${t}</div>`).join('')}
       </div>
       <input type="hidden" id="ib-type-${projId}-${id}">
     </div>
-    <div class="field">
-      <div class="lbl" style="font-size:10px">Description</div>
-      <textarea id="ib-desc-${projId}-${id}" oninput="generateAllWA()" placeholder="Describe the issue…" style="min-height:50px"></textarea>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <div class="lbl" style="font-size:10px">Priority</div>
+    <textarea id="ib-desc-${projId}-${id}" oninput="generateAllWA()" placeholder="Describe the issue…" style="min-height:50px;margin-bottom:8px"></textarea>
+    <div class="field-row" style="margin-bottom:0">
+      <div>
+        <div class="lbl" style="font-size:10px;margin-bottom:4px">Priority</div>
         <div class="pri-btns">
           <div class="pri-btn" id="ibp-1-${projId}-${id}" onclick="setIBPri(${projId},${id},1)">Low</div>
           <div class="pri-btn on-2" id="ibp-2-${projId}-${id}" onclick="setIBPri(${projId},${id},2)">Med</div>
@@ -593,36 +575,36 @@ function addIssueBlock(projId) {
         </div>
         <input type="hidden" id="ib-pri-${projId}-${id}" value="2">
       </div>
-      <div class="field">
-        <div class="lbl" style="font-size:10px">Target Date</div>
+      <div>
+        <div class="lbl" style="font-size:10px;margin-bottom:4px">Target Date</div>
         <input type="date" id="ib-date-${projId}-${id}">
       </div>
     </div>`;
-  document.getElementById(`pb-issues-list-${projId}`).appendChild(div);
+  document.getElementById(`pb-iss-${projId}`).appendChild(div);
 }
 
-function selectIssType(el, projId, id) {
+function selIssType(el,pId,iId){
   el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');
-  document.getElementById(`ib-type-${projId}-${id}`).value = el.dataset.type;
+  document.getElementById(`ib-type-${pId}-${iId}`).value=el.dataset.type;
   generateAllWA();
 }
 
-function setIBPri(projId, id, val) {
+function setIBPri(pId,iId,val){
   [1,2,3].forEach(n=>{
-    document.getElementById(`ibp-${n}-${projId}-${id}`).className = 'pri-btn' + (n===val?` on-${n}`:'');
+    document.getElementById(`ibp-${n}-${pId}-${iId}`).className='pri-btn'+(n===val?` on-${n}`:'');
   });
-  document.getElementById(`ib-pri-${projId}-${id}`).value = val;
+  document.getElementById(`ib-pri-${pId}-${iId}`).value=val;
 }
 
 // ── Decisions ──────────────────────────────────────────────
-function addDecision() {
+function addDecision(){
   decCount++;
-  const id  = decCount;
-  const div = document.createElement('div');
-  div.style.cssText = 'background:var(--blue-bg);border:1.5px solid #BBDEFB;border-radius:8px;padding:12px;margin-bottom:8px;';
-  div.id = `dc-${id}`;
-  div.innerHTML = `
+  const id=decCount;
+  const div=document.createElement('div');
+  div.id=`dc-${id}`;
+  div.style.cssText='background:var(--blue-bg);border:1.5px solid #BBDEFB;border-radius:8px;padding:11px;margin-bottom:8px;';
+  div.innerHTML=`
     <div style="display:flex;justify-content:space-between;margin-bottom:6px">
       <span style="font-size:11px;font-weight:700;color:var(--blue)">Decision ${id}</span>
       <button style="background:rgba(21,101,192,0.1);border:1px solid #BBDEFB;color:var(--blue);font-size:10px;padding:2px 7px;border-radius:5px;cursor:pointer" onclick="document.getElementById('dc-${id}').remove()">✕</button>
@@ -631,247 +613,196 @@ function addDecision() {
   document.getElementById('decisions-list').appendChild(div);
 }
 
-// ── Collect project data ───────────────────────────────────
-function collectProjects() {
-  const blocks = document.querySelectorAll('.proj-block');
-  const result = [];
-  blocks.forEach(b => {
-    const id   = b.id.replace('pb-','');
-    const proj = document.getElementById(`pb-proj-${id}`)?.value||'';
-    if (!proj) return;
-
-    const stages = [...b.querySelectorAll('.chips .chip.on')].map(c=>c.textContent).join(', ');
-    const trackVal = b.dataset.track || 'Yes';
-
-    // Collect issues in this block
-    const issueBlocks = b.querySelectorAll('.iss-block');
-    const issues = [];
-    issueBlocks.forEach(ib => {
-      const ibId = ib.id; // ib-{projId}-{issId}
-      const parts = ibId.split('-');
-      const pId = parts[1], iId = parts[2];
-      const desc = document.getElementById(`ib-desc-${pId}-${iId}`)?.value?.trim()||'';
-      if (!desc) return;
+// ── Collect data ───────────────────────────────────────────
+function collectProjects(){
+  const result=[];
+  document.querySelectorAll('.proj-block').forEach(b=>{
+    const id=b.id.replace('pb-','');
+    const proj=document.getElementById(`pb-proj-${id}`)?.value||'';
+    if(!proj) return;
+    const stages=[...b.querySelectorAll('.chips .chip.on')].map(c=>c.textContent).join(', ');
+    const procNotes=(document.getElementById(`pb-proc-${id}`)?.value||'').trim();
+    // Split procurement notes into materials/delays — send full text to materials col
+    const issues=[];
+    b.querySelectorAll('.iss-block').forEach(ib=>{
+      const parts=ib.id.split('-');
+      const pId=parts[1],iId=parts[2];
+      const desc=(document.getElementById(`ib-desc-${pId}-${iId}`)?.value||'').trim();
+      if(!desc) return;
       issues.push({
-        issueType  : document.getElementById(`ib-type-${pId}-${iId}`)?.value||'General',
-        description: desc,
-        assignedTo : leadName,
-        priority   : parseInt(document.getElementById(`ib-pri-${pId}-${iId}`)?.value||2),
-        targetDate : document.getElementById(`ib-date-${pId}-${iId}`)?.value||'',
-        reportedBy : leadName,
+        issueType  :document.getElementById(`ib-type-${pId}-${iId}`)?.value||'General',
+        description:desc,
+        assignedTo :leadName,
+        priority   :parseInt(document.getElementById(`ib-pri-${pId}-${iId}`)?.value||2),
+        targetDate :document.getElementById(`ib-date-${pId}-${iId}`)?.value||'',
+        reportedBy :leadName,
       });
     });
-
     result.push({
-      id,
-      project       : proj,
-      date          : document.getElementById('f-date')?.value||'',
-      lead          : leadName,
-      siteVisit     : document.getElementById(`pb-sv-yes-${id}`)?.classList.contains('on-yes')?'Yes':'No',
-      stage         : stages,
-      worksToday    : document.getElementById(`pb-works-${id}`)?.value?.trim()||'',
-      pctPlan       : parseInt(document.getElementById(`pb-pctplan-${id}`)?.value)||0,
-      pctOverall    : parseInt(document.getElementById(`pb-pctover-${id}`)?.value)||0,
-      workTomorrow  : document.getElementById(`pb-tomorrow-${id}`)?.value?.trim()||'',
-      onTrack       : trackVal,
-      delayReason   : document.getElementById(`pb-delayreason-${id}`)?.value?.trim()||'',
-      idleTime      : 'No',
-      idleReason    : '',
-      materials     : document.getElementById(`pb-materials-${id}`)?.value?.trim()||'',
-      materialDelays: document.getElementById(`pb-matdelays-${id}`)?.value?.trim()||'',
-      clientUpdated : document.getElementById(`pb-cl-yes-${id}`)?.classList.contains('on-yes')?'Yes':'No',
-      clientConcerns: document.getElementById(`pb-clconcerns-${id}`)?.value?.trim()||'',
-      blocking      : document.getElementById(`pb-blocking-${id}`)?.value?.trim()||'',
+      id,proj,
+      siteVisit   :document.getElementById(`pb-sv-${id}`)?.checked?'Yes':'No',
+      stage       :stages,
+      worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
+      pctPlan     :parseInt(document.getElementById(`pb-pctplan-${id}`)?.value)||0,
+      pctOverall  :parseInt(document.getElementById(`pb-pctover-${id}`)?.value)||0,
+      workTomorrow:(document.getElementById(`pb-tomorrow-${id}`)?.value||'').trim(),
+      blocking    :(document.getElementById(`pb-blocking-${id}`)?.value||'').trim(),
+      onTrack     :b.dataset.track||'Yes',
+      delayReason :(document.getElementById(`pb-dr-${id}`)?.value||'').trim(),
+      materials   :procNotes,
+      materialDelays:'',
+      clientUpdated:document.getElementById(`pb-cl-yes-${id}`)?.classList.contains('on-yes')?'Yes':'No',
+      clientConcerns:(document.getElementById(`pb-clc-${id}`)?.value||'').trim(),
       issues,
     });
   });
   return result;
 }
 
-function collectDecisions() {
-  const decs = [];
-  document.querySelectorAll('[id^="dc-"]').forEach(d => {
-    const id = d.id.replace('dc-','');
-    const desc = document.getElementById(`dc-desc-${id}`)?.value?.trim()||'';
-    if (desc) decs.push({description:desc});
+function collectDecisions(){
+  const decs=[];
+  document.querySelectorAll('[id^="dc-"]').forEach(d=>{
+    const id=d.id.replace('dc-','');
+    const desc=(document.getElementById(`dc-desc-${id}`)?.value||'').trim();
+    if(desc) decs.push({description:desc});
   });
   return decs;
 }
 
-// ── Generate WA messages ───────────────────────────────────
-function generateWAForProject(projData) {
-  const date    = document.getElementById('f-date')?.value||new Date().toISOString().substring(0,10);
-  const dateStr2= new Date(date+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const statusEmoji = projData.onTrack==='Yes'?'✅ On Track':projData.onTrack==='At Risk'?'⚠️ At Risk':'🔴 Delayed';
+// ── WhatsApp generation ────────────────────────────────────
+function generateWAForProject(p){
+  const date=document.getElementById('f-date')?.value||new Date().toISOString().substring(0,10);
+  const ds=new Date(date+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const statusEmoji=p.onTrack==='Yes'?'✅ On Track':p.onTrack==='At Risk'?'⚠️ At Risk':'🔴 Delayed';
+  const nonDesign=p.issues.filter(i=>i.issueType!=='Design');
+  const design=p.issues.filter(i=>i.issueType==='Design');
 
-  // Escalated issues for this project — prefix URGENT
-  const escalatedIssues = Object.entries(issueActions)
-    .filter(([,v])=>v.action==='escalate')
-    .map(([id])=>id);
+  // Check escalated issues for this project (from open issues panel)
+  const escIssues=Object.entries(issueActions)
+    .filter(([,v])=>v.action==='escalate').map(([id])=>id);
 
-  const nonDesign = projData.issues.filter(i=>i.issueType!=='Design');
-  const design    = projData.issues.filter(i=>i.issueType==='Design');
-
-  let msg = `*Project Update — ${projData.project}*\n`;
-  msg += `*Date:* ${dateStr2} | *Lead:* ${leadName}\n\n`;
-  if (projData.worksToday) msg += `*Today\'s Progress:*\n${projData.worksToday}\n\n`;
-  msg += `*Site Status:* ${statusEmoji}\n`;
-  if (projData.delayReason) msg += `*Reason:* ${projData.delayReason}\n`;
-  msg += '\n';
-  if (projData.workTomorrow) msg += `*Work Planned Tomorrow:*\n${projData.workTomorrow}\n\n`;
-
-  if (nonDesign.length) {
-    msg += `*Issues Requiring Attention:*\n`;
-    nonDesign.forEach((iss,i)=>{
-      msg += `${i+1}. [${iss.issueType}] ${iss.description}\n`;
-    });
-    msg += '\n';
+  let msg=`*Project Update — ${p.proj}*\n*Date:* ${ds} | *Lead:* ${leadName}\n\n`;
+  if(p.worksToday) msg+=`*Today\'s Progress:*\n${p.worksToday}\n\n`;
+  msg+=`*Site Status:* ${statusEmoji}\n`;
+  if(p.delayReason) msg+=`*Reason:* ${p.delayReason}\n`;
+  msg+='\n';
+  if(p.workTomorrow) msg+=`*Work Planned Tomorrow:*\n${p.workTomorrow}\n\n`;
+  if(p.blocking) msg+=`*Blocking Tomorrow:*\n${p.blocking}\n\n`;
+  if(nonDesign.length){
+    msg+=`*Issues Requiring Attention:*\n`;
+    nonDesign.forEach((iss,i)=>{ msg+=`${i+1}. [${iss.issueType}] ${iss.description}\n`; });
+    msg+='\n';
   }
-
-  if (design.length) {
-    msg += `*Design Deliverables Required:*\n`;
-    design.forEach((iss,i)=>{
-      msg += `${i+1}. [Design] ${iss.description}\n`;
-    });
-    msg += '\n';
+  if(design.length){
+    msg+=`*Design Deliverables Required:*\n`;
+    design.forEach((iss,i)=>{ msg+=`${i+1}. [Design] ${iss.description}\n`; });
+    msg+='\n';
   }
-
-  if (projData.materials) msg += `*Materials Required (3-5 days):*\n${projData.materials}\n\n`;
-  if (projData.materialDelays) msg += `*Material Delays:*\n${projData.materialDelays}\n\n`;
-  if (projData.blocking) msg += `*Blocking Tomorrow:*\n${projData.blocking}\n\n`;
-  msg += `— Ideaform Design Studio`;
+  if(p.materials) msg+=`*Procurement Notes:*\n${p.materials}\n\n`;
+  msg+=`— Ideaform Design Studio`;
   return msg;
 }
 
-function generateAllWA() {
-  const projData = collectProjects();
-  const container = document.getElementById('wa-messages-list');
-  if (!projData.length) {
-    container.innerHTML = '<div class="no-issues">Add project reports above to generate messages…</div>';
+function generateAllWA(){
+  const projs=collectProjects();
+  const container=document.getElementById('wa-list');
+  if(!projs.length){
+    container.innerHTML='<div class="no-issues">Add project reports above to generate messages…</div>';
     return;
   }
-  container.innerHTML = projData.map((p,i) => {
-    const msg = generateWAForProject(p);
+  container.innerHTML=projs.map(p=>{
+    const msg=generateWAForProject(p);
     return `<div class="wa-block">
-      <div class="wa-block-header">
-        <span style="font-size:16px">💬</span>
-        <span class="wa-proj-name">${p.project||'Project '+(i+1)}</span>
-      </div>
-      <textarea class="wa-textarea" id="wa-msg-${p.id}" readonly onclick="this.select()">${msg}</textarea>
-      <button class="copy-btn-sm" onclick="copyWA('wa-msg-${p.id}')">📋 Copy Message</button>
+      <div class="wa-proj-name">💬 ${p.proj||'Project'}</div>
+      <textarea class="wa-textarea" id="wa-${p.id}" readonly onclick="this.select()">${msg}</textarea>
+      <button class="copy-btn-sm" onclick="copyWA('wa-${p.id}')">📋 Copy Message</button>
     </div>`;
   }).join('');
 }
 
-function copyWA(id) {
-  const ta = document.getElementById(id);
-  if (!ta) return;
-  navigator.clipboard.writeText(ta.value).then(()=>toast('Copied!')).catch(()=>{
-    ta.select(); document.execCommand('copy'); toast('Copied!');
-  });
+function copyWA(id){
+  const ta=document.getElementById(id);
+  navigator.clipboard.writeText(ta.value).then(()=>toast('Copied!')).catch(()=>{ta.select();document.execCommand('copy');toast('Copied!');});
 }
 
-// ── Submit all ─────────────────────────────────────────────
-async function submitAll() {
-  if (!googleUser) { toast('Please sign in'); return; }
-  const projData = collectProjects();
-  if (!projData.length) { toast('Add at least one project report'); return; }
+// ── Submit ─────────────────────────────────────────────────
+async function submitAll(){
+  if(!googleUser){toast('Sign in first');return;}
+  const projs=collectProjects();
+  if(!projs.length){toast('Add at least one project report');return;}
+  const decs=collectDecisions();
+  const date=document.getElementById('f-date')?.value||'';
 
-  const decisions = collectDecisions();
-  const date = document.getElementById('f-date')?.value||'';
-
-  document.getElementById('submit-btn').disabled = true;
-  document.getElementById('submit-status').textContent = 'Submitting…';
+  document.getElementById('submit-btn').disabled=true;
+  document.getElementById('submit-status').textContent='Submitting…';
 
   try {
-    // 1. Submit issue actions (resolve/escalate/delay)
-    for (const [issueId, action] of Object.entries(issueActions)) {
-      const newStatus = action.action === 'resolve' ? 'Resolved'
-                      : action.action === 'escalate' ? 'Escalated' : 'Open';
-      await fetch(APPS_SCRIPT_URL, {
-        method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({
-          action:'updateIssueStatus',
-          issueId, status:newStatus,
-          targetDate: action.targetDate||'',
-        })
-      });
+    // 1. Issue actions
+    for(const [issueId,act] of Object.entries(issueActions)){
+      const newStatus=act.action==='resolve'?'Resolved':act.action==='escalate'?'Escalated':'Open';
+      await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'updateIssueStatus',issueId,status:newStatus,targetDate:act.targetDate||''})});
     }
 
-    // 2. Submit each project DPER
-    const subIds = [];
-    for (const p of projData) {
-      const waMsg = document.getElementById(`wa-msg-${p.id}`)?.value||'';
-      const payload = {
-        action        : 'submitDPER',
-        date          : p.date || date,
-        time          : new Date().toTimeString().substring(0,5),
-        project       : p.project,
-        lead          : leadName,
-        siteVisit     : p.siteVisit,
-        stage         : p.stage,
-        worksToday    : p.worksToday,
-        pctPlan       : p.pctPlan,
-        pctOverall    : p.pctOverall,
-        workTomorrow  : p.workTomorrow,
-        onTrack       : p.onTrack,
-        delayReason   : p.delayReason,
-        idleTime      : 'No',
-        idleReason    : '',
-        materials     : p.materials,
-        materialDelays: p.materialDelays,
-        clientUpdated : p.clientUpdated,
-        clientConcerns: p.clientConcerns,
-        blocking      : p.blocking,
-        remarks       : '',
-        issues        : JSON.stringify(p.issues),
-        decisionItems : JSON.stringify(decisions),
-        whatsappMsg   : waMsg,
-      };
-      const r    = await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
-      const data = await r.json();
-      if (data.subId) subIds.push(data.subId);
+    // 2. Each project
+    for(const p of projs){
+      const waMsg=document.getElementById(`wa-${p.id}`)?.value||'';
+      await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({
+          action:'submitDPER', date:p.date||date,
+          time:new Date().toTimeString().substring(0,5),
+          project:p.proj, lead:leadName,
+          siteVisit:p.siteVisit, stage:p.stage,
+          worksToday:p.worksToday, pctPlan:p.pctPlan, pctOverall:p.pctOverall,
+          workTomorrow:p.workTomorrow, onTrack:p.onTrack, delayReason:p.delayReason,
+          idleTime:'No', idleReason:'',
+          materials:p.materials, materialDelays:'',
+          clientUpdated:p.clientUpdated, clientConcerns:p.clientConcerns,
+          blocking:p.blocking, remarks:'',
+          decisions:'', // decisions sent separately below
+          issues:JSON.stringify(p.issues),
+          decisionItems:JSON.stringify(decs),
+          whatsappMsg:waMsg,
+        })});
     }
 
     // Show success
-    document.getElementById('form-body').style.display = 'none';
-    document.getElementById('success-screen').style.display = 'block';
-    document.querySelector('.submit-bar').style.display = 'none';
-    const resolved = Object.values(issueActions).filter(a=>a.action==='resolve').length;
-    const escalated= Object.values(issueActions).filter(a=>a.action==='escalate').length;
-    document.getElementById('success-sub').innerHTML =
-      `${projData.length} project report${projData.length!==1?'s':''} submitted<br>` +
-      (resolved?`${resolved} issue${resolved!==1?'s':''} resolved<br>`:'') +
-      (escalated?`${escalated} issue${escalated!==1?'s':''} escalated`:'');
-  } catch(e) {
-    toast('Error: ' + e.message);
-    document.getElementById('submit-btn').disabled = false;
-    document.getElementById('submit-status').textContent = leadName;
+    document.getElementById('form-body').style.display='none';
+    document.getElementById('success-screen').style.display='block';
+    document.querySelector('.submit-bar').style.display='none';
+    const res=Object.values(issueActions).filter(a=>a.action==='resolve').length;
+    const esc=Object.values(issueActions).filter(a=>a.action==='escalate').length;
+    document.getElementById('success-sub').innerHTML=
+      `${projs.length} project report${projs.length!==1?'s':''} submitted by ${leadName}<br>`+
+      (res?`${res} issue${res!==1?'s':''} resolved · `:'')+(esc?`${esc} escalated`:'');
+  } catch(e){
+    toast('Error: '+e.message);
+    document.getElementById('submit-btn').disabled=false;
+    document.getElementById('submit-status').textContent=leadName;
   }
 }
 
-function resetForm() {
-  document.getElementById('form-body').style.display = '';
-  document.getElementById('success-screen').style.display = 'none';
-  document.querySelector('.submit-bar').style.display = '';
-  document.getElementById('proj-blocks').innerHTML = '';
-  document.getElementById('decisions-list').innerHTML = '';
-  document.getElementById('wa-messages-list').innerHTML = '<div class="no-issues">Add project reports above to generate messages…</div>';
-  projBlockCount = 0; decCount = 0; decCount = 0; issBlockCount = 0;
-  issueActions = {};
-  document.getElementById('submit-btn').disabled = false;
-  document.getElementById('submit-status').textContent = leadName;
+function resetForm(){
+  document.getElementById('form-body').style.display='';
+  document.getElementById('success-screen').style.display='none';
+  document.querySelector('.submit-bar').style.display='';
+  document.getElementById('proj-blocks').innerHTML='';
+  document.getElementById('decisions-list').innerHTML='';
+  document.getElementById('wa-list').innerHTML='<div class="no-issues">Add project reports above to generate messages…</div>';
+  pbCount=0; ibCount=0; decCount=0; issueActions={};
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('submit-status').textContent=leadName;
   loadIssues();
 }
 
-function toast(msg, dur=2500) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.style.display = 'block';
-  setTimeout(()=>t.style.display='none', dur);
+function toast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  setTimeout(()=>t.style.display='none',dur);
 }
 
-window.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById('f-date').value = new Date().toISOString().substring(0,10);
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('f-date').value=new Date().toISOString().substring(0,10);
 });
 </script>
 </body>
