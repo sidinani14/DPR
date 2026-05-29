@@ -238,9 +238,22 @@ textarea{min-height:65px;resize:vertical;}
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
-const ALLOWED_EMAIL   = 'ar.deepaksoni@gmail.com'; // only Deepak can use this form
+// No email restriction — any team member can use this form
 const EMAIL_MAP = {
-  'ar.deepaksoni@gmail.com': 'Deepak Soni',
+  'ar.deepaksoni@gmail.com'     : 'Deepak Soni',
+  'achal.rathore@ideaform.in'   : 'Achal Rathore',
+  'himanshu.malviya@ideaform.in': 'Himanshu Malviya',
+  'poorvi.goyal@ideaform.in'    : 'Poorvi Goyal',
+  'khushi.agrawal@ideaform.in'  : 'Khushi Agrawal',
+  'sahil.maurya@ideaform.in'    : 'Sahil Maurya',
+  'aaditya.koshti@ideaform.in'  : 'Aaditya Koshti',
+  'aman.raghuwanshi@ideaform.in': 'Aman Raghuwanshi',
+  'bhavesh.bhagwat@ideaform.in' : 'Bhavesh Bhagwat',
+  'aashi.agrawal@ideaform.in'   : 'Aashi Agrawal',
+  'siddharth@ideaform.in'       : 'Siddharth Inani',
+  'astha@ideaform.in'           : 'Astha Inani',
+  'simi@ideaform.in'            : 'Simi',
+  'minakshi@ideaform.in'        : 'Minakshi Gokhale',
 };
 const TEAM_MEMBERS = [
   'Achal Rathore','Himanshu Malviya','Deepak Soni','Poorvi Goyal',
@@ -262,10 +275,6 @@ let issueActions  = {}; // issueId → {action, targetDate}
 function onGoogleSignIn(resp) {
   const payload = JSON.parse(atob(resp.credential.split('.')[1]));
   const email   = (payload.email||'').toLowerCase();
-  if (email !== ALLOWED_EMAIL) {
-    toast('Access restricted — this form is for Deepak Soni only', 4000);
-    return;
-  }
   leadName = EMAIL_MAP[email] || payload.name;
   googleUser = {name: leadName, email};
   document.getElementById('user-pill').classList.remove('hidden');
@@ -298,7 +307,7 @@ async function loadIssues() {
   try {
     const r = await fetch(APPS_SCRIPT_URL, {
       method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({action:'getDeepakIssues'})
+      body: JSON.stringify({action:'getDeepakIssues', lead: leadName})
     });
     const data = await r.json();
     renderIssues(data.issues||[]);
