@@ -604,11 +604,15 @@ function addDecision(){
   const div=document.createElement('div');
   div.id=`dc-${id}`;
   div.style.cssText='background:var(--blue-bg);border:1.5px solid #BBDEFB;border-radius:8px;padding:11px;margin-bottom:8px;';
+  const projOpts=projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
   div.innerHTML=`
-    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <span style="font-size:11px;font-weight:700;color:var(--blue)">Decision ${id}</span>
       <button style="background:rgba(21,101,192,0.1);border:1px solid #BBDEFB;color:var(--blue);font-size:10px;padding:2px 7px;border-radius:5px;cursor:pointer" onclick="document.getElementById('dc-${id}').remove()">✕</button>
     </div>
+    <select id="dc-proj-${id}" style="margin-bottom:7px;border-color:#BBDEFB;background:#fff;font-size:12px;padding:7px 10px">
+      <option value="">Select project…</option>${projOpts}
+    </select>
     <textarea id="dc-desc-${id}" placeholder="What decision is needed from Siddharth sir?" style="min-height:50px;border-color:#BBDEFB"></textarea>`;
   document.getElementById('decisions-list').appendChild(div);
 }
@@ -664,7 +668,8 @@ function collectDecisions(){
   document.querySelectorAll('[id^="dc-"]').forEach(d=>{
     const id=d.id.replace('dc-','');
     const desc=(document.getElementById(`dc-desc-${id}`)?.value||'').trim();
-    if(desc) decs.push({description:desc});
+    const proj=(document.getElementById(`dc-proj-${id}`)?.value||'').trim();
+    if(desc) decs.push({description:desc, project:proj});
   });
   return decs;
 }
