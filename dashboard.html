@@ -297,8 +297,12 @@ function renderHeatmap() {
     members.forEach(name => {
       const wkTgt  = TEAM_TARGETS[name] || 50;
       const donePts = doneTasks
-        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                    t.selfStatusDate >= weekDays[0] && t.selfStatusDate <= weekDays[5])
+        .filter(t=> {
+          if (!t.assignedTo.split(',').map(a=>a.trim()).includes(name)) return false;
+          // Use actualCompletion if available, fall back to selfStatusDate (mirrors script doneOn logic)
+          const doneOn = t.actualCompletion || t.selfStatusDate || '';
+          return doneOn >= weekDays[0] && doneOn <= weekDays[5];
+        })
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
       const pendPts = openTasks
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
