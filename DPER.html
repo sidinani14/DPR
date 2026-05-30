@@ -155,6 +155,12 @@ textarea{min-height:62px;resize:vertical;}
 .no-issues{text-align:center;padding:20px;color:var(--text3);font-size:13px;}
 .resolved-section-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border);}
 .toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;z-index:999;display:none;}
+.draft-banner{background:#FFF8E1;border:1.5px solid #FFE082;border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;display:none;}
+.draft-banner-title{font-size:13px;font-weight:700;color:#7A5000;margin-bottom:4px;}
+.draft-banner-sub{font-size:11px;color:#A0522D;margin-bottom:10px;}
+.draft-banner-btns{display:flex;gap:8px;}
+.draft-resume{padding:8px 18px;background:#F5A623;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.draft-discard{padding:8px 18px;background:transparent;color:#7A5000;border:1.5px solid #FFE082;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;}
 </style>
 </head>
 <body>
@@ -183,6 +189,16 @@ textarea{min-height:62px;resize:vertical;}
   </div>
 
   <div id="form-body">
+
+  <!-- Draft restore banner -->
+  <div class="draft-banner" id="draft-banner">
+    <div class="draft-banner-title">📋 Unsaved draft found</div>
+    <div class="draft-banner-sub" id="draft-banner-sub">Resume where you left off?</div>
+    <div class="draft-banner-btns">
+      <button class="draft-resume" onclick="resumeDraft()">Resume Draft</button>
+      <button class="draft-discard" onclick="discardDraft()">Start Fresh</button>
+    </div>
+  </div>
 
   <!-- S0: Open Issues -->
   <div class="section">
@@ -415,102 +431,7 @@ function addProjectBlock() {
 
   const projOpts = projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
 
-  div.innerHTML = `
-    <!-- Header row: number + project + site visit + remove -->
-    <div class="pb-header">
-      <span class="pb-num">${id}</span>
-      <select class="pb-proj-select" id="pb-proj-${id}" onchange="generateAllWA()">
-        <option value="">Select project…</option>${projOpts}
-      </select>
-      <label class="pb-visit-check">
-        <input type="checkbox" id="pb-sv-${id}" onchange="generateAllWA()"> Site Visit
-      </label>
-      <button class="remove-pb" onclick="removePB(${id})">✕</button>
-    </div>
-
-    <!-- Stage chips -->
-    <div class="field">
-      <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
-      <div class="chips" id="pb-stages-${id}">
-        ${STAGES.map(s=>`<div class="chip" onclick="this.classList.toggle('on');generateAllWA()">${s}</div>`).join('')}
-      </div>
-    </div>
-
-    <!-- Works today -->
-    <div class="field">
-      <div class="lbl">Works Completed Today</div>
-      <textarea id="pb-works-${id}" oninput="generateAllWA()" placeholder="Describe work done today…"></textarea>
-    </div>
-
-    <!-- % inputs -->
-    <div class="pct-row">
-      <div class="pct-field">
-        <div class="lbl">% Works per Plan</div>
-        <div class="pct-input-wrap">
-          <input type="number" id="pb-pctplan-${id}" min="0" max="100" value="0" oninput="generateAllWA()">
-          <span class="pct-label">%</span>
-        </div>
-      </div>
-      <div class="pct-field">
-        <div class="lbl">% Overall Completion</div>
-        <div class="pct-input-wrap">
-          <input type="number" id="pb-pctover-${id}" min="0" max="100" value="0" oninput="generateAllWA()">
-          <span class="pct-label">%</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tomorrow + blocker toggle -->
-    <div class="field">
-      <div class="lbl">Work Planned for Tomorrow</div>
-      <textarea id="pb-tomorrow-${id}" oninput="generateAllWA()" placeholder="What is planned for tomorrow?"></textarea>
-      <label class="blocker-toggle">
-        <input type="checkbox" id="pb-blk-chk-${id}" onchange="toggleBlocker(${id})"> Any blockers?
-      </label>
-      <div class="blocker-field" id="pb-blk-${id}">
-        <input type="text" id="pb-blocking-${id}" oninput="generateAllWA()" placeholder="What might block tomorrow's work?">
-      </div>
-    </div>
-
-    <!-- On track -->
-    <div class="field">
-      <div class="lbl">Is Work on Track?</div>
-      <div class="track-btns">
-        <div class="track-btn on-yes" id="pb-tr-yes-${id}" onclick="setPBTrack(${id},'Yes')">✅ On Track</div>
-        <div class="track-btn" id="pb-tr-risk-${id}" onclick="setPBTrack(${id},'At Risk')">⚠️ At Risk</div>
-        <div class="track-btn" id="pb-tr-delay-${id}" onclick="setPBTrack(${id},'Delayed')">🔴 Delayed</div>
-      </div>
-    </div>
-    <div class="field hidden" id="pb-drf-${id}">
-      <div class="lbl">Reason for Delay / Risk</div>
-      <textarea id="pb-dr-${id}" oninput="generateAllWA()" placeholder="Specify reason…" style="min-height:50px"></textarea>
-    </div>
-
-    <!-- Procurement notes (merged) -->
-    <div class="field">
-      <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
-      <textarea id="pb-proc-${id}" oninput="generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
-    </div>
-
-    <!-- Client updated -->
-    <div class="field">
-      <div class="lbl">Was Client Updated?</div>
-      <div class="yn-btns">
-        <div class="yn-btn" id="pb-cl-yes-${id}" onclick="setPBYN(${id},'cl','yes')">Yes</div>
-        <div class="yn-btn on-no" id="pb-cl-no-${id}" onclick="setPBYN(${id},'cl','no')">No</div>
-      </div>
-    </div>
-    <div class="field hidden" id="pb-clc-f-${id}">
-      <div class="lbl">Client Concerns / Inputs</div>
-      <textarea id="pb-clc-${id}" oninput="generateAllWA()" placeholder="Any concerns from client?" style="min-height:50px"></textarea>
-    </div>
-
-    <!-- Issues -->
-    <div class="field">
-      <div class="lbl">Issues on Site</div>
-      <div id="pb-iss-${id}"></div>
-      <button class="add-btn" onclick="addIssueBlock(${id})">+ Add Issue</button>
-    </div>`;
+  div.innerHTML = buildPBInnerHTML(id, projOpts);
 
   document.getElementById('proj-blocks').appendChild(div);
   generateAllWA();
@@ -771,6 +692,8 @@ async function submitAll(){
         })});
     }
 
+    // Clear draft on successful submit
+    clearDraft();
     // Show success
     document.getElementById('form-body').style.display='none';
     document.getElementById('success-screen').style.display='block';
@@ -797,6 +720,7 @@ function resetForm(){
   pbCount=0; ibCount=0; decCount=0; issueActions={};
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('submit-status').textContent=leadName;
+  clearDraft();
   loadIssues();
 }
 
@@ -809,6 +733,301 @@ function toast(msg,dur=2500){
 window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-date').value=new Date().toISOString().substring(0,10);
 });
+
+// ── Draft auto-save ───────────────────────────────────────
+let draftKey   = 'dper_draft_anonymous';
+let autoSaveTimer = null;
+
+function getDraftKey() {
+  return googleUser ? 'dper_draft_' + googleUser.email : 'dper_draft_anonymous';
+}
+
+function saveDraft() {
+  if (!googleUser) return;
+  const draft = collectDraftData();
+  try {
+    localStorage.setItem(getDraftKey(), JSON.stringify(draft));
+  } catch(e) { console.warn('Draft save failed:', e); }
+}
+
+function collectDraftData() {
+  // Collect all project block data
+  const blocks = [];
+  document.querySelectorAll('.proj-block').forEach(b => {
+    const id = b.id.replace('pb-','');
+    const stageChips = [...b.querySelectorAll('.chips .chip.on')].map(c => c.textContent);
+    // Collect issue blocks
+    const issues = [];
+    b.querySelectorAll('.iss-block').forEach(ib => {
+      const parts = ib.id.split('-');
+      const pId = parts[1], iId = parts[2];
+      issues.push({
+        type     : document.getElementById('ib-type-'+pId+'-'+iId)?.value||'',
+        desc     : document.getElementById('ib-desc-'+pId+'-'+iId)?.value||'',
+        pri      : document.getElementById('ib-pri-'+pId+'-'+iId)?.value||'2',
+        date     : document.getElementById('ib-date-'+pId+'-'+iId)?.value||'',
+        activeType: [...ib.querySelectorAll('.chip.on')].map(c=>c.dataset.type||c.textContent)[0]||'',
+      });
+    });
+    blocks.push({
+      id,
+      proj        : document.getElementById('pb-proj-'+id)?.value||'',
+      sv          : document.getElementById('pb-sv-'+id)?.checked||false,
+      stageChips,
+      works       : document.getElementById('pb-works-'+id)?.value||'',
+      pctPlan     : document.getElementById('pb-pctplan-'+id)?.value||'0',
+      pctOver     : document.getElementById('pb-pctover-'+id)?.value||'0',
+      tomorrow    : document.getElementById('pb-tomorrow-'+id)?.value||'',
+      blockerOn   : document.getElementById('pb-blk-chk-'+id)?.checked||false,
+      blocking    : document.getElementById('pb-blocking-'+id)?.value||'',
+      track       : b.dataset.track||'Yes',
+      delayReason : document.getElementById('pb-dr-'+id)?.value||'',
+      proc        : document.getElementById('pb-proc-'+id)?.value||'',
+      clientYes   : document.getElementById('pb-cl-yes-'+id)?.classList.contains('on-yes')||false,
+      clientCon   : document.getElementById('pb-clc-'+id)?.value||'',
+      issues,
+    });
+  });
+  // Decisions
+  const decisions = [];
+  document.querySelectorAll('[id^="dc-"]').forEach(d => {
+    const id = d.id.replace('dc-','');
+    decisions.push({
+      proj: document.getElementById('dc-proj-'+id)?.value||'',
+      desc: document.getElementById('dc-desc-'+id)?.value||'',
+    });
+  });
+  return {
+    savedAt  : new Date().toISOString(),
+    date     : document.getElementById('f-date')?.value||'',
+    blocks,
+    decisions,
+    issueActions,
+    pbCount, ibCount, decCount,
+  };
+}
+
+function startAutoSave() {
+  if (autoSaveTimer) clearInterval(autoSaveTimer);
+  autoSaveTimer = setInterval(saveDraft, 60000); // every 60 seconds
+}
+
+function checkForDraft() {
+  // Called after sign-in to check if a draft exists for this user
+  const key = getDraftKey();
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    if (!draft || !draft.blocks || draft.blocks.length === 0) return;
+    // Show restore banner
+    const savedAt = new Date(draft.savedAt);
+    const minsAgo = Math.round((Date.now() - savedAt.getTime()) / 60000);
+    const timeLabel = minsAgo < 2 ? 'just now'
+                    : minsAgo < 60 ? minsAgo + ' min ago'
+                    : Math.round(minsAgo/60) + ' hr ago';
+    document.getElementById('draft-banner-sub').textContent =
+      'Last saved ' + timeLabel + ' · ' + draft.blocks.length + ' project report' +
+      (draft.blocks.length !== 1 ? 's' : '');
+    document.getElementById('draft-banner').style.display = 'block';
+    // Store for resume
+    window._pendingDraft = draft;
+  } catch(e) { console.warn('Draft check failed:', e); }
+}
+
+function resumeDraft() {
+  const draft = window._pendingDraft;
+  if (!draft) return;
+  document.getElementById('draft-banner').style.display = 'none';
+
+  // Set date
+  if (draft.date) document.getElementById('f-date').value = draft.date;
+
+  // Restore counters
+  pbCount   = draft.pbCount   || 0;
+  ibCount   = draft.ibCount   || 0;
+  decCount  = draft.decCount  || 0;
+  issueActions = draft.issueActions || {};
+
+  // Restore project blocks
+  draft.blocks.forEach(b => {
+    // Add block using existing addProjectBlock logic manually
+    const id = b.id;
+    const div = document.createElement('div');
+    div.className = 'proj-block'; div.id = 'pb-'+id;
+    const projOpts = projects.map(p =>
+      '<option value="'+p.name+'"'+(p.name===b.proj?' selected':'')+'>'+p.name+'</option>').join('');
+    div.innerHTML = buildPBInnerHTML(id, projOpts);
+    document.getElementById('proj-blocks').appendChild(div);
+
+    // Set values
+    if (b.sv) document.getElementById('pb-sv-'+id).checked = true;
+    document.getElementById('pb-works-'+id).value    = b.works||'';
+    document.getElementById('pb-pctplan-'+id).value  = b.pctPlan||0;
+    document.getElementById('pb-pctover-'+id).value  = b.pctOver||0;
+    document.getElementById('pb-tomorrow-'+id).value = b.tomorrow||'';
+    document.getElementById('pb-proc-'+id).value     = b.proc||'';
+    document.getElementById('pb-dr-'+id).value       = b.delayReason||'';
+    document.getElementById('pb-clc-'+id).value      = b.clientCon||'';
+
+    // Stage chips
+    const chipsEl = document.getElementById('pb-stages-'+id);
+    if (chipsEl && b.stageChips) {
+      chipsEl.querySelectorAll('.chip').forEach(c => {
+        if (b.stageChips.includes(c.textContent)) c.classList.add('on');
+      });
+    }
+
+    // On track
+    setPBTrack(id, b.track||'Yes');
+
+    // Client
+    if (b.clientYes) {
+      setPBYN(id, 'cl', 'yes');
+    }
+
+    // Blocker
+    if (b.blockerOn) {
+      const chk = document.getElementById('pb-blk-chk-'+id);
+      if (chk) { chk.checked = true; toggleBlocker(id); }
+      const blkInput = document.getElementById('pb-blocking-'+id);
+      if (blkInput) blkInput.value = b.blocking||'';
+    }
+
+    // Issue blocks
+    if (b.issues && b.issues.length) {
+      b.issues.forEach(iss => {
+        addIssueBlock(id);
+        const curIbId = ibCount;
+        if (iss.desc) document.getElementById('ib-desc-'+id+'-'+curIbId).value = iss.desc;
+        if (iss.date) document.getElementById('ib-date-'+id+'-'+curIbId).value = iss.date;
+        if (iss.pri)  {
+          document.getElementById('ib-pri-'+id+'-'+curIbId).value = iss.pri;
+          setIBPri(id, curIbId, parseInt(iss.pri));
+        }
+        // Restore chip selection
+        const ibEl = document.getElementById('ib-'+id+'-'+curIbId);
+        if (ibEl && iss.activeType) {
+          ibEl.querySelectorAll('.chip').forEach(c => {
+            if ((c.dataset.type||c.textContent) === iss.activeType) {
+              selIssType(c, id, curIbId);
+            }
+          });
+        }
+      });
+    }
+  });
+
+  // Restore decisions
+  if (draft.decisions && draft.decisions.length) {
+    draft.decisions.forEach(dec => {
+      addDecision();
+      const curDecId = decCount;
+      if (dec.proj) {
+        const sel = document.getElementById('dc-proj-'+curDecId);
+        if (sel) sel.value = dec.proj;
+      }
+      if (dec.desc) document.getElementById('dc-desc-'+curDecId).value = dec.desc;
+    });
+  }
+
+  generateAllWA();
+  toast('Draft restored ✓');
+}
+
+function discardDraft() {
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  document.getElementById('draft-banner').style.display = 'none';
+  window._pendingDraft = null;
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  if (autoSaveTimer) { clearInterval(autoSaveTimer); autoSaveTimer = null; }
+}
+
+// Build project block inner HTML (extracted for reuse in resumeDraft)
+function buildPBInnerHTML(id, projOpts) {
+  return `
+    <div class="pb-header">
+      <span class="pb-num">${id}</span>
+      <select class="pb-proj-select" id="pb-proj-${id}" onchange="saveDraft();generateAllWA()">
+        <option value="">Select project…</option>${projOpts}
+      </select>
+      <label class="pb-visit-check">
+        <input type="checkbox" id="pb-sv-${id}" onchange="saveDraft();generateAllWA()"> Site Visit
+      </label>
+      <button class="remove-pb" onclick="removePB(${id})">✕</button>
+    </div>
+    <div class="field">
+      <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
+      <div class="chips" id="pb-stages-${id}">
+        ${STAGES.map(s=>`<div class="chip" onclick="this.classList.toggle('on');saveDraft();generateAllWA()">${s}</div>`).join('')}
+      </div>
+    </div>
+    <div class="field">
+      <div class="lbl">Works Completed Today</div>
+      <textarea id="pb-works-${id}" oninput="saveDraft();generateAllWA()" placeholder="Describe work done today…"></textarea>
+    </div>
+    <div class="pct-row">
+      <div class="pct-field">
+        <div class="lbl">% Works per Plan</div>
+        <div class="pct-input-wrap">
+          <input type="number" id="pb-pctplan-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()">
+          <span class="pct-label">%</span>
+        </div>
+      </div>
+      <div class="pct-field">
+        <div class="lbl">% Overall Completion</div>
+        <div class="pct-input-wrap">
+          <input type="number" id="pb-pctover-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()">
+          <span class="pct-label">%</span>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="lbl">Work Planned for Tomorrow</div>
+      <textarea id="pb-tomorrow-${id}" oninput="saveDraft();generateAllWA()" placeholder="What is planned for tomorrow?"></textarea>
+      <label class="blocker-toggle">
+        <input type="checkbox" id="pb-blk-chk-${id}" onchange="toggleBlocker(${id})"> Any blockers?
+      </label>
+      <div class="blocker-field" id="pb-blk-${id}">
+        <input type="text" id="pb-blocking-${id}" oninput="saveDraft();generateAllWA()" placeholder="What might block tomorrow's work?">
+      </div>
+    </div>
+    <div class="field">
+      <div class="lbl">Is Work on Track?</div>
+      <div class="track-btns">
+        <div class="track-btn on-yes" id="pb-tr-yes-${id}" onclick="setPBTrack(${id},'Yes')">✅ On Track</div>
+        <div class="track-btn" id="pb-tr-risk-${id}" onclick="setPBTrack(${id},'At Risk')">⚠️ At Risk</div>
+        <div class="track-btn" id="pb-tr-delay-${id}" onclick="setPBTrack(${id},'Delayed')">🔴 Delayed</div>
+      </div>
+    </div>
+    <div class="field hidden" id="pb-drf-${id}">
+      <div class="lbl">Reason for Delay / Risk</div>
+      <textarea id="pb-dr-${id}" oninput="saveDraft();generateAllWA()" placeholder="Specify reason…" style="min-height:50px"></textarea>
+    </div>
+    <div class="field">
+      <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
+      <textarea id="pb-proc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
+    </div>
+    <div class="field">
+      <div class="lbl">Was Client Updated?</div>
+      <div class="yn-btns">
+        <div class="yn-btn" id="pb-cl-yes-${id}" onclick="setPBYN(${id},'cl','yes')">Yes</div>
+        <div class="yn-btn on-no" id="pb-cl-no-${id}" onclick="setPBYN(${id},'cl','no')">No</div>
+      </div>
+    </div>
+    <div class="field hidden" id="pb-clc-f-${id}">
+      <div class="lbl">Client Concerns / Inputs</div>
+      <textarea id="pb-clc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Any concerns from client?" style="min-height:50px"></textarea>
+    </div>
+    <div class="field">
+      <div class="lbl">Issues on Site</div>
+      <div id="pb-iss-${id}"></div>
+      <button class="add-btn" onclick="addIssueBlock(${id})">+ Add Issue</button>
+    </div>`;
+}
 </script>
 </body>
 </html>
