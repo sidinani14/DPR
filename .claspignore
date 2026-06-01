@@ -1,0 +1,7 @@
+**/*.html
+**/*.md
+**/*.json
+!appsscript.json
+*_backup_*.gs
+clasp-auth.js
+Code_backup_25May2026.gs

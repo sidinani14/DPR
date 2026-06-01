@@ -141,7 +141,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
 let projBlockCount = 0;
 let taskCount=0;
@@ -471,88 +471,6 @@ function addTaskToBlock(pid) {
 
 // onProjectChange replaced by onProjBlockChange in multi-project mode
 
-function stageOptions() {
-  return '<option value="">— select task type —</option>'+
-    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
-}
-
-function addTask() {
-  taskCount++;
-  const id  = `tb${taskCount}`;
-  const today = new Date().toISOString().split('T')[0];
-  const div = document.createElement('div');
-  div.className='task-block'; div.id=id;
-  div.innerHTML=`
-    <div class="task-block-head">
-      <div class="task-block-title">TASK ${taskCount}</div>
-      ${taskCount>1?`<button class="task-remove" onclick="removeTask('${id}')">✕ Remove</button>`:''}
-    </div>
-    <div class="task-block-body">
-      <div class="field">
-        <div class="lbl">Task type / stage <span class="req">*</span></div>
-        <select class="t-stage" onchange="recalcAll()">${stageOptions()}</select>
-      </div>
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Area / Space <span class="opt">optional</span></div>
-          <input type="text" class="t-area" placeholder="e.g. Drawing Room, Master Bedroom">
-        </div>
-        <div class="field">
-          <div class="lbl">Drawing name <span class="opt">optional</span></div>
-          <input type="text" class="t-drawing" placeholder="e.g. First Floor Plan, False Ceiling">
-        </div>
-      </div>
-      <div class="row3">
-        <div class="field">
-          <div class="lbl">Units <span class="req">*</span></div>
-          <input type="number" class="t-units" min="1" max="50" value="1" oninput="recalcAll()">
-        </div>
-        <div class="field">
-          <div class="lbl">Target date <span class="req">*</span></div>
-          <input type="date" class="t-date" value="${today}">
-        </div>
-        <div class="field">
-          <div class="lbl">Priority</div>
-          <select class="t-priority">
-            <option value="Low">Low</option>
-            <option value="Medium" selected>Medium</option>
-            <option value="High">High</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Type <span class="opt">optional</span></div>
-        <div class="rev-row">
-          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="" checked><span class="rev-btn orig">Original Task</span></label>
-          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="Internal"><span class="rev-btn int">Internal Revision</span></label>
-          <label class="rev-opt"><input type="radio" name="revtype-${taskCount}" value="Client"><span class="rev-btn cli">Client Revision</span></label>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Instructions <span class="opt">optional</span></div>
-        <textarea class="t-notes" placeholder="What needs to be done, references, quality expectations..."></textarea>
-      </div>
-      <div class="pts-preview">
-        <div class="pts-label">Weighted points for this task</div>
-        <div class="pts-val t-pts-display">—</div>
-      </div>
-    </div>`;
-  document.getElementById('task-blocks').appendChild(div);
-  updateTaskCount(); recalcAll();
-}
-
-function removeTask(id) {
-  document.getElementById(id).remove();
-  taskCount=document.querySelectorAll('.task-block').length;
-  document.querySelectorAll('.task-block-title').forEach((el,i)=>el.textContent=`TASK ${i+1}`);
-  updateTaskCount(); recalcAll();
-}
-
-function updateTaskCount() {
-  const n=document.querySelectorAll('.task-block').length;
-  document.getElementById('task-count').textContent=`${n} task${n!==1?'s':''}`;
-}
-
 function recalcAll() {
   let total=0, taskCount=0;
   document.querySelectorAll('.card[id^="pb"]').forEach(pb => {
@@ -639,6 +557,7 @@ async function submitTasks() {
       for (let pi=0; pi<allPayloads.length; pi++) {
         await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
+          headers: {'Content-Type': 'text/plain'},
           body: JSON.stringify(allPayloads[pi]),
         });
       }

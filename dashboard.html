@@ -17,7 +17,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .filter-sel{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 28px 7px 10px;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235A5652' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
 .refresh-btn{padding:7px 12px;font-size:11px;color:var(--accent);background:var(--accent-light);border:1px solid var(--accent-light);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif}
 .metrics{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px}
-.metrics-inner{max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden}
+.metrics-inner{max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden}
 .met-cell{background:var(--surface2);padding:10px 14px;text-align:center}
 .met-val{font-size:20px;font-weight:500;color:var(--text);line-height:1;font-family:'DM Mono',monospace}
 .met-val.green{color:var(--green)}.met-val.red{color:var(--red)}.met-val.amber{color:var(--amber)}.met-val.blue{color:var(--blue)}.met-val.purple{color:var(--purple)}
@@ -88,7 +88,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .empty-sub{font-size:13px;color:var(--text2)}
 .skeleton{height:100px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius);margin-bottom:10px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-@media(max-width:500px){.metrics-inner{grid-template-columns:repeat(3,1fr)}.met-cell:nth-child(4),.met-cell:nth-child(5){display:none}}
+@media(max-width:500px){.metrics-inner{grid-template-columns:repeat(3,1fr)}.met-cell:nth-child(4),.met-cell:nth-child(5),.met-cell:nth-child(6){display:none}}
 </style>
 </head>
 <body>
@@ -113,6 +113,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="met-cell"><div class="met-val green" id="m-completed">—</div><div class="met-lbl">Completed</div></div>
     <div class="met-cell"><div class="met-val red" id="m-delayed">—</div><div class="met-lbl">Delayed</div></div>
     <div class="met-cell"><div class="met-val purple" id="m-revision">—</div><div class="met-lbl">Revision</div></div>
+    <div class="met-cell"><div class="met-val" id="m-approval" style="color:var(--amber)">—</div><div class="met-lbl">Approval</div></div>
   </div>
 </div>
 
@@ -155,7 +156,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='';
 
 window.addEventListener('DOMContentLoaded', loadTasks);
@@ -547,7 +548,7 @@ async function loadTasks() {
     // Build project filter based on current member selection
     rebuildProjectFilter();
 
-    updateMetrics(); renderTasks();
+    updateMetrics(); renderTasks(); renderHeatmap();
   } catch(e) {
     document.getElementById('task-list').innerHTML=`<div style="color:var(--red);padding:20px;font-size:13px">Failed: ${e.message}</div>`;
   }
@@ -571,9 +572,8 @@ function updateMetrics() {
   document.getElementById('m-ongoing').textContent   = tasks.filter(t=>t.status==='Ongoing').length;
   document.getElementById('m-completed').textContent = tasks.filter(t=>t.status==='Completed').length;
   document.getElementById('m-delayed').textContent   = tasks.filter(t=>t.status==='Delayed').length;
-  const apEl = document.getElementById('m-approval');
-  if(apEl) apEl.textContent = tasks.filter(t=>t.status==='Approval Pending').length;
   document.getElementById('m-revision').textContent  = tasks.filter(t=>t.status==='Revision Required').length;
+  document.getElementById('m-approval').textContent  = tasks.filter(t=>t.status==='Approval Pending').length;
 }
 
 function filterStatus(s,btn) {

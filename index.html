@@ -323,7 +323,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
+const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 
 let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[];
@@ -631,7 +631,20 @@ function renderNotifications(notifs) {
     </div>`;
 }
 
-// markOneSeen removed — notifications now shown as banners
+async function markOneSeen(row, btn) {
+  if (!btn || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  btn.textContent = '✓ Seen'; btn.disabled = true;
+  try {
+    await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'markNotifSeen', rows:[row]})});
+    const card = btn.closest('.notif-card');
+    if (card) card.style.opacity = '0.4';
+    // Hide section if all notifications are marked seen
+    const section = document.getElementById('notif-section');
+    const remaining = section.querySelectorAll('.notif-seen-btn:not(:disabled)');
+    if (!remaining.length) setTimeout(() => { section.style.display = 'none'; }, 800);
+  } catch(e) { btn.disabled = false; btn.textContent = '✓ Mark as seen'; }
+}
 
 async function markAllSeen() {
   const section = document.getElementById('notif-section');
@@ -639,12 +652,12 @@ async function markAllSeen() {
   section.querySelectorAll('.notif-seen-btn').forEach(btn => {
     const match = btn.getAttribute('onclick')?.match(/markOneSeen\((\d+)/);
     if (match) rows.push(parseInt(match[1]));
-    btn.textContent='✓ Seen'; btn.disabled=true;
+    btn.textContent = '✓ Seen'; btn.disabled = true;
   });
   if (!rows.length || APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
-  await fetch(APPS_SCRIPT_URL, {method:'POST',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'markNotifSeen', rows})});
-  setTimeout(()=>{ section.style.display='none'; }, 1000);
+  await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({action:'markNotifSeen', rows})});
+  setTimeout(() => { section.style.display = 'none'; }, 1000);
 }
 
 function signOut() {
@@ -1094,14 +1107,19 @@ function validate(d) {
   return true;
 }
 
+let _submitting = false;
 async function submitForm() {
+  if (_submitting) return;
   const data=collectData();
   if (!validate(data)) return;
+  _submitting = true;
+  document.getElementById('submit-btn').disabled = true;
   document.getElementById('sending').classList.add('show');
   try {
     if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
         body: JSON.stringify(data),
       });
     }
@@ -1112,6 +1130,8 @@ async function submitForm() {
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
+    _submitting = false;
+    document.getElementById('submit-btn').disabled = false;
     toast('Submission failed — check your connection and try again');
   }
 }

@@ -279,7 +279,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 
 // Project colour map
 const DISC_COLORS = [
@@ -346,17 +346,17 @@ async function silentRefresh() {
   if (btn) btn.classList.add('spinning');
   setRefreshStatus('Refreshing…');
   // Remember open panel
-  const openPanel = activePanelProj;
+  const openPanelName = activePanelProj;
   await loadAll().then(function() {
-  lastRefreshTime = Date.now();
-  updateRefreshStatus();
-  startAutoRefresh();
-  statusTimer = setInterval(updateRefreshStatus, 60000);
-});
+    lastRefreshTime = Date.now();
+    updateRefreshStatus();
+    startAutoRefresh();
+    statusTimer = setInterval(updateRefreshStatus, 60000);
+  });
   // Re-open panel if it was open
-  if (openPanel) {
-    const proj = allProjects.find(p => p.name === openPanel);
-    if (proj) openPanel_fn(proj);
+  if (openPanelName) {
+    const proj = allProjects.find(p => p.name === openPanelName);
+    if (proj) openPanel(proj.name);
   }
   lastRefreshTime = Date.now();
   if (btn) btn.classList.remove('spinning');
@@ -523,6 +523,7 @@ let panelFilter = 'all';
 function openPanel(name) {
   const proj = allProjects.find(p=>p.name===name);
   if (!proj) return;
+  activePanelProj = name;
   panelFilter = 'all';
 
   const [badge, cls] = discBadge(proj.discipline);
@@ -752,6 +753,7 @@ function setPanelFilter(name, status) {
 
 function closePanel(e) {
   if (e && e.target !== document.getElementById('panel-overlay')) return;
+  activePanelProj = null;
   document.getElementById('panel-overlay').classList.remove('show');
   document.body.style.overflow = '';
 }
