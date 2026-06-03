@@ -1036,7 +1036,7 @@ function calculateWeeklyScorecard() {
     // counts even if lead approves after the weekend
     asRows.forEach(function(r, i) {
       if (i === 0) return;
-      var selfDoneDate = cellDate(r[SC_STATUSDT]); // O SelfStatusDate
+      var selfDoneDate = cellDate(r[SC_DONEDATE]) || cellDate(r[SC_STATUSDT]); // P ActualCompletion → O SelfStatus fallback
       if (String(r[3]           || '').trim() === name &&
           String(r[SC_LEADAPPR] || '').trim() === 'Yes' &&
           selfDoneDate >= monStr && selfDoneDate <= sunStr)
@@ -1109,10 +1109,10 @@ function calculateWeeklyScorecard() {
 
     // TASK_LOG source removed — all tasks now in TASK_ASSIGNMENTS
 
-    // Source B: TASK_ASSIGNMENTS — use SelfStatusDate for month attribution
+    // Source B: TASK_ASSIGNMENTS — use ActualCompletion → SelfStatusDate for month attribution
     asRows.forEach(function(r, i) {
       if (i === 0) return;
-      var selfDoneDate = cellDate(r[SC_STATUSDT]);
+      var selfDoneDate = cellDate(r[SC_DONEDATE]) || cellDate(r[SC_STATUSDT]);
       if (String(r[3]           || '').trim() === name &&
           String(r[SC_LEADAPPR] || '').trim() === 'Yes' &&
           selfDoneDate >= monthStartStr)
@@ -1786,7 +1786,7 @@ function calculateCurrentWeekScorecard() {
     // Mon-Sat counts even if lead approves on Sunday or next week
     asRows.forEach(function(r, i) {
       if (i === 0) return;
-      var selfDoneDate = cellDate(r[SC_STATUSDT]); // O SelfStatusDate — when team marked done
+      var selfDoneDate = cellDate(r[SC_DONEDATE]) || cellDate(r[SC_STATUSDT]); // P ActualCompletion → O SelfStatus fallback
       if (String(r[3]           || '').trim() === name &&
           String(r[SC_LEADAPPR] || '').trim() === 'Yes' &&
           selfDoneDate >= monStr && selfDoneDate <= sunStr)
@@ -1857,7 +1857,7 @@ function calculateCurrentWeekScorecard() {
     // TASK_LOG source removed
     asRows.forEach(function(r, i) {
       if (i === 0) return;
-      var selfDoneDate = cellDate(r[SC_STATUSDT]);
+      var selfDoneDate = cellDate(r[SC_DONEDATE]) || cellDate(r[SC_STATUSDT]);
       if (String(r[3]           || '').trim() === name &&
           String(r[SC_LEADAPPR] || '').trim() === 'Yes' &&
           selfDoneDate >= monthStartStr)
@@ -3004,6 +3004,7 @@ function getWeeklyStats(weekStart) {
   var is23        = asHeaders.length >= 23 || asHeaders.indexOf('Actual Completion Date') > -1;
   var COL_LEADAPPR= is23 ? 16 : 15;
   var COL_STATUSDT= 14;
+  var COL_ACTUALDT= is23 ? 15 : -1; // P ActualCompletionDate (23-col only)
   var COL_DEADLINE= 10;
   var COL_REVTAG  = is23 ? 19 : 18;
   var COL_ASSIGNDT= 9;
@@ -3034,7 +3035,7 @@ function getWeeklyStats(weekStart) {
 
     asRows.forEach(function(r, i) {
       if (i === 0) return;
-      var doneDate   = cellDate(r[COL_STATUSDT]);
+      var doneDate   = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       var isApproved = String(r[COL_LEADAPPR]||'').trim() === 'Yes';
       if (String(r[3]||'').trim() === name &&
           String(r[13]||'').trim() === 'Done' &&
@@ -3067,12 +3068,12 @@ function getWeeklyStats(weekStart) {
       return a.project.localeCompare(b.project) || a.doneDate.localeCompare(b.doneDate);
     });
 
-    // Approved pts this week (SelfStatusDate filter)
+    // Approved pts this week (ActualCompletion → SelfStatusDate filter)
     var approvedPts = 0;
     // TASK_LOG source removed
     asRows.forEach(function(r, i) {
       if (i === 0) return;
-      var doneDate = cellDate(r[COL_STATUSDT]);
+      var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       if (String(r[3]||'').trim() === name &&
           String(r[COL_LEADAPPR]||'').trim() === 'Yes' &&
           doneDate >= mon && doneDate <= sat)
@@ -3129,9 +3130,10 @@ function getProjectStats() {
   var headers  = asRows[0] ? asRows[0].map(function(h){return String(h||'').trim();}) : [];
   var is23     = headers.length >= 23 || headers.indexOf('Actual Completion Date') > -1;
   var COL_LAPPR= is23 ? 16 : 15;
-  var COL_SSTAT= 13;
-  var COL_SDATE= 14;
-  var COL_DEAD = 10;
+  var COL_SSTAT    = 13;
+  var COL_SDATE    = 14;  // O SelfStatusDate
+  var COL_ACTUALDT = is23 ? 15 : -1; // P ActualCompletionDate
+  var COL_DEAD     = 10;
 
   var today = dateStr();
 
@@ -3163,7 +3165,7 @@ function getProjectStats() {
     var sStatus = String(r[COL_SSTAT]||'').trim();
     var lApproved=String(r[COL_LAPPR]||'').trim();
     var deadline= cellDate(r[COL_DEAD]);
-    var sDate   = cellDate(r[COL_SDATE]);
+    var sDate   = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_SDATE]);
     var pts     = parseFloat(r[8])||0;
     var priority= String(r[22]||'').trim();
 

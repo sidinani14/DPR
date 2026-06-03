@@ -251,7 +251,7 @@ function renderHeatmap() {
   function getDonePts(name, dateVal) {
     return doneTasks
       .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                  t.selfStatusDate === dateVal)
+                  (t.actualCompletion || t.selfStatusDate) === dateVal)
       .reduce((s,t)=>s+(t.weightedPts||0), 0);
   }
 
@@ -300,8 +300,8 @@ function renderHeatmap() {
       const donePts = doneTasks
         .filter(t=> {
           if (!t.assignedTo.split(',').map(a=>a.trim()).includes(name)) return false;
-          // selfStatusDate only — when team member marked Done
-          const doneOn = t.selfStatusDate || '';
+          // actualCompletion preferred; fall back to selfStatusDate
+          const doneOn = t.actualCompletion || t.selfStatusDate || '';
           return doneOn >= weekDays[0] && doneOn <= weekDays[5];
         })
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
@@ -371,7 +371,7 @@ function renderHeatmap() {
           // Past: show approved/done pts earned on this day
           pts = doneTasks
             .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        (t.selfStatusDate||'') === d)
+                        (t.actualCompletion || t.selfStatusDate || '') === d)
             .reduce((s,t)=>s+(t.weightedPts||0), 0);
           cls = pts === 0 ? 'hm-empty' : 'hm-green';
           label = pts > 0 ? pts.toFixed(1) : '—';
@@ -379,7 +379,7 @@ function renderHeatmap() {
           // Today: green (done) + blue (upcoming due today) + red (all delayed)
           const donePtsToday = doneTasks
             .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        (t.selfStatusDate||'') === d)
+                        (t.actualCompletion || t.selfStatusDate || '') === d)
             .reduce((s,t)=>s+(t.weightedPts||0),0);
           const upcomingPts = openTasks
             .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
