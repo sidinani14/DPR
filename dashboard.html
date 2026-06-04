@@ -124,8 +124,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="heatmap-view-btns">
       <button class="hm-view-btn on" onclick="setHmView('total',this)">Total</button>
       <button class="hm-view-btn" onclick="setHmView('week',this)">This Week</button>
-      <button class="hm-view-btn" onclick="setHmView('allocated',this)">Allocated</button>
-      <button class="hm-view-btn" onclick="setHmView('daily',this)">Done/Day</button>
+      <button class="hm-view-btn" onclick="setHmView('today',this)">This Day</button>
     </div>
   </div>
   <div id="heatmap-body"></div>
@@ -176,10 +175,9 @@ const DAILY_TARGETS = Object.fromEntries(
 );
 
 const HM_TITLES = {
-  total    : 'Workload Heatmap — Total Open',
-  week     : 'Workload Heatmap — This Week Progress',
-  allocated: 'Workload Heatmap — Daily Allocation vs Target',
-  daily    : 'Workload Heatmap — Done pts per Day',
+  total : 'Workload Heatmap — Total Open',
+  week  : 'Workload Heatmap — This Week Progress',
+  today : 'Workload Heatmap — Today\'s Occupancy',
 };
 function setHmView(view, btn) {
   hmView = view;
@@ -352,152 +350,78 @@ function renderHeatmap() {
     });
     html += '</tbody></table>';
 
-  } else if (hmView === 'allocated') {
-    // ── ALLOCATED: all non-completed tasks grouped by deadline date ─
-    html = '<table class="heatmap-grid"><thead><tr><th style="width:130px">Member</th>';
-    weekDays.forEach((d,i)=>{
-      const isToday  = d === today;
-      const isPast   = d < today;
-      const dayStyle = isToday ? 'color:#F5A623;font-weight:700' : isPast ? 'color:rgba(255,255,255,0.45)' : '';
-      html += `<th style="${dayStyle}">${dayNames[i]}<br><span style="font-size:8px;opacity:.6">${d.substring(5)}</span>${isToday?'<br><span style="font-size:7px;background:#F5A623;color:#000;border-radius:3px;padding:1px 4px">TODAY</span>':''}</th>`;
-    });
-    html += '<th>Wk Total</th><th style="width:60px">Target</th></tr></thead><tbody>';
+  } else if (hmView === 'today') {
+    // ── TODAY: bar per member showing done + pending due today + delayed ─
+    html = '<table class="heatmap-grid"><thead><tr>' +
+      '<th style="width:130px">Member</th>' +
+      '<th>Today\'s Occupancy</th>' +
+      '<th style="width:70px">Done</th>' +
+      '<th style="width:70px">Pending</th>' +
+      '<th style="width:70px;color:#EA4335">Delayed</th>' +
+      '<th style="width:60px">Target</th>' +
+      '</tr></thead><tbody>';
 
     members.forEach(name => {
       const wkTgt  = TEAM_TARGETS[name] || 50;
       const dayTgt = Math.round(wkTgt / 6 * 10) / 10;
-      let weekTotal = 0;
-      html += `<tr><td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${dayTgt}p/day</span></td>`;
 
-      weekDays.forEach(d => {
-        // All non-completed tasks allocated to this day
-        const dayTasks = allTasks.filter(t =>
-          t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-          t.targetDate === d &&
-          t.status !== 'Completed'
-        );
-        const pts   = dayTasks.reduce((s,t)=>s+(t.weightedPts||0), 0);
-        const count = dayTasks.length;
-        weekTotal  += pts;
+      // Done today — approved tasks completed today
+      const donePts = doneTasks
+        .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                     (t.actualCompletion || t.selfStatusDate || '') === today)
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
-        // Breakdown by status for tooltip
-        const delayed  = dayTasks.filter(t=>t.status==='Delayed').length;
-        const revision = dayTasks.filter(t=>t.status==='Revision Required').length;
+      // Pending today — non-completed tasks due today
+      const pendPts = allTasks
+        .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                     t.targetDate === today &&
+                     t.status !== 'Completed')
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
-        if (pts === 0) {
-          html += `<td><span class="hm-cell hm-empty" title="No tasks due">—</span></td>`;
-        } else {
-          const cls = hmColor(pts, dayTgt);
-          const pctOfDay = Math.round(pts / dayTgt * 100);
-          const badge = delayed > 0 ? `<span style="color:#EA4335;font-size:8px"> ⚠${delayed}</span>` : '';
-          html += `<td>
-            <span class="hm-cell ${cls}" style="line-height:1.4" title="${count} task(s) · ${pts.toFixed(1)}pts · ${pctOfDay}% of daily target${delayed?' · '+delayed+' delayed':''}${revision?' · '+revision+' revision':''}">
-              ${pts.toFixed(1)}${badge}<br>
-              <span style="font-size:8px;opacity:.65">${count}t · ${pctOfDay}%</span>
-            </span>
-          </td>`;
-        }
-      });
+      // Delayed — all overdue tasks (any date)
+      const delayedPts = allTasks
+        .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                     t.status === 'Delayed')
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
-      // Delayed tasks not in this week (have no targetDate in weekDays)
-      const offWeekDelayed = allTasks.filter(t=>
-        t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-        t.status === 'Delayed' &&
-        !weekDays.includes(t.targetDate)
-      );
-      const offDelPts = offWeekDelayed.reduce((s,t)=>s+(t.weightedPts||0), 0);
+      const totalLoad = donePts + pendPts + delayedPts;
+      const donePct   = Math.min(100, Math.round(donePts   / dayTgt * 100));
+      const pendPct   = Math.min(100 - donePct, Math.round(pendPts   / dayTgt * 100));
+      const delPct    = Math.min(100 - donePct - pendPct, Math.round(delayedPts / dayTgt * 100));
+      const loadPct   = Math.round(totalLoad / dayTgt * 100);
 
-      const totCls = hmColor(weekTotal, wkTgt);
-      const offLabel = offDelPts > 0
-        ? ` <span style="color:#EA4335;font-size:9px" title="Delayed tasks from prev weeks">+${offDelPts.toFixed(1)}⚠</span>` : '';
-      html += `<td><span class="hm-cell ${totCls}">${weekTotal.toFixed(1)}</span>${offLabel}</td>`;
-      html += `<td style="text-align:center;font-size:11px;color:rgba(255,255,255,0.4)">${wkTgt}</td></tr>`;
+      const statusLabel = totalLoad === 0
+        ? '<span style="font-size:9px;color:rgba(255,255,255,0.3)">No tasks today</span>'
+        : loadPct >= 100
+          ? '<span style="font-size:9px;color:#2ED573">● Fully occupied</span>'
+          : loadPct >= 60
+            ? '<span style="font-size:9px;color:#FBBC04">● Partially occupied</span>'
+            : '<span style="font-size:9px;color:#EA4335">● Free time available</span>';
+
+      html += `<tr>
+        <td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${dayTgt}p/day</span></td>
+        <td>
+          <div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;display:flex">
+            <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done today"></div>
+            <div style="height:100%;width:${pendPct}%;background:#4A9EFF;transition:width .3s" title="${pendPts.toFixed(1)} pts pending today"></div>
+            <div style="height:100%;width:${delPct}%;background:#EA4335;transition:width .3s" title="${delayedPts.toFixed(1)} pts delayed (overdue)"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:3px;font-size:9px">
+            ${statusLabel}
+            <span style="margin-left:auto;color:rgba(255,255,255,0.3)">${loadPct}% of daily target</span>
+          </div>
+        </td>
+        <td style="text-align:center"><span class="hm-cell hm-green">${donePts.toFixed(1)}</span></td>
+        <td style="text-align:center"><span class="hm-cell ${pendPts>0?'hm-amber':'hm-empty'}">${pendPts>0?pendPts.toFixed(1):'—'}</span></td>
+        <td style="text-align:center">${delayedPts>0?`<span class="hm-cell hm-red">${delayedPts.toFixed(1)}</span>`:`<span style="color:rgba(255,255,255,0.2);font-size:11px">—</span>`}</td>
+        <td style="text-align:center;font-size:11px;color:rgba(255,255,255,0.4)">${dayTgt}</td>
+      </tr>`;
     });
     html += '</tbody></table>';
     html += '<div style="display:flex;gap:16px;margin-top:8px;font-size:10px;color:rgba(255,255,255,0.4);padding:0 4px">';
-    html += '<span><span style="color:#2ED573">■</span> 80–120% of daily target (healthy)</span>';
-    html += '<span><span style="color:#FBBC04">■</span> Under 80% (light day)</span>';
-    html += '<span><span style="color:#EA4335">■</span> Over 120% (overloaded)</span>';
-    html += '<span>⚠ = delayed tasks</span></div>';
-
-  } else {
-    // ── PER DAY: past=done pts, today+future=open pts by deadline ─
-    html = '<table class="heatmap-grid"><thead><tr><th style="width:130px">Member</th>';
-    weekDays.forEach((d,i)=>{
-      const isPast   = d < today;
-      const isToday  = d === today;
-      const dayStyle = isToday ? 'color:#F5A623;font-weight:700' : isPast ? 'color:rgba(255,255,255,0.35)' : '';
-      html += `<th style="${dayStyle}">${dayNames[i]}<br><span style="font-size:8px;opacity:.6">${d.substring(5)}</span>${isToday?'<br><span style="font-size:7px;background:#F5A623;color:#000;border-radius:3px;padding:1px 4px">TODAY</span>':''}</th>`;
-    });
-    html += '<th>Week Total</th></tr></thead><tbody>';
-
-    members.forEach(name => {
-      const wkTgt  = TEAM_TARGETS[name] || 50;
-      const dayTgt = Math.round(wkTgt / 6 * 10) / 10;
-      let weekTotal = 0;
-      html += `<tr><td class="hm-name">${name}</td>`;
-
-      weekDays.forEach(d => {
-        const isPast  = d < today;
-        let todayHandled = false;
-        let pts = 0;
-        let cls = '';
-        let label = '';
-
-        if (isPast) {
-          // Past: show approved/done pts earned on this day
-          pts = doneTasks
-            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        (t.actualCompletion || t.selfStatusDate || '') === d)
-            .reduce((s,t)=>s+(t.weightedPts||0), 0);
-          cls = pts === 0 ? 'hm-empty' : 'hm-green';
-          label = pts > 0 ? pts.toFixed(1) : '—';
-        } else if (isToday) {
-          // Today: green (done) + blue (upcoming due today) + red (all delayed)
-          const donePtsToday = doneTasks
-            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        (t.actualCompletion || t.selfStatusDate || '') === d)
-            .reduce((s,t)=>s+(t.weightedPts||0),0);
-          const upcomingPts = openTasks
-            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        t.targetDate === d && t.status !== 'Delayed')
-            .reduce((s,t)=>s+(t.weightedPts||0),0);
-          const delayedPts = allTasks
-            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        t.status === 'Delayed')
-            .reduce((s,t)=>s+(t.weightedPts||0),0);
-          pts = donePtsToday + upcomingPts + delayedPts;
-          const parts = [];
-          if (donePtsToday > 0) parts.push(`<span class="hm-cell hm-green" style="font-size:9px;padding:1px 4px">${donePtsToday.toFixed(1)}</span>`);
-          if (upcomingPts > 0) parts.push(`<span class="hm-cell hm-blue" style="font-size:9px;padding:1px 4px">${upcomingPts.toFixed(1)}</span>`);
-          if (delayedPts > 0) parts.push(`<span class="hm-cell hm-red" style="font-size:9px;padding:1px 4px">⚠${delayedPts.toFixed(1)}</span>`);
-          weekTotal += pts;
-          html += `<td style="min-width:60px">${parts.length ? parts.join('') : '<span class="hm-cell hm-empty">—</span>'}</td>`;
-          todayHandled = true;
-        } else {
-          // Future: open pts due on this day
-          pts = openTasks
-            .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                        t.targetDate === d && t.status !== 'Delayed')
-            .reduce((s,t)=>s+(t.weightedPts||0), 0);
-          cls = hmColor(pts, dayTgt);
-          label = pts > 0 ? pts.toFixed(1) : '—';
-        }
-        if (!todayHandled) {
-          weekTotal += pts;
-          html += `<td><span class="hm-cell ${cls}" title="${isPast?'Approved pts earned':'Open pts due on this day'}">${label}</span></td>`;
-        }
-      });
-
-      // Week total — show delayed pts separately in red
-      const memberDelayed = allTasks
-        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) && t.status==='Delayed')
-        .reduce((s,t)=>s+(t.weightedPts||0),0);
-      const totCls = hmColor(weekTotal, wkTgt);
-      const delLabel = memberDelayed > 0 ? ` <span style="color:#EA4335;font-size:9px">+${memberDelayed.toFixed(1)}⚠</span>` : '';
-      html += `<td><span class="hm-cell ${totCls}">${weekTotal.toFixed(1)}</span>${delLabel}</td></tr>`;
-    });
-    html += '</tbody></table>';
+    html += '<span><span style="color:#2ED573">■</span> Done & approved today</span>';
+    html += '<span><span style="color:#4A9EFF">■</span> Pending due today</span>';
+    html += '<span><span style="color:#EA4335">■</span> Overdue / delayed</span></div>';
   }
 
   body.innerHTML = html;
