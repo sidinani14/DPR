@@ -871,7 +871,7 @@ function addTask(containerId) {
   row.innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 60px 44px 22px;gap:6px;align-items:center;margin-bottom:7px">
       <select class="t-type" onchange="refreshTaskPts(this);calcScore()">${stageOptions()}</select>
-      <input type="number" class="t-units" min="1" max="30" value="1" oninput="calcScore()" placeholder="Units">
+      <input type="number" class="t-units" min="0.5" max="30" step="0.5" value="1" oninput="calcScore()" placeholder="Units">
       <div class="task-pts t-pts-display" style="font-size:11px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace">—</div>
       <button class="rm-task" type="button" onclick="this.closest('.task-entry').remove();calcScore()">×</button>
     </div>

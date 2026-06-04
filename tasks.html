@@ -433,7 +433,7 @@ function addTaskToBlock(pid) {
       <div class="row3">
         <div class="field">
           <div class="lbl">Units <span class="req">*</span></div>
-          <input type="number" class="t-units" min="1" max="50" value="1" oninput="recalcAll()">
+          <input type="number" class="t-units" min="0.5" max="50" step="0.5" value="1" oninput="recalcAll()">
         </div>
         <div class="field">
           <div class="lbl">Target date <span class="req">*</span></div>
@@ -526,7 +526,7 @@ async function submitTasks() {
       const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
       if (isNaN(stageIdx)||stageIdx<0) { toast(`Select task type in project ${pi+1}`); valid=false; return; }
       const stage   = STAGES[stageIdx];
-      const units   = parseInt(tb.querySelector('.t-units')?.value)||1;
+      const units   = parseFloat(tb.querySelector('.t-units')?.value)||1;
       const tDate   = tb.querySelector('.t-date')?.value||today;
       const priority= tb.querySelector('.t-priority')?.value||'Medium';
       const area    = tb.querySelector('.t-area')?.value.trim()||'';
