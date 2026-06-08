@@ -229,15 +229,6 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- S3: Decisions -->
-  <div class="section">
-    <div class="section-head"><span class="section-num">3</span><span class="section-title">Decisions Pending from Siddharth Sir</span></div>
-    <div class="section-body">
-      <div id="decisions-list"></div>
-      <button class="add-btn" onclick="addDecision()">+ Add Pending Decision</button>
-    </div>
-  </div>
-
   <!-- S4: WhatsApp -->
   <div class="section">
     <div class="section-head" style="background:#1B5E20">
@@ -285,7 +276,6 @@ let leadName     = '';
 let projects     = [];
 let pbCount      = 0;
 let ibCount      = 0;
-let decCount     = 0;
 let issueActions = {};
 
 // ── Auth ──────────────────────────────────────────────────
@@ -500,6 +490,13 @@ function addIssueBlock(projId){
         <div class="lbl" style="font-size:10px;margin-bottom:4px">Target Date</div>
         <input type="date" id="ib-date-${projId}-${id}">
       </div>
+    </div>
+    <div class="field">
+      <div class="lbl" style="font-size:10px;margin-bottom:4px">Assign To <span class="opt">for design/deliverable issues</span></div>
+      <select id="ib-assign-${projId}-${id}" style="font-size:12px">
+        <option value="">-- Not assigned --</option>
+        ${Object.values(EMAIL_MAP).filter((v,i,a)=>a.indexOf(v)===i).sort().map(name=>`<option value="${name}">${name}</option>`).join('')}
+      </select>
     </div>`;
   document.getElementById(`pb-iss-${projId}`).appendChild(div);
 }
@@ -518,26 +515,6 @@ function setIBPri(pId,iId,val){
   document.getElementById(`ib-pri-${pId}-${iId}`).value=val;
 }
 
-// ── Decisions ──────────────────────────────────────────────
-function addDecision(){
-  decCount++;
-  const id=decCount;
-  const div=document.createElement('div');
-  div.id=`dc-${id}`;
-  div.style.cssText='background:var(--blue-bg);border:1.5px solid #BBDEFB;border-radius:8px;padding:11px;margin-bottom:8px;';
-  const projOpts=projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
-  div.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <span style="font-size:11px;font-weight:700;color:var(--blue)">Decision ${id}</span>
-      <button style="background:rgba(21,101,192,0.1);border:1px solid #BBDEFB;color:var(--blue);font-size:10px;padding:2px 7px;border-radius:5px;cursor:pointer" onclick="document.getElementById('dc-${id}').remove()">✕</button>
-    </div>
-    <select id="dc-proj-${id}" style="margin-bottom:7px;border-color:#BBDEFB;background:#fff;font-size:12px;padding:7px 10px">
-      <option value="">Select project…</option>${projOpts}
-    </select>
-    <textarea id="dc-desc-${id}" placeholder="What decision is needed from Siddharth sir?" style="min-height:50px;border-color:#BBDEFB"></textarea>`;
-  document.getElementById('decisions-list').appendChild(div);
-}
-
 // ── Collect data ───────────────────────────────────────────
 function collectProjects(){
   const result=[];
@@ -554,10 +531,11 @@ function collectProjects(){
       const pId=parts[1],iId=parts[2];
       const desc=(document.getElementById(`ib-desc-${pId}-${iId}`)?.value||'').trim();
       if(!desc) return;
+      const assignedPerson = document.getElementById(`ib-assign-${pId}-${iId}`)?.value||'';
       issues.push({
         issueType  :document.getElementById(`ib-type-${pId}-${iId}`)?.value||'General',
         description:desc,
-        assignedTo :leadName,
+        assignedTo :assignedPerson || leadName,
         priority   :parseInt(document.getElementById(`ib-pri-${pId}-${iId}`)?.value||2),
         targetDate :document.getElementById(`ib-date-${pId}-${iId}`)?.value||'',
         reportedBy :leadName,
@@ -585,16 +563,6 @@ function collectProjects(){
   return result;
 }
 
-function collectDecisions(){
-  const decs=[];
-  document.querySelectorAll('[id^="dc-"]').forEach(d=>{
-    const id=d.id.replace('dc-','');
-    const desc=(document.getElementById(`dc-desc-${id}`)?.value||'').trim();
-    const proj=(document.getElementById(`dc-proj-${id}`)?.value||'').trim();
-    if(desc) decs.push({description:desc, project:proj});
-  });
-  return decs;
-}
 
 // ── WhatsApp generation ────────────────────────────────────
 function generateWAForProject(p){
@@ -657,7 +625,6 @@ async function submitAll(){
   if(!googleUser){toast('Sign in first');return;}
   const projs=collectProjects();
   if(!projs.length){toast('Add at least one project report');return;}
-  const decs=collectDecisions();
   const date=document.getElementById('f-date')?.value||'';
 
   document.getElementById('submit-btn').disabled=true;
@@ -686,9 +653,7 @@ async function submitAll(){
           materials:p.materials, materialDelays:'',
           clientUpdated:p.clientUpdated, clientConcerns:p.clientConcerns,
           blocking:p.blocking, remarks:'',
-          decisions:'', // decisions sent separately below
           issues:JSON.stringify(p.issues),
-          decisionItems:JSON.stringify(decs),
           whatsappMsg:waMsg,
         })});
 
@@ -728,9 +693,8 @@ function resetForm(){
   document.getElementById('success-screen').style.display='none';
   document.querySelector('.submit-bar').style.display='';
   document.getElementById('proj-blocks').innerHTML='';
-  document.getElementById('decisions-list').innerHTML='';
   document.getElementById('wa-list').innerHTML='<div class="no-issues">Add project reports above to generate messages…</div>';
-  pbCount=0; ibCount=0; decCount=0; issueActions={};
+  pbCount=0; ibCount=0; issueActions={};
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('submit-status').textContent=leadName;
   clearDraft();
@@ -801,22 +765,12 @@ function collectDraftData() {
       issues,
     });
   });
-  // Decisions
-  const decisions = [];
-  document.querySelectorAll('[id^="dc-"]').forEach(d => {
-    const id = d.id.replace('dc-','');
-    decisions.push({
-      proj: document.getElementById('dc-proj-'+id)?.value||'',
-      desc: document.getElementById('dc-desc-'+id)?.value||'',
-    });
-  });
   return {
     savedAt  : new Date().toISOString(),
     date     : document.getElementById('f-date')?.value||'',
     blocks,
-    decisions,
     issueActions,
-    pbCount, ibCount, decCount,
+    pbCount, ibCount,
   };
 }
 
@@ -859,7 +813,6 @@ function resumeDraft() {
   // Restore counters
   pbCount   = draft.pbCount   || 0;
   ibCount   = draft.ibCount   || 0;
-  decCount  = draft.decCount  || 0;
   issueActions = draft.issueActions || {};
 
   // Restore project blocks
@@ -931,18 +884,6 @@ function resumeDraft() {
     }
   });
 
-  // Restore decisions
-  if (draft.decisions && draft.decisions.length) {
-    draft.decisions.forEach(dec => {
-      addDecision();
-      const curDecId = decCount;
-      if (dec.proj) {
-        const sel = document.getElementById('dc-proj-'+curDecId);
-        if (sel) sel.value = dec.proj;
-      }
-      if (dec.desc) document.getElementById('dc-desc-'+curDecId).value = dec.desc;
-    });
-  }
 
   generateAllWA();
   toast('Draft restored ✓');
