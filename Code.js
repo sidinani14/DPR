@@ -35,7 +35,7 @@ function calcVisitPts(taskType, hours) {
   return 0;
 }
 
-var TASK_TAB      = 'TASK_LOG';
+// TASK_TAB / TASK_LOG removed — all tasks now in TASK_ASSIGNMENTS
 var SUMMARY_TAB   = 'DAILY_SUMMARY';
 var CONFIG_TAB    = 'CONFIG';
 var PROJECTS_TAB  = 'PROJECTS';
@@ -137,6 +137,7 @@ function doGet(e) {
   if (action === 'getNotifications')         return safeRespond(function() { return getNotificationsForMember(member); });
   if (action === 'getWeeklyStats')           return safeRespond(function() { return getWeeklyStats(p.weekStart||''); });
   if (action === 'getProjectStats')          return safeRespond(getProjectStats);
+  if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
   return respond({status: 'IDS DPR live'});
 }
@@ -154,8 +155,9 @@ function doPost(e) {
     if (data.action === 'getPendingTasks')     return respond(getPendingTasks());
     if (data.action === 'getOpenTasksForMember') return respond(getOpenTasksForMember(data.member||''));
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
-    if (data.action === 'getWeeklyStats')      return respond(getWeeklyStats(data.weekStart||''));
-    if (data.action === 'getProjectStats')     return respond(getProjectStats());
+    if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
+    if (data.action === 'getProjectStats')        return respond(getProjectStats());
+    if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
     if (data.action === 'resolveIssue')        return respond(resolveIssue(data.issueId||''));
     if (data.action === 'getSiteExecution')    return respond(getSiteExecutionSummary(data.project||''));
@@ -168,6 +170,7 @@ function doPost(e) {
     if (data.action === 'markNotifSeen')     return respond(markNotificationSeen(data));
     if (data.action === 'createSelfTask')    return respond(createSelfAssignedTask(data));
     if (data.action === 'createDoneTask')    return respond(createDoneTask(data));
+    if (data.action === 'createSiddharthTask') return respond(createSiddharthTask(data));
     // Default: DPR submission
     var cfg = readConfig();
     var vPts = {};
@@ -340,73 +343,8 @@ function readConfig() {
           leads:leads, scoringWeights:sw, revPenalties:rp};
 }
 
-// ════════════════════════════════════════════════════════════════
-// TASK LOG — write DPR unplanned tasks
-//
-// TASK_LOG cols (14 total):
-// A:SubID B:Date C:Member D:Project E:Discipline F:TaskType
-// G:Area H:DrawingName I:Units J:WeightedPts K:LeadApproved
-// L:ApprovedBy M:ReviewedOn N:Notes
-// ════════════════════════════════════════════════════════════════
-function writeTaskLog(data, visitPts) {
-  var sheet = getOrCreate(TASK_TAB, writeTaskLogHeaders);
-  var subId = Utilities.getUuid().substring(0, 8).toUpperCase();
-  var date  = dateStr(data['Timestamp']);
-  var member= data['Member'] || '';
-
-  for (var p = 1; p <= 3; p++) {
-    var project = data['P' + p + ' Name'];
-    if (!project) continue;
-    var disc       = data['P' + p + ' Discipline'] || '';
-    var tasksRaw   = data['P' + p + ' Tasks']       || '';
-    var visitRaw   = data['P' + p + ' Visit']       || 'No';
-    var visitNotes = data['P' + p + ' Visit Notes'] || '';
-
-    // Parse "TaskType [Area:X] [Drawing:Y] ×N = P pts"
-    var parts = tasksRaw ? tasksRaw.split(' | ') : [];
-    parts.forEach(function(part) {
-      part = part.trim();
-      var taskType = '', area = '', drawing = '', units = 0, pts = 0;
-      var aM = part.match(/\[Area:\s*([^\]]+)\]/);
-      var dM = part.match(/\[Drawing:\s*([^\]]+)\]/);
-      if (aM) { area    = aM[1].trim(); part = part.replace(aM[0], '').trim(); }
-      if (dM) { drawing = dM[1].trim(); part = part.replace(dM[0], '').trim(); }
-      var xI = part.lastIndexOf('×'), eI = part.lastIndexOf('=');
-      if (xI > -1 && eI > -1) {
-        taskType = part.substring(0, xI).trim();
-        units    = parseFloat(part.substring(xI+1, eI).trim()) || 0;
-        pts      = parseFloat(part.substring(eI+1).replace('pts','').trim()) || 0;
-      } else { taskType = part; }
-      sheet.appendRow([subId, date, member, project, disc, taskType,
-                        area, drawing, units, pts, 'Pending', '', '', '']);
-    });
-
-    // Visit row
-    if (visitRaw && visitRaw !== 'No') {
-      var vp   = visitRaw.split('·');
-      var vTyp = vp[0] ? vp[0].trim() : visitRaw;
-      var vDur = vp[1] ? vp[1].trim() : '';
-      var vPts = visitPts[vDur] !== undefined ? visitPts[vDur] : 1.0;
-      sheet.appendRow([subId, date, member, project, disc, vTyp,
-                        '', '', 1, vPts, 'Pending', '', '', visitNotes]);
-    }
-  }
-  var lr = sheet.getLastRow();
-  if (lr > 1) sheet.getRange(2, 10, lr-1, 1).setNumberFormat('0.00');
-}
-
-function writeTaskLogHeaders(s) {
-  var h = ['Submission ID','Date','Member','Project','Discipline','Task Type',
-           'Area','Drawing Name','Units','Weighted Pts','Lead Approved',
-           'Approved By','Reviewed on','Notes'];
-  var r = s.getRange(1, 1, 1, h.length);
-  r.setValues([h]);
-  r.setBackground('#1F3A5F'); r.setFontColor('#FFFFFF');
-  r.setFontWeight('bold'); r.setFontSize(10);
-  s.setFrozenRows(1);
-  [100,90,140,200,180,240,120,160,60,100,110,130,140,200]
-    .forEach(function(w, i) { s.setColumnWidth(i+1, w); });
-}
+// writeTaskLog and writeTaskLogHeaders removed — TASK_LOG tab is obsolete.
+// All tasks (planned + unplanned) now written to TASK_ASSIGNMENTS.
 
 // ════════════════════════════════════════════════════════════════
 // DAILY SUMMARY
@@ -461,23 +399,25 @@ function assignTasks(data) {
   var written = 0;
 
   tasks.forEach(function(t) {
+    var tUnits      = parseFloat(t.units) || 1;
+    var tWeighted   = Math.round((t.basePts||0) * (data.multiplier||1) * tUnits * 10) / 10;
     sheet.appendRow([
       'T-' + Utilities.getUuid().substring(0,8).toUpperCase(), // A
       data.projectId    || '',        // B
       data.project      || '',        // C
       data.assignedTo   || '',        // D
       t.taskType        || '',        // E
-      data.discipline   || '',        // F
-      t.basePts         || 0,         // G
-      data.multiplier   || 1,         // H
-      t.weightedPts     || 0,         // I
+      data.multiplier   || 1,         // F Disc. Multiplier (number)
+      t.basePts         || 0,         // G Stage Base Pts
+      tUnits,                         // H Units
+      tWeighted,                      // I Weighted Pts = F × G × H
       data.dateAssigned || today,     // J
       t.targetDate      || '',        // K
       t.area            || '',        // L
       t.drawing         || '',        // M
       'Not Started',                  // N SelfStatus
       '',                             // O SelfStatusDate
-      '',                             // P ActualCompletionDate (NEW)
+      '',                             // P ActualCompletionDate
       'Pending',                      // Q LeadApproved
       '',                             // R ApprovedBy
       '',                             // S ApprovalDate
@@ -492,8 +432,8 @@ function assignTasks(data) {
 }
 
 function writeAssignHeaders(s) {
-  var h = ['Task ID','Project ID','Project Name','Assigned To','Stage','Discipline',
-           'Stage Base Pts','Disc. Multiplier','Weighted Points','Assigned Date','Deadline',
+  var h = ['Task ID','Project ID','Project Name','Assigned To','Stage','Disc. Multiplier',
+           'Stage Base Pts','Units','Weighted Points','Assigned Date','Deadline',
            'Area','Drawing Name','Self Status','Self Done Date','Actual Completion Date',
            'Lead Approved','Approved By','Approval Date','Revision Tag','Notes','Assigned by','Priority'];
   var r = s.getRange(1, 1, 1, h.length);
@@ -513,6 +453,18 @@ function getAllTasks() {
   if (!sheet) return {tasks:[]};
   var rows = sheet.getDataRange().getValues();
   var tasks = [], today = dateStr();
+
+  // Build project → discipline text map from PROJECTS tab (col B=Name, col D=Discipline)
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  var discMap = {};
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pRows.length; pi++) {
+      var pn = String(pRows[pi][1]||'').trim();
+      var pd = String(pRows[pi][3]||'').trim();
+      if (pn) discMap[pn] = pd;
+    }
+  }
 
   // Auto-detect column structure based on header row
   // 22-col (old): LeadApproved=P(15) RevTag=S(18) Notes=T(19) AssignedBy=U(20) Priority=V(21)
@@ -563,17 +515,19 @@ function getAllTasks() {
 
     if (status === 'Hidden') continue; // last week's completed tasks
 
+    var proj = String(r[2] || '');
     tasks.push({
       row              : i+1,
       taskId           : String(r[0]  || ''),
       projectId        : String(r[1]  || ''),
-      project          : String(r[2]  || ''),
+      project          : proj,
       assignedTo       : String(r[3]  || ''),
       taskType         : String(r[4]  || ''),
-      discipline       : String(r[5]  || ''),
-      basePts          : r[6]  || 0,
-      multiplier       : r[7]  || 1,
-      weightedPts      : r[8]  || 0,
+      multiplier       : parseFloat(r[5]) || 1,       // F Disc. Multiplier (number)
+      basePts          : parseFloat(r[6]) || 0,       // G Stage Base Pts
+      units            : parseFloat(r[7]) || 1,       // H Units
+      weightedPts      : parseFloat(r[8]) || 0,       // I Weighted Pts
+      discipline       : discMap[proj]   || '',       // lookup from PROJECTS tab
       dateAssigned     : cellDate(r[9]),
       targetDate       : target,
       area             : String(r[COL_AREA]       || ''),
@@ -725,42 +679,8 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
 function getPendingTasks() {
   var tasks = [];
 
-  // ── SOURCE 1: TASK_LOG — unplanned/additional work from DPR Section 3 ──
-  // TASK_LOG cols: SubID(A=0) Date(B=1) Member(C=2) Project(D=3) Disc(E=4)
-  //   TaskType(F=5) Area(G=6) Drawing(H=7) Units(I=8) Pts(J=9) LeadApproved(K=10)
-  var tlSheet = db().getSheetByName(TASK_TAB);
-  if (tlSheet) {
-    var tlRows = tlSheet.getDataRange().getValues();
-    for (var i = 1; i < tlRows.length; i++) {
-      var status = String(tlRows[i][10] || '').trim(); // K LeadApproved
-      // Show tasks where LeadApproved is blank or Pending (not Yes/No)
-      if (status === 'Yes' || status === 'No') continue;
-      var member   = String(tlRows[i][2] || '');
-      var project  = String(tlRows[i][3] || '');
-      var taskType = String(tlRows[i][5] || '');
-      var area     = String(tlRows[i][6] || '');
-      var drawing  = String(tlRows[i][7] || '');
-      var arRow    = findTaskAssignRow(member, project, taskType, area, drawing);
-      tasks.push({
-        row          : i + 1,
-        source       : 'TASK_LOG',
-        subId        : String(tlRows[i][0] || ''),
-        date         : String(tlRows[i][1] || '').substring(0, 10),
-        member       : member,
-        project      : project,
-        discipline   : String(tlRows[i][4] || ''),
-        taskType     : taskType,
-        area         : area,
-        drawing      : drawing,
-        units        : tlRows[i][8]  || 0,
-        pts          : tlRows[i][9]  || 0,
-        taskAssignRow: arRow,
-      });
-    }
-  }
-
-  // ── SOURCE 2: TASK_ASSIGNMENTS — assigned tasks marked Done by member ──
-  // These never appear in TASK_LOG — they are assigned via tasks form
+  // ── TASK_ASSIGNMENTS — only source: assigned tasks marked Done, not yet approved ──
+  // TASK_LOG removed — obsolete. All tasks are now in TASK_ASSIGNMENTS.
   // and marked Done via DPR Section 2. Need separate approval.
   // TASK_ASSIGNMENTS cols (23 total after col P insertion):
   //   TaskID(A=0) ProjectID(B=1) Project(C=2) AssignedTo(D=3)
@@ -811,20 +731,7 @@ function getPendingTasks() {
 
   return {tasks: tasks};
 }
-function findTaskAssignRow(member, project, taskType, area, drawing) {
-  var sheet = db().getSheetByName(ASSIGN_TAB);
-  if (!sheet) return null;
-  var rows = sheet.getDataRange().getValues();
-  for (var i = 1; i < rows.length; i++) {
-    if (String(rows[i][3]  || '').trim() === member   &&  // D
-        String(rows[i][2]  || '').trim() === project  &&  // C
-        String(rows[i][4]  || '').trim() === taskType &&  // E
-        String(rows[i][16] || '').trim() === 'Pending') { // Q LeadApproved (shifted)
-      return i + 1;
-    }
-  }
-  return null;
-}
+// findTaskAssignRow removed — was only used by TASK_LOG approval path (now obsolete)
 
 // ════════════════════════════════════════════════════════════════
 // SUBMIT APPROVALS
@@ -834,9 +741,7 @@ function findTaskAssignRow(member, project, taskType, area, drawing) {
 // ════════════════════════════════════════════════════════════════
 function submitApprovals(data) {
   var s        = db();
-  var taskLog  = s.getSheetByName(TASK_TAB);
   var taskAssn = s.getSheetByName(ASSIGN_TAB);
-  if (!taskLog) return {status:'error', message:'TASK_LOG not found'};
 
   var approvals = data.approvals || [];
   var approved = 0, rejected = 0;
@@ -844,36 +749,11 @@ function submitApprovals(data) {
 
   approvals.forEach(function(a) {
     var row    = parseInt(a.row);
-    var source = a.source || 'TASK_LOG'; // which tab this came from
     if (!row || row < 2) return;
 
-    if (source === 'TASK_LOG') {
-      // ── Update TASK_LOG (1-indexed cols) ────────────────────
-      taskLog.getRange(row, 11).setValue(a.decision);   // K LeadApproved
-      taskLog.getRange(row, 12).setValue(a.leadName);   // L ApprovedBy
-      taskLog.getRange(row, 13).setValue(now);           // M ReviewedOn
-      taskLog.getRange(row, 14).setValue(a.note || ''); // N Notes
-      // If correcting task type or points in TASK_LOG
-      if (a.correctedTaskType) taskLog.getRange(row, 6).setValue(a.correctedTaskType); // F TaskType
-      if (a.correctedPts)      taskLog.getRange(row, 10).setValue(parseFloat(a.correctedPts)); // J WeightedPts
-      // Write notification on rejection
-      if (a.decision === 'No') {
-        var tlMember = String(taskLog.getRange(row, 3).getValue()||'');
-        var tlNotif  = {
-          project:'', taskType:String(taskLog.getRange(row,6).getValue()||''),
-          correctedTaskType:a.correctedTaskType||'',
-          originalPts:taskLog.getRange(row,10).getValue()||0,
-          correctedPts:a.correctedPts||'',
-          note:a.note||'', leadName:a.leadName||'',
-        };
-        // Notification removed — rejections shown in DPR form directly
-      }
-    }
-
-    // ── Update TASK_ASSIGNMENTS (both sources need this) ──────
-    // For TASK_LOG source: taskAssignRow is found by matching member+project+task
-    // For TASK_ASSIGNMENTS source: row IS the taskAssignRow directly
-    var ar = source === 'TASK_ASSIGNMENTS' ? row : parseInt(a.taskAssignRow || 0);
+    // ── Update TASK_ASSIGNMENTS ───────────────────────────────
+    // source is always TASK_ASSIGNMENTS (TASK_LOG removed)
+    var ar = row;
 
     if (taskAssn && ar >= 2) {
       // Auto-detect column structure for write-back
@@ -988,30 +868,27 @@ function calculateWeeklyScorecard() {
   Logger.log('Week: ' + monStr + ' to ' + sunStr);
 
   // Load all data once
-  var tlSheet  = s.getSheetByName(TASK_TAB);
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
   var tSheet   = s.getSheetByName(TEAM_TAB);
   if (!tSheet) { Logger.log('TEAM tab not found'); return; }
 
-  var tlRows  = tlSheet  ? tlSheet.getDataRange().getValues()  : [];
   var asRows  = asSheet  ? asSheet.getDataRange().getValues()  : [];
   var sumRows = sumSheet ? sumSheet.getDataRange().getValues() : [];
   var tRows   = tSheet.getDataRange().getValues();
 
-  // Auto-detect TASK_ASSIGNMENTS column structure (22-col vs 23-col)
+  // Auto-detect TASK_ASSIGNMENTS column structure
   var asHeaders = asRows[0] ? asRows[0].map(function(h){ return String(h||'').trim(); }) : [];
   var scIs23    = asHeaders.length >= 23 || asHeaders.indexOf('Actual Completion Date') > -1;
-  var SC_LEADAPPR = scIs23 ? 16 : 15; // Q(16) new / P(15) old
-  var SC_APPDATE  = scIs23 ? 18 : 17; // S(18) new / R(17) old
-  var SC_DONEDATE = scIs23 ? 15 : 14; // P(15) new / O(14) old
-  var SC_STATUSDT = 14;               // O always
-  var SC_DEADLINE = 10;               // K always
-  var SC_REVTAG   = scIs23 ? 19 : 18; // T(19) new / S(18) old
-  var SC_ASSIGNDT = 9;                // J always
-  Logger.log('SC col structure: '+(scIs23?'23-col':'22-col')+' | LeadApproved='+SC_LEADAPPR+' | ApprovalDate='+SC_APPDATE);
+  var SC_LEADAPPR = scIs23 ? 16 : 15;
+  var SC_APPDATE  = scIs23 ? 18 : 17;
+  var SC_DONEDATE = scIs23 ? 15 : 14;
+  var SC_STATUSDT = 14;
+  var SC_DEADLINE = 10;
+  var SC_REVTAG   = scIs23 ? 19 : 18;
+  var SC_ASSIGNDT = 9;
+  Logger.log('SC col structure: '+(scIs23?'23-col':'22-col'));
 
-  // Write to IDS Team Scorecard sheet — clear and rewrite (live snapshot)
   var scorecard = getOrCreateScorecard(SCORECARD_TAB, writeScorecardHeaders);
   var lastScRow = scorecard.getLastRow();
   if (lastScRow > 1) scorecard.getRange(2, 1, lastScRow-1, 13).clearContent();
@@ -1019,18 +896,11 @@ function calculateWeeklyScorecard() {
   for (var ti = 1; ti < tRows.length; ti++) {
     var name   = String(tRows[ti][0] || '').trim();
     var role   = String(tRows[ti][1] || '').trim();
-    var wkTgt  = parseFloat(tRows[ti][2]) || 50; // C WeeklyTarget (=D*6 formula)
+    var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
     if (!name || active === 'no') continue;
 
-    // 1. Approved pts this week — two sources:
-    // SOURCE A: TASK_LOG (unplanned DPR work)
-    //   Member=C(2) LeadApproved=K(10) Date=B(1) WeightedPts=J(9)
-    // SOURCE B: TASK_ASSIGNMENTS (assigned tasks marked done + approved)
-    //   AssignedTo=D(3) LeadApproved=P(15) ApprovalDate=R(17) WeightedPts=I(8)
     var approvedPts = 0;
-
-    // TASK_LOG source removed — all tasks now in TASK_ASSIGNMENTS
 
     // Source B: TASK_ASSIGNMENTS — filter by SelfStatusDate so work done in the week
     // counts even if lead approves after the weekend
@@ -1379,7 +1249,6 @@ function archiveSheet(srcName, archName, dateIdx, approvedIdx) {
 
 function runMonthlyArchive() {
   Logger.log('=== Monthly Archive: ' + new Date().toISOString() + ' ===');
-  archiveSheet(TASK_TAB,    'ARCHIVE',              1, 10); // Date=B(1), LeadApproved=K(10)
   archiveSheet(ASSIGN_TAB,  'ARCHIVE_ASSIGNMENTS',  9, 16); // AssignedDate=J(9), LeadApproved=Q(16)
   archiveSheet(SUMMARY_TAB, 'ARCHIVE_SUMMARY',      0, -1); // Date=A(0), no approval filter
   Logger.log('=== Archive complete ===');
@@ -1420,40 +1289,51 @@ function buildSiteVisitsTab() {
   Logger.log('=== Building Site Visits Tab: ' + new Date().toISOString() + ' ===');
 
   var s        = db();
-  var tlSheet  = s.getSheetByName(TASK_TAB);
+  var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var projSheet= s.getSheetByName(PROJECTS_TAB);
 
-  if (!tlSheet)   { Logger.log('TASK_LOG not found'); return; }
+  if (!asSheet)   { Logger.log('TASK_ASSIGNMENTS not found'); return; }
   if (!projSheet) { Logger.log('PROJECTS tab not found'); return; }
 
-  // ── Load TASK_LOG visit rows ──────────────────────────────────
-  var tlRows  = tlSheet.getDataRange().getValues();
-  var visits  = [];   // all visit entries
+  // ── Load visit rows from TASK_ASSIGNMENTS (Done + Approved) ──
+  var asRows  = asSheet.getDataRange().getValues();
+  var asHdrs  = asRows[0] ? asRows[0].map(function(h){return String(h||'').trim();}) : [];
+  var aIs23   = asHdrs.length >= 23 || asHdrs.indexOf('Actual Completion Date') > -1;
+  var A_LAPPR = aIs23 ? 16 : 15;
+  var A_ACTDT = aIs23 ? 15 : -1;
+  var A_STATDT= 14;
+
+  var visits  = [];
   var today   = new Date(); today.setHours(0,0,0,0);
 
-  for (var i = 1; i < tlRows.length; i++) {
-    var r        = tlRows[i];
-    var taskType = String(r[5] || '').trim().toLowerCase();
-    var isVisit  = taskType.includes('site visit') || taskType.includes('site supervision');
-    var isMeeting= taskType.includes('client meeting') || taskType.includes('client + site') ||
-                   taskType.includes('client meeting + site');
+  for (var i = 1; i < asRows.length; i++) {
+    var r        = asRows[i];
+    var taskType = String(r[4] || '').trim(); // E Stage/TaskType
+    var ttLow    = taskType.toLowerCase();
+    var isVisit  = ttLow.indexOf('site visit') > -1 || ttLow.indexOf('site supervision') > -1;
+    var isMeeting= ttLow.indexOf('client meeting') > -1 || ttLow.indexOf('client + site') > -1;
     if (!isVisit && !isMeeting) continue;
 
-    var rawDate  = r[1];
+    // Only include Done + Approved visits for history
+    var selfStatus   = String(r[13]         || '').trim(); // N
+    var leadApproved = String(r[A_LAPPR]    || '').trim(); // Q
+    if (selfStatus !== 'Done' || leadApproved !== 'Yes') continue;
+
+    var rawDate  = (A_ACTDT > -1 ? r[A_ACTDT] : null) || r[A_STATDT]; // P or O
     var visitDate= rawDate instanceof Date ? rawDate : new Date(rawDate);
     if (isNaN(visitDate.getTime())) continue;
     visitDate.setHours(0,0,0,0);
 
     visits.push({
       date      : visitDate,
-      dateStr   : cellDate(r[1]),
-      project   : String(r[3] || '').trim(),
-      member    : String(r[2] || '').trim(),
-      taskType  : String(r[5] || '').trim(),
-      discipline: String(r[4] || '').trim(),
-      units     : r[8] || 1,
-      pts       : r[9] || 0,
-      notes     : String(r[13] || '').trim(),   // N Notes col
+      dateStr   : cellDate(rawDate),
+      project   : String(r[2] || '').trim(),  // C ProjectName
+      member    : String(r[3] || '').trim(),  // D AssignedTo
+      taskType  : taskType,
+      discipline: '',                          // not stored in new structure
+      units     : parseFloat(r[7]) || 1,      // H Units
+      pts       : parseFloat(r[8]) || 0,      // I WeightedPts
+      notes     : String(r[20] || '').trim(), // U Notes
       isVisit   : isVisit,
       isMeeting : isMeeting,
     });
@@ -1653,7 +1533,7 @@ function buildSiteVisitsTab() {
 
   sheet.getRange(logStart, 1).setValue('FULL VISIT LOG');
   sheet.getRange(logStart, 1).setFontWeight('bold').setFontSize(12).setFontColor(ACCENT);
-  sheet.getRange(logStart, 9).setValue('All site visits and client meetings from TASK_LOG');
+  sheet.getRange(logStart, 9).setValue('All site visits and client meetings from TASK_ASSIGNMENTS');
   sheet.getRange(logStart, 9).setFontSize(9).setFontColor('#888888');
 
   var logHeaders = ['Date','Project','Member','Visit Type','Duration / Type','Points','Notes'];
@@ -1705,7 +1585,7 @@ function buildSiteVisitsTab() {
       }
     }
   } else {
-    sheet.getRange(logStart+2, 1).setValue('No visit data found in TASK_LOG yet.');
+    sheet.getRange(logStart+2, 1).setValue('No approved visit tasks found in TASK_ASSIGNMENTS yet.');
     sheet.getRange(logStart+2, 1).setFontColor('#888888').setFontStyle('italic');
   }
 
@@ -1739,28 +1619,26 @@ function calculateCurrentWeekScorecard() {
   Logger.log('Current week: ' + monStr + ' to ' + sunStr);
 
   // Load all data
-  var tlSheet  = s.getSheetByName(TASK_TAB);
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
   var tSheet   = s.getSheetByName(TEAM_TAB);
   if (!tSheet) { Logger.log('TEAM tab not found'); return; }
 
-  var tlRows  = tlSheet  ? tlSheet.getDataRange().getValues()  : [];
   var asRows  = asSheet  ? asSheet.getDataRange().getValues()  : [];
   var sumRows = sumSheet ? sumSheet.getDataRange().getValues() : [];
   var tRows   = tSheet.getDataRange().getValues();
 
-  // Auto-detect TASK_ASSIGNMENTS column structure (22-col vs 23-col)
+  // Auto-detect TASK_ASSIGNMENTS column structure
   var asHeaders = asRows[0] ? asRows[0].map(function(h){ return String(h||'').trim(); }) : [];
   var scIs23    = asHeaders.length >= 23 || asHeaders.indexOf('Actual Completion Date') > -1;
-  var SC_LEADAPPR = scIs23 ? 16 : 15; // Q(16) new / P(15) old
-  var SC_APPDATE  = scIs23 ? 18 : 17; // S(18) new / R(17) old
-  var SC_DONEDATE = scIs23 ? 15 : 14; // P(15) new / O(14) old
-  var SC_STATUSDT = 14;               // O always
-  var SC_DEADLINE = 10;               // K always
-  var SC_REVTAG   = scIs23 ? 19 : 18; // T(19) new / S(18) old
-  var SC_ASSIGNDT = 9;                // J always
-  Logger.log('SC col structure: '+(scIs23?'23-col':'22-col')+' | LeadApproved='+SC_LEADAPPR+' | ApprovalDate='+SC_APPDATE);
+  var SC_LEADAPPR = scIs23 ? 16 : 15;
+  var SC_APPDATE  = scIs23 ? 18 : 17;
+  var SC_DONEDATE = scIs23 ? 15 : 14;
+  var SC_STATUSDT = 14;
+  var SC_DEADLINE = 10;
+  var SC_REVTAG   = scIs23 ? 19 : 18;
+  var SC_ASSIGNDT = 9;
+  Logger.log('SC col structure: '+(scIs23?'23-col':'22-col'));
 
   // Write to IDS Team Scorecard sheet — clear and rewrite (live snapshot)
   var scorecard = getOrCreateScorecard(SCORECARD_TAB, writeScorecardHeaders);
@@ -2188,16 +2066,21 @@ function loadOpenVisitTasks() {
   var open  = {};
   if (!sheet) return open;
   var rows = sheet.getDataRange().getValues();
+  // Auto-detect 22-col vs 23-col (ActualCompletionDate at P inserts before LeadApproved)
+  var headers = rows[0] ? rows[0].map(function(h){ return String(h||'').trim(); }) : [];
+  var is23    = headers.length >= 23 || headers.indexOf('Actual Completion Date') > -1;
+  var COL_LAPPR = is23 ? 16 : 15; // Q(16) new / P(15) old
+
   for (var i = 1; i < rows.length; i++) {
     var r       = rows[i];
-    var taskId  = String(r[0]||'').trim();   // A
-    var proj    = String(r[2]||'').trim();   // C
-    var tType   = String(r[4]||'').trim();   // E
-    var deadline= cellDate(r[10]);           // K
-    var status  = String(r[13]||'').trim();  // N SelfStatus
-    var appr    = String(r[15]||'').trim();  // P LeadApproved
+    var taskId  = String(r[0]||'').trim();           // A
+    var proj    = String(r[2]||'').trim();           // C
+    var tType   = String(r[4]||'').trim();           // E
+    var deadline= cellDate(r[10]);                   // K
+    var status  = String(r[13]||'').trim();          // N SelfStatus
+    var appr    = String(r[COL_LAPPR]||'').trim();   // Q LeadApproved
     if (!proj || !deadline || !isVisitType(tType)) continue;
-    if (status === 'Done' && appr === 'Yes') continue; // completed
+    if (status === 'Done' && appr === 'Yes') continue; // completed — skip
     // Use raw task type as key — consistent with pushVisitTasks
     var assigneeVal = String(r[3]||'').trim(); // D AssignedTo
     var key     = proj + '||' + tType + '||' + assigneeVal;
@@ -2399,14 +2282,14 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
         entry.project,            // C ProjectName
         assignee,                 // D AssignedTo
         entry.visitType,          // E Stage/TaskType
-        pd.disc,                  // F Discipline
-        isVisit ? 0 : 0,          // G BasePts (duration-based)
-        pd.mult,                  // H Multiplier
-        isVisit ? 3 : 1,          // I WeightedPts placeholder (Visit=3, Meeting=1)
+        pd.mult,                  // F Disc. Multiplier (number)
+        0,                        // G Stage Base Pts (0 — visit pts based on hours)
+        1,                        // H Units (always 1 visit unit)
+        0,                        // I Weighted Pts (0 placeholder — updated when hours entered on DPR)
         today,                    // J AssignedDate
         nextDate,                 // K Deadline
         '',                       // L Area
-        '',                       // M Drawing — blank for auto-scheduled visits
+        '',                       // M Drawing
         'Not Started',            // N SelfStatus
         '',                       // O SelfStatusDate
         '',                       // P ActualCompletionDate
@@ -2470,11 +2353,29 @@ function flagMissedVisits(schedSheet, cadence, history, openTasks) {
       }
       var newId='T-'+Utilities.getUuid().substring(0,8).toUpperCase();
       asSheet.appendRow([
-        newId,'',entry.project,entry.assignee,entry.visitType,
-        pd.disc||'',0,pd.mult||1,0,today,today,'','',
-        'Not Started','','Pending','','','',
-        'MISSED VISIT — was due '+nextDate+'. '+entry.notes,
-        'Auto-scheduled','High',
+        newId,                    // A TaskID
+        '',                       // B ProjectID
+        entry.project,            // C ProjectName
+        entry.assignee,           // D AssignedTo
+        entry.visitType,          // E Stage/TaskType
+        pd.mult||1,               // F Disc. Multiplier (number)
+        0,                        // G Stage Base Pts (0 — visit pts based on hours)
+        1,                        // H Units (always 1 visit unit)
+        0,                        // I Weighted Pts (0 placeholder)
+        today,                    // J AssignedDate
+        today,                    // K Deadline = today (overdue)
+        '',                       // L Area
+        '',                       // M Drawing
+        'Not Started',            // N SelfStatus
+        '',                       // O SelfStatusDate
+        '',                       // P ActualCompletionDate
+        'Pending',                // Q LeadApproved
+        '',                       // R ApprovedBy
+        '',                       // S ApprovalDate
+        '',                       // T RevisionTag
+        'MISSED VISIT — was due '+nextDate+'. '+(entry.notes||''), // U Notes
+        'Auto-scheduled',         // V AssignedBy
+        'High',                   // W Priority
       ]);
     }
   });
@@ -2881,14 +2782,16 @@ function createDoneTask(data) {
     }
   }
 
-  // Calculate points — visit tasks use hours×rate, others use basePts×mult
+  // Calculate points — visit tasks use hours×rate, others use basePts×mult×units
   var basePts = parseFloat(data.basePts) || 0;
+  var units   = parseFloat(data.units)   || 1;
   var weightedPts;
   if (isVisitTask(data.taskType) && data.visitHours) {
     weightedPts = calcVisitPts(data.taskType, data.visitHours);
     basePts     = parseFloat(data.visitHours) || basePts;
+    units       = 1; // visits always 1 unit
   } else {
-    weightedPts = Math.round(basePts * mult * 10) / 10;
+    weightedPts = Math.round(basePts * mult * units * 10) / 10;
   }
 
   var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
@@ -2900,10 +2803,10 @@ function createDoneTask(data) {
     data.project      || '',   // C ProjectName
     member,                    // D AssignedTo (self)
     data.taskType     || '',   // E Stage
-    disc,                      // F Discipline
-    basePts,                   // G StageBasePts
-    mult,                      // H Multiplier
-    weightedPts,               // I WeightedPoints
+    mult,                      // F Disc. Multiplier (number)
+    basePts,                   // G Stage Base Pts
+    units,                     // H Units
+    weightedPts,               // I Weighted Pts = F × G × H
     data.date         || today, // J AssignedDate
     today,                     // K Deadline = today (Done same day)
     data.area         || '',   // L Area
@@ -2912,9 +2815,9 @@ function createDoneTask(data) {
     today,                     // O SelfStatusDate
     today,                     // P ActualCompletionDate
     'Pending',                 // Q LeadApproved
-    '',                            // R ApprovedBy
-    '',                            // S ApprovalDate
-    '',                            // T RevisionTag
+    '',                        // R ApprovedBy
+    '',                        // S ApprovalDate
+    '',                        // T RevisionTag
     'Unplanned task — self logged via DPR', // U Notes
     member,                    // V AssignedBy (self)
     'Medium',                  // W Priority
@@ -2945,7 +2848,8 @@ function createSelfAssignedTask(data) {
   }
 
   var basePts    = parseFloat(data.basePts)  || 0;
-  var weightedPts= parseFloat((basePts * mult).toFixed(2));
+  var units      = parseFloat(data.units)    || 1;
+  var weightedPts= parseFloat((basePts * mult * units).toFixed(2));
   var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
 
   sheet.appendRow([
@@ -2954,10 +2858,10 @@ function createSelfAssignedTask(data) {
     data.project      || '',   // C
     data.member       || '',   // D AssignedTo (self)
     data.taskType     || '',   // E Stage
-    disc,                      // F Discipline
-    basePts,                   // G BasePts
-    mult,                      // H Multiplier
-    weightedPts,               // I WeightedPts
+    mult,                      // F Disc. Multiplier (number)
+    basePts,                   // G Stage Base Pts
+    units,                     // H Units
+    weightedPts,               // I Weighted Pts = F × G × H
     data.date         || dateStr(), // J AssignedDate
     tomorrow,                  // K Deadline = tomorrow
     data.area         || '',   // L Area
@@ -2978,6 +2882,61 @@ function createSelfAssignedTask(data) {
   return {status:'ok', taskId:newId};
 }
 
+// Handle Siddharth task creation from DPER form — Deepak assigns pending discussions
+function createSiddharthTask(data) {
+  var sheet    = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  var today    = dateStr();
+  var deadline = addDaysToStr(today, 1); // Next day deadline
+  var s        = db();
+
+  // Get project discipline + multiplier from PROJECTS sheet
+  var mult = 1.0;
+  var projSheet = s.getSheetByName(PROJECTS_TAB);
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var i=1; i<pRows.length; i++) {
+      if (String(pRows[i][1]||'').trim() === data.project ||
+          String(pRows[i][0]||'').trim() === data.project) {
+        mult = parseFloat(pRows[i][4]) || 1.0;
+        break;
+      }
+    }
+  }
+
+  var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
+  var basePts = 0; // Pending discussion items don't have points yet
+  var weightedPts = 0;
+
+  sheet.appendRow([
+    newId,                       // A TaskID
+    '',                          // B ProjectID
+    data.project      || '',     // C ProjectName
+    'Siddharth Inani',           // D AssignedTo
+    'Pending Discussion',        // E Stage/TaskType
+    mult,                        // F Disc. Multiplier
+    basePts,                     // G Stage Base Pts
+    1,                           // H Units
+    weightedPts,                 // I Weighted Pts
+    data.date || today,          // J AssignedDate
+    deadline,                    // K Deadline
+    '',                          // L Area
+    '',                          // M DrawingName
+    'Not Started',               // N SelfStatus
+    '',                          // O SelfStatusDate
+    '',                          // P ActualCompletionDate
+    'Pending',                   // Q LeadApproved
+    '',                          // R ApprovedBy
+    '',                          // S ApprovalDate
+    '',                          // T RevisionTag
+    data.description || '',      // U Notes (the pending discussion items)
+    data.assignedBy || 'Deepak Soni', // V AssignedBy
+    'High',                      // W Priority
+  ]);
+
+  Logger.log('Siddharth task created for '+data.project+': '+newId);
+  return {status:'ok', taskId:newId};
+}
+
 // ════════════════════════════════════════════════════════════════
 // getWeeklyStatsForReport — called by weekly report HTML
 // Returns per-member stats for a given week (Mon-Sat)
@@ -2988,13 +2947,11 @@ function getWeeklyStats(weekStart) {
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
 
-  var tlSheet  = s.getSheetByName(TASK_TAB);
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
   var tSheet   = s.getSheetByName(TEAM_TAB);
   if (!tSheet) return {error:'TEAM tab not found'};
 
-  var tlRows  = tlSheet  ? tlSheet.getDataRange().getValues()  : [];
   var asRows  = asSheet  ? asSheet.getDataRange().getValues()  : [];
   var sumRows = sumSheet ? sumSheet.getDataRange().getValues() : [];
   var tRows   = tSheet.getDataRange().getValues();
@@ -3595,12 +3552,12 @@ function createIssueTask(iss, project, date, onTrack) {
     newId,                    // A TaskID
     '',                       // B ProjectID
     project,                  // C ProjectName
-    assignee,                  // D AssignedTo (resolved from col F lead)
+    assignee,                 // D AssignedTo
     taskType,                 // E Stage
-    '',                       // F Discipline
-    1,                        // G BasePts
-    1,                        // H Multiplier
-    1,                        // I WeightedPts (1pt for site issue resolution effort)
+    1,                        // F Disc. Multiplier (1.0 for issues)
+    1,                        // G Stage Base Pts (1pt per issue)
+    1,                        // H Units
+    1,                        // I Weighted Pts = 1 × 1 × 1
     today,                    // J AssignedDate
     iss.targetDate || addDaysToStr(today,2), // K Deadline
     '',                       // L Area
@@ -3638,8 +3595,10 @@ function writeSiteDecisions(subId, date, project, decisions, onTrack, lead) {
       project,
       'Siddharth Inani',
       'Decision Pending',
-      '',
-      0, 1, 0,
+      1,             // F Disc. Multiplier
+      0,             // G Stage Base Pts
+      1,             // H Units
+      0,             // I Weighted Pts (0 — decisions are tracking tasks, not scored)
       today,
       addDaysToStr(today, 1), // Deadline = tomorrow (site is waiting)
       '',
@@ -3770,6 +3729,497 @@ function listTriggers() {
   triggers.forEach(function(t) {
     Logger.log(t.getHandlerFunction() + ' — ' + t.getEventType());
   });
+}
+
+// ════════════════════════════════════════════════════════════════
+// getDeepakVisitSummary — weekly site visit coverage for Deepak
+// Returns per-project visit status for the current or given week
+// Sources: VISIT_PLANNER (assigned projects) + SITE_EXECUTION (DPER)
+//          + TASK_ASSIGNMENTS (completed visit tasks)
+// ════════════════════════════════════════════════════════════════
+function getDeepakVisitSummary(weekStart) {
+  var mon = weekStart || dateStr(mondayOf(new Date()));
+  var sat = addDaysToStr(mon, 5);
+  var today = dateStr();
+
+  // ── 1. Deepak's assigned projects from VISIT_PLANNER ─────────
+  var planSheet = db().getSheetByName(PLANNER_TAB);
+  var assignedProjects = []; // projects Deepak is supposed to visit weekly
+  if (planSheet && planSheet.getLastRow() > 3) {
+    var pRows = planSheet.getRange(4, 1, planSheet.getLastRow()-3, 9).getValues();
+    pRows.forEach(function(r) {
+      var proj     = String(r[0]||'').trim();
+      var active   = String(r[6]||'Yes').trim().toLowerCase();
+      var assignee = String(r[2]||'').trim();
+      if (!proj || active === 'no') return;
+      var assignees = assignee.split(',').map(function(a){ return a.trim(); });
+      if (assignees.indexOf('Deepak Soni') > -1 &&
+          assignedProjects.indexOf(proj) === -1) {
+        assignedProjects.push(proj);
+      }
+    });
+  }
+
+  // ── 2. Visits recorded via DPER (SITE_EXECUTION) ─────────────
+  // Cols: B=Date(1) D=ProjectName(3) E=Lead(4) F=SiteVisitDone(5)
+  var execSheet = db().getSheetByName(SITE_EXEC_TAB);
+  var visitMap = {}; // project → [{date, siteVisit, source}]
+  if (execSheet && execSheet.getLastRow() > 1) {
+    var eRows = execSheet.getDataRange().getValues();
+    for (var i = 1; i < eRows.length; i++) {
+      var eDate    = cellDate(eRows[i][1]);               // B Date
+      var eProj    = String(eRows[i][3]||'').trim();      // D ProjectName
+      var eLead    = String(eRows[i][4]||'').trim();      // E Lead
+      var eVisited = String(eRows[i][5]||'').trim();      // F SiteVisitDone
+      if (eLead !== 'Deepak Soni') continue;
+      if (!eDate || eDate < mon || eDate > sat) continue;
+      if (!visitMap[eProj]) visitMap[eProj] = [];
+      visitMap[eProj].push({date:eDate, siteVisit:eVisited, source:'DPER'});
+    }
+  }
+
+  // ── 3. Completed visit tasks in TASK_ASSIGNMENTS ──────────────
+  var asSheet = db().getSheetByName(ASSIGN_TAB);
+  if (asSheet) {
+    var asRows  = asSheet.getDataRange().getValues();
+    var aHdrs   = asRows[0] ? asRows[0].map(function(h){return String(h||'').trim();}) : [];
+    var aIs23   = aHdrs.length >= 23 || aHdrs.indexOf('Actual Completion Date') > -1;
+    var A_ACTDT = aIs23 ? 15 : -1;
+    var A_STATDT= 14;
+
+    for (var j = 1; j < asRows.length; j++) {
+      var ar = asRows[j];
+      if (String(ar[3]||'').trim() !== 'Deepak Soni') continue;
+      if (!isVisitTask(String(ar[4]||'').trim())) continue;
+      if (String(ar[13]||'').trim() !== 'Done') continue;
+      var doneDate = (A_ACTDT > -1 ? cellDate(ar[A_ACTDT]) : '') || cellDate(ar[A_STATDT]);
+      if (!doneDate || doneDate < mon || doneDate > sat) continue;
+      var aProj = String(ar[2]||'').trim();
+      if (!visitMap[aProj]) visitMap[aProj] = [];
+      visitMap[aProj].push({date:doneDate, siteVisit:'Yes', source:'task'});
+    }
+  }
+
+  // ── 4. Build per-project result ───────────────────────────────
+  var projects = assignedProjects.map(function(proj) {
+    var visits     = visitMap[proj] || [];
+    var siteVisits = visits.filter(function(v){ return v.siteVisit==='Yes'; });
+    var dperDays   = visits.filter(function(v){ return v.source==='DPER'; }).length;
+    return {
+      project    : proj,
+      visited    : siteVisits.length > 0,
+      visitDates : siteVisits.map(function(v){ return v.date; }).filter(function(d,i,a){ return a.indexOf(d)===i; }).sort(),
+      dperDays   : dperDays,
+      unplanned  : false,
+    };
+  });
+
+  // Also surface unplanned projects visited this week
+  Object.keys(visitMap).forEach(function(proj) {
+    if (assignedProjects.indexOf(proj) > -1) return;
+    var sv = visitMap[proj].filter(function(v){ return v.siteVisit==='Yes'; });
+    if (sv.length > 0) {
+      projects.push({
+        project    : proj,
+        visited    : true,
+        visitDates : sv.map(function(v){ return v.date; }).filter(function(d,i,a){ return a.indexOf(d)===i; }).sort(),
+        dperDays   : visitMap[proj].filter(function(v){ return v.source==='DPER'; }).length,
+        unplanned  : true,
+      });
+    }
+  });
+
+  var visited = projects.filter(function(p){ return p.visited; }).length;
+  var total   = assignedProjects.length;
+
+  return {
+    weekStart   : mon,
+    weekEnd     : sat,
+    projects    : projects,
+    visitedCount: visited,
+    totalCount  : total,
+    coveragePct : total > 0 ? Math.round(visited / total * 100) : 0,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════
+// fixExistingSheetData — run once to clean up TASK_ASSIGNMENTS
+//
+// For every non-approved row:
+//   1. Looks up correct Disc.Multiplier from PROJECTS tab (col E)
+//   2. Looks up correct Stage Base Pts from CONFIG tab (col A→B)
+//   3. Detects and fixes rows where F/G were swapped during migration
+//   4. Recalculates WeightedPts = Disc.Mult × BasePts × Units
+//   5. Sets Decision Pending tasks to 1 pt (so they appear on dashboard)
+//   6. Fixes visit tasks: F=project mult, G=hours (keep), H=1,
+//      I=hours×rate (2 for site visits, 1 for meetings)
+//
+// Approved tasks (LeadApproved=Yes) are NEVER touched — they are final.
+// ════════════════════════════════════════════════════════════════
+function fixExistingSheetData() {
+  var s     = db();
+  var sheet = s.getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('TASK_ASSIGNMENTS not found'); return; }
+
+  // ── Build CONFIG stage → basePts lookup ──────────────────────
+  var configSheet = s.getSheetByName(CONFIG_TAB);
+  var stagePtsMap = {}; // stage label → basePts
+  if (configSheet) {
+    var cRows = configSheet.getDataRange().getValues();
+    var SKIP_A = ['STAGE WEIGHTS','TASK / STAGE TYPE','TOTAL',''];
+    for (var ci = 0; ci < cRows.length; ci++) {
+      var stg = String(cRows[ci][0]||'').trim();
+      var pts = parseFloat(cRows[ci][1]);
+      if (stg && SKIP_A.indexOf(stg.toUpperCase()) === -1 &&
+          !stg.startsWith('—') && !isNaN(pts) && pts > 0) {
+        stagePtsMap[stg] = pts;
+      }
+    }
+  }
+  Logger.log('Loaded ' + Object.keys(stagePtsMap).length + ' stage pts from CONFIG');
+
+  // ── Build PROJECTS project → multiplier lookup ────────────────
+  var projSheet  = s.getSheetByName(PROJECTS_TAB);
+  var projMultMap = {}; // project name → multiplier
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pRows.length; pi++) {
+      var pn = String(pRows[pi][1]||'').trim();
+      var pm = parseFloat(pRows[pi][4]) || 1.0;
+      if (pn) projMultMap[pn] = pm;
+    }
+  }
+  Logger.log('Loaded ' + Object.keys(projMultMap).length + ' project multipliers');
+
+  // ── Process every data row ────────────────────────────────────
+  var headers  = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var is23     = headers.length >= 23 || headers.indexOf('Actual Completion Date') > -1;
+  var COL_LAPPR = is23 ? 16 : 15; // Q LeadApproved (0-based index)
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('No data rows'); return; }
+
+  var data    = sheet.getRange(2, 1, lastRow-1, 23).getValues();
+  var fixed   = 0, skipped = 0;
+
+  var swapped = 0, corrected = 0, approvedSkipped = 0, unknownSkipped = 0;
+
+  for (var i = 0; i < data.length; i++) {
+    var row          = data[i];
+    var project      = String(row[2]  || '').trim(); // C ProjectName
+    var taskType     = String(row[4]  || '').trim(); // E Stage
+    var colF         = parseFloat(row[5]);           // F Disc.Mult (current)
+    var colG         = parseFloat(row[6]);           // G BasePts (current)
+    var colH         = parseFloat(row[7]) || 1;      // H Units
+    var colI         = parseFloat(row[8]) || 0;      // I WeightedPts
+    if (isNaN(colF)) colF = 0;
+    if (isNaN(colG)) colG = 0;
+    var leadApproved = String(row[COL_LAPPR]||'').trim();
+
+    // ── RULE: Never touch approved tasks ────────────────────────
+    // Lead may have manually corrected pts during approval — those are final
+    if (leadApproved === 'Yes') { approvedSkipped++; continue; }
+
+    var isVisit    = isVisitTask(taskType);
+    var isDecision = (taskType === 'Decision Pending');
+
+    // ── Look up authoritative values ─────────────────────────────
+    var multLookup = projMultMap[project];   // undefined if project not in PROJECTS
+    var baseLookup = stagePtsMap[taskType];  // undefined if stage not in CONFIG
+
+    var multFound = (multLookup !== undefined);
+    var baseFound = (baseLookup !== undefined);
+
+    // Conservative defaults: if lookup fails, keep existing value
+    var correctMult = multFound ? multLookup : colF;
+    var correctBase = baseFound ? baseLookup : colG;
+
+    var newF = colF, newG = colG, newH = colH, newI = colI;
+    var action = '';
+
+    // ── Decision Pending: always 1 pt ───────────────────────────
+    if (isDecision) {
+      newF = 1; newG = 1; newH = 1; newI = 1;
+      action = 'decision-default';
+
+    // ── Visit / Meeting tasks ─────────────────────────────────────
+    } else if (isVisit) {
+      if (multFound) newF = correctMult; // verified multiplier
+      newH = 1; // visits always 1 unit
+      // G = hours stored by updateTaskStatusesFromDPR — keep it
+      // Only recalculate WeightedPts if we have hours (G > 0)
+      if (colG > 0) {
+        newI = calcVisitPts(taskType, colG); // hours × rate (2 or 1)
+      }
+      action = 'visit';
+
+    // ── Regular tasks — both lookups succeeded ────────────────────
+    } else if (multFound && baseFound) {
+      // Detect F/G swap: F has basePts value, G has multiplier value
+      var fMatchesBase = Math.abs(colF - correctBase) < 0.01;
+      var gMatchesMult = Math.abs(colG - correctMult) < 0.01;
+
+      if (fMatchesBase && gMatchesMult && Math.abs(correctBase - correctMult) > 0.01) {
+        // Clear swap detected (values are numerically different so unambiguous)
+        newF = correctMult;
+        newG = correctBase;
+        action = 'swap-fixed';
+        Logger.log('SWAP row ' + (i+2) + ': ' + project + ' | ' + taskType +
+          ' | F:' + colF + '→' + newF + ' G:' + colG + '→' + newG);
+      } else {
+        // Verify against lookup — correct any mismatch
+        newF = correctMult;
+        newG = correctBase;
+        action = 'verified';
+      }
+      // Recalculate WeightedPts from authoritative F × G × H
+      newI = Math.round(newF * newG * colH * 10) / 10;
+
+    // ── Regular tasks — only multiplier lookup succeeded ──────────
+    } else if (multFound && !baseFound) {
+      // Can verify multiplier but not basePts — fix F only, keep G
+      newF = correctMult;
+      // Recalculate I using fixed F and existing G
+      if (colG > 0) newI = Math.round(newF * colG * colH * 10) / 10;
+      action = 'mult-only';
+
+    // ── Regular tasks — only basePts lookup succeeded ─────────────
+    } else if (!multFound && baseFound) {
+      // Can verify basePts but not multiplier — fix G only, keep F
+      newG = correctBase;
+      if (colF > 0) newI = Math.round(colF * newG * colH * 10) / 10;
+      action = 'base-only';
+
+    // ── Neither lookup succeeded — leave completely unchanged ─────
+    } else {
+      unknownSkipped++;
+      continue;
+    }
+
+    // Write only if something actually changed
+    var changed = (Math.abs(newF - colF) > 0.001) ||
+                  (Math.abs(newG - colG) > 0.001) ||
+                  (Math.abs(newH - colH) > 0.001) ||
+                  (Math.abs(newI - colI) > 0.001);
+
+    if (changed) {
+      sheet.getRange(i+2, 6, 1, 4).setValues([[newF, newG, newH, newI]]);
+      if (action === 'swap-fixed') swapped++; else corrected++;
+      if ((swapped + corrected) % 50 === 0) SpreadsheetApp.flush();
+    } else {
+      skipped++; // Already correct — no write needed
+    }
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log('=== fixExistingSheetData complete ===');
+  Logger.log('Swaps fixed: ' + swapped);
+  Logger.log('Values corrected: ' + corrected);
+  Logger.log('Already correct (no change): ' + skipped);
+  Logger.log('Approved (skipped): ' + approvedSkipped);
+  Logger.log('Unknown stage/project (skipped): ' + unknownSkipped);
+  return {status:'ok', swapped:swapped, corrected:corrected,
+          alreadyCorrect:skipped, approvedSkipped:approvedSkipped,
+          unknownSkipped:unknownSkipped};
+}
+
+// ════════════════════════════════════════════════════════════════
+// migrateToNewColumnStructure — one-time migration
+//
+// Converts TASK_ASSIGNMENTS from old structure to new:
+//   OLD: F=DisciplineText  G=BasePts  H=Multiplier  I=WeightedPts
+//   NEW: F=DiscMultiplier  G=BasePts  H=Units        I=WeightedPts
+//
+// Logic per row:
+//   F(new) = H(old) — multiplier already stored in H, move to F
+//   G(new) = G(old) — basePts unchanged
+//   H(new) = derived units = round(WeightedPts / (BasePts × Mult))
+//             visit tasks → units = 1 always
+//             bad division → units = 1 default
+//   I(new) = I(old) — keep approved WeightedPts as-is (source of truth)
+//
+// Also updates header row and applies correct number formatting.
+// ════════════════════════════════════════════════════════════════
+function migrateToNewColumnStructure() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('TASK_ASSIGNMENTS not found'); return; }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('No data rows'); return; }
+
+  Logger.log('=== migrateToNewColumnStructure: ' + (lastRow-1) + ' rows ===');
+
+  var data      = sheet.getRange(2, 1, lastRow-1, 23).getValues();
+  var migrated  = 0;
+
+  for (var i = 0; i < data.length; i++) {
+    var row         = data[i];
+    var taskType    = String(row[4]||'').trim();   // E
+    var discOrMult  = row[5];                      // F — currently discipline text OR already a number
+    var basePts     = parseFloat(row[6]) || 0;     // G
+    var oldH        = row[7];                      // H — currently multiplier number
+    var weightedPts = parseFloat(row[8]) || 0;     // I
+
+    // Determine the multiplier value:
+    // If col F already holds a number (e.g. from a partial migration), use it.
+    // Otherwise col F holds discipline text → use col H for the multiplier.
+    var mult;
+    var fIsNumber = (typeof discOrMult === 'number') ||
+                    (!isNaN(parseFloat(discOrMult)) && String(discOrMult).trim() !== '');
+    if (fIsNumber) {
+      mult = parseFloat(discOrMult) || 1;
+    } else {
+      mult = parseFloat(oldH) || 1;
+    }
+
+    // Derive units
+    var units;
+    if (isVisitTask(taskType)) {
+      units = 1; // visits: always 1 unit, pts based on hours
+    } else if (basePts > 0 && mult > 0) {
+      var derived = weightedPts / (basePts * mult);
+      units = Math.round(derived);
+      if (units < 1 || isNaN(units)) units = 1;
+    } else {
+      units = 1;
+    }
+
+    // Write: F=mult, G=basePts(unchanged), H=units, I=weightedPts(unchanged)
+    sheet.getRange(i+2, 6, 1, 4).setValues([[mult, basePts, units, weightedPts]]);
+    migrated++;
+
+    if (migrated % 50 === 0) SpreadsheetApp.flush();
+  }
+
+  SpreadsheetApp.flush();
+
+  // Update header row labels
+  sheet.getRange(1, 6).setValue('Disc. Multiplier');
+  sheet.getRange(1, 8).setValue('Units');
+
+  // Apply correct number formatting
+  var dataRows = lastRow - 1;
+  sheet.getRange(2, 6, dataRows, 1).setNumberFormat('0.0');   // F Multiplier
+  sheet.getRange(2, 7, dataRows, 1).setNumberFormat('0.00');  // G BasePts
+  sheet.getRange(2, 8, dataRows, 1).setNumberFormat('0');     // H Units (integer)
+  sheet.getRange(2, 9, dataRows, 1).setNumberFormat('0.00');  // I WeightedPts
+
+  Logger.log('=== Migration done: ' + migrated + ' rows updated ===');
+  return {status:'ok', migrated: migrated};
+}
+
+// ════════════════════════════════════════════════════════════════
+// fixShiftedTaskColumns — one-time repair for column shift bug
+//
+// BEFORE RUNNING THIS:
+//   1. Open TASK_ASSIGNMENTS in Google Sheets
+//   2. Find the "Deadline" column (currently showing right after Stage)
+//   3. Move it back to after the "Assigned Date" column
+//      (right-click column header → Move column right, repeat until
+//       it sits between Assigned Date and Area)
+//   4. Then run this function from Apps Script editor
+//
+// WHAT IT DOES:
+//   Detects rows where col K (Deadline) contains a discipline string
+//   instead of a date — these rows had their values shifted left by
+//   one position when the Deadline column was moved. Rotates them back.
+//
+//   Affected rows: [F,G,H,I,J,K] = [basePts,mult,weighted,assignedDate,deadline,disc]
+//   Fixed to:      [F,G,H,I,J,K] = [disc,basePts,mult,weighted,assignedDate,deadline]
+// ════════════════════════════════════════════════════════════════
+function fixShiftedTaskColumns() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('TASK_ASSIGNMENTS not found'); return; }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('No data rows found'); return; }
+
+  Logger.log('=== fixShiftedTaskColumns: scanning ' + (lastRow-1) + ' rows ===');
+
+  // Read all rows at once for speed
+  var data = sheet.getRange(2, 1, lastRow - 1, 23).getValues();
+  var fixed = 0, skipped = 0;
+
+  for (var i = 0; i < data.length; i++) {
+    var row   = data[i];
+    var colK  = row[10]; // K = Deadline (0-based index 10)
+
+    // Detect corrupted row: col K should hold a date after move-back.
+    // If it holds a non-empty string that doesn't look like a date → corrupted.
+    var isDate  = (colK instanceof Date) ||
+                  (typeof colK === 'string' && /^\d{4}-\d{2}-\d{2}/.test(colK)) ||
+                  (typeof colK === 'number' && colK > 10000); // Sheets date serial
+    var isEmpty = (colK === null || colK === undefined || String(colK).trim() === '');
+
+    if (isDate || isEmpty) { skipped++; continue; }
+
+    // col K is a text string (discipline) → this row is corrupted
+    // Current: [F=basePts, G=mult, H=weighted, I=assignedDate, J=deadline, K=disc]
+    // Correct: [F=disc,    G=basePts, H=mult,  I=weighted,  J=assignedDate, K=deadline]
+    var f = row[5], g = row[6], h = row[7], ii = row[8], j = row[9], k = row[10];
+
+    sheet.getRange(i + 2, 6, 1, 6).setValues([[k, f, g, h, ii, j]]);
+
+    Logger.log('Fixed row ' + (i+2) +
+      ' | proj=' + row[2] +
+      ' | assignee=' + row[3] +
+      ' | disc=' + k +
+      ' | deadline=' + j);
+    fixed++;
+
+    // Flush every 50 writes to avoid timeout
+    if (fixed % 50 === 0) SpreadsheetApp.flush();
+  }
+
+  SpreadsheetApp.flush();
+  Logger.log('=== Done: ' + fixed + ' rows fixed, ' + skipped + ' skipped ===');
+  return {status: 'ok', fixed: fixed, skipped: skipped};
+}
+
+// ════════════════════════════════════════════════════════════════
+// fixColumnFormattingAfterShift — run AFTER fixShiftedTaskColumns()
+// Restores correct number / date formats to TASK_ASSIGNMENTS columns
+// that inherited wrong formatting during the Deadline column move.
+//
+// Fixes:
+//   Col F  (Discipline)     → plain text / no format
+//   Col G  (Stage Base Pts) → number  "0.00"
+//   Col H  (Disc.Multiplier)→ number  "0.0"
+//   Col I  (Weighted Pts)   → number  "0.00"  ← was date-formatted
+//   Col J  (Assigned Date)  → date    "yyyy-mm-dd"
+//   Col K  (Deadline)       → date    "yyyy-mm-dd"  ← was DD/MM/YYYY
+// ════════════════════════════════════════════════════════════════
+function fixColumnFormattingAfterShift() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('TASK_ASSIGNMENTS not found'); return; }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('No data rows'); return; }
+
+  var dataRows = lastRow - 1; // number of data rows (exclude header)
+
+  // Col F (6) — Discipline: plain text, no format that could distort the string
+  sheet.getRange(2, 6, dataRows, 1).setNumberFormat('@STRING@');
+
+  // Col G (7) — Stage Base Pts: number with 2 dp
+  sheet.getRange(2, 7, dataRows, 1).setNumberFormat('0.00');
+
+  // Col H (8) — Disc. Multiplier: number with 1 dp
+  sheet.getRange(2, 8, dataRows, 1).setNumberFormat('0.0');
+
+  // Col I (9) — Weighted Points: number with 2 dp
+  // This is the main problem column — was showing 1.5 as "1899-12-31" etc.
+  sheet.getRange(2, 9, dataRows, 1).setNumberFormat('0.00');
+
+  // Col J (10) — Assigned Date: ISO date format
+  sheet.getRange(2, 10, dataRows, 1).setNumberFormat('yyyy-mm-dd');
+
+  // Col K (11) — Deadline: ISO date format (was showing as DD/MM/YYYY)
+  sheet.getRange(2, 11, dataRows, 1).setNumberFormat('yyyy-mm-dd');
+
+  SpreadsheetApp.flush();
+  Logger.log('Column formatting fixed for cols F–K (rows 2–' + lastRow + ')');
+  return {status: 'ok', rows: dataRows};
 }
 
 // Run this manually to verify sheet access
