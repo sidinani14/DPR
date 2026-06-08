@@ -653,21 +653,10 @@ async function submitAll(){
           materials:p.materials, materialDelays:'',
           clientUpdated:p.clientUpdated, clientConcerns:p.clientConcerns,
           blocking:p.blocking, remarks:'',
+          siddharthPending:p.siddharthPending||'',
           issues:JSON.stringify(p.issues),
           whatsappMsg:waMsg,
         })});
-
-      // 2a. Create Siddharth task if there are pending items
-      if(p.siddharthPending && p.proj){
-        await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-          body:JSON.stringify({
-            action:'createSiddharthTask',
-            project:p.proj,
-            description:p.siddharthPending,
-            assignedBy:leadName,
-            date:date
-          })});
-      }
     }
 
     // Clear draft on successful submit

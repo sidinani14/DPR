@@ -3333,13 +3333,19 @@ function handleDPERSubmission(data) {
   try {
     var subId     = writeSiteExecution(data);
     var issues    = [];
-    var decisions = [];
-    try { issues    = data.issues       ? JSON.parse(data.issues)       : []; } catch(e){}
-    try { decisions = data.decisionItems ? JSON.parse(data.decisionItems): []; } catch(e){}
+    try { issues = data.issues ? JSON.parse(data.issues) : []; } catch(e){}
     writeSiteIssues(subId, data.date||dateStr(), data.project||'',
                     issues, data.onTrack||'Yes');
-    writeSiteDecisions(subId, data.date||dateStr(), data.project||'',
-                       decisions, data.onTrack||'Yes', data.lead||'');
+
+    // Create Siddharth task if pending discussion text was entered at project level
+    if (data.siddharthPending && String(data.siddharthPending).trim()) {
+      createSiddharthTask({
+        project    : data.project   || '',
+        description: String(data.siddharthPending).trim(),
+        assignedBy : data.lead      || 'Deepak Soni',
+        date       : data.date      || dateStr(),
+      });
+    }
 
     // Write WhatsApp message to SITE_WA_MESSAGES tab
     if (data.whatsappMsg) {
@@ -3453,9 +3459,9 @@ function writeSiteExecution(data) {
     data.materialDelays|| '',
     data.clientUpdated|| 'No',
     data.clientConcerns|| '',
-    data.blocking     || '',
-    data.decisions    || '',
-    data.remarks      || '',
+    data.blocking          || '',
+    data.siddharthPending  || '',   // col U: Decisions Pending from Siddharth
+    data.remarks           || '',
   ]);
   return subId;
 }
