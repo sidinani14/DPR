@@ -2884,6 +2884,7 @@ function createSelfAssignedTask(data) {
 
 // Handle Siddharth task creation from DPER form — Deepak assigns pending discussions
 function createSiddharthTask(data) {
+  Logger.log('createSiddharthTask called: project=' + data.project + ' desc=' + data.description);
   var sheet    = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
   var today    = dateStr();
   var deadline = addDaysToStr(today, 1); // Next day deadline
@@ -3338,13 +3339,20 @@ function handleDPERSubmission(data) {
                     issues, data.onTrack||'Yes');
 
     // Create Siddharth task if pending discussion text was entered at project level
-    if (data.siddharthPending && String(data.siddharthPending).trim()) {
-      createSiddharthTask({
-        project    : data.project   || '',
-        description: String(data.siddharthPending).trim(),
-        assignedBy : data.lead      || 'Deepak Soni',
-        date       : data.date      || dateStr(),
-      });
+    Logger.log('siddharthPending received: [' + data.siddharthPending + '] for project: ' + data.project);
+    var sidPending = data.siddharthPending ? String(data.siddharthPending).trim() : '';
+    if (sidPending) {
+      try {
+        var taskResult = createSiddharthTask({
+          project    : data.project   || '',
+          description: sidPending,
+          assignedBy : data.lead      || 'Deepak Soni',
+          date       : data.date      || dateStr(),
+        });
+        Logger.log('Siddharth task created: ' + JSON.stringify(taskResult));
+      } catch(sidErr) {
+        Logger.log('ERROR in createSiddharthTask: ' + String(sidErr));
+      }
     }
 
     // Write WhatsApp message to SITE_WA_MESSAGES tab
