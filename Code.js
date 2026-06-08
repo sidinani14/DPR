@@ -139,6 +139,7 @@ function doGet(e) {
   if (action === 'getProjectStats')          return safeRespond(getProjectStats);
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
+  if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
   return respond({status: 'IDS DPR live'});
 }
 
@@ -2883,6 +2884,38 @@ function createSelfAssignedTask(data) {
 }
 
 // Handle Siddharth task creation from DPER form — Deepak assigns pending discussions
+// ════════════════════════════════════════════════════════════════
+// DEBUG — run testCreateSiddharthTask() directly from the editor
+// to verify createSiddharthTask works independently of the form
+// ════════════════════════════════════════════════════════════════
+function testCreateSiddharthTask() {
+  var result;
+  try {
+    result = createSiddharthTask({
+      project    : 'TEST-DEBUG',
+      description: 'Test pending discussion created by testCreateSiddharthTask() at ' + new Date().toLocaleString(),
+      assignedBy : 'Deepak Soni',
+      date       : dateStr(),
+    });
+    Logger.log('testCreateSiddharthTask SUCCESS: ' + JSON.stringify(result));
+    // Write outcome to spreadsheet so you can see it without logs
+    var s = db().getSheetByName(ASSIGN_TAB);
+    if (s) {
+      var last = s.getLastRow();
+      s.getRange(last, 1, 1, 23).setBackground('#C8E6C9'); // green highlight = test row
+    }
+  } catch(e) {
+    Logger.log('testCreateSiddharthTask FAILED: ' + String(e));
+    result = {status:'error', message: String(e)};
+    // Write a visible error marker to spreadsheet
+    try {
+      var errSheet = db().getSheetByName('DEBUG_LOG') || db().insertSheet('DEBUG_LOG');
+      errSheet.appendRow([new Date(), 'createSiddharthTask ERROR', String(e)]);
+    } catch(e2) {}
+  }
+  return result;
+}
+
 function createSiddharthTask(data) {
   Logger.log('createSiddharthTask called: project=' + data.project + ' desc=' + data.description);
   var sheet    = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
@@ -3341,6 +3374,8 @@ function handleDPERSubmission(data) {
     // Create Siddharth task if pending discussion text was entered at project level
     Logger.log('siddharthPending received: [' + data.siddharthPending + '] for project: ' + data.project);
     var sidPending = data.siddharthPending ? String(data.siddharthPending).trim() : '';
+    var siddharthTaskId = null;
+    var siddharthError  = null;
     if (sidPending) {
       try {
         var taskResult = createSiddharthTask({
@@ -3349,9 +3384,11 @@ function handleDPERSubmission(data) {
           assignedBy : data.lead      || 'Deepak Soni',
           date       : data.date      || dateStr(),
         });
+        siddharthTaskId = taskResult.taskId || null;
         Logger.log('Siddharth task created: ' + JSON.stringify(taskResult));
       } catch(sidErr) {
-        Logger.log('ERROR in createSiddharthTask: ' + String(sidErr));
+        siddharthError = String(sidErr);
+        Logger.log('ERROR in createSiddharthTask: ' + siddharthError);
       }
     }
 
@@ -3373,7 +3410,12 @@ function handleDPERSubmission(data) {
     }
 
     Logger.log('DPER submitted: ' + subId + ' / ' + (data.project||''));
-    return {status:'ok', subId:subId};
+    return {
+      status           : 'ok',
+      subId            : subId,
+      siddharthTaskId  : siddharthTaskId,
+      siddharthError   : siddharthError,
+    };
   } catch(err) {
     Logger.log('DPER error: ' + String(err));
     return {status:'error', message:String(err)};

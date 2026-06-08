@@ -639,9 +639,10 @@ async function submitAll(){
     }
 
     // 2. Each project
+    let siddharthErrors = [];
     for(const p of projs){
       const waMsg=document.getElementById(`wa-${p.id}`)?.value||'';
-      await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      const resp = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({
           action:'submitDPER', date:p.date||date,
           time:new Date().toTimeString().substring(0,5),
@@ -657,6 +658,12 @@ async function submitAll(){
           issues:JSON.stringify(p.issues),
           whatsappMsg:waMsg,
         })});
+      try {
+        const r = await resp.json();
+        console.log('submitDPER response for', p.proj, r);
+        if(p.siddharthPending && r.siddharthError) siddharthErrors.push(p.proj+': '+r.siddharthError);
+        if(p.siddharthPending && r.siddharthTaskId) console.log('Siddharth task created:', r.siddharthTaskId);
+      } catch(e){ console.log('Could not parse submitDPER response', e); }
     }
 
     // Clear draft on successful submit
@@ -667,9 +674,12 @@ async function submitAll(){
     document.querySelector('.submit-bar').style.display='none';
     const res=Object.values(issueActions).filter(a=>a.action==='resolve').length;
     const esc=Object.values(issueActions).filter(a=>a.action==='escalate').length;
+    const sidPendingCount = projs.filter(p=>p.siddharthPending).length;
     document.getElementById('success-sub').innerHTML=
       `${projs.length} project report${projs.length!==1?'s':''} submitted by ${leadName}<br>`+
-      (res?`${res} issue${res!==1?'s':''} resolved · `:'')+(esc?`${esc} escalated`:'');
+      (res?`${res} issue${res!==1?'s':''} resolved · `:'')+(esc?`${esc} escalated · `:'')+
+      (sidPendingCount && !siddharthErrors.length ? `✅ ${sidPendingCount} Siddharth task${sidPendingCount!==1?'s':''} created` : '')+
+      (siddharthErrors.length ? `⚠️ Siddharth task error: ${siddharthErrors.join('; ')}` : '');
   } catch(e){
     toast('Error: '+e.message);
     document.getElementById('submit-btn').disabled=false;
