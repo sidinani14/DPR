@@ -142,6 +142,7 @@ const WEEK_DAYS   = 6;
 // ── Team ─────────────────────────────────────────────────
 const ROLES = {
   'Aaditya Koshti'  : 'Junior Architect',
+  'Aashi Agrawal'   : 'Junior ID',
   'Achal Rathore'   : 'Technical Lead',
   'Bhavesh Bhagwat' : 'Junior Architect',
   'Himanshu Malviya': 'Technical Lead',
@@ -150,7 +151,7 @@ const ROLES = {
 };
 
 const TARGETS = {
-  'Aaditya Koshti':48, 'Achal Rathore':72,
+  'Aaditya Koshti':48, 'Aashi Agrawal':48, 'Achal Rathore':72,
   'Bhavesh Bhagwat':60, 'Himanshu Malviya':72,
   'Poorvi Goyal':48, 'Sahil Maurya':48,
 };
@@ -191,6 +192,17 @@ const BIO = {
       {d:'Thu 4',t:'09:00',s:'P',l:false},
       {d:'Fri 5',t:'08:51',s:'P',l:false},
       {d:'Sat 6',t:'09:06',s:'P',l:false},
+    ]
+  },
+  'Aashi Agrawal': {
+    days:4, lateCount:0, avgHrs:'08:45', hrsScore:10, punctScore:10.5,
+    att:[
+      {d:'Mon 1',t:'—',s:'—',l:false,n:'Data not available'},
+      {d:'Tue 2',t:'09:08',s:'P',l:false,n:'Biometric sync issue'},
+      {d:'Wed 3',t:'09:06',s:'P',l:false,n:'Biometric sync issue'},
+      {d:'Thu 4',t:'09:10',s:'P',l:false},
+      {d:'Fri 5',t:'—',s:'A',l:false},
+      {d:'Sat 6',t:'09:00',s:'P',l:false},
     ]
   },
   'Himanshu Malviya': {
@@ -244,6 +256,11 @@ const IMPROVE = {
     'Tuesday 2 arrival at 09:24 — 14 min late, maintain the strong on-time performance from Wed-Sun',
     'Average hours 07:44 — slightly below 8h target, aim for consistent 8h daily output',
     'Good DPR consistency (5/6 days) and attendance — focus on increasing task output delivery',
+  ],
+  'Aashi Agrawal': [
+    'Friday 5 absence — advance notice required; ensure project tasks are handed over',
+    'Biometric sync issues on Tue-Wed — verify system connectivity and data recording',
+    'DPR consistency 4/6 days (67%) — implement daily reminder to file all reports; target 6/6 next week',
   ],
   'Himanshu Malviya': [
     'Perfect attendance and DPR consistency (6/6 days submitted) — maintain this documentation discipline',
