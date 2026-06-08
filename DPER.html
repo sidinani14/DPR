@@ -578,6 +578,7 @@ function collectProjects(){
       materialDelays:'',
       clientUpdated:document.getElementById(`pb-cl-yes-${id}`)?.classList.contains('on-yes')?'Yes':'No',
       clientConcerns:(document.getElementById(`pb-clc-${id}`)?.value||'').trim(),
+      siddharthPending:(document.getElementById(`pb-siddharth-${id}`)?.value||'').trim(),
       issues,
     });
   });
@@ -690,6 +691,18 @@ async function submitAll(){
           decisionItems:JSON.stringify(decs),
           whatsappMsg:waMsg,
         })});
+
+      // 2a. Create Siddharth task if there are pending items
+      if(p.siddharthPending && p.proj){
+        await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({
+            action:'createSiddharthTask',
+            project:p.proj,
+            description:p.siddharthPending,
+            assignedBy:leadName,
+            date:date
+          })});
+      }
     }
 
     // Clear draft on successful submit
@@ -1026,6 +1039,10 @@ function buildPBInnerHTML(id, projOpts) {
       <div class="lbl">Issues on Site</div>
       <div id="pb-iss-${id}"></div>
       <button class="add-btn" onclick="addIssueBlock(${id})">+ Add Issue</button>
+    </div>
+    <div class="field">
+      <div class="lbl">Pending Discussion with Siddharth</div>
+      <textarea id="pb-siddharth-${id}" oninput="saveDraft()" placeholder="Items needing discussion or decision from Siddharth sir..." style="min-height:50px"></textarea>
     </div>`;
 }
 </script>
