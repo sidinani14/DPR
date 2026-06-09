@@ -3981,10 +3981,10 @@ function getDeepakWeeklyStats(weekStart) {
 
   // ── 4. Task Completion from TASK_ASSIGNMENTS ─────────────
   // Pool: tasks assigned TO Deepak OR assigned BY Deepak to others
-  // Due this week: Deadline in Mon–Sat
-  // Done on time: Status=Done, LeadApproved=Yes, doneDate ≤ deadline, doneDate in week
+  // Assigned this week: AssignedDate in Mon–Sat
+  // Completed same week: Done + LeadApproved=Yes + doneDate in Mon–Sat
   var asSheet = s.getSheetByName(ASSIGN_TAB);
-  var tasksDue = 0, tasksDoneOnTime = 0, tasksDoneLate = 0;
+  var tasksAssignedThisWeek = 0, tasksCompletedThisWeek = 0;
   var taskDetails = [];
 
   if (asSheet && asSheet.getLastRow() > 1) {
@@ -3994,37 +3994,35 @@ function getDeepakWeeklyStats(weekStart) {
     var COL_ACTDT  = is23 ? 15 : -1;
     var COL_STATDT = 14;
     var COL_LEADAP = is23 ? 16 : 15;
-    var COL_DEADLN = 10;
+    var COL_ASSIGNDT = 9; // col J AssignedDate
 
     for (var j = 1; j < asRows.length; j++) {
       var ar         = asRows[j];
       var assignedTo = String(ar[3]  || '').trim();
       var assignedBy = String(ar[21] || '').trim(); // col V AssignedBy
-      var deadline   = cellDate(ar[COL_DEADLN]);
+      var assignedDt = cellDate(ar[COL_ASSIGNDT]);
       var doneDate   = (COL_ACTDT > -1 ? cellDate(ar[COL_ACTDT]) : '') || cellDate(ar[COL_STATDT]);
       var isApproved = String(ar[COL_LEADAP] || '').trim() === 'Yes';
       var selfStatus = String(ar[13] || '').trim();
 
-      // In the pool if: assigned TO Deepak, OR assigned BY Deepak to someone else
+      // Pool: assigned TO Deepak, OR assigned BY Deepak to someone else
       var inPool = (assignedTo === 'Deepak Soni') ||
                    (assignedBy === 'Deepak Soni' && assignedTo !== 'Deepak Soni');
       if (!inPool) continue;
 
-      // Due this week
-      if (!deadline || deadline < mon || deadline > sat) continue;
-      tasksDue++;
+      // Must have been assigned this week
+      if (!assignedDt || assignedDt < mon || assignedDt > sat) continue;
+      tasksAssignedThisWeek++;
 
-      // Completed on time
-      if (selfStatus === 'Done' && isApproved && doneDate) {
-        var onTime = doneDate <= deadline;
-        if (onTime) tasksDoneOnTime++; else tasksDoneLate++;
+      // Completed within the same week
+      if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= sat) {
+        tasksCompletedThisWeek++;
         taskDetails.push({
-          project   : String(ar[2]  || '').trim(),
-          taskType  : String(ar[4]  || '').trim(),
+          project   : String(ar[2] || '').trim(),
+          taskType  : String(ar[4] || '').trim(),
           assignedTo: assignedTo,
+          assignedDt: assignedDt,
           doneDate  : doneDate,
-          deadline  : deadline,
-          onTime    : onTime,
         });
       }
     }
@@ -4059,9 +4057,10 @@ function getDeepakWeeklyStats(weekStart) {
   var s_client = totalSites > 0
     ? Math.round(clientCount / totalSites * 10 * 10) / 10 : 0;
 
-  // Task Completion /20 — on-time / due (0 due → full marks, he had nothing pending)
-  var s_tasks  = tasksDue > 0
-    ? Math.round(tasksDoneOnTime / tasksDue * 20 * 10) / 10
+  // Task Completion /20 — completed same week / assigned this week
+  // 0 assigned → full marks (nothing to complete)
+  var s_tasks  = tasksAssignedThisWeek > 0
+    ? Math.round(tasksCompletedThisWeek / tasksAssignedThisWeek * 20 * 10) / 10
     : 20;
 
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
@@ -4087,9 +4086,8 @@ function getDeepakWeeklyStats(weekStart) {
     daysPresent    : daysPresent,
     lateCount      : lateCount,
     absentDays     : absentDays,
-    tasksDue       : tasksDue,
-    tasksDoneOnTime: tasksDoneOnTime,
-    tasksDoneLate  : tasksDoneLate,
+    tasksAssigned  : tasksAssignedThisWeek,
+    tasksCompleted : tasksCompletedThisWeek,
     taskDetails    : taskDetails,
     perProject     : perProject,
     scores: {

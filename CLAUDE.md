@@ -59,7 +59,7 @@
 ## Deepak Soni scoring (separate page in weekly report)
 - Site Visits: /20 (active sites visited ≥1× / total active sites)
 - Client Communication: /10 (sites with clientUpdated=Yes / total active sites)
-- Task Completion: /20 (tasks assigned TO Deepak + assigned BY Deepak to team, done on time / due this week)
+- Task Completion: /20 (tasks assigned TO Deepak + assigned BY Deepak to team, with AssignedDate this week, completed within same week)
 - DPER Consistency: /15 (days with ≥1 submission / 6 — mirrors team DPR formula)
 - Punctuality: /20 (same base as team, biometric)
 - Hours: /15 (same base as team, biometric)
