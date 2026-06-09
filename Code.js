@@ -2598,6 +2598,9 @@ function sendVisitNotification(entry, nextDate, hist, isOverdue, email) {
 // ═══════════════════════════════════════════════════════════════
 // MASTER FUNCTION — runs daily at 7 AM
 // ═══════════════════════════════════════════════════════════════
+// Alias — existing time-based trigger was created with this name
+function runVisitScheduler() { syncVisitSchedule(); }
+
 function syncVisitSchedule() {
   Logger.log('=== syncVisitSchedule: '+new Date().toISOString()+' ===');
 
