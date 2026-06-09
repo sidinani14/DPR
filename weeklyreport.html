@@ -365,7 +365,7 @@ function buildOverviewPage(team){
     const rkc=i===0?'rk1':i===1?'rk2':i===2?'rk3':'rkx';
     rows+=`<tr>
       <td><span class="rk ${rkc}">${i+1}</span></td>
-      <td><div class="mn">${m.name}</div><div class="mr">${ROLES[m.name]||''}</div></td>
+      <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_punct,20)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/20*100))}%;background:${sc(s.s_punct,20)}"></div></div></td>
@@ -381,7 +381,7 @@ function buildOverviewPage(team){
     <table class="tt">
       <thead><tr>
         <th style="width:28px">#</th><th style="width:145px">Member</th>
-        <th>Output<br><span style="opacity:.5">/50</span></th>
+        <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks</span></th>
         <th>DPR<br><span style="opacity:.5">/15</span></th>
         <th>Punctuality<br><span style="opacity:.5">/20</span></th>
         <th>Hours<br><span style="opacity:.5">/15</span></th>
@@ -630,17 +630,38 @@ async function loadAndRender(){
     }
   }
 
+  // Team members (standard scoring)
   const team = Object.keys(ROLES).map(name => {
     const taskData = statsMap[name] || {};
-    const m = {name, _sc: scoreCalc({name}, taskData)};
-    m._taskData = taskData;
+    const m = {name, _sc: scoreCalc({name}, taskData), _taskData: taskData};
     return m;
   });
 
+  // Add Deepak — his output /50 = site visits + client comm + task completion
+  // DPR/punctuality/hours map to same columns as team
+  if (deepakStats && deepakStats.scores) {
+    const ds = deepakStats.scores;
+    team.push({
+      name    : 'Deepak Soni',
+      _isDeepak: true,
+      _deepakData: deepakStats,
+      _sc: {
+        s_output: Math.round((ds.s_visit + ds.s_client + ds.s_tasks) * 10) / 10,
+        s_dpr   : ds.s_dper,
+        s_punct : ds.s_punct,
+        s_hrs   : ds.s_hrs,
+        total   : ds.total,
+      },
+    });
+  }
+
   const sorted = [...team].sort((a,b)=>b._sc.total-a._sc.total);
   let outHtml = buildOverviewPage(sorted);
-  sorted.forEach(m => { outHtml += buildIndividualPage(m, m._taskData); });
-  outHtml += buildDeepakPage(deepakStats);
+  sorted.forEach(m => {
+    outHtml += m._isDeepak
+      ? buildDeepakPage(m._deepakData)
+      : buildIndividualPage(m, m._taskData);
+  });
   app.innerHTML = outHtml;
 }
 
