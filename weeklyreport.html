@@ -525,12 +525,26 @@ function buildDeepakPage(d){
   };
   const s=d.scores;
   const col=sc2(s.total,100);
-  const rows=d.perProject.map(p=>`<tr>
+
+  // Per-project table rows
+  const projRows=d.perProject.map(p=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
     <td style="font-size:9px;font-weight:600;padding:6px 8px">${p.project}</td>
     <td style="text-align:center;padding:6px 8px"><span style="color:${p.visited?'#2ED573':'#EA4335'};font-weight:700;font-size:11px">${p.visited?'✓':'✗'}</span></td>
     <td style="text-align:center;padding:6px 8px"><span style="color:${p.clientUpdated?'#2ED573':'#EA4335'};font-weight:700;font-size:11px">${p.clientUpdated?'✓':'✗'}</span></td>
     <td style="text-align:center;padding:6px 8px;font-size:9px;color:rgba(255,255,255,0.6)">${p.dperDays}/6</td>
   </tr>`).join('');
+
+  // Task completion table rows
+  const taskRows=d.taskDetails&&d.taskDetails.length
+    ? d.taskDetails.map(t=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+        <td style="font-size:8.5px;padding:5px 8px;font-weight:600">${t.project}</td>
+        <td style="font-size:8px;padding:5px 8px;color:rgba(255,255,255,0.7)">${t.taskType}</td>
+        <td style="font-size:8px;padding:5px 8px;color:rgba(255,255,255,0.5)">${t.assignedTo==='Deepak Soni'?'Self':'→ '+t.assignedTo}</td>
+        <td style="text-align:center;padding:5px 8px;font-size:8px">${t.doneDate}</td>
+        <td style="text-align:center;padding:5px 8px"><span style="color:${t.onTime?'#2ED573':'#FBBC04'};font-size:9px;font-weight:700">${t.onTime?'✓ On time':'✗ Late'}</span></td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" style="padding:10px 8px;font-size:8.5px;color:rgba(255,255,255,0.35);text-align:center">${d.tasksDue===0?'No tasks due this week — full marks awarded':'Tasks due this week not yet completed/approved'}</td></tr>`;
+
   return `<div class="page">
     ${hdr()}
     <div class="ind-top">
@@ -540,9 +554,9 @@ function buildDeepakPage(d){
         <div class="ind-week-lbl">Week of ${WEEK_LABEL} · Ideaform Design Studio</div>
         <div class="stats-row">
           <div class="stat-chip"><div class="stat-val">${d.visitedCount}/${d.totalSites}</div><div class="stat-lbl">Sites<br>Visited</div></div>
-          <div class="stat-chip"><div class="stat-val" style="color:${d.visitedCount===d.totalSites?'#2ED573':'#FBBC04'}">${Math.round(d.visitedCount/Math.max(d.totalSites,1)*100)}%</div><div class="stat-lbl">Visit<br>Coverage</div></div>
           <div class="stat-chip"><div class="stat-val">${d.clientCount}/${d.totalSites}</div><div class="stat-lbl">Client<br>Updated</div></div>
-          <div class="stat-chip"><div class="stat-val">${d.dperCount}/${d.dperPossible}</div><div class="stat-lbl">DPER<br>Submissions</div></div>
+          <div class="stat-chip"><div class="stat-val" style="color:${d.tasksDoneOnTime>0?'#2ED573':'rgba(255,255,255,0.5)'}">${d.tasksDoneOnTime}/${d.tasksDue}</div><div class="stat-lbl">Tasks<br>On Time</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.dperDaysCount}/6</div><div class="stat-lbl">DPER<br>Days</div></div>
           <div class="stat-chip"><div class="stat-val">${d.daysPresent}/6</div><div class="stat-lbl">Days<br>Present</div></div>
           <div class="stat-chip"><div class="stat-val" style="color:${d.lateCount>0?'#FBBC04':'#2ED573'}">${d.lateCount}</div><div class="stat-lbl">Late<br>Arrivals</div></div>
         </div>
@@ -556,24 +570,40 @@ function buildDeepakPage(d){
 
     <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
     <div class="pg">
-      ${pCard('Site Visits',s.s_visit,35,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
-      ${pCard('Client Comm',s.s_client,20,`${d.clientCount} of ${d.totalSites} projects updated`)}
-      ${pCard('DPER<br>Consistency',s.s_dper,20,`${d.dperCount} of ${d.dperPossible} possible submissions`)}
-      ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
-      ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
+      ${pCard('Site Visits',s.s_visit,20,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
+      ${pCard('Client Comm',s.s_client,10,`${d.clientCount} of ${d.totalSites} projects updated`)}
+      ${pCard('Task<br>Completion',s.s_tasks,20,`${d.tasksDoneOnTime} on time · ${d.tasksDoneLate} late · ${d.tasksDue} due`)}
+      ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of 6 days · ≥1 submission/day`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,20,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,15,`${d.daysPresent}/6 days present`)}
     </div>
 
-    <div style="margin-top:4mm">
-      <div class="section-title" style="margin-bottom:2mm">Per-Project Breakdown</div>
-      <table style="width:100%;border-collapse:collapse;font-size:9px;">
-        <thead><tr style="background:rgba(245,166,35,0.12)">
-          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
-          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Site Visit<br><span style="opacity:.5">≥1 this week</span></th>
-          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Client<br>Updated</th>
-          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">DPER Days</th>
-        </tr></thead>
-        <tbody style="border:1px solid rgba(255,255,255,0.06)">${rows}</tbody>
-      </table>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm">
+      <div>
+        <div class="section-title" style="margin-bottom:2mm">Site Visit & Client Update — Per Project</div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:rgba(245,166,35,0.12)">
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Visited</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Client</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">DPER</th>
+          </tr></thead>
+          <tbody>${projRows}</tbody>
+        </table>
+      </div>
+      <div>
+        <div class="section-title" style="margin-bottom:2mm">Task Completion — Due This Week</div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:rgba(245,166,35,0.12)">
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Task</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Who</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Done</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Status</th>
+          </tr></thead>
+          <tbody>${taskRows}</tbody>
+        </table>
+      </div>
     </div>
   </div>`;
 }

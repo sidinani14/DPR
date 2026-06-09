@@ -57,12 +57,14 @@
 - DPER tab: SITE_EXECUTION — col E = Execution Lead name
 
 ## Deepak Soni scoring (separate page in weekly report)
-- Site Visits: /35
-- Client Communication: /20 (projects with client updated / active projects)
-- DPER Consistency: /20 (project × day submissions / 5 projects × 6 days)
-- Punctuality: /15
-- Hours: /10
+- Site Visits: /20 (active sites visited ≥1× / total active sites)
+- Client Communication: /10 (sites with clientUpdated=Yes / total active sites)
+- Task Completion: /20 (tasks assigned TO Deepak + assigned BY Deepak to team, done on time / due this week)
+- DPER Consistency: /15 (days with ≥1 submission / 6 — mirrors team DPR formula)
+- Punctuality: /20 (same base as team, biometric)
+- Hours: /15 (same base as team, biometric)
 - Total: /100
+- Active projects list: CONFIG tab col A, under "DEEPAK ACTIVE PROJECTS" header
 
 ## Weekly targets by role
 - Junior Architect / Junior ID: 48 pts/week
