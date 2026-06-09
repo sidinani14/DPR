@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · CRM Daily Report</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;--border:#E2DFD8;--border2:#CBC7BC;
+  --text:#1A1917;--text2:#6B6860;--text3:#9E9B94;
+  --accent:#1F3A5F;--accent-light:#E8EEF5;
+  --green:#1B7A3E;--green-bg:#E8F5EE;
+  --amber:#7A5000;--amber-bg:#FFF8E1;
+  --red:#8B2020;--red-bg:#FFEBEE;
+  --blue:#1565C0;--blue-bg:#E3F2FD;
+  --teal:#005F73;--teal-bg:#E0F7FA;
+  --radius:12px;--radius-sm:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px;}
+
+.header{background:var(--accent);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+.header-title{color:rgba(255,255,255,0.9);font-size:13px;font-weight:600;}
+.header-title span{color:#F5A623;}
+.user-pill{background:rgba(255,255,255,0.15);border-radius:20px;padding:5px 12px;font-size:12px;color:#fff;display:flex;align-items:center;gap:6px;margin-left:auto;}
+.user-dot{width:8px;height:8px;border-radius:50%;background:#2ED573;}
+
+.form-wrap{max-width:660px;margin:0 auto;padding:14px;}
+.section{background:var(--surface);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;border:1px solid var(--border);}
+.section-head{background:var(--accent);padding:12px 18px;display:flex;align-items:center;gap:10px;}
+.section-num{width:22px;height:22px;border-radius:50%;background:rgba(245,166,35,0.3);color:#F5A623;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.section-title{color:#fff;font-size:13px;font-weight:600;flex:1;}
+.section-badge{background:rgba(234,67,53,0.3);color:#FF8A80;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.section-body{padding:16px 18px;}
+
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;display:block;}
+.opt{font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;}
+input[type=text],input[type=date],input[type=number],input[type=time],select,textarea{
+  width:100%;padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:var(--radius-sm);font-family:inherit;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;
+}
+input[type=number]{-moz-appearance:textfield;}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+textarea{min-height:62px;resize:vertical;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.field-row .field{margin-bottom:0;}
+.field-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;user-select:none;}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* YN buttons */
+.yn-btns{display:grid;grid-template-columns:1fr 1fr;gap:7px;max-width:170px;}
+.yn-btn{padding:7px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+.yn-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.yn-btn.on-no{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
+
+/* Lead blocks */
+.lead-block{background:var(--surface2);border:2px solid var(--blue);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;}
+.lb-header{display:flex;align-items:center;gap:10px;margin-bottom:13px;}
+.lb-num{background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:3px 11px;border-radius:11px;flex-shrink:0;}
+.lb-name-display{font-size:12px;color:var(--text2);flex:1;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.remove-block{background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer;font-family:inherit;flex-shrink:0;}
+
+/* Lead status pills */
+.status-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.status-pill{padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .15s;user-select:none;}
+.status-pill.on{border-width:2px;font-weight:700;}
+
+/* Validation */
+.val-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
+.val-btn{padding:7px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+.val-btn.on-valid{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.val-btn.on-invalid{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+.val-btn.on-nc{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
+
+/* Contact blocks */
+.contact-block{background:var(--surface2);border:2px solid var(--teal);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;}
+.cb-num{background:var(--teal);color:#fff;font-size:11px;font-weight:700;padding:3px 11px;border-radius:11px;flex-shrink:0;}
+
+/* Agenda blocks */
+.agenda-block{background:var(--surface2);border:2px solid var(--green);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;}
+.ab-num{background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:3px 11px;border-radius:11px;flex-shrink:0;}
+.type-btns{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.type-btn{padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+.type-btn.on-mtg{background:var(--accent-light);border-color:var(--accent);color:var(--accent);}
+.type-btn.on-visit{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+
+/* WA message block */
+.wa-block{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius);padding:13px;margin-bottom:10px;}
+.wa-proj-name{font-size:12px;font-weight:700;color:#1B5E20;margin-bottom:7px;}
+.wa-textarea{width:100%;min-height:150px;max-height:300px;resize:vertical;font-family:'DM Mono',monospace;font-size:11px;color:#2E7D32;background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:10px;line-height:1.6;overflow-y:auto;}
+.copy-btn-sm{margin-top:7px;width:100%;padding:8px;background:#2E7D32;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+
+/* Issue cards (open issues panel) */
+.issue-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:9px;}
+.issue-card.escalated{border-color:#D97706;background:var(--amber-bg);}
+.issue-card.resolved-pending{opacity:.6;}
+.ic-top{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.issue-type-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;flex-shrink:0;}
+.it-crm{background:rgba(0,95,115,0.12);color:var(--teal);}
+.it-design{background:rgba(74,158,255,0.12);color:var(--blue);}
+.it-finance{background:rgba(27,122,62,0.12);color:var(--green);}
+.it-contractor{background:rgba(255,107,53,0.12);color:var(--red);}
+.it-client{background:rgba(168,85,247,0.12);color:#6A1B9A;}
+.ic-proj{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;}
+.ic-status{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;}
+.ics-open{background:rgba(139,32,32,0.1);color:var(--red);}
+.ics-esc{background:var(--amber-bg);color:var(--amber);}
+.ics-res{background:var(--green-bg);color:var(--green);}
+.ic-desc{font-size:12px;color:var(--text);line-height:1.4;margin-bottom:7px;}
+.ic-meta{font-size:10px;color:var(--text3);margin-bottom:8px;}
+.ic-actions{display:flex;gap:7px;flex-wrap:wrap;}
+.ia-btn{font-size:11px;font-weight:700;padding:4px 11px;border-radius:6px;border:1.5px solid;cursor:pointer;font-family:inherit;}
+.ia-resolve{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.ia-escalate{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
+.ia-delay{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+.ia-btn:disabled{opacity:.4;cursor:not-allowed;}
+.delay-row{display:none;margin-top:7px;gap:7px;align-items:center;}
+.delay-row.open{display:flex;}
+
+/* New issue blocks */
+.new-iss-block{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px;margin-bottom:8px;}
+.ni-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.ni-num{background:rgba(0,95,115,0.1);color:var(--teal);font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;}
+.pri-btns{display:flex;gap:5px;}
+.pri-btn{flex:1;padding:6px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);text-align:center;}
+.pri-btn.on-1{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.pri-btn.on-2{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
+.pri-btn.on-3{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+
+/* Finance */
+.rupee-wrap{position:relative;}
+.rupee-wrap::before{content:'₹';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text2);pointer-events:none;}
+.rupee-wrap input{padding-left:24px;}
+
+/* Activity toggles */
+.activity-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
+.activity-toggle-row:last-of-type{border-bottom:none;}
+.atl{font-size:13px;font-weight:500;}
+.at-btns{display:flex;gap:6px;}
+.at-btn{padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);}
+.at-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.at-btn.on-no{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
+.activity-detail{display:none;padding-top:10px;}
+.activity-detail.open{display:block;}
+
+/* Follow-up card */
+.followup-card{background:var(--amber-bg);border:1.5px solid #FFE082;border-radius:var(--radius-sm);padding:11px;margin-bottom:9px;}
+.fc-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.fc-meta{font-size:11px;color:var(--text2);margin-bottom:8px;}
+
+/* Sub-section label */
+.sub-lbl{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:12px;}
+
+/* Add buttons */
+.add-proj-btn{width:100%;padding:11px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:2px dashed var(--accent);background:var(--accent-light);color:var(--accent);font-family:inherit;}
+.add-proj-btn:hover{background:var(--accent);color:#fff;}
+.add-btn{width:100%;padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed var(--border2);background:transparent;color:var(--text2);font-family:inherit;margin-top:4px;}
+.add-btn.teal{border-color:var(--teal);color:var(--teal);}
+.add-btn.green{border-color:var(--green);color:var(--green);}
+.add-btn.blue{border-color:var(--blue);color:var(--blue);}
+
+/* Submit */
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:11px 18px;display:flex;gap:10px;align-items:center;z-index:50;}
+.submit-btn{flex:1;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed;}
+.submit-status{font-size:12px;color:var(--text2);}
+
+/* Success */
+.success-screen{display:none;text-align:center;padding:40px 20px;}
+.success-icon{font-size:52px;margin-bottom:14px;}
+.success-title{font-size:20px;font-weight:700;margin-bottom:8px;color:var(--accent);}
+.success-sub{font-size:13px;color:var(--text2);line-height:1.7;}
+.new-btn{margin-top:20px;padding:11px 28px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+
+.hidden{display:none;}
+.no-issues{text-align:center;padding:20px;color:var(--text3);font-size:13px;}
+.resolved-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border);}
+.toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;z-index:999;display:none;}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="https://sidinani14.github.io/DPR/ideaform-logo.png" style="height:26px;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
+  <span class="header-title">IDS · <span>CRM Daily Report</span></span>
+  <div id="login-area" style="margin-left:auto">
+    <div id="g_id_onload"
+      data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
+      data-callback="onGoogleSignIn" data-auto_select="true"></div>
+    <div class="g_id_signin" data-type="standard" data-size="small" data-theme="outline" data-shape="pill"></div>
+  </div>
+  <div id="user-pill" class="user-pill hidden">
+    <span class="user-dot"></span><span id="user-name-display">—</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="form-wrap">
+
+  <!-- ── Success ──────────────────────────────── -->
+  <div class="success-screen" id="success-screen">
+    <div class="success-icon">✅</div>
+    <div class="success-title">CRM Report Submitted</div>
+    <div class="success-sub" id="success-sub"></div>
+    <button class="new-btn" onclick="resetForm()">Submit Another Report</button>
+  </div>
+
+  <div id="form-body">
+
+  <!-- ── S0: Open Issues ───────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">!</span>
+      <span class="section-title">Open CRM Issues</span>
+      <span class="section-badge" id="issues-badge">—</span>
+    </div>
+    <div class="section-body" id="issues-panel">
+      <div class="no-issues">Sign in to load issues…</div>
+    </div>
+  </div>
+
+  <!-- ── S1: Date ───────────────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">1</span>
+      <span class="section-title">Report Date</span>
+    </div>
+    <div class="section-body">
+      <input type="date" id="f-date">
+    </div>
+  </div>
+
+  <!-- ── S2: Lead Management ───────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">2</span>
+      <span class="section-title">Lead Management</span>
+    </div>
+    <div class="section-body">
+
+      <!-- 24-hr follow-up (hidden until data loads) -->
+      <div id="followup-wrap" class="hidden">
+        <div class="sub-lbl">⏰ 24-hr Follow-up — Yesterday's New Leads</div>
+        <div id="followup-list"></div>
+        <hr class="divider">
+      </div>
+
+      <!-- New leads today -->
+      <div class="sub-lbl">➕ New Leads Received Today</div>
+      <div id="lead-blocks"></div>
+      <button class="add-proj-btn" id="add-lead-btn" onclick="addLeadBlock()" disabled>+ Add New Lead</button>
+    </div>
+  </div>
+
+  <!-- ── S3: Client Connections Today ─────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">3</span>
+      <span class="section-title">Client Connections Today</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log every client contact — calls, WhatsApp, meetings, site visits. Each ongoing project client should be connected at least once a week.</p>
+      <div id="contact-blocks"></div>
+      <button class="add-btn teal" id="add-contact-btn" onclick="addContactBlock()" disabled>+ Log Client Connection</button>
+    </div>
+  </div>
+
+  <!-- ── S4: Tomorrow's Plans + Agenda Generator ── -->
+  <div class="section">
+    <div class="section-head" style="background:#1B5E20">
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">4</span>
+      <span class="section-title">Tomorrow's Meetings &amp; Site Visits</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Plan tomorrow's meetings/visits → agenda auto-generated for project group.</p>
+      <div id="agenda-blocks"></div>
+      <button class="add-btn green" id="add-agenda-btn" onclick="addAgendaBlock()" disabled>+ Add Meeting / Site Visit</button>
+    </div>
+  </div>
+
+  <!-- ── S5: Finance ───────────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">5</span>
+      <span class="section-title">Finance</span>
+    </div>
+    <div class="section-body">
+
+      <div class="sub-lbl">Bills Raised Today</div>
+      <div class="field-row">
+        <div class="field">
+          <span class="lbl">No. of Bills</span>
+          <input type="number" id="f-bills-count" min="0" placeholder="0">
+        </div>
+        <div class="field">
+          <span class="lbl">Total Amount (₹)</span>
+          <div class="rupee-wrap"><input type="number" id="f-bills-amount" min="0" placeholder="0"></div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl">Projects Billed <span class="opt">select all that apply</span></span>
+        <div class="chips" id="bills-proj-chips"><span style="font-size:12px;color:var(--text3)">Sign in to load projects…</span></div>
+      </div>
+
+      <hr class="divider">
+      <div class="sub-lbl">Payment Received Today</div>
+      <div class="field-row">
+        <div class="field">
+          <span class="lbl">Amount (₹)</span>
+          <div class="rupee-wrap"><input type="number" id="f-pay-amount" min="0" placeholder="0"></div>
+        </div>
+        <div class="field">
+          <span class="lbl">Project</span>
+          <select id="f-pay-proj"><option value="">Select project…</option></select>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="sub-lbl">Payment Follow-ups Done Today</div>
+      <div class="field">
+        <span class="lbl">No. of Follow-ups</span>
+        <input type="number" id="f-fup-count" min="0" placeholder="0" style="max-width:120px">
+      </div>
+      <div class="field">
+        <span class="lbl">Projects Followed Up <span class="opt">select all that apply</span></span>
+        <div class="chips" id="fup-proj-chips"><span style="font-size:12px;color:var(--text3)">Sign in to load projects…</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── S6: Other Activities ──────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">6</span>
+      <span class="section-title">Other Activities</span>
+    </div>
+    <div class="section-body">
+
+      <!-- Vendor / Contractor Connects -->
+      <div class="field">
+        <span class="lbl">Vendor / Contractor Connects</span>
+        <div class="field-row" style="margin-bottom:8px">
+          <div class="field">
+            <span class="lbl" style="font-size:10px">Count</span>
+            <input type="number" id="f-vendor-count" min="0" placeholder="0" style="max-width:100px">
+          </div>
+        </div>
+        <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Involved</span>
+        <div class="chips" id="vendor-proj-chips" style="margin-bottom:8px"><span style="font-size:12px;color:var(--text3)">Sign in…</span></div>
+        <textarea id="f-vendor-notes" placeholder="Notes on vendor/contractor interactions…" style="min-height:50px"></textarea>
+      </div>
+
+      <hr class="divider">
+
+      <!-- TNCP -->
+      <div class="field">
+        <div class="activity-toggle-row" style="padding-top:0">
+          <span class="atl">TNCP Coordination</span>
+          <div class="at-btns">
+            <div class="at-btn" id="tncp-yes" onclick="setActivity('tncp','yes')">Yes</div>
+            <div class="at-btn on-no" id="tncp-no" onclick="setActivity('tncp','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="tncp-detail">
+          <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Involved</span>
+          <div class="chips" id="tncp-proj-chips" style="margin-bottom:8px"><span style="font-size:12px;color:var(--text3)">Sign in…</span></div>
+          <textarea id="f-tncp-notes" placeholder="TNCP coordination notes…" style="min-height:45px"></textarea>
+        </div>
+      </div>
+
+      <!-- Quotations -->
+      <div class="field">
+        <div class="activity-toggle-row">
+          <span class="atl">Quotation Activities</span>
+          <div class="at-btns">
+            <div class="at-btn" id="quot-yes" onclick="setActivity('quot','yes')">Yes</div>
+            <div class="at-btn on-no" id="quot-no" onclick="setActivity('quot','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="quot-detail">
+          <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Involved</span>
+          <div class="chips" id="quot-proj-chips" style="margin-bottom:8px"><span style="font-size:12px;color:var(--text3)">Sign in…</span></div>
+          <textarea id="f-quot-notes" placeholder="Quotation comparison, vendor selection, approvals…" style="min-height:45px"></textarea>
+        </div>
+      </div>
+
+      <!-- BNI -->
+      <div class="field">
+        <div class="activity-toggle-row">
+          <span class="atl">BNI Activity</span>
+          <div class="at-btns">
+            <div class="at-btn" id="bni-yes" onclick="setActivity('bni','yes')">Yes</div>
+            <div class="at-btn on-no" id="bni-no" onclick="setActivity('bni','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="bni-detail">
+          <textarea id="f-bni-notes" placeholder="Meeting notes, referrals generated, connections made…" style="min-height:50px"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── S7: New Issues ─────────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">7</span>
+      <span class="section-title">Add New Issues</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log CRM blockers, design requests, finance holds, or client escalations. Assign to the relevant team member with a target date.</p>
+      <div id="new-iss-blocks"></div>
+      <button class="add-btn teal" id="add-iss-btn" onclick="addNewIssue()" disabled>+ Add Issue</button>
+    </div>
+  </div>
+
+  <!-- ── WhatsApp Agendas ───────────────────────── -->
+  <div class="section">
+    <div class="section-head" style="background:#1B5E20">
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span>
+      <span class="section-title">Meeting Agenda Messages</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Review, copy, and send to respective project WhatsApp groups before each meeting.</p>
+      <div id="wa-list"><div class="no-issues">Add tomorrow's plans above to generate messages…</div></div>
+    </div>
+  </div>
+
+  </div><!-- /form-body -->
+</div><!-- /form-wrap -->
+
+<div class="submit-bar">
+  <span class="submit-status" id="submit-status">Sign in to submit</span>
+  <button class="submit-btn" id="submit-btn" onclick="submitAll()" disabled>Submit CRM Report</button>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+
+const EMAIL_MAP = {
+  'ar.deepaksoni@gmail.com'     :'Deepak Soni',
+  'achal.rathore@ideaform.in'   :'Achal Rathore',
+  'himanshu.malviya@ideaform.in':'Himanshu Malviya',
+  'poorvi.goyal@ideaform.in'    :'Poorvi Goyal',
+  'khushi.agrawal@ideaform.in'  :'Khushi Agrawal',
+  'sahil.maurya@ideaform.in'    :'Sahil Maurya',
+  'aaditya.koshti@ideaform.in'  :'Aaditya Koshti',
+  'aman.raghuwanshi@ideaform.in':'Aman Raghuwanshi',
+  'bhavesh.bhagwat@ideaform.in' :'Bhavesh Bhagwat',
+  'aashi.agrawal@ideaform.in'   :'Aashi Agrawal',
+  'siddharth@ideaform.in'       :'Siddharth Inani',
+  'sidinani14@gmail.com'        :'Siddharth Inani',
+  'astha@ideaform.in'           :'Astha Inani',
+  'astha.uch@gmail.com'         :'Astha Inani',
+  'simi@ideaform.in'            :'Simi',
+};
+
+// Lead statuses matching the LMS sheet
+const LEAD_STATUSES = [
+  {key:'Not Contacted',        color:'#6B6860', bg:'#ECEFF1'},
+  {key:'Contacted over call',  color:'#1565C0', bg:'#E3F2FD'},
+  {key:'Briefing Meeting Done',color:'#1B7A3E', bg:'#E8F5EE'},
+  {key:'Design Proposal Shared',color:'#7A5000',bg:'#FFF3E0'},
+  {key:'Fee Proposal Shared',  color:'#7A5000', bg:'#FFF8E1'},
+  {key:'Lead Converted',       color:'#1B7A3E', bg:'#E0F7FA'},
+  {key:'Lost',                 color:'#8B2020', bg:'#FFEBEE'},
+  {key:'Invalid',              color:'#6B6860', bg:'#F5F3EE'},
+];
+
+const CONTACT_TYPES  = ['📞 Call','💬 WhatsApp','👥 Meeting','🏗️ Site Visit','📧 Email'];
+const CRM_ISS_TYPES  = ['CRM/Process','Design','Finance','Contractor','Client'];
+const TEAM_MEMBERS   = Object.values(EMAIL_MAP).filter((v,i,a)=>a.indexOf(v)===i).sort();
+
+let googleUser  = null;
+let crmUser     = '';
+let projects    = [];
+let leadCount   = 0;
+let contCount   = 0;
+let agendaCount = 0;
+let issCount    = 0;
+let issueActions= {};
+let pendingLeads= [];
+
+// ════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════
+function onGoogleSignIn(resp) {
+  const p   = JSON.parse(atob(resp.credential.split('.')[1]));
+  const em  = (p.email||'').toLowerCase();
+  crmUser   = EMAIL_MAP[em] || p.name || em;
+  googleUser= {name:crmUser, email:em};
+  document.getElementById('user-pill').classList.remove('hidden');
+  document.getElementById('user-name-display').textContent = crmUser;
+  document.getElementById('submit-status').textContent = crmUser;
+  ['submit-btn','add-lead-btn','add-contact-btn','add-agenda-btn','add-iss-btn'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.disabled=false;
+  });
+  loadProjects();
+  loadIssues();
+  loadPendingLeads();
+}
+
+// ════════════════════════════════════════
+// PROJECTS
+// ════════════════════════════════════════
+async function loadProjects() {
+  try {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getLists'})});
+    const d = await r.json();
+    const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
+    projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
+    refreshProjectDropdowns();
+    buildChipSets();
+  } catch(e){ toast('Could not load projects'); }
+}
+
+function refreshProjectDropdowns() {
+  const opts = '<option value="">Select project…</option>' +
+    projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  document.getElementById('f-pay-proj').innerHTML = opts;
+  document.querySelectorAll('[id^="cb-proj-"],[id^="ag-proj-"],[id^="ni-proj-"]').forEach(sel=>{
+    const cur=sel.value; sel.innerHTML=opts; if(cur) sel.value=cur;
+  });
+}
+
+function buildChipSets() {
+  const chipHtml = projects.map(p=>
+    `<div class="chip" data-proj="${p.name}" onclick="this.classList.toggle('on')">${p.name}</div>`
+  ).join('');
+  ['bills-proj-chips','fup-proj-chips','vendor-proj-chips','tncp-proj-chips','quot-proj-chips']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=chipHtml; });
+}
+
+function getChips(id) {
+  const el=document.getElementById(id); if(!el) return [];
+  return [...el.querySelectorAll('.chip.on')].map(c=>c.dataset.proj||c.textContent);
+}
+
+// ════════════════════════════════════════
+// OPEN ISSUES — Section 0
+// ════════════════════════════════════════
+async function loadIssues() {
+  document.getElementById('issues-panel').innerHTML='<div class="no-issues">Loading…</div>';
+  try {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getAmanIssues', member:crmUser})});
+    const d = await r.json();
+    renderIssues(d.issues||[]);
+  } catch(e) {
+    document.getElementById('issues-panel').innerHTML='<div class="no-issues">Could not load issues</div>';
+  }
+}
+
+function issTypeClass(t) {
+  return {'CRM/Process':'it-crm','Design':'it-design','Finance':'it-finance',
+          'Contractor':'it-contractor','Client':'it-client'}[t]||'it-crm';
+}
+function priLabel(p){return p===3?'🔴 High':p===1?'🟢 Low':'🟡 Med';}
+
+function renderIssues(issues) {
+  const open = issues.filter(i=>i.status!=='Resolved');
+  const res  = issues.filter(i=>i.status==='Resolved');
+  document.getElementById('issues-badge').textContent = open.length+' open';
+  if(!issues.length){
+    document.getElementById('issues-panel').innerHTML='<div class="no-issues">✓ No open issues</div>';
+    return;
+  }
+  let html='';
+  [...open].sort((a,b)=>b.priority-a.priority).forEach(iss=>{
+    const act=issueActions[iss.issueId];
+    const isRes=act?.action==='resolve', isEsc=act?.action==='escalate';
+    const sLabel=isRes?'✓ Resolved':isEsc?'🔴 Escalated':iss.status;
+    const sCls  =isRes?'ics-res':isEsc?'ics-esc':'ics-open';
+    html+=`<div class="issue-card${isEsc?' escalated':''}${isRes?' resolved-pending':''}" id="ic-${iss.issueId}">
+      <div class="ic-top">
+        <span class="issue-type-badge ${issTypeClass(iss.issueType)}">${iss.issueType}</span>
+        <span class="ic-proj">${iss.project}</span>
+        <span class="ic-status ${sCls}" style="margin-left:auto">${sLabel}</span>
+      </div>
+      <div class="ic-desc">${iss.description}</div>
+      <div class="ic-meta">${priLabel(iss.priority)} · Target: ${iss.targetDate||'—'} · ${iss.date}${iss.assignedTo?' · → '+iss.assignedTo:''}</div>
+      <div class="ic-actions">
+        <button class="ia-btn ia-resolve" onclick="issAction('${iss.issueId}','resolve',this)" ${isRes?'disabled':''}>✓ Resolve</button>
+        <button class="ia-btn ia-escalate" onclick="issAction('${iss.issueId}','escalate',this)" ${isEsc?'disabled':''}>🔴 Escalate</button>
+        <button class="ia-btn ia-delay" onclick="toggleDelay('${iss.issueId}')">📅 Delay</button>
+      </div>
+      <div class="delay-row" id="dr-${iss.issueId}">
+        <input type="date" id="dd-${iss.issueId}" style="flex:1;padding:7px 10px;font-size:12px">
+        <button class="ia-btn ia-delay" onclick="issAction('${iss.issueId}','delay',this)">Set Date</button>
+      </div>
+    </div>`;
+  });
+  if(res.length){
+    html+='<div class="resolved-lbl">Resolved — last 7 days</div>';
+    res.forEach(iss=>{
+      html+=`<div class="issue-card" style="opacity:.55">
+        <div class="ic-top">
+          <span class="issue-type-badge ${issTypeClass(iss.issueType)}">${iss.issueType}</span>
+          <span class="ic-proj">${iss.project}</span>
+          <span class="ic-status ics-res" style="margin-left:auto">✓ Resolved</span>
+        </div>
+        <div class="ic-desc" style="text-decoration:line-through;color:var(--text3)">${iss.description}</div>
+      </div>`;
+    });
+  }
+  document.getElementById('issues-panel').innerHTML=html;
+}
+
+function issAction(issueId, action, btn) {
+  if(action==='delay'){
+    const date=document.getElementById('dd-'+issueId)?.value;
+    if(!date){toast('Select a date first');return;}
+    issueActions[issueId]={action,targetDate:date};
+    toast('New target: '+date);
+    document.getElementById('dr-'+issueId).classList.remove('open');
+    return;
+  }
+  issueActions[issueId]={action,targetDate:''};
+  const card=document.getElementById('ic-'+issueId);
+  if(action==='resolve'){
+    card.classList.add('resolved-pending');
+    btn.textContent='✓ Resolved'; btn.disabled=true;
+    card.querySelector('.ic-status').textContent='✓ Resolved';
+    card.querySelector('.ic-status').className='ic-status ics-res';
+  } else {
+    card.classList.add('escalated');
+    btn.textContent='🔴 Escalated'; btn.disabled=true;
+    card.querySelector('.ic-status').textContent='🔴 Escalated';
+    card.querySelector('.ic-status').className='ic-status ics-esc';
+  }
+}
+function toggleDelay(id){ document.getElementById('dr-'+id).classList.toggle('open'); }
+
+// ════════════════════════════════════════
+// YESTERDAY'S LEADS — 24hr follow-up
+// ════════════════════════════════════════
+async function loadPendingLeads() {
+  try {
+    const yest = new Date(); yest.setDate(yest.getDate()-1);
+    const yStr = yest.toISOString().substring(0,10);
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getRecentLeads', date:yStr})});
+    const d = await r.json();
+    pendingLeads = d.leads||[];
+    if(pendingLeads.length){
+      renderPendingLeads();
+      document.getElementById('followup-wrap').classList.remove('hidden');
+    }
+  } catch(e){ /* silent */ }
+}
+
+function renderPendingLeads() {
+  document.getElementById('followup-list').innerHTML = pendingLeads.map((lead,i)=>`
+    <div class="followup-card">
+      <div class="fc-name">${lead.clientName}</div>
+      <div class="fc-meta">${lead.leadStatus} · Added ${lead.date}${lead.leadManager?' · Mgr: '+lead.leadManager:''}</div>
+      <span class="lbl" style="font-size:10px">Did you contact this lead today?</span>
+      <div class="yn-btns" style="margin-top:5px">
+        <div class="yn-btn" id="fu-y-${i}" onclick="setFollowup(${i},'yes')">Yes — Contacted</div>
+        <div class="yn-btn on-no" id="fu-n-${i}" onclick="setFollowup(${i},'no')">Not yet</div>
+      </div>
+      <div id="fu-status-${i}" class="hidden" style="margin-top:8px">
+        <span class="lbl" style="font-size:10px">Update Lead Status</span>
+        <select id="fu-sel-${i}" style="font-size:12px;margin-top:4px">
+          ${LEAD_STATUSES.map(s=>`<option value="${s.key}"${s.key===lead.leadStatus?' selected':''}>${s.key}</option>`).join('')}
+        </select>
+      </div>
+    </div>`).join('');
+}
+
+function setFollowup(i, val) {
+  document.getElementById('fu-y-'+i).className='yn-btn'+(val==='yes'?' on-yes':'');
+  document.getElementById('fu-n-'+i).className='yn-btn'+(val==='no'?' on-no':'');
+  document.getElementById('fu-status-'+i).classList.toggle('hidden', val!=='yes');
+  pendingLeads[i]._answer = val;
+}
+
+// ════════════════════════════════════════
+// LEAD BLOCKS — Section 2
+// ════════════════════════════════════════
+function addLeadBlock() {
+  leadCount++;
+  const id = leadCount;
+  const div = document.createElement('div');
+  div.className='lead-block'; div.id='lb-'+id;
+  const mgrOpts = TEAM_MEMBERS.map(n=>`<option value="${n}">${n}</option>`).join('');
+  div.innerHTML=`
+    <div class="lb-header">
+      <span class="lb-num">Lead ${id}</span>
+      <span class="lb-name-display" id="lb-lbl-${id}">New lead</span>
+      <button class="remove-block" onclick="document.getElementById('lb-${id}').remove()">✕</button>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl">Client Name <span style="color:var(--red)">*</span></span>
+        <input type="text" id="lb-name-${id}" oninput="document.getElementById('lb-lbl-${id}').textContent=this.value||'New lead'" placeholder="Full name…">
+      </div>
+      <div class="field">
+        <span class="lbl">Contact No.</span>
+        <input type="text" id="lb-phone-${id}" placeholder="Mobile…">
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Referred By</span>
+      <input type="text" id="lb-ref-${id}" placeholder="Who referred this lead?">
+    </div>
+    <div class="field">
+      <span class="lbl">Validation Check</span>
+      <div class="val-btns">
+        <div class="val-btn on-nc" id="lbv-nc-${id}" onclick="setLeadVal(${id},'Not checked')">Not Checked</div>
+        <div class="val-btn" id="lbv-v-${id}" onclick="setLeadVal(${id},'Valid')">✓ Valid</div>
+        <div class="val-btn" id="lbv-i-${id}" onclick="setLeadVal(${id},'Invalid')">✗ Invalid</div>
+      </div>
+      <input type="hidden" id="lb-val-${id}" value="Not checked">
+    </div>
+    <div class="field">
+      <span class="lbl">Lead Status</span>
+      <div class="status-grid" id="lb-statgrid-${id}">
+        ${LEAD_STATUSES.map(s=>`
+          <div class="status-pill" data-key="${s.key}"
+            style="background:${s.bg};color:${s.color};border-color:${s.bg}"
+            onclick="setLeadStatus(${id},'${s.key.replace(/'/g,"\\'")}')">
+            ${s.key}
+          </div>`).join('')}
+      </div>
+      <input type="hidden" id="lb-status-${id}" value="Not Contacted">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl">Lead Manager</span>
+        <select id="lb-mgr-${id}">
+          <option value="">Select…</option>${mgrOpts}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Remarks</span>
+      <textarea id="lb-remarks-${id}" placeholder="Project type, requirements, notes…" style="min-height:48px"></textarea>
+    </div>
+    <div class="field" id="lb-lost-${id}" style="display:none">
+      <span class="lbl">Lost Reason</span>
+      <input type="text" id="lb-lostrsn-${id}" placeholder="High Fee / Portfolio Shortage / Project on hold…">
+    </div>`;
+  document.getElementById('lead-blocks').appendChild(div);
+  setLeadStatus(id,'Not Contacted');
+}
+
+function setLeadVal(id, val) {
+  document.getElementById('lb-val-'+id).value=val;
+  document.getElementById('lbv-nc-'+id).className='val-btn'+(val==='Not checked'?' on-nc':'');
+  document.getElementById('lbv-v-'+id).className='val-btn'+(val==='Valid'?' on-valid':'');
+  document.getElementById('lbv-i-'+id).className='val-btn'+(val==='Invalid'?' on-invalid':'');
+}
+
+function setLeadStatus(id, status) {
+  document.getElementById('lb-status-'+id).value=status;
+  document.getElementById('lb-statgrid-'+id).querySelectorAll('.status-pill').forEach(c=>{
+    const s=LEAD_STATUSES.find(x=>x.key===c.dataset.key);
+    if(!s) return;
+    c.style.borderColor = c.dataset.key===status ? s.color : s.bg;
+    c.style.borderWidth = c.dataset.key===status ? '2px' : '1.5px';
+    c.style.fontWeight  = c.dataset.key===status ? '700' : '500';
+  });
+  const lostWrap=document.getElementById('lb-lost-'+id);
+  if(lostWrap) lostWrap.style.display=status==='Lost'?'block':'none';
+}
+
+// ════════════════════════════════════════
+// CLIENT CONNECTION BLOCKS — Section 3
+// ════════════════════════════════════════
+function addContactBlock() {
+  contCount++;
+  const id = contCount;
+  const div = document.createElement('div');
+  div.className='contact-block'; div.id='cb-'+id;
+  const projOpts='<option value="">Select project…</option>'+
+    projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  div.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span class="cb-num">Connection ${id}</span>
+      <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;margin-left:auto" onclick="document.getElementById('cb-${id}').remove()">✕</button>
+    </div>
+    <div class="field">
+      <span class="lbl">Project</span>
+      <select id="cb-proj-${id}">${projOpts}</select>
+    </div>
+    <div class="field">
+      <span class="lbl">Type of Contact</span>
+      <div class="chips">
+        ${CONTACT_TYPES.map(t=>`<div class="chip" data-type="${t}" onclick="selContactType(this,${id})">${t}</div>`).join('')}
+      </div>
+      <input type="hidden" id="cb-type-${id}">
+    </div>
+    <div class="field">
+      <span class="lbl">Notes <span class="opt">outcome, follow-up needed</span></span>
+      <textarea id="cb-notes-${id}" placeholder="What was discussed? Any action items?" style="min-height:45px"></textarea>
+    </div>`;
+  document.getElementById('contact-blocks').appendChild(div);
+}
+
+function selContactType(el, id) {
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('cb-type-'+id).value=el.dataset.type;
+}
+
+// ════════════════════════════════════════
+// AGENDA BLOCKS + WA GENERATOR — Section 4
+// ════════════════════════════════════════
+function addAgendaBlock() {
+  agendaCount++;
+  const id = agendaCount;
+  const div = document.createElement('div');
+  div.className='agenda-block'; div.id='ab-'+id;
+  const tmr = new Date(); tmr.setDate(tmr.getDate()+1);
+  const tStr = tmr.toISOString().substring(0,10);
+  const projOpts='<option value="">Select project…</option>'+
+    projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  div.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span class="ab-num">Agenda ${id}</span>
+      <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;margin-left:auto" onclick="document.getElementById('ab-${id}').remove();generateAllWA()">✕</button>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl">Project</span>
+        <select id="ag-proj-${id}" onchange="generateAllWA()">${projOpts}</select>
+      </div>
+      <div class="field">
+        <span class="lbl">Type</span>
+        <div class="type-btns">
+          <div class="type-btn on-mtg" id="ab-tmtg-${id}" onclick="setAgendaType(${id},'Meeting')">👥 Meeting</div>
+          <div class="type-btn" id="ab-tvis-${id}" onclick="setAgendaType(${id},'Site Visit')">🏗️ Site Visit</div>
+        </div>
+        <input type="hidden" id="ag-type-${id}" value="Meeting">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl">Date</span>
+        <input type="date" id="ag-date-${id}" value="${tStr}" onchange="generateAllWA()">
+      </div>
+      <div class="field">
+        <span class="lbl">Time</span>
+        <input type="time" id="ag-time-${id}" value="11:00" onchange="generateAllWA()">
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Agenda Points</span>
+      <textarea id="ag-agenda-${id}" oninput="generateAllWA()" placeholder="• Review design drawings\n• Discuss material finalization\n• Address pending approvals…" style="min-height:70px"></textarea>
+    </div>
+    <div class="field">
+      <span class="lbl">Attendees</span>
+      <input type="text" id="ag-attendees-${id}" oninput="generateAllWA()" placeholder="Client name, Siddharth sir, Achal, site team…">
+    </div>`;
+  document.getElementById('agenda-blocks').appendChild(div);
+  generateAllWA();
+}
+
+function setAgendaType(id, type) {
+  document.getElementById('ag-type-'+id).value=type;
+  document.getElementById('ab-tmtg-'+id).className='type-btn'+(type==='Meeting'?' on-mtg':'');
+  document.getElementById('ab-tvis-'+id).className='type-btn'+(type==='Site Visit'?' on-visit':'');
+  generateAllWA();
+}
+
+function buildAgendaWA(id) {
+  const proj      = document.getElementById('ag-proj-'+id)?.value||'[Project]';
+  const type      = document.getElementById('ag-type-'+id)?.value||'Meeting';
+  const dateVal   = document.getElementById('ag-date-'+id)?.value||'';
+  const time      = document.getElementById('ag-time-'+id)?.value||'';
+  const agendaTxt = document.getElementById('ag-agenda-'+id)?.value?.trim()||'';
+  const attendees = document.getElementById('ag-attendees-'+id)?.value?.trim()||'';
+  const emoji     = type==='Meeting'?'👥':'🏗️';
+  const dFormatted= dateVal
+    ? new Date(dateVal+'T12:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})
+    : '[Date]';
+
+  let msg=`${emoji} *${type} Agenda — ${proj}*\n\n`;
+  msg+=`📆 *Date:* ${dFormatted}\n`;
+  msg+=`🕐 *Time:* ${time||'[Time]'}\n`;
+  msg+=`📍 *Type:* ${type}\n\n`;
+  if(agendaTxt){ msg+=`*Agenda:*\n${agendaTxt}\n\n`; }
+  if(attendees){
+    msg+=`*Attendees:*\n`;
+    attendees.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>{ msg+=`• ${a}\n`; });
+    msg+='\n';
+  }
+  msg+=`Please confirm your availability.\n\n— Ideaform Design Studio\nCRM: ${crmUser||'Aman Raghuwanshi'}`;
+  return msg;
+}
+
+function generateAllWA() {
+  const blocks=document.querySelectorAll('.agenda-block');
+  const c=document.getElementById('wa-list');
+  if(!blocks.length){
+    c.innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
+    return;
+  }
+  c.innerHTML=[...blocks].map(b=>{
+    const id=b.id.replace('ab-','');
+    const proj=document.getElementById('ag-proj-'+id)?.value||'Project';
+    const type=document.getElementById('ag-type-'+id)?.value||'Meeting';
+    const msg=buildAgendaWA(id);
+    return `<div class="wa-block">
+      <div class="wa-proj-name">${type==='Meeting'?'👥':'🏗️'} ${proj} — ${type}</div>
+      <textarea class="wa-textarea" id="wa-${id}" readonly onclick="this.select()">${msg}</textarea>
+      <button class="copy-btn-sm" onclick="copyWA('wa-${id}')">📋 Copy &amp; Send to Group</button>
+    </div>`;
+  }).join('');
+}
+
+function copyWA(id){
+  const ta=document.getElementById(id);
+  navigator.clipboard.writeText(ta.value)
+    .then(()=>toast('Copied!'))
+    .catch(()=>{ ta.select(); document.execCommand('copy'); toast('Copied!'); });
+}
+
+// ════════════════════════════════════════
+// OTHER ACTIVITIES — Section 6
+// ════════════════════════════════════════
+function setActivity(key, val) {
+  document.getElementById(key+'-yes').className='at-btn'+(val==='yes'?' on-yes':'');
+  document.getElementById(key+'-no').className='at-btn'+(val==='no'?' on-no':'');
+  document.getElementById(key+'-detail').classList.toggle('open', val==='yes');
+}
+
+// ════════════════════════════════════════
+// NEW ISSUES — Section 7
+// ════════════════════════════════════════
+function addNewIssue() {
+  issCount++;
+  const id=issCount;
+  const div=document.createElement('div');
+  div.className='new-iss-block'; div.id='ni-'+id;
+  const projOpts='<option value="">Select project…</option>'+
+    projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  const mbrOpts='<option value="">— Not assigned —</option>'+
+    TEAM_MEMBERS.map(n=>`<option value="${n}">${n}</option>`).join('');
+  div.innerHTML=`
+    <div class="ni-header">
+      <span class="ni-num">Issue ${id}</span>
+      <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer" onclick="this.closest('.new-iss-block').remove()">✕</button>
+    </div>
+    <div class="field" style="margin-bottom:8px">
+      <span class="lbl" style="font-size:10px">Type</span>
+      <div class="chips">
+        ${CRM_ISS_TYPES.map(t=>`<div class="chip" data-type="${t}" onclick="selNIType(this,${id})">${t}</div>`).join('')}
+      </div>
+      <input type="hidden" id="ni-type-${id}">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl" style="font-size:10px">Project</span>
+        <select id="ni-proj-${id}">${projOpts}</select>
+      </div>
+      <div class="field">
+        <span class="lbl" style="font-size:10px">Assign To</span>
+        <select id="ni-assign-${id}">${mbrOpts}</select>
+      </div>
+    </div>
+    <textarea id="ni-desc-${id}" placeholder="Describe the issue clearly…" style="min-height:50px;margin-bottom:8px"></textarea>
+    <div class="field-row" style="margin-bottom:0">
+      <div>
+        <span class="lbl" style="font-size:10px;display:block;margin-bottom:4px">Priority</span>
+        <div class="pri-btns">
+          <div class="pri-btn" id="nip-1-${id}" onclick="setNIPri(${id},1)">Low</div>
+          <div class="pri-btn on-2" id="nip-2-${id}" onclick="setNIPri(${id},2)">Med</div>
+          <div class="pri-btn" id="nip-3-${id}" onclick="setNIPri(${id},3)">High</div>
+        </div>
+        <input type="hidden" id="ni-pri-${id}" value="2">
+      </div>
+      <div>
+        <span class="lbl" style="font-size:10px;display:block;margin-bottom:4px">Target Date</span>
+        <input type="date" id="ni-tdate-${id}">
+      </div>
+    </div>`;
+  document.getElementById('new-iss-blocks').appendChild(div);
+}
+
+function selNIType(el, id) {
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('ni-type-'+id).value=el.dataset.type;
+}
+
+function setNIPri(id, val) {
+  [1,2,3].forEach(n=>{
+    document.getElementById('nip-'+n+'-'+id).className='pri-btn'+(n===val?' on-'+n:'');
+  });
+  document.getElementById('ni-pri-'+id).value=val;
+}
+
+// ════════════════════════════════════════
+// COLLECT
+// ════════════════════════════════════════
+function collectLeads() {
+  const out=[];
+  document.querySelectorAll('.lead-block').forEach(b=>{
+    const id=b.id.replace('lb-','');
+    const nm=(document.getElementById('lb-name-'+id)?.value||'').trim();
+    if(!nm) return;
+    out.push({
+      clientName : nm,
+      contactNo  : (document.getElementById('lb-phone-'+id)?.value||'').trim(),
+      referredBy : (document.getElementById('lb-ref-'+id)?.value||'').trim(),
+      validation : document.getElementById('lb-val-'+id)?.value||'Not checked',
+      leadStatus : document.getElementById('lb-status-'+id)?.value||'Not Contacted',
+      leadManager: document.getElementById('lb-mgr-'+id)?.value||'',
+      remarks    : (document.getElementById('lb-remarks-'+id)?.value||'').trim(),
+      lostReasons: (document.getElementById('lb-lostrsn-'+id)?.value||'').trim(),
+    });
+  });
+  return out;
+}
+
+function collectFollowups() {
+  return pendingLeads
+    .filter(l=>l._answer)
+    .map((l,i)=>({
+      leadId   : l.leadId||'',
+      contacted: l._answer==='yes',
+      newStatus: l._answer==='yes'
+        ? (document.getElementById('fu-sel-'+i)?.value||l.leadStatus)
+        : l.leadStatus,
+    }));
+}
+
+function collectContacts() {
+  const out=[];
+  document.querySelectorAll('.contact-block').forEach(b=>{
+    const id=b.id.replace('cb-','');
+    out.push({
+      project:(document.getElementById('cb-proj-'+id)?.value||''),
+      type   :(document.getElementById('cb-type-'+id)?.value||''),
+      notes  :(document.getElementById('cb-notes-'+id)?.value||'').trim(),
+    });
+  });
+  return out;
+}
+
+function collectAgendas() {
+  const out=[];
+  document.querySelectorAll('.agenda-block').forEach(b=>{
+    const id=b.id.replace('ab-','');
+    out.push({
+      project  : document.getElementById('ag-proj-'+id)?.value||'',
+      type     : document.getElementById('ag-type-'+id)?.value||'Meeting',
+      date     : document.getElementById('ag-date-'+id)?.value||'',
+      time     : document.getElementById('ag-time-'+id)?.value||'',
+      agenda   : (document.getElementById('ag-agenda-'+id)?.value||'').trim(),
+      attendees: (document.getElementById('ag-attendees-'+id)?.value||'').trim(),
+      waMsg    : document.getElementById('wa-'+id)?.value||'',
+    });
+  });
+  return out;
+}
+
+function collectFinance() {
+  return {
+    billsCount     : parseInt(document.getElementById('f-bills-count')?.value)||0,
+    billsAmount    : parseFloat(document.getElementById('f-bills-amount')?.value)||0,
+    billsProjects  : getChips('bills-proj-chips'),
+    paymentAmount  : parseFloat(document.getElementById('f-pay-amount')?.value)||0,
+    paymentProject : document.getElementById('f-pay-proj')?.value||'',
+    followupCount  : parseInt(document.getElementById('f-fup-count')?.value)||0,
+    followupProjects: getChips('fup-proj-chips'),
+  };
+}
+
+function collectOther() {
+  const tncpOn=document.getElementById('tncp-yes')?.classList.contains('on-yes');
+  const quotOn=document.getElementById('quot-yes')?.classList.contains('on-yes');
+  const bniOn =document.getElementById('bni-yes')?.classList.contains('on-yes');
+  return {
+    vendorCount   : parseInt(document.getElementById('f-vendor-count')?.value)||0,
+    vendorProjects: getChips('vendor-proj-chips'),
+    vendorNotes   : (document.getElementById('f-vendor-notes')?.value||'').trim(),
+    tncp          : tncpOn?'Yes':'No',
+    tncpProjects  : tncpOn?getChips('tncp-proj-chips'):[],
+    tncpNotes     : tncpOn?(document.getElementById('f-tncp-notes')?.value||'').trim():'',
+    quotations    : quotOn?'Yes':'No',
+    quotProjects  : quotOn?getChips('quot-proj-chips'):[],
+    quotNotes     : quotOn?(document.getElementById('f-quot-notes')?.value||'').trim():'',
+    bni           : bniOn?'Yes':'No',
+    bniNotes      : bniOn?(document.getElementById('f-bni-notes')?.value||'').trim():'',
+  };
+}
+
+function collectNewIssues() {
+  const out=[];
+  document.querySelectorAll('.new-iss-block').forEach(b=>{
+    const id=b.id.replace('ni-','');
+    const desc=(document.getElementById('ni-desc-'+id)?.value||'').trim();
+    if(!desc) return;
+    out.push({
+      issueType  : document.getElementById('ni-type-'+id)?.value||'CRM/Process',
+      project    : document.getElementById('ni-proj-'+id)?.value||'',
+      description: desc,
+      assignedTo : document.getElementById('ni-assign-'+id)?.value||'',
+      priority   : parseInt(document.getElementById('ni-pri-'+id)?.value||2),
+      targetDate : document.getElementById('ni-tdate-'+id)?.value||'',
+      reportedBy : crmUser,
+    });
+  });
+  return out;
+}
+
+// ════════════════════════════════════════
+// SUBMIT
+// ════════════════════════════════════════
+async function submitAll() {
+  if(!googleUser){ toast('Sign in first'); return; }
+  const date=document.getElementById('f-date')?.value||'';
+
+  document.getElementById('submit-btn').disabled=true;
+  document.getElementById('submit-status').textContent='Submitting…';
+
+  try {
+    // 1. Issue status updates
+    for(const [issueId, act] of Object.entries(issueActions)){
+      const newStatus=act.action==='resolve'?'Resolved':act.action==='escalate'?'Escalated':'Open';
+      await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'updateIssueStatus',issueId,status:newStatus,targetDate:act.targetDate||''})});
+    }
+
+    // 2. Main CRM submission
+    const leads    = collectLeads();
+    const followups= collectFollowups();
+    const contacts = collectContacts();
+    const agendas  = collectAgendas();
+    const finance  = collectFinance();
+    const other    = collectOther();
+    const newIssues= collectNewIssues();
+
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({
+        action      : 'submitAmanCRM',
+        date, time  : new Date().toTimeString().substring(0,5),
+        member      : crmUser,
+        newLeads    : JSON.stringify(leads),
+        leadFollowups: JSON.stringify(followups),
+        contacts    : JSON.stringify(contacts),
+        agendas     : JSON.stringify(agendas),
+        finance     : JSON.stringify(finance),
+        other       : JSON.stringify(other),
+        newIssues   : JSON.stringify(newIssues),
+      })});
+    const resp = await r.json();
+    if(resp.status!=='ok') throw new Error(resp.message||'Submission failed');
+
+    // Success screen
+    document.getElementById('form-body').style.display='none';
+    document.getElementById('success-screen').style.display='block';
+    document.querySelector('.submit-bar').style.display='none';
+
+    const issActCount=Object.keys(issueActions).length;
+    const billsAmt=finance.billsAmount;
+    const payAmt=finance.paymentAmount;
+    document.getElementById('success-sub').innerHTML=
+      `CRM report submitted by ${crmUser}<br>`+
+      (leads.length?`📋 ${leads.length} new lead${leads.length!==1?'s':''} added to LMS<br>`:'')+
+      (contacts.length?`📞 ${contacts.length} client connection${contacts.length!==1?'s':''} logged<br>`:'')+
+      (agendas.length?`📅 ${agendas.length} meeting agenda${agendas.length!==1?'s':''} ready to send<br>`:'')+
+      (billsAmt?`🧾 ₹${billsAmt.toLocaleString('en-IN')} billed today<br>`:'')+
+      (payAmt?`💰 ₹${payAmt.toLocaleString('en-IN')} payment received<br>`:'')+
+      (newIssues.length?`🚩 ${newIssues.length} issue${newIssues.length!==1?'s':''} logged<br>`:'')+
+      (issActCount?`✅ ${issActCount} issue${issActCount!==1?'s':''} updated`:'');
+
+  } catch(e) {
+    toast('Error: '+e.message);
+    document.getElementById('submit-btn').disabled=false;
+    document.getElementById('submit-status').textContent=crmUser;
+  }
+}
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+function resetForm() {
+  document.getElementById('form-body').style.display='';
+  document.getElementById('success-screen').style.display='none';
+  document.querySelector('.submit-bar').style.display='';
+  ['lead-blocks','contact-blocks','agenda-blocks','new-iss-blocks'].forEach(id=>{
+    document.getElementById(id).innerHTML='';
+  });
+  document.getElementById('wa-list').innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
+  leadCount=contCount=agendaCount=issCount=0;
+  issueActions={}; pendingLeads=[];
+  document.getElementById('followup-wrap').classList.add('hidden');
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('submit-status').textContent=crmUser;
+  loadIssues();
+  loadPendingLeads();
+}
+
+function toast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  setTimeout(()=>t.style.display='none',dur);
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('f-date').value=new Date().toISOString().substring(0,10);
+});
+</script>
+</body>
+</html>
