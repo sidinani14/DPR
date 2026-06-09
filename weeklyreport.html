@@ -508,23 +508,95 @@ function buildIndividualPage(m, taskData){
   </div>`;
 }
 
+// ── Deepak page ─────────────────────────────────────────────
+function buildDeepakPage(d){
+  if(!d) return '';
+  const sc2=(v,m)=>{const p=v/m;return p>=.85?'#2ED573':p>=.70?'#34A853':p>=.50?'#FBBC04':'#EA4335';};
+  const gc2=(v,m)=>{const p=v/m;return p>=.85?'g':p>=.70?'a':p>=.50?'o':'r';};
+  const gpc2=(v,m)=>{const p=v/m;return p>=.85?'pb-g':p>=.70?'pb-a':p>=.50?'pb-o':'pb-r';};
+  const pCard=(label,val,max,detail)=>{
+    const cl=gc2(val,max),pc=gpc2(val,max),col=sc2(val,max),pct=Math.round(val/max*100);
+    return `<div class="pc ${cl}">
+      <div class="pc-lbl">${label}</div>
+      <div class="pc-val" style="color:${col}" contenteditable="true">${val}<span class="pc-max">/${max}</span></div>
+      <div class="pc-det">${detail}</div>
+      <div class="pw"><div class="pb ${pc}" style="width:${pct}%"></div></div>
+    </div>`;
+  };
+  const s=d.scores;
+  const col=sc2(s.total,100);
+  const rows=d.perProject.map(p=>`<tr>
+    <td style="font-size:9px;font-weight:600;padding:6px 8px">${p.project}</td>
+    <td style="text-align:center;padding:6px 8px"><span style="color:${p.visited?'#2ED573':'#EA4335'};font-weight:700;font-size:11px">${p.visited?'✓':'✗'}</span></td>
+    <td style="text-align:center;padding:6px 8px"><span style="color:${p.clientUpdated?'#2ED573':'#EA4335'};font-weight:700;font-size:11px">${p.clientUpdated?'✓':'✗'}</span></td>
+    <td style="text-align:center;padding:6px 8px;font-size:9px;color:rgba(255,255,255,0.6)">${p.dperDays}/6</td>
+  </tr>`).join('');
+  return `<div class="page">
+    ${hdr()}
+    <div class="ind-top">
+      <div>
+        <div class="ind-name">Deepak Soni</div>
+        <div class="ind-role">Execution Lead &nbsp;·&nbsp; Site Operations</div>
+        <div class="ind-week-lbl">Week of ${WEEK_LABEL} · Ideaform Design Studio</div>
+        <div class="stats-row">
+          <div class="stat-chip"><div class="stat-val">${d.visitedCount}/${d.totalSites}</div><div class="stat-lbl">Sites<br>Visited</div></div>
+          <div class="stat-chip"><div class="stat-val" style="color:${d.visitedCount===d.totalSites?'#2ED573':'#FBBC04'}">${Math.round(d.visitedCount/Math.max(d.totalSites,1)*100)}%</div><div class="stat-lbl">Visit<br>Coverage</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.clientCount}/${d.totalSites}</div><div class="stat-lbl">Client<br>Updated</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.dperCount}/${d.dperPossible}</div><div class="stat-lbl">DPER<br>Submissions</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.daysPresent}/6</div><div class="stat-lbl">Days<br>Present</div></div>
+          <div class="stat-chip"><div class="stat-val" style="color:${d.lateCount>0?'#FBBC04':'#2ED573'}">${d.lateCount}</div><div class="stat-lbl">Late<br>Arrivals</div></div>
+        </div>
+      </div>
+      <div class="score-box">
+        <div class="sc-lbl">Overall Score</div>
+        <div class="sc-num" style="color:${col}" contenteditable="true">${s.total}<span class="sc-den">/100</span></div>
+        <div style="margin-top:6px"><span class="chip ${chip(s.total)}">${chipLabel(s.total)}</span></div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
+    <div class="pg">
+      ${pCard('Site Visits',s.s_visit,35,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
+      ${pCard('Client Comm',s.s_client,20,`${d.clientCount} of ${d.totalSites} projects updated`)}
+      ${pCard('DPER<br>Consistency',s.s_dper,20,`${d.dperCount} of ${d.dperPossible} possible submissions`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
+    </div>
+
+    <div style="margin-top:4mm">
+      <div class="section-title" style="margin-bottom:2mm">Per-Project Breakdown</div>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;">
+        <thead><tr style="background:rgba(245,166,35,0.12)">
+          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
+          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Site Visit<br><span style="opacity:.5">≥1 this week</span></th>
+          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Client<br>Updated</th>
+          <th style="padding:6px 8px;font-size:7.5px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">DPER Days</th>
+        </tr></thead>
+        <tbody style="border:1px solid rgba(255,255,255,0.06)">${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
 // ── Main render ────────────────────────────────────────────
 async function loadAndRender(){
   const app = document.getElementById('app');
-  let statsMap = {};
+  let statsMap = {}, deepakStats = null;
 
   if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
     try {
-      const res  = await fetch(APPS_SCRIPT_URL, {
-        method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({action:'getWeeklyStats', weekStart:WEEK_START})
-      });
-      const data = await res.json();
-      if (data.stats) {
-        data.stats.forEach(s => { statsMap[s.name] = s; });
-      }
+      const [res, dRes] = await Promise.all([
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({action:'getWeeklyStats', weekStart:WEEK_START})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({action:'getDeepakWeeklyStats', weekStart:WEEK_START})}),
+      ]);
+      const data  = await res.json();
+      const dData = await dRes.json();
+      if (data.stats)  data.stats.forEach(s => { statsMap[s.name] = s; });
+      if (dData.scores) deepakStats = dData;
     } catch(e) {
-      console.warn('Could not fetch task stats:', e);
+      console.warn('Could not fetch stats:', e);
     }
   }
 
@@ -538,6 +610,7 @@ async function loadAndRender(){
   const sorted = [...team].sort((a,b)=>b._sc.total-a._sc.total);
   let outHtml = buildOverviewPage(sorted);
   sorted.forEach(m => { outHtml += buildIndividualPage(m, m._taskData); });
+  outHtml += buildDeepakPage(deepakStats);
   app.innerHTML = outHtml;
 }
 

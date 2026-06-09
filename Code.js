@@ -139,6 +139,7 @@ function doGet(e) {
   if (action === 'getProjectStats')          return safeRespond(getProjectStats);
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
+  if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
   if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
   return respond({status: 'IDS DPR live'});
 }
@@ -157,6 +158,7 @@ function doPost(e) {
     if (data.action === 'getOpenTasksForMember') return respond(getOpenTasksForMember(data.member||''));
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
     if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
+    if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -3895,6 +3897,151 @@ function getDeepakVisitSummary(weekStart) {
     visitedCount: visited,
     totalCount  : total,
     coveragePct : total > 0 ? Math.round(visited / total * 100) : 0,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════
+// getDeepakWeeklyStats — Deepak Soni weekly scorecard
+// action=getDeepakWeeklyStats&weekStart=2026-06-01
+//
+// Scoring:
+//   Site Visits     /35 — active sites visited ≥1 time / total active sites
+//   Client Comm     /20 — active sites with clientUpdated=Yes ≥1 time / total
+//   DPER Consistency/20 — total DPER submissions / (totalSites × 6 days)
+//   Punctuality     /15 — from DAILY_SUMMARY biometric (same base as team)
+//   Hours           /10 — from DAILY_SUMMARY biometric
+// ════════════════════════════════════════════════════════════════
+function getDeepakWeeklyStats(weekStart) {
+  var s   = db();
+  var mon = weekStart || dateStr(mondayOf(new Date()));
+  var sat = addDaysToStr(mon, 5);
+
+  // ── 1. Read active projects from CONFIG tab ───────────────
+  // Scans col A for "DEEPAK ACTIVE PROJECTS" header,
+  // then reads project names until the next blank row.
+  var activeProjects = [];
+  var configSheet = s.getSheetByName(CONFIG_TAB);
+  if (configSheet) {
+    var cRows = configSheet.getDataRange().getValues();
+    var inSection = false;
+    for (var ci = 0; ci < cRows.length; ci++) {
+      var cell = String(cRows[ci][0] || '').trim();
+      if (!inSection) {
+        if (cell.toUpperCase() === 'DEEPAK ACTIVE PROJECTS') { inSection = true; }
+      } else {
+        if (!cell) break; // blank row ends the section
+        activeProjects.push(cell);
+      }
+    }
+  }
+  var totalSites = activeProjects.length;
+
+  // ── 2. Scan SITE_EXECUTION for this week ─────────────────
+  // Cols: B=Date(1) D=ProjectName(3) E=Lead(4) F=SiteVisitDone(5) R=ClientUpdated(17)
+  var visitedSet  = {};  // project → true if visited ≥1
+  var clientSet   = {};  // project → true if clientUpdated=Yes ≥1
+  var dperCount   = 0;   // total DPER submissions by Deepak this week
+  var projectDays = {};  // project → set of dates submitted (for per-project DPER days)
+
+  var execSheet = s.getSheetByName(SITE_EXEC_TAB);
+  if (execSheet && execSheet.getLastRow() > 1) {
+    var eRows = execSheet.getDataRange().getValues();
+    for (var i = 1; i < eRows.length; i++) {
+      var eDate    = cellDate(eRows[i][1]);
+      var eProj    = String(eRows[i][3] || '').trim();
+      var eLead    = String(eRows[i][4] || '').trim();
+      var eVisit   = String(eRows[i][5] || '').trim();
+      var eClient  = String(eRows[i][17]|| '').trim(); // col R ClientUpdated
+      if (eLead !== 'Deepak Soni') continue;
+      if (!eDate || eDate < mon || eDate > sat) continue;
+
+      dperCount++;
+      if (!projectDays[eProj]) projectDays[eProj] = {};
+      projectDays[eProj][eDate] = true;
+
+      if (eVisit === 'Yes')   visitedSet[eProj]  = true;
+      if (eClient === 'Yes')  clientSet[eProj]   = true;
+    }
+  }
+
+  // ── 3. Per-project breakdown ──────────────────────────────
+  var perProject = activeProjects.map(function(proj) {
+    return {
+      project       : proj,
+      visited       : !!visitedSet[proj],
+      clientUpdated : !!clientSet[proj],
+      dperDays      : projectDays[proj] ? Object.keys(projectDays[proj]).length : 0,
+    };
+  });
+
+  var visitedCount  = perProject.filter(function(p){ return p.visited; }).length;
+  var clientCount   = perProject.filter(function(p){ return p.clientUpdated; }).length;
+  var dperPossible  = totalSites * 6; // 6 days × N sites
+
+  // ── 4. Biometric / attendance from DAILY_SUMMARY ─────────
+  // Cols: Date=A(0) Time=B(1) Member=C(2) ArrivedOnTime=E(4) TotalHrs=F(5) HrsScore=G(6) PunctScore=H(7)
+  // (same columns as other team members)
+  var sumSheet = s.getSheetByName(SUMMARY_TAB);
+  var daysPresent = 0, lateCount = 0, totalHrsMins = 0, hrsScoreSum = 0, punctScoreSum = 0;
+  var attRows = [];
+  var DEEPAK_THRESHOLD = '09:10';
+
+  if (sumSheet && sumSheet.getLastRow() > 1) {
+    var sRows = sumSheet.getDataRange().getValues();
+    for (var si = 1; si < sRows.length; si++) {
+      var rDate  = cellDate(sRows[si][0]);
+      var rName  = String(sRows[si][2] || '').trim();
+      if (rName !== 'Deepak Soni') continue;
+      if (!rDate || rDate < mon || rDate > sat) continue;
+      daysPresent++;
+      var arrTime  = String(sRows[si][1] || '').trim(); // col B Time (HH:MM)
+      var isLate   = arrTime > DEEPAK_THRESHOLD;
+      if (isLate) lateCount++;
+      attRows.push({ date: rDate, time: arrTime, late: isLate });
+    }
+  }
+
+  var absentDays = 6 - daysPresent;
+
+  // Punctuality /15 (same base as rest of team, but max for Deepak stays /15)
+  // Full 15 if 0 late; −2 per late; −2 per absent
+  var punctBase = Math.max(0, 15 - lateCount * 2 - absentDays * 2);
+
+  // Hours /10
+  // Simple: present days × (hrs/10) lookup matches team logic
+  // Using hrsScore mapped to /10: daysPresent/6 × 10 adjusted for hours quality
+  // Since DAILY_SUMMARY may or may not store individual hrs, use present ratio as proxy
+  // Absent deduction: −1.5/absent day
+  var hrsBase = Math.max(0, Math.round((daysPresent / 6 * 10 - absentDays * 1.5) * 10) / 10);
+
+  // ── 5. Score calculation ──────────────────────────────────
+  var s_visit  = totalSites > 0 ? Math.round(visitedCount  / totalSites  * 35 * 10) / 10 : 0;
+  var s_client = totalSites > 0 ? Math.round(clientCount   / totalSites  * 20 * 10) / 10 : 0;
+  var s_dper   = dperPossible > 0 ? Math.min(20, Math.round(dperCount / dperPossible * 20 * 10) / 10) : 0;
+  var s_punct  = Math.min(15, punctBase);
+  var s_hrs    = Math.min(10, hrsBase);
+  var total    = Math.round((s_visit + s_client + s_dper + s_punct + s_hrs) * 10) / 10;
+
+  return {
+    weekStart      : mon,
+    weekEnd        : sat,
+    totalSites     : totalSites,
+    visitedCount   : visitedCount,
+    clientCount    : clientCount,
+    dperCount      : dperCount,
+    dperPossible   : dperPossible,
+    daysPresent    : daysPresent,
+    lateCount      : lateCount,
+    absentDays     : absentDays,
+    perProject     : perProject,
+    scores: {
+      s_visit  : s_visit,
+      s_client : s_client,
+      s_dper   : s_dper,
+      s_punct  : s_punct,
+      s_hrs    : s_hrs,
+      total    : total,
+    },
   };
 }
 
