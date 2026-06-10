@@ -186,6 +186,53 @@ textarea{min-height:62px;resize:vertical;}
 .resolved-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--border);}
 .toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;z-index:999;display:none;}
 .divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+
+/* Multi-select project dropdown */
+.msel{position:relative;}
+.msel-control{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:40px;padding:6px 30px 6px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;position:relative;}
+.msel-control:focus-within{border-color:var(--accent);}
+.msel-ph{font-size:13px;color:var(--text3);}
+.msel-caret{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text3);pointer-events:none;}
+.msel-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.msel-tag{display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;padding:3px 7px 3px 9px;border-radius:13px;}
+.msel-x{cursor:pointer;font-size:13px;line-height:1;opacity:.8;}
+.msel-x:hover{opacity:1;}
+.msel-drop{margin-top:6px;background:#fff;border:1.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 4px 14px rgba(0,0,0,.08);padding:8px;max-height:260px;overflow:hidden;display:flex;flex-direction:column;}
+.msel-search{margin-bottom:6px;}
+.msel-opts{overflow-y:auto;}
+.msel-opt{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:12.5px;cursor:pointer;color:var(--text);}
+.msel-opt:hover{background:var(--surface2);}
+.msel-opt.on{background:var(--accent-light);color:var(--accent);font-weight:600;}
+.msel-check{width:15px;height:15px;border:1.5px solid var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;}
+.msel-opt.on .msel-check{background:var(--accent);border-color:var(--accent);}
+.msel-empty{padding:10px;text-align:center;color:var(--text3);font-size:12px;}
+
+/* Per-project entry rows (activities + payments) */
+.entry-row{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;}
+.entry-top{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.entry-top select{flex:1;}
+.entry-x{background:var(--red-bg);border:none;color:var(--red);font-size:13px;width:28px;height:30px;border-radius:6px;cursor:pointer;flex-shrink:0;}
+.pay-amt{max-width:150px;}
+
+/* Monthly feedback block + rating scales */
+.fb-block{background:var(--surface2);border:2px solid #6A1B9A;border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;}
+.fb-num{background:#6A1B9A;color:#fff;font-size:11px;font-weight:700;padding:3px 11px;border-radius:11px;flex-shrink:0;}
+.fb-q{font-size:12px;font-weight:600;color:var(--text);margin:14px 0 7px;}
+.fb-q b{font-weight:700;}
+.fb-q .qsub{font-weight:400;color:var(--text2);}
+.rate-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.rate-anchor{font-size:10px;color:var(--text3);min-width:50px;}
+.rate-anchor.r{text-align:right;}
+.rate-btns{display:flex;gap:5px;flex-wrap:wrap;flex:1;justify-content:center;}
+.rate-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border2);background:#fff;font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;}
+.rate-btn:hover{border-color:#6A1B9A;}
+.rate-btn.on{background:#6A1B9A;border-color:#6A1B9A;color:#fff;}
+
+/* Issue / Deliverable kind toggle */
+.kind-btns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;}
+.kind-btn{padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);text-align:center;}
+.kind-btn.on-issue{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+.kind-btn.on-deliv{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
 </style>
 </head>
 <body>
@@ -309,20 +356,20 @@ textarea{min-height:62px;resize:vertical;}
       </div>
       <div class="field">
         <span class="lbl">Projects Billed <span class="opt">select all that apply</span></span>
-        <div class="chips" id="bills-proj-chips"><span style="font-size:12px;color:var(--text3)">Sign in to load projects…</span></div>
+        <div id="msel-bills"></div>
       </div>
 
       <hr class="divider">
-      <div class="sub-lbl">Payment Received Today</div>
-      <div class="field-row">
-        <div class="field">
-          <span class="lbl">Amount (₹)</span>
-          <div class="rupee-wrap"><input type="number" id="f-pay-amount" min="0" placeholder="0"></div>
+      <div class="activity-toggle-row" style="padding-top:0">
+        <span class="atl">Payment Received Today?</span>
+        <div class="at-btns">
+          <div class="at-btn" id="pay-yes" onclick="setActivity('pay','yes')">Yes</div>
+          <div class="at-btn on-no" id="pay-no" onclick="setActivity('pay','no')">No</div>
         </div>
-        <div class="field">
-          <span class="lbl">Project</span>
-          <select id="f-pay-proj"><option value="">Select project…</option></select>
-        </div>
+      </div>
+      <div class="activity-detail" id="pay-detail">
+        <div id="pay-entries"></div>
+        <button class="add-btn green" onclick="addPayment()">+ Add Payment</button>
       </div>
 
       <hr class="divider">
@@ -333,7 +380,7 @@ textarea{min-height:62px;resize:vertical;}
       </div>
       <div class="field">
         <span class="lbl">Projects Followed Up <span class="opt">select all that apply</span></span>
-        <div class="chips" id="fup-proj-chips"><span style="font-size:12px;color:var(--text3)">Sign in to load projects…</span></div>
+        <div id="msel-fup"></div>
       </div>
 
     </div>
@@ -346,56 +393,54 @@ textarea{min-height:62px;resize:vertical;}
       <span class="section-title">Other Activities</span>
     </div>
     <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:6px">Mark each activity Yes/No. If Yes, add the project(s) involved with notes for each.</p>
 
-      <!-- Vendor / Contractor Connects -->
-      <div class="field">
-        <span class="lbl">Vendor / Contractor Connects</span>
-        <div class="field-row" style="margin-bottom:8px">
-          <div class="field">
-            <span class="lbl" style="font-size:10px">Count</span>
-            <input type="number" id="f-vendor-count" min="0" placeholder="0" style="max-width:100px">
-          </div>
-        </div>
-        <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Involved</span>
-        <div class="chips" id="vendor-proj-chips" style="margin-bottom:8px"><span style="font-size:12px;color:var(--text3)">Sign in…</span></div>
-        <textarea id="f-vendor-notes" placeholder="Notes on vendor/contractor interactions…" style="min-height:50px"></textarea>
-      </div>
-
-      <hr class="divider">
-
-      <!-- TNCP -->
+      <!-- Vendor Coordination -->
       <div class="field">
         <div class="activity-toggle-row" style="padding-top:0">
-          <span class="atl">TNCP Coordination</span>
+          <span class="atl">Vendor Coordination</span>
+          <div class="at-btns">
+            <div class="at-btn" id="vendor-yes" onclick="setActivity('vendor','yes')">Yes</div>
+            <div class="at-btn on-no" id="vendor-no" onclick="setActivity('vendor','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="vendor-detail">
+          <div id="vendor-entries"></div>
+          <button class="add-btn teal" onclick="addActEntry('vendor')">+ Add Project</button>
+        </div>
+      </div>
+
+      <!-- Site Issues Addressed -->
+      <div class="field">
+        <div class="activity-toggle-row">
+          <span class="atl">Site Issues Addressed</span>
+          <div class="at-btns">
+            <div class="at-btn" id="siteissues-yes" onclick="setActivity('siteissues','yes')">Yes</div>
+            <div class="at-btn on-no" id="siteissues-no" onclick="setActivity('siteissues','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="siteissues-detail">
+          <div id="siteissues-entries"></div>
+          <button class="add-btn teal" onclick="addActEntry('siteissues')">+ Add Project</button>
+        </div>
+      </div>
+
+      <!-- TnCP Coordination -->
+      <div class="field">
+        <div class="activity-toggle-row">
+          <span class="atl">TnCP Coordination</span>
           <div class="at-btns">
             <div class="at-btn" id="tncp-yes" onclick="setActivity('tncp','yes')">Yes</div>
             <div class="at-btn on-no" id="tncp-no" onclick="setActivity('tncp','no')">No</div>
           </div>
         </div>
         <div class="activity-detail" id="tncp-detail">
-          <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Involved</span>
-          <div class="chips" id="tncp-proj-chips" style="margin-bottom:8px"><span style="font-size:12px;color:var(--text3)">Sign in…</span></div>
-          <textarea id="f-tncp-notes" placeholder="TNCP coordination notes…" style="min-height:45px"></textarea>
+          <div id="tncp-entries"></div>
+          <button class="add-btn teal" onclick="addActEntry('tncp')">+ Add Project</button>
         </div>
       </div>
 
-      <!-- Quotations -->
-      <div class="field">
-        <div class="activity-toggle-row">
-          <span class="atl">Quotation Activities</span>
-          <div class="at-btns">
-            <div class="at-btn" id="quot-yes" onclick="setActivity('quot','yes')">Yes</div>
-            <div class="at-btn on-no" id="quot-no" onclick="setActivity('quot','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="quot-detail">
-          <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Involved</span>
-          <div class="chips" id="quot-proj-chips" style="margin-bottom:8px"><span style="font-size:12px;color:var(--text3)">Sign in…</span></div>
-          <textarea id="f-quot-notes" placeholder="Quotation comparison, vendor selection, approvals…" style="min-height:45px"></textarea>
-        </div>
-      </div>
-
-      <!-- BNI -->
+      <!-- BNI Activity -->
       <div class="field">
         <div class="activity-toggle-row">
           <span class="atl">BNI Activity</span>
@@ -405,7 +450,8 @@ textarea{min-height:62px;resize:vertical;}
           </div>
         </div>
         <div class="activity-detail" id="bni-detail">
-          <textarea id="f-bni-notes" placeholder="Meeting notes, referrals generated, connections made…" style="min-height:50px"></textarea>
+          <div id="bni-entries"></div>
+          <button class="add-btn teal" onclick="addActEntry('bni')">+ Add Project</button>
         </div>
       </div>
 
@@ -416,12 +462,34 @@ textarea{min-height:62px;resize:vertical;}
   <div class="section">
     <div class="section-head">
       <span class="section-num">7</span>
-      <span class="section-title">Add New Issues</span>
+      <span class="section-title">Add Issues &amp; Design Deliverables</span>
     </div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log CRM blockers, design requests, finance holds, or client escalations. Assign to the relevant team member with a target date.</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log CRM blockers, finance holds, client escalations — or request a <b>design deliverable</b> from the team (drawing, 3D, proposal). Assign to a team member with a target date; design items create a task automatically.</p>
       <div id="new-iss-blocks"></div>
-      <button class="add-btn teal" id="add-iss-btn" onclick="addNewIssue()" disabled>+ Add Issue</button>
+      <button class="add-btn teal" id="add-iss-btn" onclick="addNewIssue()" disabled>+ Add Issue / Deliverable</button>
+    </div>
+  </div>
+
+  <!-- ── S8: Monthly Client Feedback ──────────────── -->
+  <div class="section">
+    <div class="section-head" style="background:#6A1B9A">
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">8</span>
+      <span class="section-title">Monthly Client Feedback</span>
+    </div>
+    <div class="section-body">
+      <div class="activity-toggle-row" style="padding-top:0">
+        <span class="atl">Monthly feedback collected today?</span>
+        <div class="at-btns">
+          <div class="at-btn" id="fb-yes" onclick="setFeedback('yes')">Yes</div>
+          <div class="at-btn on-no" id="fb-no" onclick="setFeedback('no')">No</div>
+        </div>
+      </div>
+      <div class="activity-detail" id="fb-detail">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Record monthly feedback per project/client. Add a block for each.</p>
+        <div id="fb-blocks"></div>
+        <button class="add-btn blue" onclick="addFeedbackBlock()">+ Add Project Feedback</button>
+      </div>
     </div>
   </div>
 
@@ -522,31 +590,82 @@ async function loadProjects() {
     const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
     projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
     refreshProjectDropdowns();
-    buildChipSets();
+    buildMsels();
   } catch(e){ toast('Could not load projects'); }
 }
 
+function projOptionsHtml(){
+  return '<option value="">Select project…</option>' +
+    projects.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+}
+
 function refreshProjectDropdowns() {
-  const opts = '<option value="">Select project…</option>' +
-    projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
-  document.getElementById('f-pay-proj').innerHTML = opts;
-  document.querySelectorAll('[id^="cb-proj-"],[id^="ag-proj-"],[id^="ni-proj-"]').forEach(sel=>{
+  const opts = projOptionsHtml();
+  document.querySelectorAll('[id^="cb-proj-"],[id^="ag-proj-"],[id^="ni-proj-"],[id^="ae-proj-"],[id^="pay-proj-"],[id^="fb-proj-"]').forEach(sel=>{
     const cur=sel.value; sel.innerHTML=opts; if(cur) sel.value=cur;
   });
 }
 
-function buildChipSets() {
-  const chipHtml = projects.map(p=>
-    `<div class="chip" data-proj="${p.name}" onclick="this.classList.toggle('on')">${p.name}</div>`
-  ).join('');
-  ['bills-proj-chips','fup-proj-chips','vendor-proj-chips','tncp-proj-chips','quot-proj-chips']
-    .forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=chipHtml; });
-}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-function getChips(id) {
-  const el=document.getElementById(id); if(!el) return [];
-  return [...el.querySelectorAll('.chip.on')].map(c=>c.dataset.proj||c.textContent);
+// ── Multi-select project dropdown ──────────────────────────
+const mselState = {};
+const MSELS = {bills:'msel-bills', fup:'msel-fup'};
+function buildMsels(){ Object.keys(MSELS).forEach(k=>buildMsel(k,MSELS[k])); }
+function buildMsel(key, containerId){
+  if(!(key in mselState)) mselState[key]=[];
+  const c=document.getElementById(containerId); if(!c) return;
+  c.innerHTML=`
+    <div class="msel">
+      <div class="msel-control" id="msel-ctrl-${key}" tabindex="0" onclick="openMsel('${key}')">
+        <span class="msel-ph" id="msel-ph-${key}">Select projects…</span>
+        <div class="msel-tags" id="msel-tags-${key}"></div>
+        <span class="msel-caret">▾</span>
+      </div>
+      <div class="msel-drop hidden" id="msel-drop-${key}">
+        <input class="msel-search" id="msel-search-${key}" placeholder="Search projects…" oninput="renderMselOpts('${key}')" onclick="event.stopPropagation()">
+        <div class="msel-opts" id="msel-opts-${key}"></div>
+      </div>
+    </div>`;
+  renderMselOpts(key); renderMselTags(key);
 }
+function openMsel(key){
+  const drop=document.getElementById('msel-drop-'+key);
+  const wasOpen=!drop.classList.contains('hidden');
+  closeAllMsels();
+  if(!wasOpen){
+    drop.classList.remove('hidden');
+    const s=document.getElementById('msel-search-'+key);
+    if(s){ s.value=''; renderMselOpts(key); s.focus(); }
+  }
+}
+function closeAllMsels(){ document.querySelectorAll('.msel-drop').forEach(d=>d.classList.add('hidden')); }
+document.addEventListener('click', e=>{ if(!e.target.closest('.msel')) closeAllMsels(); });
+
+function renderMselOpts(key){
+  const q=(document.getElementById('msel-search-'+key)?.value||'').toLowerCase();
+  const list=projects.filter(p=>p.name.toLowerCase().includes(q));
+  const box=document.getElementById('msel-opts-'+key); if(!box) return;
+  box.innerHTML = list.length ? list.map(p=>{
+    const on=mselState[key].includes(p.name);
+    return `<div class="msel-opt ${on?'on':''}" data-name="${esc(p.name)}" onclick="event.stopPropagation();toggleMselOpt('${key}',this.dataset.name)">
+      <span class="msel-check">${on?'✓':''}</span><span>${esc(p.name)}</span></div>`;
+  }).join('') : '<div class="msel-empty">No matching projects</div>';
+}
+function toggleMselOpt(key,name){
+  const a=mselState[key], i=a.indexOf(name);
+  if(i>=0) a.splice(i,1); else a.push(name);
+  renderMselOpts(key); renderMselTags(key);
+}
+function renderMselTags(key){
+  const a=mselState[key]||[];
+  const ph=document.getElementById('msel-ph-'+key); if(ph) ph.style.display=a.length?'none':'inline';
+  const t=document.getElementById('msel-tags-'+key); if(!t) return;
+  t.innerHTML=a.map(n=>
+    `<span class="msel-tag" data-name="${esc(n)}">${esc(n)}<span class="msel-x" onclick="event.stopPropagation();removeMsel('${key}',this.parentNode.dataset.name)">×</span></span>`).join('');
+}
+function removeMsel(key,name){ const a=mselState[key],i=a.indexOf(name); if(i>=0)a.splice(i,1); renderMselOpts(key); renderMselTags(key); }
+function getMsel(key){ return (mselState[key]||[]).slice(); }
 
 // ════════════════════════════════════════
 // OPEN ISSUES — Section 0
@@ -936,6 +1055,73 @@ function setActivity(key, val) {
   document.getElementById(key+'-yes').className='at-btn'+(val==='yes'?' on-yes':'');
   document.getElementById(key+'-no').className='at-btn'+(val==='no'?' on-no':'');
   document.getElementById(key+'-detail').classList.toggle('open', val==='yes');
+  if(val==='yes'){
+    if(key==='pay'){ if(!document.querySelector('#pay-entries .entry-row')) addPayment(); }
+    else { const c=document.getElementById(key+'-entries'); if(c && !c.querySelector('.entry-row')) addActEntry(key); }
+  }
+}
+
+// ── Payment repeater ───────────────────────────────────────
+let payCount=0;
+function addPayment(){
+  payCount++; const id=payCount;
+  const div=document.createElement('div');
+  div.className='entry-row'; div.id='pay-'+id;
+  div.innerHTML=`
+    <div class="entry-top">
+      <select id="pay-proj-${id}">${projOptionsHtml()}</select>
+      <button class="entry-x" onclick="document.getElementById('pay-${id}').remove()">✕</button>
+    </div>
+    <div class="rupee-wrap" style="max-width:180px"><input type="number" class="pay-amt" id="pay-amt-${id}" min="0" placeholder="Amount received"></div>`;
+  document.getElementById('pay-entries').appendChild(div);
+}
+function collectPayments(){
+  const out=[];
+  document.querySelectorAll('#pay-entries .entry-row').forEach(b=>{
+    const id=b.id.replace('pay-','');
+    const proj=document.getElementById('pay-proj-'+id)?.value||'';
+    const amt=parseFloat(document.getElementById('pay-amt-'+id)?.value)||0;
+    if(proj||amt) out.push({project:proj, amount:amt});
+  });
+  return out;
+}
+
+// ── Activity per-project entry repeater ────────────────────
+const actEntryCount={vendor:0,siteissues:0,tncp:0,bni:0};
+function addActEntry(act){
+  actEntryCount[act]=(actEntryCount[act]||0)+1;
+  const id=act+'-'+actEntryCount[act];
+  const div=document.createElement('div');
+  div.className='entry-row'; div.id='ae-'+id;
+  div.innerHTML=`
+    <div class="entry-top">
+      <select id="ae-proj-${id}">${projOptionsHtml()}</select>
+      <button class="entry-x" onclick="document.getElementById('ae-${id}').remove()">✕</button>
+    </div>
+    <textarea id="ae-notes-${id}" placeholder="Notes for this project…" style="min-height:44px"></textarea>`;
+  document.getElementById(act+'-entries').appendChild(div);
+}
+function collectActEntries(act){
+  const out=[];
+  document.querySelectorAll('#'+act+'-entries .entry-row').forEach(b=>{
+    const id=b.id.replace('ae-','');
+    const proj=document.getElementById('ae-proj-'+id)?.value||'';
+    const notes=(document.getElementById('ae-notes-'+id)?.value||'').trim();
+    if(proj||notes) out.push({project:proj, notes:notes});
+  });
+  return out;
+}
+function collectActivity(act){
+  const on=document.getElementById(act+'-yes')?.classList.contains('on-yes');
+  return {on:on?'Yes':'No', entries:on?collectActEntries(act):[]};
+}
+function collectActivities(){
+  return {
+    vendor    : collectActivity('vendor'),
+    siteIssues: collectActivity('siteissues'),
+    tncp      : collectActivity('tncp'),
+    bni       : collectActivity('bni'),
+  };
 }
 
 // ════════════════════════════════════════
@@ -952,10 +1138,15 @@ function addNewIssue() {
     TEAM_MEMBERS.map(n=>`<option value="${n}">${n}</option>`).join('');
   div.innerHTML=`
     <div class="ni-header">
-      <span class="ni-num">Issue ${id}</span>
+      <span class="ni-num">Item ${id}</span>
       <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer" onclick="this.closest('.new-iss-block').remove()">✕</button>
     </div>
-    <div class="field" style="margin-bottom:8px">
+    <div class="kind-btns">
+      <div class="kind-btn on-issue" id="nik-iss-${id}" onclick="setNIKind(${id},'Issue')">🚩 Issue</div>
+      <div class="kind-btn" id="nik-del-${id}" onclick="setNIKind(${id},'Deliverable')">📐 Design Deliverable</div>
+    </div>
+    <input type="hidden" id="ni-kind-${id}" value="Issue">
+    <div class="field" id="ni-typewrap-${id}" style="margin-bottom:8px">
       <span class="lbl" style="font-size:10px">Type</span>
       <div class="chips">
         ${CRM_ISS_TYPES.map(t=>`<div class="chip" data-type="${t}" onclick="selNIType(this,${id})">${t}</div>`).join('')}
@@ -997,11 +1188,163 @@ function selNIType(el, id) {
   document.getElementById('ni-type-'+id).value=el.dataset.type;
 }
 
+function selNITypeByValue(id, val){
+  document.getElementById('ni-type-'+id).value=val;
+  document.getElementById('ni-'+id).querySelectorAll('.chips .chip').forEach(c=>{
+    c.classList.toggle('on', c.dataset.type===val);
+  });
+}
+
+function setNIKind(id, kind){
+  document.getElementById('ni-kind-'+id).value=kind;
+  document.getElementById('nik-iss-'+id).className='kind-btn'+(kind==='Issue'?' on-issue':'');
+  document.getElementById('nik-del-'+id).className='kind-btn'+(kind==='Deliverable'?' on-deliv':'');
+  // A deliverable is always a design task — preset Type to Design and hide the type picker
+  document.getElementById('ni-typewrap-'+id).style.display = kind==='Deliverable'?'none':'';
+  if(kind==='Deliverable') selNITypeByValue(id,'Design');
+  const desc=document.getElementById('ni-desc-'+id);
+  if(desc) desc.placeholder = kind==='Deliverable'
+    ? 'What design deliverable is needed? (drawing, 3D view, revised proposal…)'
+    : 'Describe the issue clearly…';
+}
+
 function setNIPri(id, val) {
   [1,2,3].forEach(n=>{
     document.getElementById('nip-'+n+'-'+id).className='pri-btn'+(n===val?' on-'+n:'');
   });
   document.getElementById('ni-pri-'+id).value=val;
+}
+
+// ════════════════════════════════════════
+// MONTHLY CLIENT FEEDBACK — Section 8
+// ════════════════════════════════════════
+let fbCount=0;
+function setFeedback(val){
+  document.getElementById('fb-yes').className='at-btn'+(val==='yes'?' on-yes':'');
+  document.getElementById('fb-no').className='at-btn'+(val==='no'?' on-no':'');
+  document.getElementById('fb-detail').classList.toggle('open', val==='yes');
+  if(val==='yes' && !document.querySelector('#fb-blocks .fb-block')) addFeedbackBlock();
+}
+
+// rating scale: 1..n buttons with left/right anchor labels
+function rateScale(id, field, n, leftLbl, rightLbl){
+  let btns='';
+  for(let v=1; v<=n; v++) btns+=`<div class="rate-btn" id="rt-${id}-${field}-${v}" onclick="setRate('${id}','${field}',${v},${n})">${v}</div>`;
+  return `<div class="rate-wrap">
+    <span class="rate-anchor">${leftLbl}</span>
+    <div class="rate-btns">${btns}</div>
+    <span class="rate-anchor r">${rightLbl}</span>
+  </div><input type="hidden" id="rt-${id}-${field}" value="">`;
+}
+function setRate(id, field, v, n){
+  document.getElementById('rt-'+id+'-'+field).value=v;
+  for(let i=1;i<=n;i++) document.getElementById('rt-'+id+'-'+field+'-'+i).classList.toggle('on', i===v);
+}
+
+function fbYN(id, field){
+  return `<div class="yn-btns" style="max-width:160px">
+    <div class="yn-btn" id="fy-${id}-${field}-y" onclick="setFbYN('${id}','${field}','Yes')">Yes</div>
+    <div class="yn-btn" id="fy-${id}-${field}-n" onclick="setFbYN('${id}','${field}','No')">No</div>
+  </div><input type="hidden" id="fy-${id}-${field}" value="">`;
+}
+function setFbYN(id, field, val){
+  document.getElementById('fy-'+id+'-'+field).value=val;
+  document.getElementById('fy-'+id+'-'+field+'-y').className='yn-btn'+(val==='Yes'?' on-yes':'');
+  document.getElementById('fy-'+id+'-'+field+'-n').className='yn-btn'+(val==='No'?' on-no':'');
+}
+
+function addFeedbackBlock(){
+  fbCount++; const id=fbCount;
+  const div=document.createElement('div');
+  div.className='fb-block'; div.id='fb-'+id;
+  div.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span class="fb-num">Feedback ${id}</span>
+      <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;margin-left:auto" onclick="document.getElementById('fb-${id}').remove()">✕</button>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl">Project / Client <span style="color:var(--red)">*</span></span>
+        <select id="fb-proj-${id}">${projOptionsHtml()}</select>
+      </div>
+      <div class="field">
+        <span class="lbl">Date of Visit / Meeting</span>
+        <input type="date" id="fb-date-${id}">
+      </div>
+    </div>
+
+    <div class="fb-q"><b>Overall Satisfaction</b> <span class="qsub">— rate the meeting/visit; was time spent worth it?</span></div>
+    ${rateScale(id,'overall',10,'Not Happy','Totally')}
+
+    <div class="fb-q"><b>Agenda</b> <span class="qsub">— was the agenda well communicated / established?</span></div>
+    ${fbYN(id,'agenda')}
+
+    <div class="fb-q"><b>Design &amp; Functionality</b> <span class="qsub">— did designs meet expectations?</span></div>
+    ${rateScale(id,'design',5,'Below par','Overwhelmed')}
+
+    <div class="fb-q"><b>Communication</b> <span class="qsub">— communication skill of the Lead?</span></div>
+    ${rateScale(id,'comm',5,'Very Poor','Excellent')}
+
+    <div class="fb-q"><b>Problem Resolution</b> <span class="qsub">— satisfaction with issues you raised?</span></div>
+    ${rateScale(id,'prob',5,'Poor','Excellent')}
+
+    <div class="fb-q"><b>Responsiveness</b> <span class="qsub">— team response to your inquiries?</span></div>
+    ${rateScale(id,'resp',5,'Poor','Quick')}
+
+    <div class="fb-q"><b>Quality of Work</b> <span class="qsub">— supervision of workmanship quality?</span></div>
+    ${rateScale(id,'qow',5,'Poor','Excellent')}
+
+    <div class="fb-q"><b>Professionalism</b> <span class="qsub">— professionalism of the team?</span></div>
+    ${rateScale(id,'prof',5,'Poor','Excellent')}
+
+    <div class="fb-q"><b>Meeting Duration</b> <span class="qsub">— completed within pre-decided timeframe?</span></div>
+    ${fbYN(id,'duration')}
+
+    <div class="fb-q"><b>Rate Us</b> <span class="qsub">— how strongly would you recommend us to your network?</span></div>
+    ${rateScale(id,'nps',10,'Not really','For sure')}
+
+    <div class="field" style="margin-top:14px">
+      <span class="lbl">Additional Comments</span>
+      <textarea id="fb-comments-${id}" placeholder="Any feedback or suggestions for improvement…" style="min-height:46px"></textarea>
+    </div>
+    <div class="field">
+      <span class="lbl">Appraisal of Specific Person <span class="opt">if any</span></span>
+      <textarea id="fb-appraisal-${id}" placeholder="Praise / concern about a specific team member…" style="min-height:40px"></textarea>
+    </div>
+    <div class="field">
+      <span class="lbl">Referrals <span class="opt">name &amp; contact info</span></span>
+      <textarea id="fb-referrals-${id}" placeholder="Potential clients the client can refer…" style="min-height:40px"></textarea>
+    </div>`;
+  document.getElementById('fb-blocks').appendChild(div);
+}
+
+function collectFeedback(){
+  if(!document.getElementById('fb-yes')?.classList.contains('on-yes')) return [];
+  const out=[];
+  document.querySelectorAll('#fb-blocks .fb-block').forEach(b=>{
+    const id=b.id.replace('fb-','');
+    const project=document.getElementById('fb-proj-'+id)?.value||'';
+    const comments=(document.getElementById('fb-comments-'+id)?.value||'').trim();
+    const rec={
+      project        : project,
+      visitDate      : document.getElementById('fb-date-'+id)?.value||'',
+      overall        : document.getElementById('rt-'+id+'-overall')?.value||'',
+      agenda         : document.getElementById('fy-'+id+'-agenda')?.value||'',
+      design         : document.getElementById('rt-'+id+'-design')?.value||'',
+      communication  : document.getElementById('rt-'+id+'-comm')?.value||'',
+      problemRes     : document.getElementById('rt-'+id+'-prob')?.value||'',
+      responsiveness : document.getElementById('rt-'+id+'-resp')?.value||'',
+      qualityOfWork  : document.getElementById('rt-'+id+'-qow')?.value||'',
+      professionalism: document.getElementById('rt-'+id+'-prof')?.value||'',
+      duration       : document.getElementById('fy-'+id+'-duration')?.value||'',
+      recommend      : document.getElementById('rt-'+id+'-nps')?.value||'',
+      comments       : comments,
+      appraisal      : (document.getElementById('fb-appraisal-'+id)?.value||'').trim(),
+      referrals      : (document.getElementById('fb-referrals-'+id)?.value||'').trim(),
+    };
+    if(project||comments||rec.overall) out.push(rec);
+  });
+  return out;
 }
 
 // ════════════════════════════════════════
@@ -1070,33 +1413,15 @@ function collectAgendas() {
 }
 
 function collectFinance() {
+  const payOn=document.getElementById('pay-yes')?.classList.contains('on-yes');
   return {
     billsCount     : parseInt(document.getElementById('f-bills-count')?.value)||0,
     billsAmount    : parseFloat(document.getElementById('f-bills-amount')?.value)||0,
-    billsProjects  : getChips('bills-proj-chips'),
-    paymentAmount  : parseFloat(document.getElementById('f-pay-amount')?.value)||0,
-    paymentProject : document.getElementById('f-pay-proj')?.value||'',
+    billsProjects  : getMsel('bills'),
+    paymentReceived: payOn?'Yes':'No',
+    payments       : payOn?collectPayments():[],
     followupCount  : parseInt(document.getElementById('f-fup-count')?.value)||0,
-    followupProjects: getChips('fup-proj-chips'),
-  };
-}
-
-function collectOther() {
-  const tncpOn=document.getElementById('tncp-yes')?.classList.contains('on-yes');
-  const quotOn=document.getElementById('quot-yes')?.classList.contains('on-yes');
-  const bniOn =document.getElementById('bni-yes')?.classList.contains('on-yes');
-  return {
-    vendorCount   : parseInt(document.getElementById('f-vendor-count')?.value)||0,
-    vendorProjects: getChips('vendor-proj-chips'),
-    vendorNotes   : (document.getElementById('f-vendor-notes')?.value||'').trim(),
-    tncp          : tncpOn?'Yes':'No',
-    tncpProjects  : tncpOn?getChips('tncp-proj-chips'):[],
-    tncpNotes     : tncpOn?(document.getElementById('f-tncp-notes')?.value||'').trim():'',
-    quotations    : quotOn?'Yes':'No',
-    quotProjects  : quotOn?getChips('quot-proj-chips'):[],
-    quotNotes     : quotOn?(document.getElementById('f-quot-notes')?.value||'').trim():'',
-    bni           : bniOn?'Yes':'No',
-    bniNotes      : bniOn?(document.getElementById('f-bni-notes')?.value||'').trim():'',
+    followupProjects: getMsel('fup'),
   };
 }
 
@@ -1106,8 +1431,12 @@ function collectNewIssues() {
     const id=b.id.replace('ni-','');
     const desc=(document.getElementById('ni-desc-'+id)?.value||'').trim();
     if(!desc) return;
+    const kind=document.getElementById('ni-kind-'+id)?.value||'Issue';
+    let type=document.getElementById('ni-type-'+id)?.value||'CRM/Process';
+    if(kind==='Deliverable') type='Design';
     out.push({
-      issueType  : document.getElementById('ni-type-'+id)?.value||'CRM/Process',
+      kind       : kind,
+      issueType  : type,
       project    : document.getElementById('ni-proj-'+id)?.value||'',
       description: desc,
       assignedTo : document.getElementById('ni-assign-'+id)?.value||'',
@@ -1143,8 +1472,9 @@ async function submitAll() {
     const contacts = collectContacts();
     const agendas  = collectAgendas();
     const finance  = collectFinance();
-    const other    = collectOther();
+    const activities= collectActivities();
     const newIssues= collectNewIssues();
+    const feedback = collectFeedback();
 
     const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({
@@ -1156,8 +1486,9 @@ async function submitAll() {
         contacts    : JSON.stringify(contacts),
         agendas     : JSON.stringify(agendas),
         finance     : JSON.stringify(finance),
-        other       : JSON.stringify(other),
+        activities  : JSON.stringify(activities),
         newIssues   : JSON.stringify(newIssues),
+        feedback    : JSON.stringify(feedback),
       })});
     const resp = await r.json();
     if(resp.status!=='ok') throw new Error(resp.message||'Submission failed');
@@ -1169,7 +1500,7 @@ async function submitAll() {
 
     const issActCount=Object.keys(issueActions).length;
     const billsAmt=finance.billsAmount;
-    const payAmt=finance.paymentAmount;
+    const payAmt=(finance.payments||[]).reduce((s,p)=>s+(p.amount||0),0);
     document.getElementById('success-sub').innerHTML=
       `CRM report submitted by ${crmUser}<br>`+
       (leads.length?`📋 ${leads.length} new lead${leads.length!==1?'s':''} added to LMS<br>`:'')+
@@ -1178,6 +1509,7 @@ async function submitAll() {
       (billsAmt?`🧾 ₹${billsAmt.toLocaleString('en-IN')} billed today<br>`:'')+
       (payAmt?`💰 ₹${payAmt.toLocaleString('en-IN')} payment received<br>`:'')+
       (newIssues.length?`🚩 ${newIssues.length} issue${newIssues.length!==1?'s':''} logged<br>`:'')+
+      (feedback.length?`⭐ ${feedback.length} client feedback recorded<br>`:'')+
       (issActCount?`✅ ${issActCount} issue${issActCount!==1?'s':''} updated`:'');
 
   } catch(e) {
@@ -1194,11 +1526,20 @@ function resetForm() {
   document.getElementById('form-body').style.display='';
   document.getElementById('success-screen').style.display='none';
   document.querySelector('.submit-bar').style.display='';
-  ['lead-blocks','contact-blocks','agenda-blocks','new-iss-blocks'].forEach(id=>{
-    document.getElementById(id).innerHTML='';
+  ['lead-blocks','contact-blocks','agenda-blocks','new-iss-blocks',
+   'pay-entries','vendor-entries','siteissues-entries','tncp-entries','bni-entries','fb-blocks'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.innerHTML='';
   });
+  // Reset all Yes/No toggles back to No + close details
+  ['pay','vendor','siteissues','tncp','bni'].forEach(k=>setActivity(k,'no'));
+  setFeedback('no');
+  // Reset numeric/text finance inputs + rebuild project multi-selects (clears selection)
+  ['f-bills-count','f-bills-amount','f-fup-count'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  Object.keys(mselState).forEach(k=>mselState[k]=[]);
+  buildMsels();
   document.getElementById('wa-list').innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
-  leadCount=contCount=agendaCount=issCount=0;
+  leadCount=contCount=agendaCount=issCount=payCount=fbCount=0;
+  actEntryCount.vendor=actEntryCount.siteissues=actEntryCount.tncp=actEntryCount.bni=0;
   issueActions={}; pendingLeads=[];
   document.getElementById('followup-wrap').classList.add('hidden');
   document.getElementById('submit-btn').disabled=false;
