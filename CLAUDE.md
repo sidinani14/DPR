@@ -78,7 +78,52 @@
 - getWeeklyStats(weekStart) — returns team weekly scores
 - getDeepakWeeklyStats(weekStart) — returns Deepak's weekly scores
 - getAllTasks() — returns all tasks for dashboard
-- getDeepakOpenIssues(lead) — returns open issues filtered by lead name
+- getIssuesByReporter(member) — returns SITE_ISSUES filtered by col O (Reported By)
+- updateIssueStatus(issueId, status, targetDate) — updates SITE_ISSUES row
+- submitAmanCRM(data) — writes AMAN_DAILY, LEADS, SITE_ISSUES from CRM form
+- getRecentLeads(date) — returns LEADS rows for given date with 24hr contact pending
+
+## Sheet structure — AMAN_DAILY (26 cols A–Z)
+- A: Submission ID (CRM-001…), B: Date, C: Time, D: Member
+- E: New Leads (JSON), F: Lead Followups (JSON)
+- G: Client Contacts (JSON), H: Agendas (JSON)
+- I: Bills Count, J: Bills Amount, K: Bills Projects (comma list)
+- L: Payment Received (Yes/No), M: Payments (JSON [{project,amount}]), N: Total Payment (Rs)
+- O: Followup Count, P: Followup Projects (comma list)
+- Q: Vendor Coordination (Yes/No), R: Vendor Entries (JSON [{project,notes}])
+- S: Site Issues Addressed (Yes/No), T: Site Issue Entries (JSON)
+- U: TnCP Coordination (Yes/No), V: TnCP Entries (JSON)
+- W: BNI Activity (Yes/No), X: BNI Entries (JSON)
+- Y: New Issues (JSON), Z: Monthly Feedback (JSON)
+- NOTE: schema changed — if an old AMAN_DAILY tab exists with the prior headers,
+  delete the tab so getOrCreate rewrites the new 26-col header row.
+
+## Sheet structure — FEEDBACK (19 cols, mirrors Monthly Feedback Google Form)
+- A: Feedback ID (FB-001…), B: Submission ID (CRM-…), C: Date Recorded, D: Recorded By
+- E: Project/Client, F: Date of Visit/Meeting
+- G: Overall Satisfaction (1-10), H: Agenda Communicated (Yes/No)
+- I: Design & Functionality (1-5), J: Communication (1-5), K: Problem Resolution (1-5)
+- L: Responsiveness (1-5), M: Quality of Work (1-5), N: Professionalism (1-5)
+- O: Meeting On Time (Yes/No), P: Recommend/NPS (1-10)
+- Q: Additional Comments, R: Appraisal of Person, S: Referrals
+- CRM Section 8 "Monthly Client Feedback": Yes/No toggle → repeatable per-project blocks.
+  Written to FEEDBACK sheet (one row per project) + AMAN_DAILY col Z (JSON).
+- Other Activities = 4 toggles, each Yes → repeatable {project, notes} entries.
+  Finance Payment = Yes/No → repeatable {project, amount} entries.
+  Bills/Followup projects use a searchable multi-select dropdown (not chips).
+
+## Sheet structure — LEADS (matches LMS Google Sheet format)
+- A: Lead ID (LEAD-001…), B: Client Name, C: Contact No., D: Referred By
+- E: Validation Check (Valid/Invalid/Not checked)
+- F: Lead Status, G: Contacted By, H: Lead Creation Date, I: Last Contacted
+- J: Lead Manager, K: Remarks, L: Lost Reasons, M: 24hr Contact Done (Pending/Yes/No)
+
+## SITE_ISSUES — col O added: Reported By (Deepak Soni / Aman Raghuwanshi)
+- Used by getIssuesByReporter(member, useFallback) to filter issues per person's form
+- getDeepakIssues → useFallback=true (matches blank col O via Assigned To, for legacy rows)
+- getAmanIssues → useFallback=false (STRICT col O match — CRM never shows DPER's issues)
+- CRM new issues carry their own per-issue project; writeSiteIssues uses iss.project || project
+- CRM "Design Deliverable" items set iss.kind='Deliverable' → createIssueTask makes a design task
 
 ## Do not change
 - Apps Script URL (hardcoded in all HTML forms)

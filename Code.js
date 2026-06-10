@@ -166,6 +166,11 @@ function doPost(e) {
     if (data.action === 'getSiteExecution')    return respond(getSiteExecutionSummary(data.project||''));
     if (data.action === 'submitDPER')          return respond(handleDPERSubmission(data));
     if (data.action === 'getCalendarData')     return respond(getCalendarData());
+    if (data.action === 'getDeepakIssues')     return respond(getIssuesByReporter(data.lead||'Deepak Soni', true));
+    if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
+    if (data.action === 'updateIssueStatus')   return respond(updateIssueStatus(data.issueId||'', data.status||'', data.targetDate||''));
+    if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
+    if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
 
     // Form submission actions
     if (data.action === 'submitApprovals')   return respond(submitApprovals(data));
@@ -3465,12 +3470,12 @@ function writeSiteIssuesHeaders(sheet) {
   var h = ['Issue ID','Submission ID','Date','Project Name','Issue #',
     'Issue Type','Description','Assigned To','Priority (1=Low 3=High)',
     'Target Date','Status','Task ID (TASK_ASSIGNMENTS)',
-    'Resolution Notes','Resolved Date'];
+    'Resolution Notes','Resolved Date','Reported By'];
   sheet.getRange(1,1,1,h.length).setValues([h])
     .setBackground('#8B2020').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
-  var widths=[140,140,100,200,70,160,340,160,120,110,120,180,220,110];
+  var widths=[140,140,100,200,70,160,340,160,120,110,120,180,220,110,160];
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
@@ -3522,26 +3527,28 @@ function writeSiteExecution(data) {
 }
 
 // ── writeSiteIssues ────────────────────────────────────────
-function writeSiteIssues(subId, date, project, issues, onTrack) {
+function writeSiteIssues(subId, date, project, issues, onTrack, reportedBy) {
   if (!issues || issues.length === 0) return [];
   var sheet  = getOrCreate(SITE_ISSUES_TAB, writeSiteIssuesHeaders);
   var asSheet= db().getSheetByName(ASSIGN_TAB);
   var taskIds= [];
+  var reporter = reportedBy || 'Deepak Soni';
 
   issues.forEach(function(iss, idx) {
     var issId  = nextId(sheet, 'ISS-');
     var taskId = '';
+    var issProject = iss.project || project;  // each issue carries its own project (CRM); DPER uses shared param
 
     // Auto-create task in TASK_ASSIGNMENTS for all issue types
     if (asSheet && iss.assignedTo && iss.description) {
-      taskId = createIssueTask(iss, project, date, onTrack);
+      taskId = createIssueTask(iss, issProject, date, onTrack);
     }
 
     sheet.appendRow([
       issId,
       subId,
       date,
-      project,
+      issProject,
       idx + 1,
       iss.issueType    || '',
       iss.description  || '',
@@ -3552,6 +3559,7 @@ function writeSiteIssues(subId, date, project, issues, onTrack) {
       taskId,
       '',
       '',
+      iss.reportedBy   || reporter,  // col O: Reported By
     ]);
     taskIds.push(taskId);
   });
@@ -3585,8 +3593,8 @@ function resolveAssignee(assignedTo, projectName) {
 }
 
 function createIssueTask(iss, project, date, onTrack) {
-  // Only create tasks for Design issues
-  if ((iss.issueType||'') !== 'Design') {
+  // Create tasks for Design issues AND CRM design deliverables
+  if ((iss.issueType||'') !== 'Design' && (iss.kind||'') !== 'Deliverable') {
     Logger.log('Skipping non-design issue task: ' + iss.issueType);
     return '';
   }
@@ -3606,8 +3614,9 @@ function createIssueTask(iss, project, date, onTrack) {
   var priority = 'Medium'; // Default — site issues are medium priority
   if (onTrack === 'At Risk' || onTrack === 'Delayed') priority = 'High';
 
-  var taskType = 'Site Issue — Design';
-  var notes    = iss.description + ' [From DPER: ' + project + ', ' + date + ']';
+  var srcLabel = (iss.reportedBy === 'Aman Raghuwanshi') ? 'CRM' : 'DPER';
+  var taskType = (iss.kind === 'Deliverable') ? 'Design Deliverable — CRM' : 'Site Issue — Design';
+  var notes    = iss.description + ' [From ' + srcLabel + ': ' + project + ', ' + date + ']';
 
   sheet.appendRow([
     newId,                    // A TaskID
@@ -3631,7 +3640,7 @@ function createIssueTask(iss, project, date, onTrack) {
     '',                       // S ApprovalDate
     '',                       // T RevisionTag
     notes,                    // U Notes
-    'DPER — ' + (iss.reportedBy||'Execution Lead'), // V AssignedBy
+    srcLabel + ' — ' + (iss.reportedBy||'Execution Lead'), // V AssignedBy
     priority,                 // W Priority
   ]);
 
@@ -4506,4 +4515,308 @@ function testLists() {
   Logger.log('PROJECTS count: ' + result.projects.length);
   Logger.log('First 3 team: ' + result.team.slice(0,3).join(', '));
   Logger.log('First 3 projects: ' + result.projects.slice(0,3).map(function(p){return p.name;}).join(', '));
+}
+
+// ════════════════════════════════════════════════════════════════
+// AMAN CRM — Sheet tabs + header writers
+// ════════════════════════════════════════════════════════════════
+var AMAN_DAILY_TAB = 'AMAN_DAILY';
+var LEADS_TAB      = 'LEADS';
+var FEEDBACK_TAB   = 'FEEDBACK';
+
+function writeAmanDailyHeaders(sheet) {
+  var h = [
+    'Submission ID','Date','Time','Member',
+    'New Leads (JSON)','Lead Followups (JSON)',
+    'Client Contacts (JSON)','Agendas (JSON)',
+    'Bills Count','Bills Amount (Rs)','Bills Projects',
+    'Payment Received','Payments (JSON)','Total Payment (Rs)',
+    'Followup Count','Followup Projects',
+    'Vendor Coordination','Vendor Entries (JSON)',
+    'Site Issues Addressed','Site Issue Entries (JSON)',
+    'TnCP Coordination','TnCP Entries (JSON)',
+    'BNI Activity','BNI Entries (JSON)',
+    'New Issues (JSON)','Monthly Feedback (JSON)',
+  ];
+  sheet.getRange(1,1,1,h.length).setValues([h])
+    .setBackground('#005F73').setFontColor('#FFFFFF')
+    .setFontWeight('bold').setFontSize(10);
+  sheet.setFrozenRows(1);
+}
+
+function writeFeedbackHeaders(sheet) {
+  // Mirrors the Monthly Feedback Google Form
+  var h = [
+    'Feedback ID','Submission ID','Date Recorded','Recorded By',
+    'Project / Client','Date of Visit/Meeting',
+    'Overall Satisfaction (1-10)','Agenda Communicated',
+    'Design & Functionality (1-5)','Communication (1-5)',
+    'Problem Resolution (1-5)','Responsiveness (1-5)',
+    'Quality of Work (1-5)','Professionalism (1-5)',
+    'Meeting On Time','Recommend / NPS (1-10)',
+    'Additional Comments','Appraisal of Person','Referrals',
+  ];
+  sheet.getRange(1,1,1,h.length).setValues([h])
+    .setBackground('#6A1B9A').setFontColor('#FFFFFF')
+    .setFontWeight('bold').setFontSize(10);
+  sheet.setFrozenRows(1);
+  var widths=[120,130,120,150,200,140,110,120,130,120,130,120,120,120,110,130,300,220,260];
+  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
+}
+
+function writeLeadsHeaders(sheet) {
+  // Matches LMS structure from IDS Google Form
+  var h = [
+    'Lead ID','Client Name','Contact No.','Referred By',
+    'Validation Check','Lead Status','Contacted By',
+    'Lead Creation Date','Last Contacted','Lead Manager',
+    'Remarks','Lost Reasons','24hr Contact Done',
+  ];
+  sheet.getRange(1,1,1,h.length).setValues([h])
+    .setBackground('#1565C0').setFontColor('#FFFFFF')
+    .setFontWeight('bold').setFontSize(10);
+  sheet.setFrozenRows(1);
+  var widths=[120,200,140,200,120,200,160,130,130,160,300,200,130];
+  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
+}
+
+// ════════════════════════════════════════════════════════════════
+// getIssuesByReporter — used by both Deepak DPER and Aman CRM forms
+// Reads SITE_ISSUES col O (index 14) for Reported By
+// ════════════════════════════════════════════════════════════════
+function getIssuesByReporter(member, useFallback) {
+  var sheet = db().getSheetByName(SITE_ISSUES_TAB);
+  if (!sheet) return {issues:[]};
+  var rows = sheet.getDataRange().getValues();
+  var issues = [];
+  var sevenAgo = addDaysToStr(dateStr(), -7);
+
+  for (var i = 1; i < rows.length; i++) {
+    var r          = rows[i];
+    var reportedBy = String(r[14] || '').trim();  // col O (0-indexed 14)
+    var assignedTo = String(r[7] || '').trim();
+
+    // Strict match on Reported By. The assignedTo fallback is ONLY used for
+    // Deepak's legacy DPER rows that predate the "Reported By" column (blank col O).
+    // CRM (Aman) passes useFallback=false so it never picks up DPER-sourced issues.
+    var isMatch    = (reportedBy === member) ||
+                     (useFallback && reportedBy === '' && assignedTo === member);
+    if (member && !isMatch) continue;
+
+    var issStatus  = String(r[10] || '').trim();
+    var resolvedDt = String(r[13] || '').substring(0, 10);
+    if (issStatus === 'Resolved' && resolvedDt < sevenAgo) continue;
+
+    issues.push({
+      issueId    : String(r[0]  || ''),
+      date       : String(r[2]  || '').substring(0, 10),
+      project    : String(r[3]  || ''),
+      issueType  : String(r[5]  || ''),
+      description: String(r[6]  || ''),
+      assignedTo : assignedTo,
+      priority   : r[8]  || 2,
+      targetDate : String(r[9]  || ''),
+      status     : issStatus,
+      reportedBy : reportedBy,
+    });
+  }
+  return {issues: issues};
+}
+
+// ════════════════════════════════════════════════════════════════
+// updateIssueStatus — called from DPER & CRM forms for issue actions
+// ════════════════════════════════════════════════════════════════
+function updateIssueStatus(issueId, status, targetDate) {
+  var sheet = db().getSheetByName(SITE_ISSUES_TAB);
+  if (!sheet) return {status:'error', message:'SITE_ISSUES not found'};
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] || '').trim() !== issueId) continue;
+    sheet.getRange(i+1, 11).setValue(status);                          // K Status
+    if (targetDate) sheet.getRange(i+1, 10).setValue(targetDate);      // J Target Date
+    if (status === 'Resolved') sheet.getRange(i+1, 14).setValue(dateStr()); // N Resolved Date
+    Logger.log('Issue updated: ' + issueId + ' → ' + status);
+    return {status:'ok', issueId:issueId};
+  }
+  return {status:'error', message:'Issue not found: ' + issueId};
+}
+
+// ════════════════════════════════════════════════════════════════
+// getRecentLeads — returns leads added on a given date with
+// 24hr contact still pending (col M = 'Pending')
+// ════════════════════════════════════════════════════════════════
+function getRecentLeads(date) {
+  var targetDate = date || addDaysToStr(dateStr(), -1);
+  var sheet = db().getSheetByName(LEADS_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {leads:[]};
+  var rows = sheet.getDataRange().getValues();
+  var leads = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var rowDate   = String(r[7]  || '').substring(0, 10); // H Lead Creation Date
+    var contact24 = String(r[12] || '').trim();            // M 24hr Contact Done
+    if (rowDate !== targetDate) continue;
+    if (contact24 !== 'Pending') continue;
+    leads.push({
+      leadId     : String(r[0] || ''),
+      clientName : String(r[1] || ''),
+      contactNo  : String(r[2] || ''),
+      referredBy : String(r[3] || ''),
+      leadStatus : String(r[5] || ''),
+      leadManager: String(r[9] || ''),
+      date       : rowDate,
+      rowNum     : i + 1,
+    });
+  }
+  return {leads: leads};
+}
+
+// ════════════════════════════════════════════════════════════════
+// submitAmanCRM — main CRM daily form submission handler
+// Writes: AMAN_DAILY row, LEADS rows (new), LEADS updates (followups),
+//         SITE_ISSUES rows (new issues)
+// ════════════════════════════════════════════════════════════════
+function submitAmanCRM(data) {
+  try {
+    var today   = data.date || dateStr();
+    var member  = data.member || 'Aman Raghuwanshi';
+    var now     = data.time  || new Date().toTimeString().substring(0, 5);
+
+    // ── Parse JSON fields ──────────────────────────────────────
+    var newLeads    = [];
+    var leadFollows = [];
+    var contacts    = [];
+    var agendas     = [];
+    var finance     = {};
+    var activities  = {};
+    var newIssues   = [];
+    var feedback    = [];
+    try { newLeads    = JSON.parse(data.newLeads     || '[]'); } catch(e){}
+    try { leadFollows = JSON.parse(data.leadFollowups|| '[]'); } catch(e){}
+    try { contacts    = JSON.parse(data.contacts     || '[]'); } catch(e){}
+    try { agendas     = JSON.parse(data.agendas      || '[]'); } catch(e){}
+    try { finance     = JSON.parse(data.finance      || '{}'); } catch(e){}
+    try { activities  = JSON.parse(data.activities    || '{}'); } catch(e){}
+    try { newIssues   = JSON.parse(data.newIssues    || '[]'); } catch(e){}
+    try { feedback    = JSON.parse(data.feedback     || '[]'); } catch(e){}
+
+    // Tag each issue with the reporter so SITE_ISSUES col O is correct
+    newIssues.forEach(function(iss){ iss.reportedBy = iss.reportedBy || member; });
+
+    var payments  = finance.payments || [];
+    var payTotal  = payments.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+    var vendor    = activities.vendor     || {on:'No', entries:[]};
+    var siteIss   = activities.siteIssues || {on:'No', entries:[]};
+    var tncp      = activities.tncp       || {on:'No', entries:[]};
+    var bni       = activities.bni        || {on:'No', entries:[]};
+
+    // ── 1. Write AMAN_DAILY row ────────────────────────────────
+    var dailySheet = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
+    var subId      = nextId(dailySheet, 'CRM-');
+    dailySheet.appendRow([
+      subId,
+      today,
+      now,
+      member,
+      data.newLeads     || '',
+      data.leadFollowups|| '',
+      data.contacts     || '',
+      data.agendas      || '',
+      finance.billsCount     || 0,
+      finance.billsAmount    || 0,
+      (finance.billsProjects || []).join(', '),
+      finance.paymentReceived || 'No',
+      JSON.stringify(payments),
+      payTotal,
+      finance.followupCount  || 0,
+      (finance.followupProjects || []).join(', '),
+      vendor.on  || 'No', JSON.stringify(vendor.entries  || []),
+      siteIss.on || 'No', JSON.stringify(siteIss.entries || []),
+      tncp.on    || 'No', JSON.stringify(tncp.entries    || []),
+      bni.on     || 'No', JSON.stringify(bni.entries      || []),
+      data.newIssues || '',
+      data.feedback  || '',
+    ]);
+    Logger.log('AMAN_DAILY written: ' + subId);
+
+    // ── 2. Write new leads to LEADS sheet ─────────────────────
+    var leadsSheet = getOrCreate(LEADS_TAB, writeLeadsHeaders);
+    newLeads.forEach(function(lead) {
+      if (!lead.clientName) return;
+      var leadId = nextId(leadsSheet, 'LEAD-');
+      leadsSheet.appendRow([
+        leadId,
+        lead.clientName  || '',
+        lead.contactNo   || '',
+        lead.referredBy  || '',
+        lead.validation  || 'Not checked',
+        lead.leadStatus  || 'Not Contacted',
+        member,                    // Contacted By = Aman
+        today,                     // Lead Creation Date
+        '',                        // Last Contacted (blank — not contacted yet)
+        lead.leadManager || '',
+        lead.remarks     || '',
+        lead.lostReasons || '',
+        'Pending',                 // 24hr Contact Done — to be confirmed next day
+      ]);
+    });
+    Logger.log('Leads written: ' + newLeads.length);
+
+    // ── 3. Update 24hr follow-up status on existing leads ─────
+    if (leadFollows.length > 0) {
+      var leadsData = leadsSheet.getDataRange().getValues();
+      leadFollows.forEach(function(f) {
+        if (!f.leadId) return;
+        for (var i = 1; i < leadsData.length; i++) {
+          if (String(leadsData[i][0] || '') !== f.leadId) continue;
+          leadsSheet.getRange(i+1, 13).setValue(f.contacted ? 'Yes' : 'No'); // M 24hr Contact Done
+          if (f.contacted) {
+            leadsSheet.getRange(i+1, 6).setValue(f.newStatus || '');   // F Lead Status
+            leadsSheet.getRange(i+1, 9).setValue(today);               // I Last Contacted
+          }
+          break;
+        }
+      });
+    }
+
+    // ── 4. Write new CRM issues to SITE_ISSUES ────────────────
+    if (newIssues.length > 0) {
+      writeSiteIssues(subId, today, '', newIssues, 'Yes', member);
+    }
+
+    // ── 5. Write monthly client feedback to FEEDBACK ──────────
+    if (feedback.length > 0) {
+      var fbSheet = getOrCreate(FEEDBACK_TAB, writeFeedbackHeaders);
+      feedback.forEach(function(f) {
+        if (!f.project && !f.comments && !f.overall) return;
+        var fbId = nextId(fbSheet, 'FB-');
+        fbSheet.appendRow([
+          fbId, subId, today, member,
+          f.project        || '',
+          f.visitDate      || '',
+          f.overall        || '',
+          f.agenda         || '',
+          f.design         || '',
+          f.communication  || '',
+          f.problemRes     || '',
+          f.responsiveness || '',
+          f.qualityOfWork  || '',
+          f.professionalism|| '',
+          f.duration       || '',
+          f.recommend      || '',
+          f.comments       || '',
+          f.appraisal      || '',
+          f.referrals      || '',
+        ]);
+      });
+      Logger.log('Feedback written: ' + feedback.length);
+    }
+
+    Logger.log('submitAmanCRM complete: ' + subId);
+    return {status:'ok', subId:subId};
+
+  } catch(err) {
+    Logger.log('submitAmanCRM error: ' + String(err));
+    return {status:'error', message:String(err)};
+  }
 }

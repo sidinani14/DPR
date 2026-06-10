@@ -440,7 +440,7 @@ textarea{min-height:62px;resize:vertical;}
         </div>
       </div>
 
-      <!-- BNI Activity -->
+      <!-- BNI Activity — simple Yes/No only -->
       <div class="field">
         <div class="activity-toggle-row">
           <span class="atl">BNI Activity</span>
@@ -448,10 +448,6 @@ textarea{min-height:62px;resize:vertical;}
             <div class="at-btn" id="bni-yes" onclick="setActivity('bni','yes')">Yes</div>
             <div class="at-btn on-no" id="bni-no" onclick="setActivity('bni','no')">No</div>
           </div>
-        </div>
-        <div class="activity-detail" id="bni-detail">
-          <div id="bni-entries"></div>
-          <button class="add-btn teal" onclick="addActEntry('bni')">+ Add Project</button>
         </div>
       </div>
 
@@ -1054,8 +1050,9 @@ function copyWA(id){
 function setActivity(key, val) {
   document.getElementById(key+'-yes').className='at-btn'+(val==='yes'?' on-yes':'');
   document.getElementById(key+'-no').className='at-btn'+(val==='no'?' on-no':'');
-  document.getElementById(key+'-detail').classList.toggle('open', val==='yes');
-  if(val==='yes'){
+  const detail=document.getElementById(key+'-detail');
+  if(detail) detail.classList.toggle('open', val==='yes');   // BNI has no detail panel
+  if(val==='yes' && key!=='bni'){
     if(key==='pay'){ if(!document.querySelector('#pay-entries .entry-row')) addPayment(); }
     else { const c=document.getElementById(key+'-entries'); if(c && !c.querySelector('.entry-row')) addActEntry(key); }
   }
