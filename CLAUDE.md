@@ -102,6 +102,14 @@
 - NOTE: schema changed (now 12 cols) — delete any old AMAN_DAILY tab so
   getOrCreate rewrites the new header row.
 
+## Lead → Project promotion
+- When a lead reaches "Briefing Meeting Done" or further (Design Proposal Shared /
+  Fee Proposal Shared / Lead Converted), submitAmanCRM adds a PROJECTS row:
+  [NL-id, ClientName, 'New Lead', '', '', ''] — de-duplicated by name.
+- Fires for new leads added at that stage AND for 24hr follow-ups that set that stage.
+- Aman's weekly "active projects" (Client Connection Coverage denominator) =
+  all PROJECTS rows with Status = Ongoing (NOT the 'New Lead' pipeline rows).
+
 ## Sheet structure — BILLING (9 cols)
 - A: Bill ID (BILL-001…), B: Project, C: Bill Date, D: Bill Amount
 - E: Amount Received, F: Received Date, G: Last Follow-up Date, H: Status, I: Submission ID

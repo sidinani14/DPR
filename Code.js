@@ -4757,6 +4757,8 @@ function submitAmanCRM(data) {
         lead.lostReasons || '',
         'Pending',                 // 24hr Contact Done — to be confirmed next day
       ]);
+      // Promote serious leads (briefing done or further) to PROJECTS tab
+      if (isPromoteLeadStage(lead.leadStatus)) promoteLeadToProject(lead.clientName, member);
     });
     Logger.log('Leads written: ' + newLeads.length);
 
@@ -4771,6 +4773,8 @@ function submitAmanCRM(data) {
           if (f.contacted) {
             leadsSheet.getRange(i+1, 6).setValue(f.newStatus || '');   // F Lead Status
             leadsSheet.getRange(i+1, 9).setValue(today);               // I Last Contacted
+            // Promote to PROJECTS once it reaches briefing-done or further
+            if (isPromoteLeadStage(f.newStatus)) promoteLeadToProject(String(leadsData[i][1]||''), member);
           }
           break;
         }
@@ -4823,6 +4827,33 @@ function submitAmanCRM(data) {
     Logger.log('submitAmanCRM error: ' + String(err));
     return {status:'error', message:String(err)};
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Lead → Project promotion. Once a lead reaches "Briefing Meeting Done"
+// or a further stage, add it to the PROJECTS tab as a "New Lead" so it
+// enters the pipeline. De-duplicated by project name.
+//   PROJECTS cols: A ID, B Name, C Status, D Discipline, E Multiplier, F Lead
+// ════════════════════════════════════════════════════════════════
+var CRM_PROMOTE_STAGES = ['Briefing Meeting Done','Design Proposal Shared',
+                          'Fee Proposal Shared','Lead Converted'];
+function isPromoteLeadStage(status) {
+  return CRM_PROMOTE_STAGES.indexOf(String(status||'').trim()) > -1;
+}
+function promoteLeadToProject(clientName, member) {
+  var nm = String(clientName||'').trim();
+  if (!nm) return false;
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  if (!projSheet) return false;
+  var rows = projSheet.getDataRange().getValues();
+  var key  = nm.toLowerCase();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]||'').trim().toLowerCase() === key) return false; // already in PROJECTS
+  }
+  var pid = nextId(projSheet, 'NL-');
+  projSheet.appendRow([ pid, nm, 'New Lead', '', '', '' ]);
+  Logger.log('Lead promoted to PROJECTS: ' + nm + ' (' + pid + ')');
+  return true;
 }
 
 // ════════════════════════════════════════════════════════════════
