@@ -982,11 +982,22 @@ function addAgendaBlock() {
       <textarea id="ag-agenda-${id}" oninput="generateAllWA()" placeholder="• Review design drawings\n• Discuss material finalization\n• Address pending approvals…" style="min-height:70px"></textarea>
     </div>
     <div class="field">
-      <span class="lbl">Attendees</span>
-      <input type="text" id="ag-attendees-${id}" oninput="generateAllWA()" placeholder="Client name, Siddharth sir, Achal, site team…">
+      <span class="lbl">Team Attendees <span class="opt">each gets a site-visit / meeting task</span></span>
+      <div class="chips" id="ag-team-${id}">
+        ${TEAM_MEMBERS.map(n=>`<div class="chip" data-name="${n}" onclick="this.classList.toggle('on');generateAllWA()">${n}</div>`).join('')}
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Other Attendees <span class="opt">client / external — message only</span></span>
+      <input type="text" id="ag-others-${id}" oninput="generateAllWA()" placeholder="Client name, consultant, site team…">
     </div>`;
   document.getElementById('agenda-blocks').appendChild(div);
   generateAllWA();
+}
+
+function getAgendaTeam(id){
+  const el=document.getElementById('ag-team-'+id); if(!el) return [];
+  return [...el.querySelectorAll('.chip.on')].map(c=>c.dataset.name);
 }
 
 function setAgendaType(id, type) {
@@ -1002,7 +1013,8 @@ function buildAgendaWA(id) {
   const dateVal   = document.getElementById('ag-date-'+id)?.value||'';
   const time      = document.getElementById('ag-time-'+id)?.value||'';
   const agendaTxt = document.getElementById('ag-agenda-'+id)?.value?.trim()||'';
-  const attendees = document.getElementById('ag-attendees-'+id)?.value?.trim()||'';
+  const others    = document.getElementById('ag-others-'+id)?.value?.trim()||'';
+  const team      = getAgendaTeam(id);
   const emoji     = type==='Meeting'?'👥':'🏗️';
   const dFormatted= dateVal
     ? new Date(dateVal+'T12:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})
@@ -1013,9 +1025,10 @@ function buildAgendaWA(id) {
   msg+=`🕐 *Time:* ${time||'[Time]'}\n`;
   msg+=`📍 *Type:* ${type}\n\n`;
   if(agendaTxt){ msg+=`*Agenda:*\n${agendaTxt}\n\n`; }
-  if(attendees){
+  const allAtt=[...team, ...others.split(',').map(a=>a.trim()).filter(Boolean)];
+  if(allAtt.length){
     msg+=`*Attendees:*\n`;
-    attendees.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>{ msg+=`• ${a}\n`; });
+    allAtt.forEach(a=>{ msg+=`• ${a}\n`; });
     msg+='\n';
   }
   msg+=`Please confirm your availability.\n\n— Ideaform Design Studio\nCRM: ${crmUser||'Aman Raghuwanshi'}`;
@@ -1429,13 +1442,14 @@ function collectAgendas() {
   document.querySelectorAll('.agenda-block').forEach(b=>{
     const id=b.id.replace('ab-','');
     out.push({
-      project  : document.getElementById('ag-proj-'+id)?.value||'',
-      type     : document.getElementById('ag-type-'+id)?.value||'Meeting',
-      date     : document.getElementById('ag-date-'+id)?.value||'',
-      time     : document.getElementById('ag-time-'+id)?.value||'',
-      agenda   : (document.getElementById('ag-agenda-'+id)?.value||'').trim(),
-      attendees: (document.getElementById('ag-attendees-'+id)?.value||'').trim(),
-      waMsg    : document.getElementById('wa-'+id)?.value||'',
+      project       : document.getElementById('ag-proj-'+id)?.value||'',
+      type          : document.getElementById('ag-type-'+id)?.value||'Meeting',
+      date          : document.getElementById('ag-date-'+id)?.value||'',
+      time          : document.getElementById('ag-time-'+id)?.value||'',
+      agenda        : (document.getElementById('ag-agenda-'+id)?.value||'').trim(),
+      teamAttendees : getAgendaTeam(id),
+      otherAttendees: (document.getElementById('ag-others-'+id)?.value||'').trim(),
+      waMsg         : document.getElementById('wa-'+id)?.value||'',
     });
   });
   return out;

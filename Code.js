@@ -4523,25 +4523,38 @@ function testLists() {
 var AMAN_DAILY_TAB = 'AMAN_DAILY';
 var LEADS_TAB      = 'LEADS';
 var FEEDBACK_TAB   = 'FEEDBACK';
+var BILLING_TAB    = 'BILLING';
 
 function writeAmanDailyHeaders(sheet) {
+  // Stores ONLY client communication + other activities.
+  // Leads→LEADS, Finance→BILLING, Issues→SITE_ISSUES, Feedback→FEEDBACK,
+  // Agendas→TASK_ASSIGNMENTS (meeting/visit tasks).
   var h = [
     'Submission ID','Date','Time','Member',
-    'New Leads (JSON)','Lead Followups (JSON)',
-    'Client Contacts (JSON)','Agendas (JSON)',
-    'Bills Raised','Bills (JSON)','Total Bills (Rs)',
-    'Payment Received','Payments (JSON)','Total Payment (Rs)',
-    'Follow-ups Done','Followup Projects',
+    'Client Contacts (JSON)',
     'Vendor Coordination','Vendor Entries (JSON)',
     'Site Issues Addressed','Site Issue Entries (JSON)',
     'TnCP Coordination','TnCP Entries (JSON)',
-    'BNI Activity','BNI Entries (JSON)',
-    'New Issues (JSON)','Monthly Feedback (JSON)',
+    'BNI Activity',
   ];
   sheet.getRange(1,1,1,h.length).setValues([h])
     .setBackground('#005F73').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
+}
+
+function writeBillingHeaders(sheet) {
+  var h = [
+    'Bill ID','Project','Bill Date','Bill Amount (Rs)',
+    'Amount Received (Rs)','Received Date','Last Follow-up Date',
+    'Status','Submission ID',
+  ];
+  sheet.getRange(1,1,1,h.length).setValues([h])
+    .setBackground('#7A5000').setFontColor('#FFFFFF')
+    .setFontWeight('bold').setFontSize(10);
+  sheet.setFrozenRows(1);
+  var widths=[120,200,110,140,150,130,150,110,130];
+  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
 function writeFeedbackHeaders(sheet) {
@@ -4703,14 +4716,12 @@ function submitAmanCRM(data) {
     // Tag each issue with the reporter so SITE_ISSUES col O is correct
     newIssues.forEach(function(iss){ iss.reportedBy = iss.reportedBy || member; });
 
-    var payments  = finance.payments || [];
-    var payTotal  = payments.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
     var vendor    = activities.vendor     || {on:'No', entries:[]};
     var siteIss   = activities.siteIssues || {on:'No', entries:[]};
     var tncp      = activities.tncp       || {on:'No', entries:[]};
     var bni       = activities.bni        || {on:'No', entries:[]};
 
-    // ── 1. Write AMAN_DAILY row ────────────────────────────────
+    // ── 1. Write AMAN_DAILY row — client communication + other activities only ──
     var dailySheet = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
     var subId      = nextId(dailySheet, 'CRM-');
     dailySheet.appendRow([
@@ -4718,24 +4729,11 @@ function submitAmanCRM(data) {
       today,
       now,
       member,
-      data.newLeads     || '',
-      data.leadFollowups|| '',
-      data.contacts     || '',
-      data.agendas      || '',
-      finance.billsRaised    || 'No',
-      JSON.stringify(finance.bills || []),
-      finance.billsAmount    || 0,
-      finance.paymentReceived || 'No',
-      JSON.stringify(payments),
-      payTotal,
-      finance.followupsDone  || 'No',
-      (finance.followupProjects || []).join(', '),
+      data.contacts || '',
       vendor.on  || 'No', JSON.stringify(vendor.entries  || []),
       siteIss.on || 'No', JSON.stringify(siteIss.entries || []),
       tncp.on    || 'No', JSON.stringify(tncp.entries    || []),
-      bni.on     || 'No', JSON.stringify(bni.entries      || []),
-      data.newIssues || '',
-      data.feedback  || '',
+      bni.on     || 'No',
     ]);
     Logger.log('AMAN_DAILY written: ' + subId);
 
@@ -4812,6 +4810,12 @@ function submitAmanCRM(data) {
       Logger.log('Feedback written: ' + feedback.length);
     }
 
+    // ── 6. Update BILLING tab (bills, payments, follow-ups) ───
+    writeBilling(subId, today, finance);
+
+    // ── 7. Auto-create Site Visit / Meeting tasks for attendees ──
+    createMeetingTasks(agendas, member, today);
+
     Logger.log('submitAmanCRM complete: ' + subId);
     return {status:'ok', subId:subId};
 
@@ -4819,4 +4823,126 @@ function submitAmanCRM(data) {
     Logger.log('submitAmanCRM error: ' + String(err));
     return {status:'error', message:String(err)};
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// writeBilling — BILLING tab: one row per bill, payments attach to the
+// oldest unpaid bill of the same project, follow-up date stamped on
+// unpaid bills of the followed-up projects.
+//   Cols: A BillID, B Project, C BillDate, D BillAmt, E AmtRecd,
+//         F RecdDate, G LastFollowup, H Status, I SubmissionID
+// ════════════════════════════════════════════════════════════════
+function writeBilling(subId, today, finance) {
+  finance = finance || {};
+  var bills      = finance.bills || [];
+  var payments   = (finance.paymentReceived === 'Yes') ? (finance.payments || []) : [];
+  var fupProj    = (finance.followupsDone === 'Yes')   ? (finance.followupProjects || []) : [];
+  if (finance.billsRaised !== 'Yes') bills = [];
+
+  if (!bills.length && !payments.length && !fupProj.length) return;
+
+  var sheet = getOrCreate(BILLING_TAB, writeBillingHeaders);
+
+  // 1) Append a row for each bill raised today
+  bills.forEach(function(b) {
+    if (!b.project && !b.amount) return;
+    var billId = nextId(sheet, 'BILL-');
+    sheet.appendRow([
+      billId, b.project || '', today, parseFloat(b.amount) || 0,
+      '', '', '', 'Pending', subId,
+    ]);
+  });
+
+  // Re-read after appends so matching sees today's bills too
+  var data = sheet.getDataRange().getValues();  // row0 = header
+
+  function norm(s){ return String(s||'').trim().toLowerCase(); }
+
+  // 2) Attach each payment to the OLDEST unpaid bill of that project
+  payments.forEach(function(p) {
+    var amt = parseFloat(p.amount) || 0;
+    if (!p.project && !amt) return;
+    var targetRow = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (norm(data[i][1]) !== norm(p.project)) continue;     // B Project
+      if (String(data[i][7]) === 'Paid') continue;            // H Status
+      targetRow = i; break;                                    // first = oldest
+    }
+    if (targetRow > -1) {
+      var billAmt  = parseFloat(data[targetRow][3]) || 0;     // D
+      var already  = parseFloat(data[targetRow][4]) || 0;     // E
+      var recd     = already + amt;
+      var status   = (billAmt > 0 && recd >= billAmt) ? 'Paid' : 'Partial';
+      sheet.getRange(targetRow+1, 5).setValue(recd);          // E Amount Received
+      sheet.getRange(targetRow+1, 6).setValue(today);         // F Received Date
+      sheet.getRange(targetRow+1, 8).setValue(status);        // H Status
+      data[targetRow][4] = recd; data[targetRow][7] = status; // keep local copy in sync
+    } else {
+      // Payment with no matching open bill — record as its own row
+      var pid = nextId(sheet, 'BILL-');
+      sheet.appendRow([ pid, p.project || '', '', '', amt, today, '', 'Payment (no bill)', subId ]);
+    }
+  });
+
+  // 3) Stamp last follow-up date on unpaid bills of followed-up projects
+  if (fupProj.length) {
+    data = sheet.getDataRange().getValues();
+    fupProj.forEach(function(proj) {
+      for (var i = 1; i < data.length; i++) {
+        if (norm(data[i][1]) !== norm(proj)) continue;
+        if (String(data[i][7]) === 'Paid') continue;
+        sheet.getRange(i+1, 7).setValue(today);               // G Last Follow-up Date
+      }
+    });
+  }
+  Logger.log('BILLING updated — bills:'+bills.length+' payments:'+payments.length+' followups:'+fupProj.length);
+}
+
+// ════════════════════════════════════════════════════════════════
+// createMeetingTasks — for each tomorrow's meeting/site-visit agenda,
+// create a TASK_ASSIGNMENTS row for every team-member attendee.
+// Default = 1 weighted point; overwritten later when the member logs
+// hours in their DPR (weekly scoring recalculates points = hours).
+// ════════════════════════════════════════════════════════════════
+function createMeetingTasks(agendas, member, today) {
+  if (!agendas || !agendas.length) return;
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return;
+  var count = 0;
+  agendas.forEach(function(ag) {
+    var attendees = ag.teamAttendees || [];
+    if (!attendees.length) return;
+    var type = (ag.type === 'Site Visit') ? 'Site Visit' : 'Meeting';
+    attendees.forEach(function(person) {
+      if (!person) return;
+      var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
+      var notes = (type + ' — ' + (ag.project||'') +
+                   (ag.time ? ' @ ' + ag.time : '') +
+                   (ag.agenda ? '. Agenda: ' + ag.agenda : '') +
+                   ' [CRM auto; points = hours logged in DPR]');
+      sheet.appendRow([
+        newId,                        // A TaskID
+        '',                           // B ProjectID
+        ag.project || '',             // C ProjectName
+        person,                       // D AssignedTo
+        type,                         // E Stage/Type
+        1,                            // F Disc Multiplier
+        1,                            // G Base Pts (default — hours override)
+        1,                            // H Units
+        1,                            // I Weighted Pts (default 1; recalculated from hours)
+        today,                        // J AssignedDate
+        ag.date || today,             // K Deadline (meeting/visit date)
+        '', '',                       // L Area, M Drawing
+        'Not Started',                // N SelfStatus
+        '', '',                       // O SelfStatusDate, P ActualCompletion
+        'Pending',                    // Q LeadApproved
+        '', '', '',                   // R ApprovedBy, S ApprovalDate, T RevisionTag
+        notes,                        // U Notes
+        'CRM — ' + member,            // V AssignedBy
+        'Medium',                     // W Priority
+      ]);
+      count++;
+    });
+  });
+  Logger.log('Meeting/visit tasks created: ' + count);
 }

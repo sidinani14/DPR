@@ -83,20 +83,30 @@
 - submitAmanCRM(data) — writes AMAN_DAILY, LEADS, SITE_ISSUES from CRM form
 - getRecentLeads(date) — returns LEADS rows for given date with 24hr contact pending
 
-## Sheet structure — AMAN_DAILY (26 cols A–Z)
+## CRM data routing — where each form section is stored
+- AMAN_DAILY  → client communication + other activities ONLY
+- LEADS       → new leads (LMS format) + 24hr follow-up updates
+- BILLING     → bills / payments / follow-ups (one row per bill)
+- SITE_ISSUES → CRM issues & design deliverables (col O = Reported By = Aman)
+- FEEDBACK    → monthly client feedback (one row per project)
+- TASK_ASSIGNMENTS → auto-tasks: design issues/deliverables (1 pt) +
+  site-visit/meeting tasks per team attendee (default 1 pt, overwritten by hours in DPR)
+
+## Sheet structure — AMAN_DAILY (12 cols A–L; client comm + other activities only)
 - A: Submission ID (CRM-001…), B: Date, C: Time, D: Member
-- E: New Leads (JSON), F: Lead Followups (JSON)
-- G: Client Contacts (JSON), H: Agendas (JSON)
-- I: Bills Raised (Yes/No), J: Bills (JSON [{project,amount}]), K: Total Bills (Rs)
-- L: Payment Received (Yes/No), M: Payments (JSON [{project,amount}]), N: Total Payment (Rs)
-- O: Follow-ups Done (Yes/No), P: Followup Projects (comma list)
-- Q: Vendor Coordination (Yes/No), R: Vendor Entries (JSON [{project,notes}])
-- S: Site Issues Addressed (Yes/No), T: Site Issue Entries (JSON)
-- U: TnCP Coordination (Yes/No), V: TnCP Entries (JSON)
-- W: BNI Activity (Yes/No), X: BNI Entries (JSON)
-- Y: New Issues (JSON), Z: Monthly Feedback (JSON)
-- NOTE: schema changed — if an old AMAN_DAILY tab exists with the prior headers,
-  delete the tab so getOrCreate rewrites the new 26-col header row.
+- E: Client Contacts (JSON)
+- F: Vendor Coordination (Yes/No), G: Vendor Entries (JSON [{project,notes}])
+- H: Site Issues Addressed (Yes/No), I: Site Issue Entries (JSON)
+- J: TnCP Coordination (Yes/No), K: TnCP Entries (JSON)
+- L: BNI Activity (Yes/No)
+- NOTE: schema changed (now 12 cols) — delete any old AMAN_DAILY tab so
+  getOrCreate rewrites the new header row.
+
+## Sheet structure — BILLING (9 cols)
+- A: Bill ID (BILL-001…), B: Project, C: Bill Date, D: Bill Amount
+- E: Amount Received, F: Received Date, G: Last Follow-up Date, H: Status, I: Submission ID
+- writeBilling(): bills append new rows; payments attach to OLDEST unpaid bill of that
+  project (Partial/Paid); follow-ups stamp Last Follow-up Date on unpaid bills of that project.
 
 ## Sheet structure — FEEDBACK (19 cols, mirrors Monthly Feedback Google Form)
 - A: Feedback ID (FB-001…), B: Submission ID (CRM-…), C: Date Recorded, D: Recorded By
@@ -107,7 +117,9 @@
 - O: Meeting On Time (Yes/No), P: Recommend/NPS (1-10)
 - Q: Additional Comments, R: Appraisal of Person, S: Referrals
 - CRM Section 8 "Monthly Client Feedback": Yes/No toggle → repeatable per-project blocks.
-  Written to FEEDBACK sheet (one row per project) + AMAN_DAILY col Z (JSON).
+  Written to FEEDBACK sheet only (one row per project) — NOT in AMAN_DAILY.
+- Agenda block attendees = Team Attendees (chips of TEAM_MEMBERS → each gets a
+  meeting/visit task) + Other Attendees (free text, message only).
 - Other Activities = Vendor/SiteIssues/TnCP each Yes → repeatable {project, notes};
   BNI = plain Yes/No (no detail).
 - Finance = 3 collapsible Yes/No: Bills Raised (repeatable {project, amount}),
