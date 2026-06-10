@@ -87,9 +87,9 @@
 - A: Submission ID (CRM-001…), B: Date, C: Time, D: Member
 - E: New Leads (JSON), F: Lead Followups (JSON)
 - G: Client Contacts (JSON), H: Agendas (JSON)
-- I: Bills Count, J: Bills Amount, K: Bills Projects (comma list)
+- I: Bills Raised (Yes/No), J: Bills (JSON [{project,amount}]), K: Total Bills (Rs)
 - L: Payment Received (Yes/No), M: Payments (JSON [{project,amount}]), N: Total Payment (Rs)
-- O: Followup Count, P: Followup Projects (comma list)
+- O: Follow-ups Done (Yes/No), P: Followup Projects (comma list)
 - Q: Vendor Coordination (Yes/No), R: Vendor Entries (JSON [{project,notes}])
 - S: Site Issues Addressed (Yes/No), T: Site Issue Entries (JSON)
 - U: TnCP Coordination (Yes/No), V: TnCP Entries (JSON)
@@ -108,9 +108,12 @@
 - Q: Additional Comments, R: Appraisal of Person, S: Referrals
 - CRM Section 8 "Monthly Client Feedback": Yes/No toggle → repeatable per-project blocks.
   Written to FEEDBACK sheet (one row per project) + AMAN_DAILY col Z (JSON).
-- Other Activities = 4 toggles, each Yes → repeatable {project, notes} entries.
-  Finance Payment = Yes/No → repeatable {project, amount} entries.
-  Bills/Followup projects use a searchable multi-select dropdown (not chips).
+- Other Activities = Vendor/SiteIssues/TnCP each Yes → repeatable {project, notes};
+  BNI = plain Yes/No (no detail).
+- Finance = 3 collapsible Yes/No: Bills Raised (repeatable {project, amount}),
+  Payment Received (repeatable {project, amount}), Follow-ups Done (project multi-select only).
+- Section order: Open Issues, Report Date, Client Connections, Issues/Deliverables,
+  Tomorrow's Meetings, (WhatsApp agendas), Finance, Other Activities, Lead Management, Monthly Feedback.
 
 ## Sheet structure — LEADS (matches LMS Google Sheet format)
 - A: Lead ID (LEAD-001…), B: Client Name, C: Contact No., D: Referred By

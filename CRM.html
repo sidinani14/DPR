@@ -279,33 +279,11 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── S1: Date ───────────────────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">1</span>
+      <span class="section-num">2</span>
       <span class="section-title">Report Date</span>
     </div>
     <div class="section-body">
       <input type="date" id="f-date">
-    </div>
-  </div>
-
-  <!-- ── S2: Lead Management ───────────────────── -->
-  <div class="section">
-    <div class="section-head">
-      <span class="section-num">2</span>
-      <span class="section-title">Lead Management</span>
-    </div>
-    <div class="section-body">
-
-      <!-- 24-hr follow-up (hidden until data loads) -->
-      <div id="followup-wrap" class="hidden">
-        <div class="sub-lbl">⏰ 24-hr Follow-up — Yesterday's New Leads</div>
-        <div id="followup-list"></div>
-        <hr class="divider">
-      </div>
-
-      <!-- New leads today -->
-      <div class="sub-lbl">➕ New Leads Received Today</div>
-      <div id="lead-blocks"></div>
-      <button class="add-proj-btn" id="add-lead-btn" onclick="addLeadBlock()" disabled>+ Add New Lead</button>
     </div>
   </div>
 
@@ -322,10 +300,23 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
+  <!-- ── S7: New Issues ─────────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">4</span>
+      <span class="section-title">Add Issues &amp; Design Deliverables</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log CRM blockers, finance holds, client escalations — or request a <b>design deliverable</b> from the team (drawing, 3D, proposal). Assign to a team member with a target date; design items create a task automatically.</p>
+      <div id="new-iss-blocks"></div>
+      <button class="add-btn teal" id="add-iss-btn" onclick="addNewIssue()" disabled>+ Add Issue / Deliverable</button>
+    </div>
+  </div>
+
   <!-- ── S4: Tomorrow's Plans + Agenda Generator ── -->
   <div class="section">
     <div class="section-head" style="background:#1B5E20">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">4</span>
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">5</span>
       <span class="section-title">Tomorrow's Meetings &amp; Site Visits</span>
     </div>
     <div class="section-body">
@@ -335,52 +326,69 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- ── S5: Finance ───────────────────────────── -->
+  <!-- ── WhatsApp Agendas ───────────────────────── -->
+  <div class="section">
+    <div class="section-head" style="background:#1B5E20">
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span>
+      <span class="section-title">Meeting Agenda Messages</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Review, copy, and send to respective project WhatsApp groups before each meeting.</p>
+      <div id="wa-list"><div class="no-issues">Add tomorrow's plans above to generate messages…</div></div>
+    </div>
+  </div>
+
+  <!-- ── Finance ───────────────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">5</span>
+      <span class="section-num">6</span>
       <span class="section-title">Finance</span>
     </div>
     <div class="section-body">
 
-      <div class="sub-lbl">Bills Raised Today</div>
-      <div class="field-row">
-        <div class="field">
-          <span class="lbl">No. of Bills</span>
-          <input type="number" id="f-bills-count" min="0" placeholder="0">
-        </div>
-        <div class="field">
-          <span class="lbl">Total Amount (₹)</span>
-          <div class="rupee-wrap"><input type="number" id="f-bills-amount" min="0" placeholder="0"></div>
-        </div>
-      </div>
+      <!-- Bills Raised -->
       <div class="field">
-        <span class="lbl">Projects Billed <span class="opt">select all that apply</span></span>
-        <div id="msel-bills"></div>
+        <div class="activity-toggle-row" style="padding-top:0">
+          <span class="atl">Bills Raised Today?</span>
+          <div class="at-btns">
+            <div class="at-btn" id="bills-yes" onclick="setActivity('bills','yes')">Yes</div>
+            <div class="at-btn on-no" id="bills-no" onclick="setActivity('bills','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="bills-detail">
+          <div id="bills-entries"></div>
+          <button class="add-btn green" onclick="addBill()">+ Add Bill</button>
+        </div>
       </div>
 
-      <hr class="divider">
-      <div class="activity-toggle-row" style="padding-top:0">
-        <span class="atl">Payment Received Today?</span>
-        <div class="at-btns">
-          <div class="at-btn" id="pay-yes" onclick="setActivity('pay','yes')">Yes</div>
-          <div class="at-btn on-no" id="pay-no" onclick="setActivity('pay','no')">No</div>
+      <!-- Payment Received -->
+      <div class="field">
+        <div class="activity-toggle-row">
+          <span class="atl">Payment Received Today?</span>
+          <div class="at-btns">
+            <div class="at-btn" id="pay-yes" onclick="setActivity('pay','yes')">Yes</div>
+            <div class="at-btn on-no" id="pay-no" onclick="setActivity('pay','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="pay-detail">
+          <div id="pay-entries"></div>
+          <button class="add-btn green" onclick="addPayment()">+ Add Payment</button>
         </div>
       </div>
-      <div class="activity-detail" id="pay-detail">
-        <div id="pay-entries"></div>
-        <button class="add-btn green" onclick="addPayment()">+ Add Payment</button>
-      </div>
 
-      <hr class="divider">
-      <div class="sub-lbl">Payment Follow-ups Done Today</div>
+      <!-- Payment Follow-ups -->
       <div class="field">
-        <span class="lbl">No. of Follow-ups</span>
-        <input type="number" id="f-fup-count" min="0" placeholder="0" style="max-width:120px">
-      </div>
-      <div class="field">
-        <span class="lbl">Projects Followed Up <span class="opt">select all that apply</span></span>
-        <div id="msel-fup"></div>
+        <div class="activity-toggle-row">
+          <span class="atl">Payment Follow-ups Done Today?</span>
+          <div class="at-btns">
+            <div class="at-btn" id="fup-yes" onclick="setActivity('fup','yes')">Yes</div>
+            <div class="at-btn on-no" id="fup-no" onclick="setActivity('fup','no')">No</div>
+          </div>
+        </div>
+        <div class="activity-detail" id="fup-detail">
+          <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Followed Up <span class="opt">select all that apply</span></span>
+          <div id="msel-fup"></div>
+        </div>
       </div>
 
     </div>
@@ -389,7 +397,7 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── S6: Other Activities ──────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">6</span>
+      <span class="section-num">7</span>
       <span class="section-title">Other Activities</span>
     </div>
     <div class="section-body">
@@ -454,23 +462,32 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- ── S7: New Issues ─────────────────────────── -->
+  <!-- ── S2: Lead Management ───────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">7</span>
-      <span class="section-title">Add Issues &amp; Design Deliverables</span>
+      <span class="section-num">8</span>
+      <span class="section-title">Lead Management</span>
     </div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log CRM blockers, finance holds, client escalations — or request a <b>design deliverable</b> from the team (drawing, 3D, proposal). Assign to a team member with a target date; design items create a task automatically.</p>
-      <div id="new-iss-blocks"></div>
-      <button class="add-btn teal" id="add-iss-btn" onclick="addNewIssue()" disabled>+ Add Issue / Deliverable</button>
+
+      <!-- 24-hr follow-up (hidden until data loads) -->
+      <div id="followup-wrap" class="hidden">
+        <div class="sub-lbl">⏰ 24-hr Follow-up — Yesterday's New Leads</div>
+        <div id="followup-list"></div>
+        <hr class="divider">
+      </div>
+
+      <!-- New leads today -->
+      <div class="sub-lbl">➕ New Leads Received Today</div>
+      <div id="lead-blocks"></div>
+      <button class="add-proj-btn" id="add-lead-btn" onclick="addLeadBlock()" disabled>+ Add New Lead</button>
     </div>
   </div>
 
   <!-- ── S8: Monthly Client Feedback ──────────────── -->
   <div class="section">
     <div class="section-head" style="background:#6A1B9A">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">8</span>
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">9</span>
       <span class="section-title">Monthly Client Feedback</span>
     </div>
     <div class="section-body">
@@ -486,18 +503,6 @@ textarea{min-height:62px;resize:vertical;}
         <div id="fb-blocks"></div>
         <button class="add-btn blue" onclick="addFeedbackBlock()">+ Add Project Feedback</button>
       </div>
-    </div>
-  </div>
-
-  <!-- ── WhatsApp Agendas ───────────────────────── -->
-  <div class="section">
-    <div class="section-head" style="background:#1B5E20">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span>
-      <span class="section-title">Meeting Agenda Messages</span>
-    </div>
-    <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Review, copy, and send to respective project WhatsApp groups before each meeting.</p>
-      <div id="wa-list"><div class="no-issues">Add tomorrow's plans above to generate messages…</div></div>
     </div>
   </div>
 
@@ -597,7 +602,7 @@ function projOptionsHtml(){
 
 function refreshProjectDropdowns() {
   const opts = projOptionsHtml();
-  document.querySelectorAll('[id^="cb-proj-"],[id^="ag-proj-"],[id^="ni-proj-"],[id^="ae-proj-"],[id^="pay-proj-"],[id^="fb-proj-"]').forEach(sel=>{
+  document.querySelectorAll('[id^="cb-proj-"],[id^="ag-proj-"],[id^="ni-proj-"],[id^="ae-proj-"],[id^="pay-proj-"],[id^="bill-proj-"],[id^="fb-proj-"]').forEach(sel=>{
     const cur=sel.value; sel.innerHTML=opts; if(cur) sel.value=cur;
   });
 }
@@ -606,7 +611,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').re
 
 // ── Multi-select project dropdown ──────────────────────────
 const mselState = {};
-const MSELS = {bills:'msel-bills', fup:'msel-fup'};
+const MSELS = {fup:'msel-fup'};
 function buildMsels(){ Object.keys(MSELS).forEach(k=>buildMsel(k,MSELS[k])); }
 function buildMsel(key, containerId){
   if(!(key in mselState)) mselState[key]=[];
@@ -1047,15 +1052,42 @@ function copyWA(id){
 // ════════════════════════════════════════
 // OTHER ACTIVITIES — Section 6
 // ════════════════════════════════════════
+// keys whose "Yes" just reveals a panel with no auto-added entry row
+const NO_AUTO_ENTRY = ['bni','fup'];
 function setActivity(key, val) {
   document.getElementById(key+'-yes').className='at-btn'+(val==='yes'?' on-yes':'');
   document.getElementById(key+'-no').className='at-btn'+(val==='no'?' on-no':'');
   const detail=document.getElementById(key+'-detail');
   if(detail) detail.classList.toggle('open', val==='yes');   // BNI has no detail panel
-  if(val==='yes' && key!=='bni'){
-    if(key==='pay'){ if(!document.querySelector('#pay-entries .entry-row')) addPayment(); }
-    else { const c=document.getElementById(key+'-entries'); if(c && !c.querySelector('.entry-row')) addActEntry(key); }
-  }
+  if(val!=='yes' || NO_AUTO_ENTRY.includes(key)) return;
+  if(key==='pay'){ if(!document.querySelector('#pay-entries .entry-row')) addPayment(); }
+  else if(key==='bills'){ if(!document.querySelector('#bills-entries .entry-row')) addBill(); }
+  else { const c=document.getElementById(key+'-entries'); if(c && !c.querySelector('.entry-row')) addActEntry(key); }
+}
+
+// ── Bills repeater (project + amount) ──────────────────────
+let billCount=0;
+function addBill(){
+  billCount++; const id=billCount;
+  const div=document.createElement('div');
+  div.className='entry-row'; div.id='bill-'+id;
+  div.innerHTML=`
+    <div class="entry-top">
+      <select id="bill-proj-${id}">${projOptionsHtml()}</select>
+      <button class="entry-x" onclick="document.getElementById('bill-${id}').remove()">✕</button>
+    </div>
+    <div class="rupee-wrap" style="max-width:180px"><input type="number" class="pay-amt" id="bill-amt-${id}" min="0" placeholder="Bill amount"></div>`;
+  document.getElementById('bills-entries').appendChild(div);
+}
+function collectBills(){
+  const out=[];
+  document.querySelectorAll('#bills-entries .entry-row').forEach(b=>{
+    const id=b.id.replace('bill-','');
+    const proj=document.getElementById('bill-proj-'+id)?.value||'';
+    const amt=parseFloat(document.getElementById('bill-amt-'+id)?.value)||0;
+    if(proj||amt) out.push({project:proj, amount:amt});
+  });
+  return out;
 }
 
 // ── Payment repeater ───────────────────────────────────────
@@ -1410,15 +1442,22 @@ function collectAgendas() {
 }
 
 function collectFinance() {
-  const payOn=document.getElementById('pay-yes')?.classList.contains('on-yes');
+  const billsOn=document.getElementById('bills-yes')?.classList.contains('on-yes');
+  const payOn  =document.getElementById('pay-yes')?.classList.contains('on-yes');
+  const fupOn  =document.getElementById('fup-yes')?.classList.contains('on-yes');
+  const bills  =billsOn?collectBills():[];
+  const fupProj=fupOn?getMsel('fup'):[];
   return {
-    billsCount     : parseInt(document.getElementById('f-bills-count')?.value)||0,
-    billsAmount    : parseFloat(document.getElementById('f-bills-amount')?.value)||0,
-    billsProjects  : getMsel('bills'),
+    billsRaised    : billsOn?'Yes':'No',
+    bills          : bills,
+    billsCount     : bills.length,
+    billsAmount    : bills.reduce((s,b)=>s+(b.amount||0),0),
+    billsProjects  : bills.map(b=>b.project).filter(Boolean),
     paymentReceived: payOn?'Yes':'No',
     payments       : payOn?collectPayments():[],
-    followupCount  : parseInt(document.getElementById('f-fup-count')?.value)||0,
-    followupProjects: getMsel('fup'),
+    followupsDone  : fupOn?'Yes':'No',
+    followupCount  : fupProj.length,
+    followupProjects: fupProj,
   };
 }
 
@@ -1524,18 +1563,17 @@ function resetForm() {
   document.getElementById('success-screen').style.display='none';
   document.querySelector('.submit-bar').style.display='';
   ['lead-blocks','contact-blocks','agenda-blocks','new-iss-blocks',
-   'pay-entries','vendor-entries','siteissues-entries','tncp-entries','bni-entries','fb-blocks'].forEach(id=>{
+   'bills-entries','pay-entries','vendor-entries','siteissues-entries','tncp-entries','bni-entries','fb-blocks'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.innerHTML='';
   });
   // Reset all Yes/No toggles back to No + close details
-  ['pay','vendor','siteissues','tncp','bni'].forEach(k=>setActivity(k,'no'));
+  ['bills','pay','fup','vendor','siteissues','tncp','bni'].forEach(k=>setActivity(k,'no'));
   setFeedback('no');
-  // Reset numeric/text finance inputs + rebuild project multi-selects (clears selection)
-  ['f-bills-count','f-bills-amount','f-fup-count'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  // Rebuild project multi-selects (clears selection)
   Object.keys(mselState).forEach(k=>mselState[k]=[]);
   buildMsels();
   document.getElementById('wa-list').innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
-  leadCount=contCount=agendaCount=issCount=payCount=fbCount=0;
+  leadCount=contCount=agendaCount=issCount=payCount=billCount=fbCount=0;
   actEntryCount.vendor=actEntryCount.siteissues=actEntryCount.tncp=actEntryCount.bni=0;
   issueActions={}; pendingLeads=[];
   document.getElementById('followup-wrap').classList.add('hidden');
