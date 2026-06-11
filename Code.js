@@ -141,6 +141,7 @@ function doGet(e) {
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
+  if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
   return respond({status: 'IDS DPR live'});
 }
@@ -173,6 +174,7 @@ function doPost(e) {
     if (data.action === 'updateIssueStatus')   return respond(updateIssueStatus(data.issueId||'', data.status||'', data.targetDate||''));
     if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
+    if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
 
     // Form submission actions
     if (data.action === 'submitApprovals')   return respond(submitApprovals(data));
@@ -4861,6 +4863,37 @@ function getRecentLeads(date) {
       leadStatus : String(r[5] || ''),
       leadManager: String(r[9] || ''),
       date       : rowDate,
+      rowNum     : i + 1,
+    });
+  }
+  return {leads: leads};
+}
+
+// ════════════════════════════════════════════════════════════════
+// getOpenLeads — leads still needing a status decision (early stages).
+// Shown in the CRM form's "Open Leads" panel every day until the lead is
+// advanced to Briefing Meeting Done (→ promoted to a project) or marked
+// Lost/Invalid. Lets the CRM mark: Not Contacted / Contacted / Briefing /
+// Rejected on any open lead, not just yesterday's.
+// ════════════════════════════════════════════════════════════════
+function getOpenLeads(member) {
+  var sheet = db().getSheetByName(LEADS_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {leads:[]};
+  var rows = sheet.getDataRange().getValues();
+  var OPEN = ['', 'Not Contacted', 'Contacted over call'];
+  var leads = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var status = String(r[5] || '').trim();   // F Lead Status
+    if (OPEN.indexOf(status) === -1) continue;
+    leads.push({
+      leadId     : String(r[0] || ''),
+      clientName : String(r[1] || ''),
+      contactNo  : String(r[2] || ''),
+      referredBy : String(r[3] || ''),
+      leadStatus : status || 'Not Contacted',
+      leadManager: String(r[9] || ''),
+      date       : String(r[7] || '').substring(0, 10),  // H Lead Creation Date
       rowNum     : i + 1,
     });
   }

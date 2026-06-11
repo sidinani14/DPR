@@ -157,6 +157,15 @@ textarea{min-height:62px;resize:vertical;}
 .fc-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;}
 .fc-meta{font-size:11px;color:var(--text2);margin-bottom:8px;}
 
+/* Open lead cards (status update) */
+.lead-card{background:var(--amber-bg);border:1.5px solid #FFE082;border-radius:var(--radius-sm);padding:11px;margin-bottom:9px;}
+.lead-act-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px;}
+.lead-act{padding:7px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--text2);text-align:center;user-select:none;}
+.lead-act.on{border-width:2px;border-color:var(--text2);color:var(--text);}
+.lead-act.la-contacted.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+.lead-act.la-brief.on{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.lead-act.la-reject.on{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+
 /* Sub-section label */
 .sub-lbl{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:12px;}
 
@@ -273,6 +282,18 @@ textarea{min-height:62px;resize:vertical;}
     </div>
     <div class="section-body" id="issues-panel">
       <div class="no-issues">Sign in to load issues…</div>
+    </div>
+  </div>
+
+  <!-- ── Open Leads — pending status updates ────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">★</span>
+      <span class="section-title">Open Leads — Update Status</span>
+      <span class="section-badge" id="leads-badge">—</span>
+    </div>
+    <div class="section-body" id="open-leads-panel">
+      <div class="no-issues">Sign in to load leads…</div>
     </div>
   </div>
 
@@ -470,14 +491,7 @@ textarea{min-height:62px;resize:vertical;}
     </div>
     <div class="section-body">
 
-      <!-- 24-hr follow-up (hidden until data loads) -->
-      <div id="followup-wrap" class="hidden">
-        <div class="sub-lbl">⏰ 24-hr Follow-up — Yesterday's New Leads</div>
-        <div id="followup-list"></div>
-        <hr class="divider">
-      </div>
-
-      <!-- New leads today -->
+      <!-- New leads today (open-lead follow-ups live in the top "Open Leads" panel) -->
       <div class="sub-lbl">➕ New Leads Received Today</div>
       <div id="lead-blocks"></div>
       <button class="add-proj-btn" id="add-lead-btn" onclick="addLeadBlock()" disabled>+ Add New Lead</button>
@@ -559,7 +573,7 @@ let contCount   = 0;
 let agendaCount = 0;
 let issCount    = 0;
 let issueActions= {};
-let pendingLeads= [];
+let openLeads   = [];
 
 // ════════════════════════════════════════
 // AUTH
@@ -577,7 +591,7 @@ function onGoogleSignIn(resp) {
   });
   loadProjects();
   loadIssues();
-  loadPendingLeads();
+  loadOpenLeads();
 }
 
 // ════════════════════════════════════════
@@ -766,45 +780,51 @@ function toggleDelay(id){ document.getElementById('dr-'+id).classList.toggle('op
 // ════════════════════════════════════════
 // YESTERDAY'S LEADS — 24hr follow-up
 // ════════════════════════════════════════
-async function loadPendingLeads() {
+async function loadOpenLeads() {
+  document.getElementById('open-leads-panel').innerHTML='<div class="no-issues">Loading…</div>';
   try {
-    const yest = new Date(); yest.setDate(yest.getDate()-1);
-    const yStr = yest.toISOString().substring(0,10);
     const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'getRecentLeads', date:yStr})});
+      body:JSON.stringify({action:'getOpenLeads', member:crmUser})});
     const d = await r.json();
-    pendingLeads = d.leads||[];
-    if(pendingLeads.length){
-      renderPendingLeads();
-      document.getElementById('followup-wrap').classList.remove('hidden');
-    }
-  } catch(e){ /* silent */ }
+    openLeads = d.leads||[];
+    renderOpenLeads();
+  } catch(e){
+    document.getElementById('open-leads-panel').innerHTML='<div class="no-issues">Could not load leads</div>';
+  }
 }
 
-function renderPendingLeads() {
-  document.getElementById('followup-list').innerHTML = pendingLeads.map((lead,i)=>`
-    <div class="followup-card">
-      <div class="fc-name">${lead.clientName}</div>
-      <div class="fc-meta">${lead.leadStatus} · Added ${lead.date}${lead.leadManager?' · Mgr: '+lead.leadManager:''}</div>
-      <span class="lbl" style="font-size:10px">Did you contact this lead today?</span>
-      <div class="yn-btns" style="margin-top:5px">
-        <div class="yn-btn" id="fu-y-${i}" onclick="setFollowup(${i},'yes')">Yes — Contacted</div>
-        <div class="yn-btn on-no" id="fu-n-${i}" onclick="setFollowup(${i},'no')">Not yet</div>
-      </div>
-      <div id="fu-status-${i}" class="hidden" style="margin-top:8px">
-        <span class="lbl" style="font-size:10px">Update Lead Status</span>
-        <select id="fu-sel-${i}" style="font-size:12px;margin-top:4px">
-          ${LEAD_STATUSES.map(s=>`<option value="${s.key}"${s.key===lead.leadStatus?' selected':''}>${s.key}</option>`).join('')}
-        </select>
+const LEAD_ACTIONS = [
+  {key:'Not Contacted',         label:'Not Contacted', cls:''},
+  {key:'Contacted over call',   label:'Contacted',     cls:'la-contacted'},
+  {key:'Briefing Meeting Done', label:'Briefing Done', cls:'la-brief'},
+  {key:'Lost',                  label:'Rejected',      cls:'la-reject'},
+];
+
+function renderOpenLeads() {
+  const badge=document.getElementById('leads-badge');
+  const panel=document.getElementById('open-leads-panel');
+  if(!openLeads.length){
+    if(badge) badge.textContent='0';
+    panel.innerHTML='<div class="no-issues">No open leads 🎉</div>';
+    return;
+  }
+  if(badge) badge.textContent=openLeads.length+' open';
+  panel.innerHTML=openLeads.map((lead,i)=>`
+    <div class="lead-card" id="lc-${i}">
+      <div class="fc-name">${lead.clientName||'(no name)'}</div>
+      <div class="fc-meta">${lead.leadStatus} · Added ${lead.date}${lead.contactNo?' · '+lead.contactNo:''}${lead.leadManager?' · Mgr: '+lead.leadManager:''}</div>
+      <span class="lbl" style="font-size:10px;margin-top:6px">Update status</span>
+      <div class="lead-act-btns">
+        ${LEAD_ACTIONS.map(a=>`<div class="lead-act ${a.cls}" data-key="${a.key}" onclick="setLeadAction(${i},this.dataset.key)">${a.label}</div>`).join('')}
       </div>
     </div>`).join('');
 }
 
-function setFollowup(i, val) {
-  document.getElementById('fu-y-'+i).className='yn-btn'+(val==='yes'?' on-yes':'');
-  document.getElementById('fu-n-'+i).className='yn-btn'+(val==='no'?' on-no':'');
-  document.getElementById('fu-status-'+i).classList.toggle('hidden', val!=='yes');
-  pendingLeads[i]._answer = val;
+function setLeadAction(i, statusKey) {
+  openLeads[i]._newStatus = statusKey;
+  document.querySelectorAll('#lc-'+i+' .lead-act').forEach(b=>{
+    b.classList.toggle('on', b.dataset.key===statusKey);
+  });
 }
 
 // ════════════════════════════════════════
@@ -1412,15 +1432,13 @@ function collectLeads() {
   return out;
 }
 
-function collectFollowups() {
-  return pendingLeads
-    .filter(l=>l._answer)
-    .map((l,i)=>({
+function collectLeadUpdates() {
+  return openLeads
+    .filter(l=>l._newStatus && l._newStatus !== l.leadStatus)
+    .map(l=>({
       leadId   : l.leadId||'',
-      contacted: l._answer==='yes',
-      newStatus: l._answer==='yes'
-        ? (document.getElementById('fu-sel-'+i)?.value||l.leadStatus)
-        : l.leadStatus,
+      newStatus: l._newStatus,
+      contacted: l._newStatus !== 'Not Contacted',
     }));
 }
 
@@ -1518,7 +1536,7 @@ async function submitAll() {
 
     // 2. Main CRM submission
     const leads    = collectLeads();
-    const followups= collectFollowups();
+    const followups= collectLeadUpdates();
     const contacts = collectContacts();
     const agendas  = collectAgendas();
     const finance  = collectFinance();
@@ -1589,12 +1607,11 @@ function resetForm() {
   document.getElementById('wa-list').innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
   leadCount=contCount=agendaCount=issCount=payCount=billCount=fbCount=0;
   actEntryCount.vendor=actEntryCount.siteissues=actEntryCount.tncp=actEntryCount.bni=0;
-  issueActions={}; pendingLeads=[];
-  document.getElementById('followup-wrap').classList.add('hidden');
+  issueActions={}; openLeads=[];
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('submit-status').textContent=crmUser;
   loadIssues();
-  loadPendingLeads();
+  loadOpenLeads();
 }
 
 function toast(msg,dur=2500){
