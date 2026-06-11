@@ -58,14 +58,16 @@
 
 ## Aman Raghuwanshi — CRM scoring (separate page in weekly report)
 - getAmanWeeklyStats(weekStart) — routes: getAmanWeeklyStats (GET+POST)
-- Output /50:
+- Output /50 (components are N/A when there's nothing to measure → excluded &
+  output rescaled across active ones: output = activeScore/activeMax × 50):
   - Client Connection Coverage /20 = ongoing projects connected ÷ total ongoing × 20
-    (ongoing = PROJECTS not matching completed/closed/dead/cancelled/proposal/new lead;
-     connections read from AMAN_DAILY col E Client Contacts JSON, Mon–Sat)
-  - Lead Management /15 = leads 24hr-contacted ÷ new leads this week × 15 (no leads → full 15)
-    (LEADS col H creation date in week, col M = 'Yes')
-  - Revenue Collection /15 = min(collected ÷ billsRaised, 0.70) ÷ 0.70 × 15 (no bills → full 15)
-    (BILLING: bill amount where bill date in week vs amount received where received date in week)
+    (connection = client contact OR meeting/visit task OR feedback this week; N/A if no ongoing)
+  - Lead Management /15 = open leads worked this week ÷ leads needing attention × 15
+    (worked = LEADS Last-Contacted col I in week; base = worked + still-open-untouched;
+     open = status Not Contacted/Contacted over call; N/A if base = 0 — no free marks)
+  - Revenue Collection /15 = min(totalCollected ÷ totalBilled, 0.70) ÷ 0.70 × 15
+    (CUMULATIVE across all BILLING rows — outstanding old bills lower it; N/A if nothing billed)
+  - visitsDone/meetingsDone derived from Client Contacts type (display only)
 - DPR Consistency /15 = AMAN_DAILY submission days ÷ 6 × 15
 - Punctuality /20 + Hours /15 = biometric from DAILY_SUMMARY (same formulas as Deepak/team, Thr 09:10)
 - weeklyreport.html: buildAmanPage(d), fetched via getAmanWeeklyStats, pushed into team[] with _isAman
