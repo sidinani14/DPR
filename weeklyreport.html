@@ -660,7 +660,7 @@ function buildAmanPage(d){
 
     <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
     <div class="pg">
-      ${pCard('Client<br>Connections',s.s_client,20,`${d.connectedCount} of ${d.totalOngoing} ongoing clients connected ≥1×`)}
+      ${pCard('Client<br>Connections',s.s_client,20,`${d.connectedCount} of ${d.totalOngoing} clients engaged (connect / meeting / visit / feedback)`)}
       ${pCard('Lead<br>Management',s.s_lead,15,leadDetail)}
       ${pCard('Revenue<br>Collection',s.s_rev,15,collDetail)}
       ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of 6 days · ≥1 CRM report/day`)}
@@ -680,11 +680,10 @@ function buildAmanPage(d){
         </table>
       </div>
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Revenue Summary</div>
+        <div class="section-title" style="margin-bottom:2mm">Revenue &amp; Leads</div>
         <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Bills Raised</td><td style="padding:7px 8px;text-align:right;font-weight:700">₹${(d.billsRaised||0).toLocaleString('en-IN')}</td></tr>
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collected</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">₹${(d.collected||0).toLocaleString('en-IN')}</td></tr>
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.collectionPct===null?'—':d.collectionPct+'%'}</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(255,255,255,0.4);font-weight:400"> · target ${d.collectionTarget}%</span></td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Clients Connected</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.connectedCount} / ${d.totalOngoing}</td></tr>
           <tr><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">New Leads</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
         </table>
       </div>

@@ -4172,6 +4172,36 @@ function getAmanWeeklyStats(weekStart, member) {
       });
     }
   }
+
+  // A meeting / site visit logged by CRM this week also counts as a connection
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  if (asSheet && asSheet.getLastRow() > 1) {
+    var aRows = asSheet.getDataRange().getValues();
+    for (var ai = 1; ai < aRows.length; ai++) {
+      var aType = String(aRows[ai][4]  || '').trim();   // E Type
+      var aProj = String(aRows[ai][2]  || '').trim();   // C ProjectName
+      var aBy   = String(aRows[ai][21] || '').trim();   // V AssignedBy
+      var aDate = cellDate(aRows[ai][9]);               // J AssignedDate
+      if (aBy.indexOf('CRM') !== 0) continue;           // created via CRM form
+      if (aType !== 'Meeting' && aType !== 'Site Visit') continue;
+      if (!aDate || aDate < mon || aDate > sat) continue;
+      if (aProj) connected[aProj.toLowerCase()] = true;
+    }
+  }
+
+  // A monthly client feedback collected this week also counts as a connection
+  var fbSheet = s.getSheetByName(FEEDBACK_TAB);
+  if (fbSheet && fbSheet.getLastRow() > 1) {
+    var fRows = fbSheet.getDataRange().getValues();
+    for (var fi = 1; fi < fRows.length; fi++) {
+      var fDate = cellDate(fRows[fi][2]);               // C Date Recorded
+      var fProj = String(fRows[fi][4] || '').trim();    // E Project
+      if (String(fRows[fi][3]||'').trim() !== who) continue; // D Recorded By
+      if (!fDate || fDate < mon || fDate > sat) continue;
+      if (fProj) connected[fProj.toLowerCase()] = true;
+    }
+  }
+
   var perProject = ongoing.map(function(p){
     return { project:p, connected: !!connected[p.toLowerCase()] };
   });
@@ -4247,8 +4277,6 @@ function getAmanWeeklyStats(weekStart, member) {
     connectedCount: connectedCount,
     leadsThisWeek : leadsThisWeek,
     leads24       : leads24,
-    billsRaised   : r1(billsRaised),
-    collected     : r1(collected),
     collectionPct : (collRatio === null) ? null : Math.round(collRatio*100),
     collectionTarget: COLLECTION_TARGET*100,
     dprDaysCount  : dprDaysCount,
