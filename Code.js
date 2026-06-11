@@ -140,6 +140,7 @@ function doGet(e) {
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
+  if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
   return respond({status: 'IDS DPR live'});
 }
@@ -159,6 +160,7 @@ function doPost(e) {
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
     if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
+    if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -4107,6 +4109,159 @@ function getDeepakWeeklyStats(weekStart) {
       s_client : s_client,
       s_tasks  : s_tasks,
       s_dper   : s_dper,
+      s_punct  : s_punct,
+      s_hrs    : s_hrs,
+      total    : total,
+    },
+  };
+}
+
+// ════════════════════════════════════════════════════════════════
+// getAmanWeeklyStats — CRM (Aman) weekly scorecard /100
+//   Output /50:
+//     Client Connection Coverage /20 — ongoing projects connected ÷ total
+//     Lead Management            /15 — leads 24hr-contacted ÷ new leads
+//     Revenue Collection         /15 — min(collected÷billsRaised, 70%)/70%
+//   DPR Consistency  /15 — AMAN_DAILY submission days ÷ 6
+//   Punctuality      /20 — biometric (same base as team)
+//   Hours            /15 — biometric (same base as team)
+// ════════════════════════════════════════════════════════════════
+function getAmanWeeklyStats(weekStart, member) {
+  var s   = db();
+  var mon = weekStart || dateStr(mondayOf(new Date()));
+  var sat = addDaysToStr(mon, 5);
+  var who = member || 'Aman Raghuwanshi';
+  var COLLECTION_TARGET = 0.70;  // 70% of bills raised cleared = full marks
+
+  // ── 1. Ongoing projects (denominator) — same filter as the CRM form ──
+  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
+  function isExcluded(stat){
+    stat = String(stat||'').toLowerCase();
+    for (var i=0;i<EXCL.length;i++){ if (stat.indexOf(EXCL[i]) > -1) return true; }
+    return false;
+  }
+  var ongoing = [];
+  var projSheet = s.getSheetByName(PROJECTS_TAB);
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pRows.length; pi++) {
+      var pName = String(pRows[pi][1]||'').trim();
+      if (!pName || isExcluded(pRows[pi][2])) continue;
+      ongoing.push(pName);
+    }
+  }
+  var totalOngoing = ongoing.length;
+
+  // ── 2. Client connections this week + DPR days (AMAN_DAILY) ──
+  var connected = {};      // project lower → true
+  var dprDaysSet = {};     // date → true
+  var dailySheet = s.getSheetByName(AMAN_DAILY_TAB);
+  if (dailySheet && dailySheet.getLastRow() > 1) {
+    var dRows = dailySheet.getDataRange().getValues();
+    for (var di = 1; di < dRows.length; di++) {
+      var dDate = cellDate(dRows[di][1]);          // B Date
+      var dMem  = String(dRows[di][3]||'').trim(); // D Member
+      if (dMem !== who) continue;
+      if (!dDate || dDate < mon || dDate > sat) continue;
+      dprDaysSet[dDate] = true;
+      var contacts = [];
+      try { contacts = JSON.parse(dRows[di][4] || '[]'); } catch(e){}  // E Client Contacts
+      contacts.forEach(function(c){
+        var pr = String((c && c.project) || '').trim();
+        if (pr) connected[pr.toLowerCase()] = true;
+      });
+    }
+  }
+  var perProject = ongoing.map(function(p){
+    return { project:p, connected: !!connected[p.toLowerCase()] };
+  });
+  var connectedCount = perProject.filter(function(p){ return p.connected; }).length;
+  var dprDaysCount   = Object.keys(dprDaysSet).length;
+
+  // ── 3. Leads this week + 24hr compliance (LEADS) ──
+  var leadsThisWeek = 0, leads24 = 0;
+  var leadsSheet = s.getSheetByName(LEADS_TAB);
+  if (leadsSheet && leadsSheet.getLastRow() > 1) {
+    var lRows = leadsSheet.getDataRange().getValues();
+    for (var li = 1; li < lRows.length; li++) {
+      var lDate = cellDate(lRows[li][7]);          // H Lead Creation Date
+      if (!lDate || lDate < mon || lDate > sat) continue;
+      leadsThisWeek++;
+      if (String(lRows[li][12]||'').trim() === 'Yes') leads24++;  // M 24hr Contact Done
+    }
+  }
+
+  // ── 4. Bills raised vs collected this week (BILLING) ──
+  var billsRaised = 0, collected = 0;
+  var billSheet = s.getSheetByName(BILLING_TAB);
+  if (billSheet && billSheet.getLastRow() > 1) {
+    var bRows = billSheet.getDataRange().getValues();
+    for (var bi = 1; bi < bRows.length; bi++) {
+      var billDate = cellDate(bRows[bi][2]);   // C Bill Date
+      var recdDate = cellDate(bRows[bi][5]);   // F Received Date
+      if (billDate && billDate >= mon && billDate <= sat)
+        billsRaised += parseFloat(bRows[bi][3]) || 0;  // D Bill Amount
+      if (recdDate && recdDate >= mon && recdDate <= sat)
+        collected += parseFloat(bRows[bi][4]) || 0;    // E Amount Received
+    }
+  }
+
+  // ── 5. Biometric from DAILY_SUMMARY (same as team) ──
+  var sumSheet = s.getSheetByName(SUMMARY_TAB);
+  var daysPresent = 0, lateCount = 0;
+  var THR = '09:10';
+  if (sumSheet && sumSheet.getLastRow() > 1) {
+    var smRows = sumSheet.getDataRange().getValues();
+    for (var mi = 1; mi < smRows.length; mi++) {
+      var rDate = cellDate(smRows[mi][0]);
+      var rName = String(smRows[mi][2]||'').trim();
+      if (rName !== who) continue;
+      if (!rDate || rDate < mon || rDate > sat) continue;
+      daysPresent++;
+      var arr = String(smRows[mi][1]||'').trim();
+      if (arr && arr > THR) lateCount++;
+    }
+  }
+  var absentDays = 6 - daysPresent;
+
+  // ── 6. Scores ──
+  function r1(n){ return Math.round(n*10)/10; }
+  var s_client = totalOngoing > 0 ? r1(connectedCount/totalOngoing*20) : 0;
+  var s_lead   = leadsThisWeek > 0 ? r1(leads24/leadsThisWeek*15) : 15;   // no leads → full
+  var collRatio= billsRaised > 0 ? collected/billsRaised : null;
+  var s_rev    = (collRatio === null) ? 15
+                 : r1(Math.min(collRatio, COLLECTION_TARGET)/COLLECTION_TARGET*15);
+  var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
+  var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
+  var s_punct  = Math.min(20, r1(punctBase/15*20));
+  var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
+  var s_hrs    = Math.min(15, r1(hrsBase/10*15));
+  var output   = r1(s_client + s_lead + s_rev);
+  var total    = r1(output + s_dpr + s_punct + s_hrs);
+
+  return {
+    member        : who,
+    weekStart     : mon,
+    weekEnd       : sat,
+    totalOngoing  : totalOngoing,
+    connectedCount: connectedCount,
+    leadsThisWeek : leadsThisWeek,
+    leads24       : leads24,
+    billsRaised   : r1(billsRaised),
+    collected     : r1(collected),
+    collectionPct : (collRatio === null) ? null : Math.round(collRatio*100),
+    collectionTarget: COLLECTION_TARGET*100,
+    dprDaysCount  : dprDaysCount,
+    daysPresent   : daysPresent,
+    lateCount     : lateCount,
+    absentDays    : absentDays,
+    perProject    : perProject,
+    scores: {
+      s_client : s_client,
+      s_lead   : s_lead,
+      s_rev    : s_rev,
+      output   : output,
+      s_dpr    : s_dpr,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
       total    : total,

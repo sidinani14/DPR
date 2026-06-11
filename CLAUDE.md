@@ -56,6 +56,20 @@
 - DPR tab: DAILY_SUMMARY — Date(A) Time(B) Member(C) Email(D)
 - DPER tab: SITE_EXECUTION — col E = Execution Lead name
 
+## Aman Raghuwanshi — CRM scoring (separate page in weekly report)
+- getAmanWeeklyStats(weekStart) — routes: getAmanWeeklyStats (GET+POST)
+- Output /50:
+  - Client Connection Coverage /20 = ongoing projects connected ÷ total ongoing × 20
+    (ongoing = PROJECTS not matching completed/closed/dead/cancelled/proposal/new lead;
+     connections read from AMAN_DAILY col E Client Contacts JSON, Mon–Sat)
+  - Lead Management /15 = leads 24hr-contacted ÷ new leads this week × 15 (no leads → full 15)
+    (LEADS col H creation date in week, col M = 'Yes')
+  - Revenue Collection /15 = min(collected ÷ billsRaised, 0.70) ÷ 0.70 × 15 (no bills → full 15)
+    (BILLING: bill amount where bill date in week vs amount received where received date in week)
+- DPR Consistency /15 = AMAN_DAILY submission days ÷ 6 × 15
+- Punctuality /20 + Hours /15 = biometric from DAILY_SUMMARY (same formulas as Deepak/team, Thr 09:10)
+- weeklyreport.html: buildAmanPage(d), fetched via getAmanWeeklyStats, pushed into team[] with _isAman
+
 ## Deepak Soni scoring (separate page in weekly report)
 - Site Visits: /20 (active sites visited ≥1× / total active sites)
 - Client Communication: /10 (sites with clientUpdated=Yes / total active sites)

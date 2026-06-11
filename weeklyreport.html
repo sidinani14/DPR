@@ -365,7 +365,7 @@ function buildOverviewPage(team){
     const rkc=i===0?'rk1':i===1?'rk2':i===2?'rk3':'rkx';
     rows+=`<tr>
       <td><span class="rk ${rkc}">${i+1}</span></td>
-      <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':ROLES[m.name]||''}</div></td>
+      <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_punct,20)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/20*100))}%;background:${sc(s.s_punct,20)}"></div></div></td>
@@ -608,23 +608,111 @@ function buildDeepakPage(d){
   </div>`;
 }
 
+// ── Aman (CRM) page ─────────────────────────────────────────
+function buildAmanPage(d){
+  if(!d) return '';
+  const sc2=(v,m)=>{const p=v/m;return p>=.85?'#2ED573':p>=.70?'#34A853':p>=.50?'#FBBC04':'#EA4335';};
+  const gc2=(v,m)=>{const p=v/m;return p>=.85?'g':p>=.70?'a':p>=.50?'o':'r';};
+  const gpc2=(v,m)=>{const p=v/m;return p>=.85?'pb-g':p>=.70?'pb-a':p>=.50?'pb-o':'pb-r';};
+  const pCard=(label,val,max,detail)=>{
+    const cl=gc2(val,max),pc=gpc2(val,max),col=sc2(val,max),pct=Math.round(val/max*100);
+    return `<div class="pc ${cl}">
+      <div class="pc-lbl">${label}</div>
+      <div class="pc-val" style="color:${col}" contenteditable="true">${val}<span class="pc-max">/${max}</span></div>
+      <div class="pc-det">${detail}</div>
+      <div class="pw"><div class="pb ${pc}" style="width:${pct}%"></div></div>
+    </div>`;
+  };
+  const s=d.scores;
+  const col=sc2(s.total,100);
+  const collDetail = d.collectionPct===null ? 'No bills raised this week — full marks'
+    : `${d.collectionPct}% collected · target ${d.collectionTarget}%`;
+  const leadDetail = d.leadsThisWeek===0 ? 'No new leads this week — full marks'
+    : `${d.leads24} of ${d.leadsThisWeek} leads contacted in 24 hrs`;
+
+  const projRows=d.perProject.length ? d.perProject.map(p=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+    <td style="font-size:9px;font-weight:600;padding:6px 8px">${p.project}</td>
+    <td style="text-align:center;padding:6px 8px"><span style="color:${p.connected?'#2ED573':'#EA4335'};font-weight:700;font-size:11px">${p.connected?'✓':'✗'}</span></td>
+  </tr>`).join('') : `<tr><td colspan="2" style="padding:10px 8px;font-size:8.5px;color:rgba(255,255,255,0.35);text-align:center">No ongoing projects found</td></tr>`;
+
+  return `<div class="page">
+    ${hdr()}
+    <div class="ind-top">
+      <div>
+        <div class="ind-name">Aman Raghuwanshi</div>
+        <div class="ind-role">CRM &nbsp;·&nbsp; Client Relations &amp; Revenue</div>
+        <div class="ind-week-lbl">Week of ${WEEK_LABEL} · Ideaform Design Studio</div>
+        <div class="stats-row">
+          <div class="stat-chip"><div class="stat-val">${d.connectedCount}/${d.totalOngoing}</div><div class="stat-lbl">Clients<br>Connected</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.leads24}/${d.leadsThisWeek}</div><div class="stat-lbl">Leads<br>24h</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.collectionPct===null?'—':d.collectionPct+'%'}</div><div class="stat-lbl">Collection<br>Rate</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.dprDaysCount}/6</div><div class="stat-lbl">DPR<br>Days</div></div>
+          <div class="stat-chip"><div class="stat-val">${d.daysPresent}/6</div><div class="stat-lbl">Days<br>Present</div></div>
+          <div class="stat-chip"><div class="stat-val" style="color:${d.lateCount>0?'#FBBC04':'#2ED573'}">${d.lateCount}</div><div class="stat-lbl">Late<br>Arrivals</div></div>
+        </div>
+      </div>
+      <div class="score-box">
+        <div class="sc-lbl">Overall Score</div>
+        <div class="sc-num" style="color:${col}" contenteditable="true">${s.total}<span class="sc-den">/100</span></div>
+        <div style="margin-top:6px"><span class="chip ${chip(s.total)}">${chipLabel(s.total)}</span></div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
+    <div class="pg">
+      ${pCard('Client<br>Connections',s.s_client,20,`${d.connectedCount} of ${d.totalOngoing} ongoing clients connected ≥1×`)}
+      ${pCard('Lead<br>Management',s.s_lead,15,leadDetail)}
+      ${pCard('Revenue<br>Collection',s.s_rev,15,collDetail)}
+      ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of 6 days · ≥1 CRM report/day`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,20,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,15,`${d.daysPresent}/6 days present`)}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:4mm;margin-top:4mm">
+      <div>
+        <div class="section-title" style="margin-bottom:2mm">Client Connection — Per Ongoing Project</div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:rgba(245,166,35,0.12)">
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
+            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Connected</th>
+          </tr></thead>
+          <tbody>${projRows}</tbody>
+        </table>
+      </div>
+      <div>
+        <div class="section-title" style="margin-bottom:2mm">Revenue Summary</div>
+        <table style="width:100%;border-collapse:collapse;font-size:9px">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Bills Raised</td><td style="padding:7px 8px;text-align:right;font-weight:700">₹${(d.billsRaised||0).toLocaleString('en-IN')}</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collected</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">₹${(d.collected||0).toLocaleString('en-IN')}</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.collectionPct===null?'—':d.collectionPct+'%'}</td></tr>
+          <tr><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">New Leads</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── Main render ────────────────────────────────────────────
 async function loadAndRender(){
   const app = document.getElementById('app');
-  let statsMap = {}, deepakStats = null;
+  let statsMap = {}, deepakStats = null, amanStats = null;
 
   if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
     try {
-      const [res, dRes] = await Promise.all([
+      const [res, dRes, aRes] = await Promise.all([
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
           body: JSON.stringify({action:'getWeeklyStats', weekStart:WEEK_START})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
           body: JSON.stringify({action:'getDeepakWeeklyStats', weekStart:WEEK_START})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({action:'getAmanWeeklyStats', weekStart:WEEK_START})}),
       ]);
       const data  = await res.json();
       const dData = await dRes.json();
+      const aData = await aRes.json();
       if (data.stats)  data.stats.forEach(s => { statsMap[s.name] = s; });
       if (dData.scores) deepakStats = dData;
+      if (aData.scores) amanStats = aData;
     } catch(e) {
       console.warn('Could not fetch stats:', e);
     }
@@ -655,12 +743,29 @@ async function loadAndRender(){
     });
   }
 
+  // Add Aman (CRM) — output /50 = client connections + lead mgmt + revenue
+  if (amanStats && amanStats.scores) {
+    const as = amanStats.scores;
+    team.push({
+      name      : 'Aman Raghuwanshi',
+      _isAman   : true,
+      _amanData : amanStats,
+      _sc: {
+        s_output: as.output,
+        s_dpr   : as.s_dpr,
+        s_punct : as.s_punct,
+        s_hrs   : as.s_hrs,
+        total   : as.total,
+      },
+    });
+  }
+
   const sorted = [...team].sort((a,b)=>b._sc.total-a._sc.total);
   let outHtml = buildOverviewPage(sorted);
   sorted.forEach(m => {
-    outHtml += m._isDeepak
-      ? buildDeepakPage(m._deepakData)
-      : buildIndividualPage(m, m._taskData);
+    outHtml += m._isDeepak ? buildDeepakPage(m._deepakData)
+             : m._isAman   ? buildAmanPage(m._amanData)
+             : buildIndividualPage(m, m._taskData);
   });
   app.innerHTML = outHtml;
 }
