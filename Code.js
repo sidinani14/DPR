@@ -4837,6 +4837,8 @@ function getIssuesByReporter(member, useFallback) {
 
     var issStatus  = String(r[10] || '').trim();
     var resolvedDt = String(r[13] || '').substring(0, 10);
+    // Blocked / Void / Invalid / Cancelled issues are erased from the open list
+    if (['Blocked','Void','Invalid','Cancelled'].indexOf(issStatus) > -1) continue;
     if (issStatus === 'Resolved' && resolvedDt < sevenAgo) continue;
 
     issues.push({
@@ -4954,6 +4956,7 @@ function submitAmanCRM(data) {
     var activities  = {};
     var newIssues   = [];
     var feedback    = [];
+    var newProjects = [];
     try { newLeads    = JSON.parse(data.newLeads     || '[]'); } catch(e){}
     try { leadFollows = JSON.parse(data.leadFollowups|| '[]'); } catch(e){}
     try { contacts    = JSON.parse(data.contacts     || '[]'); } catch(e){}
@@ -4962,6 +4965,10 @@ function submitAmanCRM(data) {
     try { activities  = JSON.parse(data.activities    || '{}'); } catch(e){}
     try { newIssues   = JSON.parse(data.newIssues    || '[]'); } catch(e){}
     try { feedback    = JSON.parse(data.feedback     || '[]'); } catch(e){}
+    try { newProjects = JSON.parse(data.newProjects  || '[]'); } catch(e){}
+
+    // ── 0. Create any new projects CRM added (PROJECTS tab) ───
+    if (newProjects.length > 0) createCrmProjects(newProjects);
 
     // Tag each issue with the reporter so SITE_ISSUES col O is correct
     newIssues.forEach(function(iss){ iss.reportedBy = iss.reportedBy || member; });
@@ -5031,9 +5038,19 @@ function submitAmanCRM(data) {
       });
     }
 
-    // ── 4. Write new CRM issues to SITE_ISSUES ────────────────
+    // ── 4. New issues vs design deliverables ──────────────────
+    // Issues → SITE_ISSUES (show in CRM open-issues panel).
+    // Deliverables → TASK_ASSIGNMENTS only (NOT the open-issues panel).
     if (newIssues.length > 0) {
-      writeSiteIssues(subId, today, '', newIssues, 'Yes', member);
+      var realIssues = [], deliverables = [];
+      newIssues.forEach(function(iss){
+        if (iss.kind === 'Deliverable') deliverables.push(iss); else realIssues.push(iss);
+      });
+      if (realIssues.length) writeSiteIssues(subId, today, '', realIssues, 'Yes', member);
+      var asD = db().getSheetByName(ASSIGN_TAB);
+      if (asD) deliverables.forEach(function(d){
+        if (d.assignedTo && d.description) createIssueTask(d, d.project || '', today, 'Yes');
+      });
     }
 
     // ── 5. Write monthly client feedback to FEEDBACK ──────────
@@ -5090,6 +5107,28 @@ var CRM_PROMOTE_STAGES = ['Briefing Meeting Done','Design Proposal Shared',
 function isPromoteLeadStage(status) {
   return CRM_PROMOTE_STAGES.indexOf(String(status||'').trim()) > -1;
 }
+// CRM adds projects not yet in the PROJECTS tab (name + type + stage + client).
+// Persists them so Aman can raise issues/deliverables without Siddharth's help.
+//   PROJECTS cols: A ID, B Name, C Status(stage), D Discipline(type), E Mult, F Lead, G Client
+function createCrmProjects(list) {
+  if (!list || !list.length) return;
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  if (!projSheet) return;
+  var rows = projSheet.getDataRange().getValues();
+  // Ensure a "Client" header exists in col G
+  if (rows.length && String(rows[0][6]||'').trim() === '') projSheet.getRange(1,7).setValue('Client');
+  var existing = {};
+  for (var i = 1; i < rows.length; i++) existing[String(rows[i][1]||'').trim().toLowerCase()] = true;
+  list.forEach(function(np){
+    var nm = String(np.name||'').trim();
+    if (!nm || existing[nm.toLowerCase()]) return;
+    var pid = nextId(projSheet, 'CP-');
+    projSheet.appendRow([ pid, nm, np.stage || 'Ongoing', np.type || '', '', '', np.client || '' ]);
+    existing[nm.toLowerCase()] = true;
+    Logger.log('CRM added project: ' + nm + ' (' + pid + ')');
+  });
+}
+
 function promoteLeadToProject(clientName, member) {
   var nm = String(clientName||'').trim();
   if (!nm) return false;

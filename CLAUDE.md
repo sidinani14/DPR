@@ -157,6 +157,15 @@
 - F: Lead Status, G: Contacted By, H: Lead Creation Date, I: Last Contacted
 - J: Lead Manager, K: Remarks, L: Lost Reasons, M: 24hr Contact Done (Pending/Yes/No)
 
+## CRM form — recent additions (Aman feedback)
+- Add New Project: Section 4 captures name + type(discipline from getConfig) + stage + client;
+  createCrmProjects() writes PROJECTS rows [CP-id, name, stage, type, '', '', client] (col G = Client).
+- Issue actions now include "Blocked" (status 'Blocked'); getIssuesByReporter excludes
+  Blocked/Void/Invalid/Cancelled from the open list (erases invalid issues).
+- Design Deliverables (kind='Deliverable') go to TASK_ASSIGNMENTS only — NOT SITE_ISSUES,
+  so they don't appear in the CRM open-issues panel. Only kind='Issue' writes to SITE_ISSUES.
+- PROJECTS col G = Client (added) — foundation for client-level monthly feedback KPI.
+
 ## SITE_ISSUES — col O added: Reported By (Deepak Soni / Aman Raghuwanshi)
 - Used by getIssuesByReporter(member, useFallback) to filter issues per person's form
 - getDeepakIssues → useFallback=true (matches blank col O via Assigned To, for legacy rows)

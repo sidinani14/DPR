@@ -122,6 +122,8 @@ textarea{min-height:62px;resize:vertical;}
 .ia-resolve{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .ia-escalate{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
 .ia-delay{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+.ia-block{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
+.ics-block{background:var(--surface2);color:var(--text3);}
 .ia-btn:disabled{opacity:.4;cursor:not-allowed;}
 .delay-row{display:none;margin-top:7px;gap:7px;align-items:center;}
 .delay-row.open{display:flex;}
@@ -329,6 +331,25 @@ textarea{min-height:62px;resize:vertical;}
     </div>
     <div class="section-body">
       <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Log CRM blockers, finance holds, client escalations — or request a <b>design deliverable</b> from the team (drawing, 3D, proposal). Assign to a team member with a target date; design items create a task automatically.</p>
+
+      <!-- Add a project not yet in the system -->
+      <button type="button" class="add-btn blue" onclick="toggleNewProj()" style="margin-bottom:8px">+ Project not in the list?</button>
+      <div id="np-form" class="hidden" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px;margin-bottom:12px">
+        <div class="field-row">
+          <div class="field"><span class="lbl" style="font-size:10px">Project Name <span style="color:var(--red)">*</span></span><input type="text" id="np-name" placeholder="New project name…"></div>
+          <div class="field"><span class="lbl" style="font-size:10px">Client <span class="opt">groups projects</span></span><input type="text" id="np-client" placeholder="Client name…"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><span class="lbl" style="font-size:10px">Type</span><select id="np-type"><option value="">Select…</option></select></div>
+          <div class="field"><span class="lbl" style="font-size:10px">Stage</span><select id="np-stage">
+            <option value="Ongoing">Ongoing</option><option value="New Lead">New Lead</option>
+            <option value="Proposal">Proposal</option><option value="On Hold">On Hold</option>
+          </select></div>
+        </div>
+        <button type="button" class="add-btn green" onclick="addNewProject()">✓ Add to Projects</button>
+        <div id="np-added" style="font-size:11px;color:var(--green);margin-top:7px"></div>
+      </div>
+
       <div id="new-iss-blocks"></div>
       <button class="add-btn teal" id="add-iss-btn" onclick="addNewIssue()" disabled>+ Add Issue / Deliverable</button>
     </div>
@@ -574,6 +595,8 @@ let agendaCount = 0;
 let issCount    = 0;
 let issueActions= {};
 let openLeads   = [];
+let newProjects = [];
+let disciplines = [];
 
 // ════════════════════════════════════════
 // AUTH
@@ -599,14 +622,39 @@ function onGoogleSignIn(resp) {
 // ════════════════════════════════════════
 async function loadProjects() {
   try {
-    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'getLists'})});
-    const d = await r.json();
+    const [lr, cr] = await Promise.all([
+      fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})}),
+      fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getConfig'})}),
+    ]);
+    const d = await lr.json();
     const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
     projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
+    try { const cfg = await cr.json(); disciplines = (cfg.disciplines||[]).map(x=>x.label).filter(Boolean); } catch(e){}
+    populateTypeDropdown();
     refreshProjectDropdowns();
     buildMsels();
   } catch(e){ toast('Could not load projects'); }
+}
+
+function populateTypeDropdown(){
+  const sel=document.getElementById('np-type'); if(!sel) return;
+  const opts = disciplines.length ? disciplines : ['Architecture','Interior','Architecture + Interior','PMC','Consultation'];
+  sel.innerHTML = '<option value="">Select…</option>'+opts.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+}
+
+function toggleNewProj(){ document.getElementById('np-form').classList.toggle('hidden'); }
+
+function addNewProject(){
+  const name=(document.getElementById('np-name').value||'').trim();
+  if(!name){ toast('Enter a project name'); return; }
+  if(projects.some(p=>p.name.toLowerCase()===name.toLowerCase())){ toast('Project already exists'); return; }
+  const np={ name, client:(document.getElementById('np-client').value||'').trim(),
+             type:document.getElementById('np-type').value||'', stage:document.getElementById('np-stage').value||'Ongoing' };
+  newProjects.push(np);
+  projects.push({name:name, status:np.stage, discipline:np.type});   // usable immediately
+  refreshProjectDropdowns(); buildMsels();
+  document.getElementById('np-added').innerHTML = `✓ Added: ${newProjects.map(p=>esc(p.name)).join(', ')} — now selectable below`;
+  ['np-name','np-client'].forEach(id=>document.getElementById(id).value='');
 }
 
 function projOptionsHtml(){
@@ -714,10 +762,10 @@ function renderIssues(issues) {
   let html='';
   [...open].sort((a,b)=>b.priority-a.priority).forEach(iss=>{
     const act=issueActions[iss.issueId];
-    const isRes=act?.action==='resolve', isEsc=act?.action==='escalate';
-    const sLabel=isRes?'✓ Resolved':isEsc?'🔴 Escalated':iss.status;
-    const sCls  =isRes?'ics-res':isEsc?'ics-esc':'ics-open';
-    html+=`<div class="issue-card${isEsc?' escalated':''}${isRes?' resolved-pending':''}" id="ic-${iss.issueId}">
+    const isRes=act?.action==='resolve', isEsc=act?.action==='escalate', isBlk=act?.action==='block';
+    const sLabel=isRes?'✓ Resolved':isEsc?'🔴 Escalated':isBlk?'🚫 Invalid':iss.status;
+    const sCls  =isRes?'ics-res':isEsc?'ics-esc':isBlk?'ics-block':'ics-open';
+    html+=`<div class="issue-card${isEsc?' escalated':''}${(isRes||isBlk)?' resolved-pending':''}" id="ic-${iss.issueId}">
       <div class="ic-top">
         <span class="issue-type-badge ${issTypeClass(iss.issueType)}">${iss.issueType}</span>
         <span class="ic-proj">${iss.project}</span>
@@ -729,6 +777,7 @@ function renderIssues(issues) {
         <button class="ia-btn ia-resolve" onclick="issAction('${iss.issueId}','resolve',this)" ${isRes?'disabled':''}>✓ Resolve</button>
         <button class="ia-btn ia-escalate" onclick="issAction('${iss.issueId}','escalate',this)" ${isEsc?'disabled':''}>🔴 Escalate</button>
         <button class="ia-btn ia-delay" onclick="toggleDelay('${iss.issueId}')">📅 Delay</button>
+        <button class="ia-btn ia-block" onclick="issAction('${iss.issueId}','block',this)" ${isBlk?'disabled':''}>🚫 Invalid</button>
       </div>
       <div class="delay-row" id="dr-${iss.issueId}">
         <input type="date" id="dd-${iss.issueId}" style="flex:1;padding:7px 10px;font-size:12px">
@@ -763,16 +812,19 @@ function issAction(issueId, action, btn) {
   }
   issueActions[issueId]={action,targetDate:''};
   const card=document.getElementById('ic-'+issueId);
+  const st=card.querySelector('.ic-status');
   if(action==='resolve'){
     card.classList.add('resolved-pending');
     btn.textContent='✓ Resolved'; btn.disabled=true;
-    card.querySelector('.ic-status').textContent='✓ Resolved';
-    card.querySelector('.ic-status').className='ic-status ics-res';
+    st.textContent='✓ Resolved'; st.className='ic-status ics-res';
+  } else if(action==='block'){
+    card.classList.add('resolved-pending');
+    btn.textContent='🚫 Invalid'; btn.disabled=true;
+    st.textContent='🚫 Invalid'; st.className='ic-status ics-block';
   } else {
     card.classList.add('escalated');
     btn.textContent='🔴 Escalated'; btn.disabled=true;
-    card.querySelector('.ic-status').textContent='🔴 Escalated';
-    card.querySelector('.ic-status').className='ic-status ics-esc';
+    st.textContent='🔴 Escalated'; st.className='ic-status ics-esc';
   }
 }
 function toggleDelay(id){ document.getElementById('dr-'+id).classList.toggle('open'); }
@@ -1529,7 +1581,7 @@ async function submitAll() {
   try {
     // 1. Issue status updates
     for(const [issueId, act] of Object.entries(issueActions)){
-      const newStatus=act.action==='resolve'?'Resolved':act.action==='escalate'?'Escalated':'Open';
+      const newStatus=act.action==='resolve'?'Resolved':act.action==='escalate'?'Escalated':act.action==='block'?'Blocked':'Open';
       await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({action:'updateIssueStatus',issueId,status:newStatus,targetDate:act.targetDate||''})});
     }
@@ -1557,6 +1609,7 @@ async function submitAll() {
         activities  : JSON.stringify(activities),
         newIssues   : JSON.stringify(newIssues),
         feedback    : JSON.stringify(feedback),
+        newProjects : JSON.stringify(newProjects),
       })});
     const resp = await r.json();
     if(resp.status!=='ok') throw new Error(resp.message||'Submission failed');
@@ -1607,7 +1660,9 @@ function resetForm() {
   document.getElementById('wa-list').innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
   leadCount=contCount=agendaCount=issCount=payCount=billCount=fbCount=0;
   actEntryCount.vendor=actEntryCount.siteissues=actEntryCount.tncp=actEntryCount.bni=0;
-  issueActions={}; openLeads=[];
+  issueActions={}; openLeads=[]; newProjects=[];
+  document.getElementById('np-added').innerHTML='';
+  document.getElementById('np-form').classList.add('hidden');
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('submit-status').textContent=crmUser;
   loadIssues();
