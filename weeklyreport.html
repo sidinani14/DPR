@@ -680,10 +680,12 @@ function buildAmanPage(d){
         </table>
       </div>
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Revenue &amp; Leads</div>
+        <div class="section-title" style="margin-bottom:2mm">Weekly Activity</div>
         <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(255,255,255,0.4);font-weight:400"> · target ${d.collectionTarget}%</span></td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">🏗️ Site Visits Done</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.visitsDone||0}</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">👥 Meetings Done</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.meetingsDone||0}</td></tr>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Clients Connected</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.connectedCount} / ${d.totalOngoing}</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(255,255,255,0.4);font-weight:400"> · target ${d.collectionTarget}%</span></td></tr>
           <tr><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">New Leads</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
         </table>
       </div>

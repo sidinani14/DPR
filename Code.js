@@ -4157,6 +4157,7 @@ function getAmanWeeklyStats(weekStart, member) {
   // ── 2. Client connections this week + DPR days (AMAN_DAILY) ──
   var connected = {};      // project lower → true
   var dprDaysSet = {};     // date → true
+  var visitsDone = 0, meetingsDone = 0;  // derived from contact type
   var dailySheet = s.getSheetByName(AMAN_DAILY_TAB);
   if (dailySheet && dailySheet.getLastRow() > 1) {
     var dRows = dailySheet.getDataRange().getValues();
@@ -4171,6 +4172,9 @@ function getAmanWeeklyStats(weekStart, member) {
       contacts.forEach(function(c){
         var pr = String((c && c.project) || '').trim();
         if (pr) connected[pr.toLowerCase()] = true;
+        var ty = String((c && c.type) || '');
+        if (ty.indexOf('Site Visit') > -1)   visitsDone++;
+        else if (ty.indexOf('Meeting') > -1) meetingsDone++;
       });
     }
   }
@@ -4277,6 +4281,8 @@ function getAmanWeeklyStats(weekStart, member) {
     weekEnd       : sat,
     totalOngoing  : totalOngoing,
     connectedCount: connectedCount,
+    visitsDone    : visitsDone,
+    meetingsDone  : meetingsDone,
     leadsThisWeek : leadsThisWeek,
     leads24       : leads24,
     collectionPct : (collRatio === null) ? null : Math.round(collRatio*100),
