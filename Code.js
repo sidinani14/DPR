@@ -4214,31 +4214,43 @@ function getAmanWeeklyStats(weekStart, member) {
   var connectedCount = perProject.filter(function(p){ return p.connected; }).length;
   var dprDaysCount   = Object.keys(dprDaysSet).length;
 
-  // ── 3. Leads this week + 24hr compliance (LEADS) ──
-  var leadsThisWeek = 0, leads24 = 0;
+  // ── 3. Lead pipeline (LEADS) ──
+  // Score = open leads worked this week ÷ leads that needed attention.
+  // "needed attention" = open leads (Not Contacted / Contacted over call)
+  // plus any lead touched this week (Last Contacted in week). Untouched open
+  // leads drag the score down; if no leads need attention at all → N/A.
+  var OPEN_LEAD = ['', 'Not Contacted', 'Contacted over call'];
+  var leadWorked = 0, leadOpenUntouched = 0;
+  var leadsThisWeek = 0, leads24 = 0;   // kept for display only
   var leadsSheet = s.getSheetByName(LEADS_TAB);
   if (leadsSheet && leadsSheet.getLastRow() > 1) {
     var lRows = leadsSheet.getDataRange().getValues();
     for (var li = 1; li < lRows.length; li++) {
-      var lDate = cellDate(lRows[li][7]);          // H Lead Creation Date
-      if (!lDate || lDate < mon || lDate > sat) continue;
-      leadsThisWeek++;
-      if (String(lRows[li][12]||'').trim() === 'Yes') leads24++;  // M 24hr Contact Done
+      var lStatus  = String(lRows[li][5] || '').trim();   // F Lead Status
+      var lLast    = cellDate(lRows[li][8]);              // I Last Contacted
+      var lCreated = cellDate(lRows[li][7]);              // H Lead Creation Date
+      var isOpen   = OPEN_LEAD.indexOf(lStatus) > -1;
+      var touched  = lLast && lLast >= mon && lLast <= sat;
+      if (touched) leadWorked++;
+      else if (isOpen) leadOpenUntouched++;
+      if (lCreated && lCreated >= mon && lCreated <= sat) {
+        leadsThisWeek++;
+        if (String(lRows[li][12]||'').trim() === 'Yes') leads24++;  // M 24hr Contact Done
+      }
     }
   }
+  var leadBase = leadWorked + leadOpenUntouched;
 
-  // ── 4. Bills raised vs collected this week (BILLING) ──
-  var billsRaised = 0, collected = 0;
+  // ── 4. Collection vs total outstanding (BILLING, cumulative) ──
+  // Collection rate = total collected ÷ total billed (all time). Old unpaid
+  // bills lower it — no free marks for a quiet week. Nothing billed → N/A.
+  var totalBilled = 0, totalCollected = 0;
   var billSheet = s.getSheetByName(BILLING_TAB);
   if (billSheet && billSheet.getLastRow() > 1) {
     var bRows = billSheet.getDataRange().getValues();
     for (var bi = 1; bi < bRows.length; bi++) {
-      var billDate = cellDate(bRows[bi][2]);   // C Bill Date
-      var recdDate = cellDate(bRows[bi][5]);   // F Received Date
-      if (billDate && billDate >= mon && billDate <= sat)
-        billsRaised += parseFloat(bRows[bi][3]) || 0;  // D Bill Amount
-      if (recdDate && recdDate >= mon && recdDate <= sat)
-        collected += parseFloat(bRows[bi][4]) || 0;    // E Amount Received
+      totalBilled    += parseFloat(bRows[bi][3]) || 0;   // D Bill Amount
+      totalCollected += parseFloat(bRows[bi][4]) || 0;   // E Amount Received
     }
   }
 
@@ -4262,17 +4274,28 @@ function getAmanWeeklyStats(weekStart, member) {
 
   // ── 6. Scores ──
   function r1(n){ return Math.round(n*10)/10; }
-  var s_client = totalOngoing > 0 ? r1(connectedCount/totalOngoing*20) : 0;
-  var s_lead   = leadsThisWeek > 0 ? r1(leads24/leadsThisWeek*15) : 15;   // no leads → full
-  var collRatio= billsRaised > 0 ? collected/billsRaised : null;
-  var s_rev    = (collRatio === null) ? 15
-                 : r1(Math.min(collRatio, COLLECTION_TARGET)/COLLECTION_TARGET*15);
+
+  // Output components — each is "active" only if there's something to measure.
+  // N/A components are excluded and the output is rescaled across active ones.
+  var clientActive = totalOngoing > 0;
+  var leadActive   = leadBase > 0;
+  var revActive    = totalBilled > 0;
+
+  var s_client = clientActive ? r1(connectedCount/totalOngoing*20) : 0;
+  var s_lead   = leadActive   ? r1(leadWorked/leadBase*15) : 0;
+  var collRatio= revActive    ? totalCollected/totalBilled : null;
+  var s_rev    = revActive
+                 ? r1(Math.min(collRatio, COLLECTION_TARGET)/COLLECTION_TARGET*15) : 0;
+
+  var activeMax   = (clientActive?20:0) + (leadActive?15:0) + (revActive?15:0);
+  var activeScore = (clientActive?s_client:0) + (leadActive?s_lead:0) + (revActive?s_rev:0);
+  var output      = activeMax > 0 ? r1(activeScore/activeMax*50) : 0;
+
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
   var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
   var s_punct  = Math.min(20, r1(punctBase/15*20));
   var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
   var s_hrs    = Math.min(15, r1(hrsBase/10*15));
-  var output   = r1(s_client + s_lead + s_rev);
   var total    = r1(output + s_dpr + s_punct + s_hrs);
 
   return {
@@ -4285,8 +4308,13 @@ function getAmanWeeklyStats(weekStart, member) {
     meetingsDone  : meetingsDone,
     leadsThisWeek : leadsThisWeek,
     leads24       : leads24,
+    leadWorked    : leadWorked,
+    leadBase      : leadBase,
     collectionPct : (collRatio === null) ? null : Math.round(collRatio*100),
     collectionTarget: COLLECTION_TARGET*100,
+    clientActive  : clientActive,
+    leadActive    : leadActive,
+    revActive     : revActive,
     dprDaysCount  : dprDaysCount,
     daysPresent   : daysPresent,
     lateCount     : lateCount,

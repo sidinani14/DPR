@@ -625,10 +625,19 @@ function buildAmanPage(d){
   };
   const s=d.scores;
   const col=sc2(s.total,100);
-  const collDetail = d.collectionPct===null ? 'No bills raised this week — full marks'
-    : `${d.collectionPct}% collected · target ${d.collectionTarget}%`;
-  const leadDetail = d.leadsThisWeek===0 ? 'No new leads this week — full marks'
-    : `${d.leads24} of ${d.leadsThisWeek} leads contacted in 24 hrs`;
+  const naCard=(label,detail)=>`<div class="pc" style="opacity:.5">
+    <div class="pc-lbl">${label}</div>
+    <div class="pc-val" style="color:rgba(255,255,255,0.45)">N/A</div>
+    <div class="pc-det">${detail}</div>
+    <div class="pw"><div class="pb" style="width:0%"></div></div>
+  </div>`;
+  const collDetail = `${d.collectionPct===null?'—':d.collectionPct+'%'} of all billed collected · target ${d.collectionTarget}%`;
+  const leadDetail = `${d.leadWorked} of ${d.leadBase} open leads worked this week`;
+  const clientDetail = `${d.connectedCount} of ${d.totalOngoing} clients engaged (connect / meeting / visit / feedback)`;
+  const excluded = [!d.clientActive&&'Client', !d.leadActive&&'Leads', !d.revActive&&'Revenue'].filter(Boolean);
+  const rescaleNote = excluded.length
+    ? ` <span style="font-size:7px;color:rgba(255,255,255,0.4);font-weight:400;text-transform:none;letter-spacing:0">· output rescaled across active metrics (${excluded.join(', ')} N/A)</span>`
+    : '';
 
   const projRows=d.perProject.length ? d.perProject.map(p=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
     <td style="font-size:9px;font-weight:600;padding:6px 8px">${p.project}</td>
@@ -658,11 +667,11 @@ function buildAmanPage(d){
       </div>
     </div>
 
-    <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
+    <div class="section-title" style="margin-bottom:2mm">Score Breakdown${rescaleNote}</div>
     <div class="pg">
-      ${pCard('Client<br>Connections',s.s_client,20,`${d.connectedCount} of ${d.totalOngoing} clients engaged (connect / meeting / visit / feedback)`)}
-      ${pCard('Lead<br>Management',s.s_lead,15,leadDetail)}
-      ${pCard('Revenue<br>Collection',s.s_rev,15,collDetail)}
+      ${d.clientActive ? pCard('Client<br>Connections',s.s_client,20,clientDetail) : naCard('Client<br>Connections','No ongoing projects — excluded')}
+      ${d.leadActive ? pCard('Lead<br>Management',s.s_lead,15,leadDetail) : naCard('Lead<br>Management','No open leads — excluded')}
+      ${d.revActive ? pCard('Revenue<br>Collection',s.s_rev,15,collDetail) : naCard('Revenue<br>Collection','Nothing billed yet — excluded')}
       ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of 6 days · ≥1 CRM report/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,20,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,15,`${d.daysPresent}/6 days present`)}
@@ -685,7 +694,8 @@ function buildAmanPage(d){
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">🏗️ Site Visits Done</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.visitsDone||0}</td></tr>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">👥 Meetings Done</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.meetingsDone||0}</td></tr>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Clients Connected</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.connectedCount} / ${d.totalOngoing}</td></tr>
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(255,255,255,0.4);font-weight:400"> · target ${d.collectionTarget}%</span></td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Open Leads Worked</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadWorked} / ${d.leadBase}</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#2ED573">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(255,255,255,0.4);font-weight:400"> · of all billed</span></td></tr>
           <tr><td style="padding:7px 8px;color:rgba(255,255,255,0.7)">New Leads</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
         </table>
       </div>
