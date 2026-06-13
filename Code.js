@@ -142,6 +142,7 @@ function doGet(e) {
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
+  if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
   return respond({status: 'IDS DPR live'});
 }
@@ -5141,6 +5142,83 @@ function submitAmanCRM(data) {
     Logger.log('submitAmanCRM error: ' + String(err));
     return {status:'error', message:String(err)};
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// migrateAmanDailyToTabs — one-time, non-destructive migration of the
+// old JSON-blob AMAN_DAILY into the new split format.
+//   - Backs up the original tab (renamed AMAN_DAILY_OLD_<timestamp>)
+//   - Rebuilds a slim AMAN_DAILY (8-col index)
+//   - Fills CLIENT_CONNECTIONS (row per contact) + ACTIVITIES (row per entry)
+// Header-name based, so it works regardless of the old column layout.
+// Safe to re-run: aborts if AMAN_DAILY is already in the new (no-JSON) format.
+// ════════════════════════════════════════════════════════════════
+function migrateAmanDailyToTabs() {
+  var s   = db();
+  var old = s.getSheetByName(AMAN_DAILY_TAB);
+  if (!old || old.getLastRow() < 2) return {status:'nothing to migrate (no AMAN_DAILY data)'};
+
+  var rows = old.getDataRange().getValues();
+  var hdr  = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });
+  function colIdx(sub){ for (var i=0;i<hdr.length;i++){ if (hdr[i].indexOf(sub.toLowerCase())>-1) return i; } return -1; }
+
+  var iContacts = colIdx('client contacts');
+  var iVendorOn = colIdx('vendor coordination'), iVendorE = colIdx('vendor entries');
+  var iSiteOn   = colIdx('site issues addressed'), iSiteE = colIdx('site issue entries');
+  var iTncpOn   = colIdx('tncp coordination'),   iTncpE  = colIdx('tncp entries');
+  var iBniOn    = colIdx('bni activity');
+
+  // Already migrated? (new format has no JSON columns)
+  if (iContacts < 0 && iVendorE < 0 && iSiteE < 0 && iTncpE < 0)
+    return {status:'AMAN_DAILY already in new format — nothing to migrate'};
+
+  function pj(v){ try { var x = JSON.parse(v); return (x && x.length) ? x : []; } catch(e){ return []; } }
+  function dstr(v){ return (v instanceof Date) ? dateStr(v) : String(v||'').substring(0,10); }
+  function pad(n){ return ('000'+n).slice(-3); }
+
+  var dailyOut=[], connOut=[], actOut=[];
+  var connN=0, actN=0;
+  for (var r=1; r<rows.length; r++){
+    var row = rows[r];
+    var subId = String(row[0]||'');
+    if (subId.indexOf('CRM-') !== 0) continue;
+    var date = dstr(row[1]), time = String(row[2]||''), member = String(row[3]||'');
+    var vOn = iVendorOn>-1 ? String(row[iVendorOn]||'No') : 'No';
+    var sOn = iSiteOn>-1   ? String(row[iSiteOn]||'No')   : 'No';
+    var tOn = iTncpOn>-1   ? String(row[iTncpOn]||'No')   : 'No';
+    var bOn = iBniOn>-1    ? String(row[iBniOn]||'No')    : 'No';
+
+    dailyOut.push([subId, date, time, member, vOn, sOn, tOn, bOn]);
+
+    if (iContacts>-1) pj(row[iContacts]).forEach(function(c){
+      connOut.push(['CONN-'+pad(++connN), subId, date, member, c.project||'', c.type||'', c.notes||'']);
+    });
+    function pushAct(label, idx){
+      if (idx<0) return;
+      pj(row[idx]).forEach(function(e){
+        actOut.push(['ACT-'+pad(++actN), subId, date, member, label, e.project||'', e.notes||'']);
+      });
+    }
+    pushAct('Vendor Coordination', iVendorE);
+    pushAct('Site Issues Addressed', iSiteE);
+    pushAct('TnCP Coordination', iTncpE);
+    if (String(bOn).toLowerCase()==='yes') actOut.push(['ACT-'+pad(++actN), subId, date, member, 'BNI Activity', '', '']);
+  }
+
+  // Back up the original tab (renamed — nothing deleted)
+  var backupName = 'AMAN_DAILY_OLD_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone()||'Asia/Kolkata', 'yyyyMMdd_HHmm');
+  old.setName(backupName);
+
+  // Fresh slim AMAN_DAILY + detail tabs
+  var daily = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
+  var conn  = getOrCreate(CLIENT_CONN_TAB, writeClientConnHeaders);
+  var act   = getOrCreate(ACTIVITIES_TAB, writeActivitiesHeaders);
+  if (dailyOut.length) daily.getRange(daily.getLastRow()+1, 1, dailyOut.length, 8).setValues(dailyOut);
+  if (connOut.length)  conn.getRange(conn.getLastRow()+1, 1, connOut.length, 7).setValues(connOut);
+  if (actOut.length)   act.getRange(act.getLastRow()+1, 1, actOut.length, 7).setValues(actOut);
+
+  Logger.log('Migration: daily='+dailyOut.length+' conn='+connOut.length+' act='+actOut.length+' backup='+backupName);
+  return {status:'ok', dailyRows:dailyOut.length, connections:connOut.length, activities:actOut.length, backup:backupName};
 }
 
 // ════════════════════════════════════════════════════════════════
