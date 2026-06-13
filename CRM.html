@@ -1161,7 +1161,10 @@ function addBill(){
       <select id="bill-proj-${id}">${projOptionsHtml()}</select>
       <button class="entry-x" onclick="document.getElementById('bill-${id}').remove()">✕</button>
     </div>
-    <div class="rupee-wrap" style="max-width:180px"><input type="number" class="pay-amt" id="bill-amt-${id}" min="0" placeholder="Bill amount"></div>`;
+    <div style="display:flex;gap:8px">
+      <input type="text" id="bill-inv-${id}" placeholder="Invoice no." style="flex:1">
+      <div class="rupee-wrap" style="max-width:150px"><input type="number" class="pay-amt" id="bill-amt-${id}" min="0" placeholder="Bill amount"></div>
+    </div>`;
   document.getElementById('bills-entries').appendChild(div);
 }
 function collectBills(){
@@ -1169,8 +1172,9 @@ function collectBills(){
   document.querySelectorAll('#bills-entries .entry-row').forEach(b=>{
     const id=b.id.replace('bill-','');
     const proj=document.getElementById('bill-proj-'+id)?.value||'';
+    const inv=(document.getElementById('bill-inv-'+id)?.value||'').trim();
     const amt=parseFloat(document.getElementById('bill-amt-'+id)?.value)||0;
-    if(proj||amt) out.push({project:proj, amount:amt});
+    if(proj||amt||inv) out.push({project:proj, invoice:inv, amount:amt});
   });
   return out;
 }
@@ -1186,7 +1190,10 @@ function addPayment(){
       <select id="pay-proj-${id}">${projOptionsHtml()}</select>
       <button class="entry-x" onclick="document.getElementById('pay-${id}').remove()">✕</button>
     </div>
-    <div class="rupee-wrap" style="max-width:180px"><input type="number" class="pay-amt" id="pay-amt-${id}" min="0" placeholder="Amount received"></div>`;
+    <div style="display:flex;gap:8px">
+      <input type="text" id="pay-inv-${id}" placeholder="Invoice no. paid against" style="flex:1">
+      <div class="rupee-wrap" style="max-width:150px"><input type="number" class="pay-amt" id="pay-amt-${id}" min="0" placeholder="Amount received"></div>
+    </div>`;
   document.getElementById('pay-entries').appendChild(div);
 }
 function collectPayments(){
@@ -1194,8 +1201,9 @@ function collectPayments(){
   document.querySelectorAll('#pay-entries .entry-row').forEach(b=>{
     const id=b.id.replace('pay-','');
     const proj=document.getElementById('pay-proj-'+id)?.value||'';
+    const inv=(document.getElementById('pay-inv-'+id)?.value||'').trim();
     const amt=parseFloat(document.getElementById('pay-amt-'+id)?.value)||0;
-    if(proj||amt) out.push({project:proj, amount:amt});
+    if(proj||amt||inv) out.push({project:proj, invoice:inv, amount:amt});
   });
   return out;
 }

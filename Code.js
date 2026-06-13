@@ -4249,8 +4249,8 @@ function getAmanWeeklyStats(weekStart, member) {
   if (billSheet && billSheet.getLastRow() > 1) {
     var bRows = billSheet.getDataRange().getValues();
     for (var bi = 1; bi < bRows.length; bi++) {
-      totalBilled    += parseFloat(bRows[bi][3]) || 0;   // D Bill Amount
-      totalCollected += parseFloat(bRows[bi][4]) || 0;   // E Amount Received
+      totalBilled    += parseFloat(bRows[bi][4]) || 0;   // E Bill Amount
+      totalCollected += parseFloat(bRows[bi][5]) || 0;   // F Amount Received
     }
   }
 
@@ -4764,7 +4764,7 @@ function writeAmanDailyHeaders(sheet) {
 
 function writeBillingHeaders(sheet) {
   var h = [
-    'Bill ID','Project','Bill Date','Bill Amount (Rs)',
+    'Bill ID','Invoice No.','Project','Bill Date','Bill Amount (Rs)',
     'Amount Received (Rs)','Received Date','Last Follow-up Date',
     'Status','Submission ID',
   ];
@@ -4772,7 +4772,7 @@ function writeBillingHeaders(sheet) {
     .setBackground('#7A5000').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
-  var widths=[120,200,110,140,150,130,150,110,130];
+  var widths=[120,130,200,110,140,150,130,150,110,130];
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
@@ -5146,11 +5146,11 @@ function promoteLeadToProject(clientName, member) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// writeBilling — BILLING tab: one row per bill, payments attach to the
-// oldest unpaid bill of the same project, follow-up date stamped on
-// unpaid bills of the followed-up projects.
-//   Cols: A BillID, B Project, C BillDate, D BillAmt, E AmtRecd,
-//         F RecdDate, G LastFollowup, H Status, I SubmissionID
+// writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
+// else fall back to the oldest unpaid bill of the same project. Follow-up
+// dates stamped on unpaid bills of the followed-up projects.
+//   Cols: A BillID, B InvoiceNo, C Project, D BillDate, E BillAmt,
+//         F AmtRecd, G RecdDate, H LastFollowup, I Status, J SubmissionID
 // ════════════════════════════════════════════════════════════════
 function writeBilling(subId, today, finance) {
   finance = finance || {};
@@ -5165,42 +5165,50 @@ function writeBilling(subId, today, finance) {
 
   // 1) Append a row for each bill raised today
   bills.forEach(function(b) {
-    if (!b.project && !b.amount) return;
+    if (!b.project && !b.amount && !b.invoice) return;
     var billId = nextId(sheet, 'BILL-');
     sheet.appendRow([
-      billId, b.project || '', today, parseFloat(b.amount) || 0,
+      billId, b.invoice || '', b.project || '', today, parseFloat(b.amount) || 0,
       '', '', '', 'Pending', subId,
     ]);
   });
 
   // Re-read after appends so matching sees today's bills too
   var data = sheet.getDataRange().getValues();  // row0 = header
-
   function norm(s){ return String(s||'').trim().toLowerCase(); }
 
-  // 2) Attach each payment to the OLDEST unpaid bill of that project
+  // 2) Attach each payment — match by Invoice No. first, else oldest unpaid of project
   payments.forEach(function(p) {
     var amt = parseFloat(p.amount) || 0;
-    if (!p.project && !amt) return;
+    if (!p.project && !amt && !p.invoice) return;
     var targetRow = -1;
-    for (var i = 1; i < data.length; i++) {
-      if (norm(data[i][1]) !== norm(p.project)) continue;     // B Project
-      if (String(data[i][7]) === 'Paid') continue;            // H Status
-      targetRow = i; break;                                    // first = oldest
+    if (p.invoice) {                                          // (a) exact invoice match
+      for (var i = 1; i < data.length; i++) {
+        if (norm(data[i][1]) !== norm(p.invoice)) continue;   // B Invoice No.
+        if (String(data[i][8]) === 'Paid') continue;          // I Status
+        targetRow = i; break;
+      }
+    }
+    if (targetRow < 0) {                                       // (b) oldest unpaid of project
+      for (var j = 1; j < data.length; j++) {
+        if (norm(data[j][2]) !== norm(p.project)) continue;   // C Project
+        if (String(data[j][8]) === 'Paid') continue;          // I Status
+        targetRow = j; break;
+      }
     }
     if (targetRow > -1) {
-      var billAmt  = parseFloat(data[targetRow][3]) || 0;     // D
-      var already  = parseFloat(data[targetRow][4]) || 0;     // E
+      var billAmt  = parseFloat(data[targetRow][4]) || 0;     // E Bill Amount
+      var already  = parseFloat(data[targetRow][5]) || 0;     // F Amount Received
       var recd     = already + amt;
       var status   = (billAmt > 0 && recd >= billAmt) ? 'Paid' : 'Partial';
-      sheet.getRange(targetRow+1, 5).setValue(recd);          // E Amount Received
-      sheet.getRange(targetRow+1, 6).setValue(today);         // F Received Date
-      sheet.getRange(targetRow+1, 8).setValue(status);        // H Status
-      data[targetRow][4] = recd; data[targetRow][7] = status; // keep local copy in sync
+      sheet.getRange(targetRow+1, 6).setValue(recd);          // F Amount Received
+      sheet.getRange(targetRow+1, 7).setValue(today);         // G Received Date
+      sheet.getRange(targetRow+1, 9).setValue(status);        // I Status
+      data[targetRow][5] = recd; data[targetRow][8] = status;
     } else {
-      // Payment with no matching open bill — record as its own row
+      // Payment with no matching bill — record as its own row
       var pid = nextId(sheet, 'BILL-');
-      sheet.appendRow([ pid, p.project || '', '', '', amt, today, '', 'Payment (no bill)', subId ]);
+      sheet.appendRow([ pid, p.invoice || '', p.project || '', '', '', amt, today, '', 'Payment (no bill)', subId ]);
     }
   });
 
@@ -5209,9 +5217,9 @@ function writeBilling(subId, today, finance) {
     data = sheet.getDataRange().getValues();
     fupProj.forEach(function(proj) {
       for (var i = 1; i < data.length; i++) {
-        if (norm(data[i][1]) !== norm(proj)) continue;
-        if (String(data[i][7]) === 'Paid') continue;
-        sheet.getRange(i+1, 7).setValue(today);               // G Last Follow-up Date
+        if (norm(data[i][2]) !== norm(proj)) continue;        // C Project
+        if (String(data[i][8]) === 'Paid') continue;          // I Status
+        sheet.getRange(i+1, 8).setValue(today);               // H Last Follow-up Date
       }
     });
   }
