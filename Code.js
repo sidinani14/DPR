@@ -143,6 +143,7 @@ function doGet(e) {
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
+  if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
   if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
   return respond({status: 'IDS DPR live'});
 }
@@ -4169,20 +4170,21 @@ function getAmanWeeklyStats(weekStart, member) {
     }
   }
 
-  // ── 2b. Client connections this week — CLIENT_CONNECTIONS (one row each) ──
+  // ── 2b. Client connections this week — CRM_LOG (Category = Client Connection) ──
   var connected = {};      // project lower → true
   var visitsDone = 0, meetingsDone = 0;  // derived from contact type
-  var connSheet = s.getSheetByName(CLIENT_CONN_TAB);
-  if (connSheet && connSheet.getLastRow() > 1) {
-    var cRows = connSheet.getDataRange().getValues();
+  var logSheet = s.getSheetByName(CRM_LOG_TAB);
+  if (logSheet && logSheet.getLastRow() > 1) {
+    var cRows = logSheet.getDataRange().getValues();
     for (var ci = 1; ci < cRows.length; ci++) {
       var cDate = cellDate(cRows[ci][2]);          // C Date
       var cMem  = String(cRows[ci][3]||'').trim(); // D Member
-      if (cMem !== who) continue;
+      var cCat  = String(cRows[ci][4]||'').trim(); // E Category
+      if (cMem !== who || cCat !== 'Client Connection') continue;
       if (!cDate || cDate < mon || cDate > sat) continue;
-      var pr = String(cRows[ci][4]||'').trim();    // E Project
+      var pr = String(cRows[ci][6]||'').trim();    // G Project
       if (pr) connected[pr.toLowerCase()] = true;
-      var ty = String(cRows[ci][5]||'');           // F Type
+      var ty = String(cRows[ci][5]||'');           // F Type / Activity
       if (ty.indexOf('Site Visit') > -1)   visitsDone++;
       else if (ty.indexOf('Meeting') > -1) meetingsDone++;
     }
@@ -4752,8 +4754,7 @@ var AMAN_DAILY_TAB = 'AMAN_DAILY';
 var LEADS_TAB      = 'LEADS';
 var FEEDBACK_TAB   = 'FEEDBACK';
 var BILLING_TAB    = 'BILLING';
-var CLIENT_CONN_TAB= 'CLIENT_CONNECTIONS';
-var ACTIVITIES_TAB = 'ACTIVITIES';
+var CRM_LOG_TAB    = 'CRM_LOG';   // client connections + other activities (one row each)
 
 function writeAmanDailyHeaders(sheet) {
   // Daily index/summary only. Detail rows now live in dedicated tabs:
@@ -4771,23 +4772,14 @@ function writeAmanDailyHeaders(sheet) {
   sheet.setFrozenRows(1);
 }
 
-function writeClientConnHeaders(sheet) {
-  var h = ['Connection ID','Submission ID','Date','Member','Project','Type','Discussion / Notes'];
+function writeCrmLogHeaders(sheet) {
+  // Combined client connections + other activities, one row per entry.
+  var h = ['Log ID','Submission ID','Date','Member','Category','Type / Activity','Project','Notes / Discussion'];
   sheet.getRange(1,1,1,h.length).setValues([h])
     .setBackground('#005F73').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
-  var widths=[120,130,100,150,200,150,360];
-  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
-}
-
-function writeActivitiesHeaders(sheet) {
-  var h = ['Activity ID','Submission ID','Date','Member','Activity','Project','Notes'];
-  sheet.getRange(1,1,1,h.length).setValues([h])
-    .setBackground('#1B5E20').setFontColor('#FFFFFF')
-    .setFontWeight('bold').setFontSize(10);
-  sheet.setFrozenRows(1);
-  var widths=[120,130,100,150,180,200,360];
+  var widths=[120,130,100,150,150,180,200,340];
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
@@ -5016,31 +5008,25 @@ function submitAmanCRM(data) {
     ]);
     Logger.log('AMAN_DAILY written: ' + subId);
 
-    // ── 1a. Client connections → one row per contact ──────────
-    if (contacts.length > 0) {
-      var connSheet = getOrCreate(CLIENT_CONN_TAB, writeClientConnHeaders);
-      contacts.forEach(function(c) {
-        if (!c.project && !c.type && !c.notes) return;
-        connSheet.appendRow([
-          nextId(connSheet, 'CONN-'), subId, today, member,
-          c.project || '', c.type || '', c.notes || '',
-        ]);
-      });
-      Logger.log('Client connections written: ' + contacts.length);
-    }
-
-    // ── 1b. Other activities → one row per entry ──────────────
-    var actSheet = getOrCreate(ACTIVITIES_TAB, writeActivitiesHeaders);
+    // ── 1a. Client connections + activities → CRM_LOG (one row each) ──
+    var logSheet = getOrCreate(CRM_LOG_TAB, writeCrmLogHeaders);
+    contacts.forEach(function(c) {
+      if (!c.project && !c.type && !c.notes) return;
+      logSheet.appendRow([
+        nextId(logSheet, 'LOG-'), subId, today, member,
+        'Client Connection', c.type || '', c.project || '', c.notes || '',
+      ]);
+    });
     function writeActRows(label, act) {
       (act.entries || []).forEach(function(e) {
         if (!e.project && !e.notes) return;
-        actSheet.appendRow([ nextId(actSheet, 'ACT-'), subId, today, member, label, e.project || '', e.notes || '' ]);
+        logSheet.appendRow([ nextId(logSheet, 'LOG-'), subId, today, member, 'Other Activity', label, e.project || '', e.notes || '' ]);
       });
     }
     if (vendor.on  === 'Yes') writeActRows('Vendor Coordination', vendor);
     if (siteIss.on === 'Yes') writeActRows('Site Issues Addressed', siteIss);
     if (tncp.on    === 'Yes') writeActRows('TnCP Coordination', tncp);
-    if (bni.on     === 'Yes') actSheet.appendRow([ nextId(actSheet, 'ACT-'), subId, today, member, 'BNI Activity', '', '' ]);
+    if (bni.on     === 'Yes') logSheet.appendRow([ nextId(logSheet, 'LOG-'), subId, today, member, 'Other Activity', 'BNI Activity', '', '' ]);
 
     // ── 2. Write new leads to LEADS sheet ─────────────────────
     var leadsSheet = getOrCreate(LEADS_TAB, writeLeadsHeaders);
@@ -5176,8 +5162,8 @@ function migrateAmanDailyToTabs() {
   function dstr(v){ return (v instanceof Date) ? dateStr(v) : String(v||'').substring(0,10); }
   function pad(n){ return ('000'+n).slice(-3); }
 
-  var dailyOut=[], connOut=[], actOut=[];
-  var connN=0, actN=0;
+  var dailyOut=[], logOut=[];
+  var logN=0;
   for (var r=1; r<rows.length; r++){
     var row = rows[r];
     var subId = String(row[0]||'');
@@ -5191,34 +5177,71 @@ function migrateAmanDailyToTabs() {
     dailyOut.push([subId, date, time, member, vOn, sOn, tOn, bOn]);
 
     if (iContacts>-1) pj(row[iContacts]).forEach(function(c){
-      connOut.push(['CONN-'+pad(++connN), subId, date, member, c.project||'', c.type||'', c.notes||'']);
+      logOut.push(['LOG-'+pad(++logN), subId, date, member, 'Client Connection', c.type||'', c.project||'', c.notes||'']);
     });
     function pushAct(label, idx){
       if (idx<0) return;
       pj(row[idx]).forEach(function(e){
-        actOut.push(['ACT-'+pad(++actN), subId, date, member, label, e.project||'', e.notes||'']);
+        logOut.push(['LOG-'+pad(++logN), subId, date, member, 'Other Activity', label, e.project||'', e.notes||'']);
       });
     }
     pushAct('Vendor Coordination', iVendorE);
     pushAct('Site Issues Addressed', iSiteE);
     pushAct('TnCP Coordination', iTncpE);
-    if (String(bOn).toLowerCase()==='yes') actOut.push(['ACT-'+pad(++actN), subId, date, member, 'BNI Activity', '', '']);
+    if (String(bOn).toLowerCase()==='yes') logOut.push(['LOG-'+pad(++logN), subId, date, member, 'Other Activity', 'BNI Activity', '', '']);
   }
 
   // Back up the original tab (renamed — nothing deleted)
   var backupName = 'AMAN_DAILY_OLD_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone()||'Asia/Kolkata', 'yyyyMMdd_HHmm');
   old.setName(backupName);
 
-  // Fresh slim AMAN_DAILY + detail tabs
+  // Fresh slim AMAN_DAILY + combined CRM_LOG
   var daily = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
-  var conn  = getOrCreate(CLIENT_CONN_TAB, writeClientConnHeaders);
-  var act   = getOrCreate(ACTIVITIES_TAB, writeActivitiesHeaders);
+  var log   = getOrCreate(CRM_LOG_TAB, writeCrmLogHeaders);
   if (dailyOut.length) daily.getRange(daily.getLastRow()+1, 1, dailyOut.length, 8).setValues(dailyOut);
-  if (connOut.length)  conn.getRange(conn.getLastRow()+1, 1, connOut.length, 7).setValues(connOut);
-  if (actOut.length)   act.getRange(act.getLastRow()+1, 1, actOut.length, 7).setValues(actOut);
+  if (logOut.length)   log.getRange(log.getLastRow()+1, 1, logOut.length, 8).setValues(logOut);
 
-  Logger.log('Migration: daily='+dailyOut.length+' conn='+connOut.length+' act='+actOut.length+' backup='+backupName);
-  return {status:'ok', dailyRows:dailyOut.length, connections:connOut.length, activities:actOut.length, backup:backupName};
+  Logger.log('Migration: daily='+dailyOut.length+' log='+logOut.length+' backup='+backupName);
+  return {status:'ok', dailyRows:dailyOut.length, logRows:logOut.length, backup:backupName};
+}
+
+// ════════════════════════════════════════════════════════════════
+// mergeCrmLogTabs — one-time, non-destructive merge of the existing
+// CLIENT_CONNECTIONS + ACTIVITIES tabs into the combined CRM_LOG tab.
+// Old tabs are renamed (backed up), not deleted. Idempotent.
+// ════════════════════════════════════════════════════════════════
+function mergeCrmLogTabs() {
+  var s    = db();
+  var conn = s.getSheetByName('CLIENT_CONNECTIONS');
+  var act  = s.getSheetByName('ACTIVITIES');
+  if (!conn && !act) return {status:'no CLIENT_CONNECTIONS / ACTIVITIES tabs to merge'};
+
+  function dstr(v){ return (v instanceof Date) ? dateStr(v) : String(v||'').substring(0,10); }
+  function pad(n){ return ('000'+n).slice(-3); }
+
+  var log = getOrCreate(CRM_LOG_TAB, writeCrmLogHeaders);
+  var out = [];
+  var n   = Math.max(0, log.getLastRow() - 1);   // continue numbering
+
+  if (conn && conn.getLastRow() > 1) {            // cols: A id B sub C date D member E project F type G notes
+    var cr = conn.getDataRange().getValues();
+    for (var i=1;i<cr.length;i++){ var r=cr[i]; if(!String(r[1]||'')) continue;
+      out.push(['LOG-'+pad(++n), String(r[1]||''), dstr(r[2]), String(r[3]||''), 'Client Connection', String(r[5]||''), String(r[4]||''), String(r[6]||'')]); }
+  }
+  if (act && act.getLastRow() > 1) {              // cols: A id B sub C date D member E activity F project G notes
+    var ar = act.getDataRange().getValues();
+    for (var j=1;j<ar.length;j++){ var r2=ar[j]; if(!String(r2[1]||'')) continue;
+      out.push(['LOG-'+pad(++n), String(r2[1]||''), dstr(r2[2]), String(r2[3]||''), 'Other Activity', String(r2[4]||''), String(r2[5]||''), String(r2[6]||'')]); }
+  }
+  if (out.length) log.getRange(log.getLastRow()+1, 1, out.length, 8).setValues(out);
+
+  var ts = Utilities.formatDate(new Date(), Session.getScriptTimeZone()||'Asia/Kolkata', 'yyyyMMdd_HHmm');
+  var backups = [];
+  if (conn) { conn.setName('CLIENT_CONNECTIONS_OLD_'+ts); backups.push('CLIENT_CONNECTIONS_OLD_'+ts); }
+  if (act)  { act.setName('ACTIVITIES_OLD_'+ts);          backups.push('ACTIVITIES_OLD_'+ts); }
+
+  Logger.log('Merged into CRM_LOG: '+out.length+' rows; backups: '+backups.join(', '));
+  return {status:'ok', merged:out.length, backups:backups};
 }
 
 // ════════════════════════════════════════════════════════════════

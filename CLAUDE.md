@@ -101,8 +101,11 @@
 
 ## CRM data routing — where each form section is stored
 - AMAN_DAILY  → daily INDEX only: subId, date, time, member + 4 activity Yes/No flags
-- CLIENT_CONNECTIONS → one row per client contact (ConnID, subId, date, member, project, type, notes)
-- ACTIVITIES  → one row per vendor/site-issue/TnCP entry + a BNI row (ActID, subId, date, member, activity, project, notes)
+- CRM_LOG → one row per client connection AND per activity (combined). Cols:
+  Log ID, Submission ID, Date, Member, Category (Client Connection | Other Activity),
+  Type/Activity, Project, Notes. getAmanWeeklyStats filters Category='Client Connection'.
+  (Migrations: migrateAmanDaily splits old JSON → AMAN_DAILY+CRM_LOG; mergeCrmLog
+   folds old CLIENT_CONNECTIONS+ACTIVITIES tabs into CRM_LOG. Both non-destructive/idempotent.)
 - LEADS       → new leads (LMS format) + 24hr follow-up updates
 - BILLING     → bills / payments / follow-ups (one row per bill)
 - SITE_ISSUES → CRM issues & design deliverables (col O = Reported By = Aman)
@@ -116,14 +119,11 @@
 - Detail rows now live in CLIENT_CONNECTIONS + ACTIVITIES (row per entry, filterable).
 - NOTE: schema changed (now 8 cols, JSON removed) — delete any old AMAN_DAILY tab so headers rewrite.
 
-## Sheet structure — CLIENT_CONNECTIONS (7 cols)
-- A: Connection ID (CONN-001…), B: Submission ID, C: Date, D: Member
-- E: Project, F: Type (Call/WhatsApp/Meeting/Site Visit/Email), G: Discussion/Notes
-
-## Sheet structure — ACTIVITIES (7 cols)
-- A: Activity ID (ACT-001…), B: Submission ID, C: Date, D: Member
-- E: Activity (Vendor Coordination / Site Issues Addressed / TnCP Coordination / BNI Activity)
-- F: Project, G: Notes
+## Sheet structure — CRM_LOG (8 cols; connections + activities combined)
+- A: Log ID (LOG-001…), B: Submission ID, C: Date, D: Member
+- E: Category (Client Connection | Other Activity)
+- F: Type / Activity (Call/WhatsApp/Meeting/Site Visit/Email  OR  Vendor/Site Issues/TnCP/BNI)
+- G: Project, H: Notes / Discussion
 
 ## Lead → Project promotion
 - When a lead reaches "Briefing Meeting Done" or further (Design Proposal Shared /
