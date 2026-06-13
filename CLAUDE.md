@@ -126,11 +126,13 @@
 - Aman's weekly "active projects" (Client Connection Coverage denominator) =
   all PROJECTS rows with Status = Ongoing (NOT the 'New Lead' pipeline rows).
 
-## Sheet structure — BILLING (9 cols)
-- A: Bill ID (BILL-001…), B: Project, C: Bill Date, D: Bill Amount
-- E: Amount Received, F: Received Date, G: Last Follow-up Date, H: Status, I: Submission ID
-- writeBilling(): bills append new rows; payments attach to OLDEST unpaid bill of that
-  project (Partial/Paid); follow-ups stamp Last Follow-up Date on unpaid bills of that project.
+## Sheet structure — BILLING (10 cols A–J)
+- A: Bill ID (BILL-001…), B: Invoice No., C: Project, D: Bill Date, E: Bill Amount
+- F: Amount Received, G: Received Date, H: Last Follow-up Date, I: Status, J: Submission ID
+- CRM form asks Invoice No. on each bill AND each payment.
+- writeBilling(): bills append new rows; payments match by Invoice No. FIRST, else
+  OLDEST unpaid bill of that project (Partial/Paid); follow-ups stamp Last Follow-up Date.
+- NOTE: schema changed (invoice col added) — delete any old BILLING tab so new headers write.
 
 ## Sheet structure — FEEDBACK (19 cols, mirrors Monthly Feedback Google Form)
 - A: Feedback ID (FB-001…), B: Submission ID (CRM-…), C: Date Recorded, D: Recorded By
