@@ -4154,10 +4154,8 @@ function getAmanWeeklyStats(weekStart, member) {
   }
   var totalOngoing = ongoing.length;
 
-  // ── 2. Client connections this week + DPR days (AMAN_DAILY) ──
-  var connected = {};      // project lower → true
+  // ── 2a. DPR days — AMAN_DAILY submission rows ──
   var dprDaysSet = {};     // date → true
-  var visitsDone = 0, meetingsDone = 0;  // derived from contact type
   var dailySheet = s.getSheetByName(AMAN_DAILY_TAB);
   if (dailySheet && dailySheet.getLastRow() > 1) {
     var dRows = dailySheet.getDataRange().getValues();
@@ -4167,15 +4165,25 @@ function getAmanWeeklyStats(weekStart, member) {
       if (dMem !== who) continue;
       if (!dDate || dDate < mon || dDate > sat) continue;
       dprDaysSet[dDate] = true;
-      var contacts = [];
-      try { contacts = JSON.parse(dRows[di][4] || '[]'); } catch(e){}  // E Client Contacts
-      contacts.forEach(function(c){
-        var pr = String((c && c.project) || '').trim();
-        if (pr) connected[pr.toLowerCase()] = true;
-        var ty = String((c && c.type) || '');
-        if (ty.indexOf('Site Visit') > -1)   visitsDone++;
-        else if (ty.indexOf('Meeting') > -1) meetingsDone++;
-      });
+    }
+  }
+
+  // ── 2b. Client connections this week — CLIENT_CONNECTIONS (one row each) ──
+  var connected = {};      // project lower → true
+  var visitsDone = 0, meetingsDone = 0;  // derived from contact type
+  var connSheet = s.getSheetByName(CLIENT_CONN_TAB);
+  if (connSheet && connSheet.getLastRow() > 1) {
+    var cRows = connSheet.getDataRange().getValues();
+    for (var ci = 1; ci < cRows.length; ci++) {
+      var cDate = cellDate(cRows[ci][2]);          // C Date
+      var cMem  = String(cRows[ci][3]||'').trim(); // D Member
+      if (cMem !== who) continue;
+      if (!cDate || cDate < mon || cDate > sat) continue;
+      var pr = String(cRows[ci][4]||'').trim();    // E Project
+      if (pr) connected[pr.toLowerCase()] = true;
+      var ty = String(cRows[ci][5]||'');           // F Type
+      if (ty.indexOf('Site Visit') > -1)   visitsDone++;
+      else if (ty.indexOf('Meeting') > -1) meetingsDone++;
     }
   }
 
@@ -4743,23 +4751,43 @@ var AMAN_DAILY_TAB = 'AMAN_DAILY';
 var LEADS_TAB      = 'LEADS';
 var FEEDBACK_TAB   = 'FEEDBACK';
 var BILLING_TAB    = 'BILLING';
+var CLIENT_CONN_TAB= 'CLIENT_CONNECTIONS';
+var ACTIVITIES_TAB = 'ACTIVITIES';
 
 function writeAmanDailyHeaders(sheet) {
-  // Stores ONLY client communication + other activities.
-  // Leads→LEADS, Finance→BILLING, Issues→SITE_ISSUES, Feedback→FEEDBACK,
-  // Agendas→TASK_ASSIGNMENTS (meeting/visit tasks).
+  // Daily index/summary only. Detail rows now live in dedicated tabs:
+  //   Client connections → CLIENT_CONNECTIONS (one row each)
+  //   Other activities   → ACTIVITIES (one row each)
+  //   Leads→LEADS, Finance→BILLING, Issues→SITE_ISSUES, Feedback→FEEDBACK,
+  //   Agendas→TASK_ASSIGNMENTS.
   var h = [
     'Submission ID','Date','Time','Member',
-    'Client Contacts (JSON)',
-    'Vendor Coordination','Vendor Entries (JSON)',
-    'Site Issues Addressed','Site Issue Entries (JSON)',
-    'TnCP Coordination','TnCP Entries (JSON)',
-    'BNI Activity',
+    'Vendor Coordination','Site Issues Addressed','TnCP Coordination','BNI Activity',
   ];
   sheet.getRange(1,1,1,h.length).setValues([h])
     .setBackground('#005F73').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
+}
+
+function writeClientConnHeaders(sheet) {
+  var h = ['Connection ID','Submission ID','Date','Member','Project','Type','Discussion / Notes'];
+  sheet.getRange(1,1,1,h.length).setValues([h])
+    .setBackground('#005F73').setFontColor('#FFFFFF')
+    .setFontWeight('bold').setFontSize(10);
+  sheet.setFrozenRows(1);
+  var widths=[120,130,100,150,200,150,360];
+  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
+}
+
+function writeActivitiesHeaders(sheet) {
+  var h = ['Activity ID','Submission ID','Date','Member','Activity','Project','Notes'];
+  sheet.getRange(1,1,1,h.length).setValues([h])
+    .setBackground('#1B5E20').setFontColor('#FFFFFF')
+    .setFontWeight('bold').setFontSize(10);
+  sheet.setFrozenRows(1);
+  var widths=[120,130,100,150,180,200,360];
+  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
 function writeBillingHeaders(sheet) {
@@ -4978,21 +5006,40 @@ function submitAmanCRM(data) {
     var tncp      = activities.tncp       || {on:'No', entries:[]};
     var bni       = activities.bni        || {on:'No', entries:[]};
 
-    // ── 1. Write AMAN_DAILY row — client communication + other activities only ──
+    // ── 1. Write AMAN_DAILY index row (summary only) ──────────
     var dailySheet = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
     var subId      = nextId(dailySheet, 'CRM-');
     dailySheet.appendRow([
-      subId,
-      today,
-      now,
-      member,
-      data.contacts || '',
-      vendor.on  || 'No', JSON.stringify(vendor.entries  || []),
-      siteIss.on || 'No', JSON.stringify(siteIss.entries || []),
-      tncp.on    || 'No', JSON.stringify(tncp.entries    || []),
-      bni.on     || 'No',
+      subId, today, now, member,
+      vendor.on || 'No', siteIss.on || 'No', tncp.on || 'No', bni.on || 'No',
     ]);
     Logger.log('AMAN_DAILY written: ' + subId);
+
+    // ── 1a. Client connections → one row per contact ──────────
+    if (contacts.length > 0) {
+      var connSheet = getOrCreate(CLIENT_CONN_TAB, writeClientConnHeaders);
+      contacts.forEach(function(c) {
+        if (!c.project && !c.type && !c.notes) return;
+        connSheet.appendRow([
+          nextId(connSheet, 'CONN-'), subId, today, member,
+          c.project || '', c.type || '', c.notes || '',
+        ]);
+      });
+      Logger.log('Client connections written: ' + contacts.length);
+    }
+
+    // ── 1b. Other activities → one row per entry ──────────────
+    var actSheet = getOrCreate(ACTIVITIES_TAB, writeActivitiesHeaders);
+    function writeActRows(label, act) {
+      (act.entries || []).forEach(function(e) {
+        if (!e.project && !e.notes) return;
+        actSheet.appendRow([ nextId(actSheet, 'ACT-'), subId, today, member, label, e.project || '', e.notes || '' ]);
+      });
+    }
+    if (vendor.on  === 'Yes') writeActRows('Vendor Coordination', vendor);
+    if (siteIss.on === 'Yes') writeActRows('Site Issues Addressed', siteIss);
+    if (tncp.on    === 'Yes') writeActRows('TnCP Coordination', tncp);
+    if (bni.on     === 'Yes') actSheet.appendRow([ nextId(actSheet, 'ACT-'), subId, today, member, 'BNI Activity', '', '' ]);
 
     // ── 2. Write new leads to LEADS sheet ─────────────────────
     var leadsSheet = getOrCreate(LEADS_TAB, writeLeadsHeaders);
