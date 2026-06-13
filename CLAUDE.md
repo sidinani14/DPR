@@ -100,7 +100,9 @@
 - getRecentLeads(date) — returns LEADS rows for given date with 24hr contact pending
 
 ## CRM data routing — where each form section is stored
-- AMAN_DAILY  → client communication + other activities ONLY
+- AMAN_DAILY  → daily INDEX only: subId, date, time, member + 4 activity Yes/No flags
+- CLIENT_CONNECTIONS → one row per client contact (ConnID, subId, date, member, project, type, notes)
+- ACTIVITIES  → one row per vendor/site-issue/TnCP entry + a BNI row (ActID, subId, date, member, activity, project, notes)
 - LEADS       → new leads (LMS format) + 24hr follow-up updates
 - BILLING     → bills / payments / follow-ups (one row per bill)
 - SITE_ISSUES → CRM issues & design deliverables (col O = Reported By = Aman)
@@ -108,15 +110,20 @@
 - TASK_ASSIGNMENTS → auto-tasks: design issues/deliverables (1 pt) +
   site-visit/meeting tasks per team attendee (default 1 pt, overwritten by hours in DPR)
 
-## Sheet structure — AMAN_DAILY (12 cols A–L; client comm + other activities only)
+## Sheet structure — AMAN_DAILY (8 cols A–H; daily index only)
 - A: Submission ID (CRM-001…), B: Date, C: Time, D: Member
-- E: Client Contacts (JSON)
-- F: Vendor Coordination (Yes/No), G: Vendor Entries (JSON [{project,notes}])
-- H: Site Issues Addressed (Yes/No), I: Site Issue Entries (JSON)
-- J: TnCP Coordination (Yes/No), K: TnCP Entries (JSON)
-- L: BNI Activity (Yes/No)
-- NOTE: schema changed (now 12 cols) — delete any old AMAN_DAILY tab so
-  getOrCreate rewrites the new header row.
+- E: Vendor Coordination, F: Site Issues Addressed, G: TnCP Coordination, H: BNI Activity (Yes/No)
+- Detail rows now live in CLIENT_CONNECTIONS + ACTIVITIES (row per entry, filterable).
+- NOTE: schema changed (now 8 cols, JSON removed) — delete any old AMAN_DAILY tab so headers rewrite.
+
+## Sheet structure — CLIENT_CONNECTIONS (7 cols)
+- A: Connection ID (CONN-001…), B: Submission ID, C: Date, D: Member
+- E: Project, F: Type (Call/WhatsApp/Meeting/Site Visit/Email), G: Discussion/Notes
+
+## Sheet structure — ACTIVITIES (7 cols)
+- A: Activity ID (ACT-001…), B: Submission ID, C: Date, D: Member
+- E: Activity (Vendor Coordination / Site Issues Addressed / TnCP Coordination / BNI Activity)
+- F: Project, G: Notes
 
 ## Lead → Project promotion
 - When a lead reaches "Briefing Meeting Done" or further (Design Proposal Shared /
