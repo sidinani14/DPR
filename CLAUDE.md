@@ -111,7 +111,10 @@
 - SITE_ISSUES → CRM issues & design deliverables (col O = Reported By = Aman)
 - FEEDBACK    → monthly client feedback (one row per project)
 - TASK_ASSIGNMENTS → auto-tasks: design issues/deliverables (1 pt) +
-  site-visit/meeting tasks per team attendee (default 1 pt, overwritten by hours in DPR)
+  site-visit/meeting tasks per team attendee (created at 0 pts; scored off hours
+  the attendee logs in their DPR — Site Visit ×2/hr, Meeting ×1/hr).
+  isVisitTask/calcVisitPts (Code.js) + isVisitType/isVisitRate2 (index.html) now
+  recognise the plain 'Site Visit' / 'Meeting' types, not just the canonical ones.
 
 ## Sheet structure — AMAN_DAILY (8 cols A–H; daily index only)
 - A: Submission ID (CRM-001…), B: Date, C: Time, D: Member

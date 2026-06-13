@@ -24,14 +24,15 @@ var VISIT_TYPES_MTG  = ['Client Meeting (Regular)', 'Client Meeting'];
 
 function isVisitTask(taskType) {
   var t = String(taskType||'').trim();
-  return VISIT_TYPES_ARCH.indexOf(t) > -1 || VISIT_TYPES_MTG.indexOf(t) > -1;
+  return VISIT_TYPES_ARCH.indexOf(t) > -1 || VISIT_TYPES_MTG.indexOf(t) > -1 ||
+         t === 'Site Visit' || t === 'Meeting';   // CRM-created meeting/visit tasks
 }
 
 function calcVisitPts(taskType, hours) {
   var t = String(taskType||'').trim();
   var h = parseFloat(hours) || 0;
-  if (VISIT_TYPES_ARCH.indexOf(t) > -1) return Math.round(h * 2 * 10) / 10;
-  if (VISIT_TYPES_MTG.indexOf(t)  > -1) return Math.round(h * 1 * 10) / 10;
+  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit') return Math.round(h * 2 * 10) / 10;
+  if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting')    return Math.round(h * 1 * 10) / 10;
   return 0;
 }
 
@@ -5395,7 +5396,7 @@ function createMeetingTasks(agendas, member, today) {
       var notes = (type + ' — ' + (ag.project||'') +
                    (ag.time ? ' @ ' + ag.time : '') +
                    (ag.agenda ? '. Agenda: ' + ag.agenda : '') +
-                   ' [CRM auto; points = hours logged in DPR]');
+                   ' [CRM auto; points = hours logged in DPR — Site Visit ×2/hr, Meeting ×1/hr]');
       sheet.appendRow([
         newId,                        // A TaskID
         '',                           // B ProjectID
@@ -5403,9 +5404,9 @@ function createMeetingTasks(agendas, member, today) {
         person,                       // D AssignedTo
         type,                         // E Stage/Type
         1,                            // F Disc Multiplier
-        1,                            // G Base Pts (default — hours override)
+        0,                            // G Base Pts (0 — visit pts come from hours)
         1,                            // H Units
-        1,                            // I Weighted Pts (default 1; recalculated from hours)
+        0,                            // I Weighted Pts (0 until Done w/ hours → hours × rate)
         today,                        // J AssignedDate
         ag.date || today,             // K Deadline (meeting/visit date)
         '', '',                       // L Area, M Drawing
