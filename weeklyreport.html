@@ -293,6 +293,7 @@ function gc(v,m){const p=v/m;return p>=.85?'g':p>=.70?'a':p>=.50?'o':'r';}
 function gpc(v,m){const p=v/m;return p>=.85?'pb-g':p>=.70?'pb-a':p>=.50?'pb-o':'pb-r';}
 function chip(t){return t>=85?'c-ex':t>=70?'c-go':t>=50?'c-av':'c-lo';}
 function chipLabel(t){return t>=85?'Excellent':t>=70?'Good':t>=50?'Average':'Needs Work';}
+function statusChip(s){ if(s && s.presentDays===0) return '<span class="chip" style="background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.6)">Absent</span>'; return '<span class="chip '+chip(s.total)+'">'+chipLabel(s.total)+'</span>'; }
 
 function attClass(d){if(d.s==='A')return'aa';if(d.l)return'al';if(d.s==='HD')return'ah';return'ap';}
 function attColor(d){if(d.s==='A')return'#EA4335';if(d.l)return'#FBBC04';if(d.s==='HD')return'#F5A623';if(d.s==='E')return'rgba(245,166,35,0.7)';return'#2ED573';}
@@ -329,7 +330,7 @@ function buildOverviewPage(team){
       <td><div class="sv" style="color:${sc(s.s_punct,20)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/20*100))}%;background:${sc(s.s_punct,20)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_hrs,15)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/15*100))}%;background:${sc(s.s_hrs,15)}"></div></div></td>
       <td><div class="sv" style="color:${col};font-size:19px;" contenteditable="true">${s.total}</div></td>
-      <td><span class="chip ${chip(s.total)}">${chipLabel(s.total)}</span></td>
+      <td>${statusChip(s)}</td>
     </tr>`;
   });
   return `<div class="page">
@@ -435,7 +436,7 @@ function buildIndividualPage(m, taskData){
       <div class="score-box">
         <div class="sc-lbl">Overall Score</div>
         <div class="sc-num" style="color:${col}" contenteditable="true">${s.total}<span class="sc-den">/100</span></div>
-        <div style="margin-top:6px"><span class="chip ${chip(s.total)}">${chipLabel(s.total)}</span></div>
+        <div style="margin-top:6px">${statusChip(s)}</div>
       </div>
     </div>
 
@@ -532,7 +533,7 @@ function buildDeepakPage(d){
       <div class="score-box">
         <div class="sc-lbl">Overall Score</div>
         <div class="sc-num" style="color:${col}" contenteditable="true">${s.total}<span class="sc-den">/100</span></div>
-        <div style="margin-top:6px"><span class="chip ${chip(s.total)}">${chipLabel(s.total)}</span></div>
+        <div style="margin-top:6px">${statusChip(s)}</div>
       </div>
     </div>
 
@@ -631,7 +632,7 @@ function buildAmanPage(d){
       <div class="score-box">
         <div class="sc-lbl">Overall Score</div>
         <div class="sc-num" style="color:${col}" contenteditable="true">${s.total}<span class="sc-den">/100</span></div>
-        <div style="margin-top:6px"><span class="chip ${chip(s.total)}">${chipLabel(s.total)}</span></div>
+        <div style="margin-top:6px">${statusChip(s)}</div>
       </div>
     </div>
 
