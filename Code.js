@@ -669,6 +669,9 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
           // P ActualCompletionDate
           var actualDate = a.actualCompletionDate || now;
           sheet.getRange(i+1, 16).setValue(actualDate);
+          // Re-enter the approval queue (clears a prior rejection so redone work
+          // returns to 'Approval Pending' instead of staying rejected)
+          sheet.getRange(i+1, 17).setValue('Pending'); // Q LeadApproved
 
           // If visit/meeting task — overwrite WeightedPoints (col I) with hours-based pts
           var taskType = String(rows[i][4]||'').trim(); // E

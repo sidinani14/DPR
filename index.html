@@ -701,8 +701,10 @@ async function fetchAssignedTasks() {
       catch(pe) { throw new Error('Invalid JSON: ' + text.substring(0,100)); }
       // Separate rejected tasks (last 24h) from open tasks
     const allFetched = data.tasks || [];
-    window._rejectedTasks = allFetched.filter(t => t.isRejected || t.leadApproved === 'No');
-    assignedTasks = allFetched.filter(t => !t.isRejected && t.leadApproved !== 'No');
+    // Done & awaiting approval → locked (no re-marking). Everything else (incl.
+    // rejected/revision) → editable so it can be acted on / redone.
+    window._pendingTasks = allFetched.filter(t => t.status === 'Approval Pending');
+    assignedTasks = allFetched.filter(t => t.status !== 'Approval Pending');
 
     }
     renderAssignedTasks();
@@ -714,26 +716,29 @@ async function fetchAssignedTasks() {
 
 function renderAssignedTasks() {
   const today=new Date().toISOString().substring(0,10);
+  const pending = window._pendingTasks || [];
   document.getElementById('assigned-count').textContent=
-    assignedTasks.length?`${assignedTasks.length} open`:'none today ✓';
+    assignedTasks.length?`${assignedTasks.length} open`:(pending.length?'all submitted ✓':'none today ✓');
 
-  if (!assignedTasks.length) {
+  if (!assignedTasks.length && !pending.length) {
     document.getElementById('assigned-tasks-list').innerHTML='<div class="no-tasks">No open tasks assigned to you ✓</div>';
     return;
   }
 
-  // Rejected banners — shown above task cards
-  const rejBanners = (window._rejectedTasks||[]).map(t=>
-    `<div class="rejected-banner">
-      <div class="rejected-title">✗ REJECTED — ${t.project||''} · ${t.taskType||''}</div>
-      ${t.rejectionNote?`<div class="rejected-note">"${t.rejectionNote}"</div>`:''}
-      <div class="rejected-meta">${t.pts||0} pts · Rejected by lead · No action required</div>
+  // Locked cards — Done & awaiting approval (no action allowed, can't be re-opened)
+  const pendingCards = pending.map(t=>
+    `<div class="assigned-task-card" style="opacity:.72;border-left:3px solid #FBBC04">
+      <div class="atc-head">
+        <div class="atc-type">${t.taskType}</div>
+        <div class="atc-project">${t.project}</div>
+        ${t.area||t.drawing?`<div class="atc-area">${t.area||''}${t.area&&t.drawing?' · ':''}${t.drawing||''}</div>`:''}
+        <div class="atc-meta" style="margin-top:5px"><div class="atc-m">Pts: <span>${t.weightedPts}</span></div></div>
+      </div>
+      <div style="padding:9px 13px;font-size:12px;font-weight:700;color:#FBBC04">⏳ Awaiting approval — submitted, no action needed</div>
     </div>`
   ).join('');
-  document.getElementById('assigned-tasks-list').innerHTML =
-    rejBanners +
-    (assignedTasks.length ? '' : '<p style="color:var(--text3);font-size:13px;padding:10px 0">No tasks assigned for today.</p>');
-  if (!assignedTasks.length && !window._rejectedTasks?.length) return;
+  document.getElementById('assigned-tasks-list').innerHTML = pendingCards;
+  if (!assignedTasks.length) return;
 
   // Append task cards
   const taskCards = assignedTasks.map((t,i)=>{
@@ -746,7 +751,7 @@ function renderAssignedTasks() {
         <div class="atc-type">${t.taskType}</div>
         <div class="atc-project">${t.project}</div>
         ${t.area||t.drawing?`<div class="atc-area">${t.area?t.area:''}${t.area&&t.drawing?' · ':''}${t.drawing?t.drawing:''}</div>`:''}
-        ${isRevision?`<div class="atc-revision">🔴 ${t.revisionTag||'Revision Required'}${t.revisionType?' — '+t.revisionType:''}</div>`:''}
+        ${isRevision?`<div class="atc-revision">🔴 ${t.isRejected?'Rejected — please redo':'Revision Required'}${t.revisionTag?' ('+t.revisionTag+')':''}</div>`:''}
         ${t.notes?`<div style="font-size:11px;color:var(--text3);margin-top:4px;font-style:italic">${t.notes}</div>`:''}
         <div class="atc-meta" style="margin-top:5px">
           <div class="atc-m ${isOverdue?'overdue':''}">Due: <span>${t.targetDate}${isOverdue?' ⚠':''}</span></div>
