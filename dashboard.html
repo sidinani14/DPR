@@ -122,9 +122,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="heatmap-title">
     <span id="heatmap-title-text">Workload Heatmap — Open Tasks</span>
     <div class="heatmap-view-btns">
-      <button class="hm-view-btn on" onclick="setHmView('total',this)">Total</button>
-      <button class="hm-view-btn" onclick="setHmView('week',this)">This Week</button>
-      <button class="hm-view-btn" onclick="setHmView('today',this)">This Day</button>
+      <button class="hm-view-btn on" onclick="setHmView('week',this)">This Week</button>
+      <button class="hm-view-btn" onclick="setHmView('today',this)">Today</button>
+      <button class="hm-view-btn" onclick="setHmView('total',this)">Total</button>
     </div>
   </div>
   <div id="heatmap-body"></div>
@@ -162,7 +162,7 @@ let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', da
 window.addEventListener('DOMContentLoaded', loadTasks);
 
 // ── HEATMAP ──────────────────────────────────────────────────
-let hmView = 'total';
+let hmView = 'week';
 
 const TEAM_TARGETS = {
   'Aaditya Koshti':48,'Aashi Agrawal':48,'Achal Rathore':72,
@@ -175,7 +175,7 @@ const DAILY_TARGETS = Object.fromEntries(
 );
 
 const HM_TITLES = {
-  total : 'Workload Heatmap — Total Open',
+  total : 'Allotted Points — Overdue + Rolling 6 Weeks (by target date)',
   week  : 'Workload Heatmap — This Week Progress',
   today : 'Workload Heatmap — Today\'s Occupancy',
 };
@@ -265,29 +265,36 @@ function renderHeatmap() {
   let html = '';
 
   if (hmView === 'total') {
-    // ── TOTAL: weekly progress bar per person ──────────────────
+    // ── TOTAL: allotted points by target-date week (rolling 6 wks) + overdue ──
+    // Open / approval-pending only; done tasks live in the This-Week view.
+    const mon0 = new Date(); mon0.setDate(mon0.getDate()-((mon0.getDay()+6)%7)); mon0.setHours(0,0,0,0);
+    const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const weeks=[];
+    for (let w=0; w<6; w++){
+      const ws=new Date(mon0); ws.setDate(mon0.getDate()+w*7);
+      const we=new Date(ws);   we.setDate(ws.getDate()+5);
+      const lbl = ws.getMonth()===we.getMonth()
+        ? `${ws.getDate()}–${we.getDate()} ${MON[ws.getMonth()]}`
+        : `${ws.getDate()} ${MON[ws.getMonth()]}–${we.getDate()} ${MON[we.getMonth()]}`;
+      weeks.push({ start:ws.toISOString().substring(0,10), end:we.toISOString().substring(0,10), label:lbl });
+    }
+    const curMon = weeks[0].start;
     html = '<table class="heatmap-grid"><thead><tr>' +
-      '<th style="width:130px">Member</th>' +
-      '<th>Workload (Total Open)</th>' +
-      '<th style="width:80px">Open Pts</th>' +
-      '<th style="width:60px">Tasks</th>' +
-      '</tr></thead><tbody>';
+      '<th style="width:128px">Member</th>' +
+      '<th style="width:64px;color:#EA4335">⚠ Overdue</th>' +
+      weeks.map((wk,k)=>`<th${k===0?' style="color:#F5A623"':''}>${wk.label}${k===0?'<br><span style="font-size:7px;opacity:.6">THIS WEEK</span>':''}</th>`).join('') +
+      '<th style="width:52px">Total</th></tr></thead><tbody>';
 
     members.forEach(name => {
-      const wkTgt   = TEAM_TARGETS[name] || 50;
-      const myOpen  = openTasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(name));
-      const openPts = myOpen.reduce((s,t)=>s+(t.weightedPts||0), 0);
-      const pct     = Math.min(120, Math.round(openPts / wkTgt * 100));
-      const barColor = openPts/wkTgt > 1.2 ? '#EA4335' : openPts/wkTgt >= 0.8 ? '#2ED573' : '#FBBC04';
-      html += `<tr>
-        <td class="hm-name">${name}</td>
-        <td><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:20px;position:relative">
-          <div style="height:100%;width:${Math.min(100,pct)}%;background:${barColor};border-radius:4px;transition:width .3s"></div>
-          <span style="position:absolute;left:8px;top:2px;font-size:10px;font-weight:700;color:#fff">${pct}% of weekly target (${wkTgt}pts)</span>
-        </div></td>
-        <td style="text-align:center"><span class="hm-cell ${hmColor(openPts,wkTgt)}">${openPts.toFixed(1)}</span></td>
-        <td style="text-align:center;font-size:11px;color:rgba(255,255,255,0.5)">${myOpen.length}</td>
-      </tr>`;
+      const mine = openTasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(name));
+      const overdue = mine.filter(t=> t.targetDate && t.targetDate < curMon).reduce((s,t)=>s+(t.weightedPts||0),0);
+      const wkPts = weeks.map(wk=> mine.filter(t=> t.targetDate>=wk.start && t.targetDate<=wk.end).reduce((s,t)=>s+(t.weightedPts||0),0));
+      const total = overdue + wkPts.reduce((a,b)=>a+b,0);
+      const cell=(p,c)=>`<td style="text-align:center;font-size:11px;font-weight:600;color:${p>0?(c||'#fff'):'rgba(255,255,255,0.18)'}">${p>0?p.toFixed(1):'—'}</td>`;
+      html += `<tr><td class="hm-name">${name}</td>` +
+        cell(overdue,'#EA4335') +
+        wkPts.map(p=>cell(p)).join('') +
+        `<td style="text-align:center;font-size:11px;font-weight:700;color:#F5A623">${total>0?total.toFixed(1):'—'}</td></tr>`;
     });
     html += '</tbody></table>';
 
