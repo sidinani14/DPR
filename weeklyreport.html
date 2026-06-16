@@ -269,17 +269,20 @@ function scoreCalc(m, taskData) {
   // Punctuality /20 — scaled from biometric base (/15) to /20
   // absent-day penalty removed — punctuality/hours scored on present days only
   const punctBase   = bio.punctScore ?? 15;
-  const punctScaled = Math.round(punctBase / 15 * 20 * 10) / 10;
+  const punctScaled = Math.round(Math.min(15, punctBase) * 10) / 10;  // /15
   const s_punct     = presentDays > 0 ? punctScaled : 0;
 
   // Hours /15 — scaled from biometric base (/10) to /15
   const hrsBase   = bio.hrsScore ?? 7;
-  const hrsScaled = Math.round(hrsBase / 10 * 15 * 10) / 10;
+  const hrsScaled = Math.round(Math.min(10, hrsBase) * 10) / 10;  // /10
   const s_hrs     = presentDays > 0 ? hrsScaled : 0;
 
-  const total = Math.round((s_output + s_dpr + s_punct + s_hrs) * 10) / 10;
+  // Reliability /10 — 10 minus delay penalties (−1 late, −2 reassigned)
+  const s_reliability = Math.max(0, Math.round((10 - (taskData.reliabilityPenalty || 0)) * 10) / 10);
+  const total = Math.round((s_output + s_dpr + s_punct + s_hrs + s_reliability) * 10) / 10;
 
-  return {s_output, s_dpr, s_punct, s_hrs,
+  return {s_output, s_dpr, s_punct, s_hrs, s_reliability,
+          reliabilityPenalty: taskData.reliabilityPenalty||0, lateCount: taskData.lateCount||0, workNotDone: taskData.workNotDone||0,
           total, tgt, approvedPts,
           dprDays: effectiveDprDays, presentDays,
           completedOT: taskData.completedOnTime || 0,
@@ -327,8 +330,9 @@ function buildOverviewPage(team){
       <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(s.s_punct,20)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/20*100))}%;background:${sc(s.s_punct,20)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(s.s_hrs,15)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/15*100))}%;background:${sc(s.s_hrs,15)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_punct,15)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/15*100))}%;background:${sc(s.s_punct,15)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_hrs,10)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/10*100))}%;background:${sc(s.s_hrs,10)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_reliability,10)}">${s.s_reliability}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_reliability/10*100))}%;background:${sc(s.s_reliability,10)}"></div></div></td>
       <td><div class="sv" style="color:${col};font-size:19px;" contenteditable="true">${s.total}</div></td>
       <td>${statusChip(s)}</td>
     </tr>`;
@@ -342,8 +346,9 @@ function buildOverviewPage(team){
         <th style="width:28px">#</th><th style="width:145px">Member</th>
         <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks</span></th>
         <th>DPR<br><span style="opacity:.5">/15</span></th>
-        <th>Punctuality<br><span style="opacity:.5">/20</span></th>
-        <th>Hours<br><span style="opacity:.5">/15</span></th>
+        <th>Punctuality<br><span style="opacity:.5">/15</span></th>
+        <th>Hours<br><span style="opacity:.5">/10</span></th>
+        <th>Reliability<br><span style="opacity:.5">/10</span></th>
         <th>Total<br><span style="opacity:.5">/100</span></th>
         <th>Status</th>
       </tr></thead>
@@ -444,8 +449,9 @@ function buildIndividualPage(m, taskData){
     <div class="pg">
       ${paramCard('Output<br>Approved Pts',s.s_output,50,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${s.presentDays} present days filed`)}
-      ${paramCard('Punctuality<br>Biometric',s.s_punct,20,`${bio.lateCount||0} late · ${WEEK_DAYS-(bio.days||WEEK_DAYS)} absent<br>−2.0/absent · Thr: 09:10${achalNote}`)}
-      ${paramCard('Hours<br>Biometric',s.s_hrs,15,`Avg: ${bio.avgHrs||'—'}/day · ${WEEK_DAYS-(bio.days||WEEK_DAYS)} absent<br>−1.5/absent · Target: 8:00 hrs`)}
+      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
+      ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
+      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`${s.lateCount||0} late (−1) · ${s.workNotDone||0} reassigned (−2)`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 170px;gap:4mm;margin-bottom:3mm;">

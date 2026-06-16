@@ -181,6 +181,7 @@ function doPost(e) {
 
     // Form submission actions
     if (data.action === 'submitApprovals')   return respond(submitApprovals(data));
+    if (data.action === 'reassignTask')      return respond(reassignTask(data));
     if (data.action === 'assignTasks')       return respond(assignTasks(data));
     if (data.action === 'markNotifSeen')     return respond(markNotificationSeen(data));
     if (data.action === 'createSelfTask')    return respond(createSelfAssignedTask(data));
@@ -524,7 +525,10 @@ function getAllTasks() {
     var monOfWeek = cellDate(mondayOf(new Date()));
 
     var status = 'Upcoming';
-    if (selfStatus === 'Done') {
+    if (selfStatus === 'Work Not Done') {
+      status = 'Work Not Done';  // lead closed it off the assignee (reassigned) — penalty applies
+    }
+    else if (selfStatus === 'Done') {
       if      (leadApproved === 'Yes') {
         // Completed — only show if completed this week (Mon onwards)
         var doneOn = (COL_ACTUALDATE > -1 ? cellDate(r[COL_ACTUALDATE]) : '') ||
@@ -767,6 +771,53 @@ function getPendingTasks() {
 // TASK_ASSIGNMENTS: LeadApproved=P(16) ApprovedBy=Q(17) ApprovalDate=R(18)
 //   SelfStatus=N(14) SelfDoneDate=O(15) RevisionTag=S(19) Notes=T(20)
 // ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+// reassignTask — lead marks a delayed task "Work Not Done" off the
+// original assignee (the −2 reliability penalty sticks to them) and
+// re-creates it fresh for a new assignee at full points.
+// ════════════════════════════════════════════════════════════════
+function reassignTask(data) {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var row = parseInt(data.row);
+  if (!row || row < 2) return {status:'error', message:'Invalid row'};
+  var newAssignee = String(data.newAssignee||'').trim();
+  if (!newAssignee) return {status:'error', message:'No new assignee'};
+  var leadName = String(data.leadName||'lead').trim();
+  var today = dateStr();
+
+  var lastCol = sheet.getLastColumn();
+  var orig = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
+  var origAssignee = String(orig[3]||'').trim();
+
+  // 1. Close the original off the assignee (penalty stays with them)
+  sheet.getRange(row, 14).setValue('Work Not Done');  // N SelfStatus
+  var existNotes = String(orig[20]||'').trim();        // U Notes
+  sheet.getRange(row, 21).setValue(
+    (existNotes ? existNotes + ' | ' : '') +
+    'Reassigned to ' + newAssignee + ' by ' + leadName + ' on ' + today + ' (delay)');
+
+  // 2. Fresh copy for the new assignee at full points
+  var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
+  var n = orig.slice();
+  n[0]  = newId;            // A TaskID
+  n[3]  = newAssignee;      // D AssignedTo
+  n[9]  = today;            // J AssignedDate (K Deadline kept from original)
+  n[13] = 'Not Started';    // N SelfStatus
+  n[14] = '';               // O SelfStatusDate
+  if (n.length > 15) n[15] = ''; // P ActualCompletion
+  n[16] = 'Pending';        // Q LeadApproved
+  n[17] = '';               // R ApprovedBy
+  n[18] = '';               // S ApprovalDate
+  n[19] = '';               // T RevisionTag
+  n[20] = 'Reassigned from ' + origAssignee + ' (delay)'; // U Notes
+  n[21] = leadName + ' (reassigned)'; // V AssignedBy
+  sheet.appendRow(n);
+
+  Logger.log('Reassigned row '+row+' from '+origAssignee+' → '+newAssignee+' ('+newId+')');
+  return {status:'ok', newTaskId:newId, original:origAssignee, newAssignee:newAssignee};
+}
+
 function submitApprovals(data) {
   var s        = db();
   var taskAssn = s.getSheetByName(ASSIGN_TAB);
@@ -3112,6 +3163,24 @@ function getWeeklyStats(weekStart) {
         dprDays++;
     });
 
+    // Reliability — delays this week. Late (deadline in week, passed, not done
+    // on time) = −1; "Work Not Done" (reassigned by a lead) = −2.
+    var lateCount = 0, wndCount = 0;
+    var nowD = dateStr();
+    asRows.forEach(function(r, i) {
+      if (i === 0) return;
+      if (String(r[3]||'').trim() !== name) return;
+      var dl = cellDate(r[COL_DEADLINE]);
+      if (!dl || dl < mon || dl > sat) return;       // deadline must fall in this week
+      var selfStat = String(r[13]||'').trim();         // N SelfStatus
+      if (selfStat === 'Work Not Done') { wndCount++; return; }
+      if (dl >= nowD) return;                          // not due yet — not late
+      var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
+      var onTime   = String(r[COL_LEADAPPR]||'').trim() === 'Yes' && doneDate && doneDate <= dl;
+      if (!onTime) lateCount++;
+    });
+    var reliabilityPenalty = lateCount * 1 + wndCount * 2;
+
     results.push({
       name           : name,
       role           : role,
@@ -3122,6 +3191,9 @@ function getWeeklyStats(weekStart) {
       completedLate  : completedLate,
       approvedPts    : Math.round(approvedPts * 10) / 10,
       dprDays        : dprDays,
+      lateCount      : lateCount,
+      workNotDone    : wndCount,
+      reliabilityPenalty: reliabilityPenalty,
       completedTasks : completedTasks,
     });
   }

@@ -82,6 +82,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .task-notes{font-size:11px;color:var(--text3);margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:4px;line-height:1.5;font-style:italic}
 .revision-badge{font-size:11px;color:var(--purple);margin-top:6px;padding:4px 8px;background:var(--purple-light);border-radius:4px;display:inline-block}
 .task-done-date{font-size:11px;color:var(--green);margin-top:6px;font-family:'DM Mono',monospace}
+.reassign-host{margin-top:8px}
+.reassign-btn{font-size:11px;font-weight:600;color:var(--red);background:transparent;border:1px solid var(--red);border-radius:5px;padding:5px 10px;cursor:pointer}
+.reassign-btn:hover{background:rgba(224,85,107,.08)}
+.reassign-picker{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.reassign-picker select{font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);min-width:200px}
+.reassign-go{font-size:11px;font-weight:600;color:#fff;background:var(--red);border:none;border-radius:5px;padding:5px 12px;cursor:pointer}
+.reassign-x{font-size:11px;color:var(--text3);background:transparent;border:1px solid var(--border);border-radius:5px;padding:5px 9px;cursor:pointer}
+.reassign-note{font-size:10px;color:var(--text3);margin-top:5px;font-style:italic}
+.reassign-busy{font-size:11px;color:var(--text3)}
+.reassign-ok{font-size:11px;font-weight:600;color:var(--green)}
+.reassign-err{font-size:11px;font-weight:600;color:var(--red)}
 .empty{text-align:center;padding:60px 20px}
 .empty-icon{font-size:40px;margin-bottom:12px}
 .empty-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
@@ -726,9 +737,52 @@ function renderTaskList(tasks) {
         </div>
         ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
         ${t.completedDate?`<div class="task-done-date">✓ Completed ${t.completedDate}</div>`:''}
+        ${(isOverdue||t.status==='Delayed')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" onclick="openReassign(${t.row},this)">↪ Work Not Done — reassign</button></div>`:''}
       </div>
     </div>`;
   }).join('');
+}
+
+// ── REASSIGN (lead only) ─────────────────────────────────────
+function allMembers(){
+  return [...new Set(allTasks.flatMap(t=>t.assignedTo.split(',').map(a=>a.trim())).filter(Boolean))].sort();
+}
+function memberOpenPts(name){
+  return allTasks
+    .filter(t=>['Upcoming','Ongoing','Delayed','Approval Pending'].includes(t.status) &&
+               t.assignedTo.split(',').map(a=>a.trim()).includes(name))
+    .reduce((s,t)=>s+(t.weightedPts||0),0);
+}
+function openReassign(row, btn){
+  const t = allTasks.find(x=>x.row===row); if(!t) return;
+  const cur = t.assignedTo.split(',').map(a=>a.trim());
+  const opts = allMembers().filter(m=>!cur.includes(m))
+    .sort((a,b)=>memberOpenPts(a)-memberOpenPts(b))
+    .map(m=>`<option value="${m}">${m} — ${(Math.round(memberOpenPts(m)*10)/10)} open pts</option>`).join('');
+  btn.parentElement.innerHTML =
+    `<div class="reassign-picker">
+       <select id="ra-sel-${row}"><option value="">Reassign to (lightest first)…</option>${opts}</select>
+       <button class="reassign-go" onclick="doReassign(${row})">Confirm</button>
+       <button class="reassign-x" onclick="renderTasks()">✕</button>
+     </div>
+     <div class="reassign-note">Original keeps the −2 reliability penalty; new person earns full points.</div>`;
+}
+async function doReassign(row){
+  const sel = document.getElementById('ra-sel-'+row);
+  const newAssignee = sel && sel.value;
+  if(!newAssignee){ sel.style.borderColor='#E0556B'; return; }
+  let leadName = localStorage.getItem('dpr_lead_name');
+  if(!leadName){ leadName = (prompt('Your name (recorded as the lead who reassigned):')||'').trim();
+    if(!leadName) return; localStorage.setItem('dpr_lead_name', leadName); }
+  const host = document.getElementById('ra-host-'+row);
+  if(host) host.innerHTML = '<span class="reassign-busy">Reassigning…</span>';
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'reassignTask', row, newAssignee, leadName})});
+    const j = await res.json();
+    if(j.status==='ok'){ if(host) host.innerHTML='<span class="reassign-ok">✓ Reassigned to '+newAssignee+'</span>'; setTimeout(loadTasks, 900); }
+    else { if(host) host.innerHTML='<span class="reassign-err">✗ '+(j.message||'Failed')+'</span>'; }
+  }catch(e){ if(host) host.innerHTML='<span class="reassign-err">✗ Network error</span>'; }
 }
 </script>
 </body>
