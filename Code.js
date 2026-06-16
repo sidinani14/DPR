@@ -143,6 +143,7 @@ function doGet(e) {
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
+  if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
@@ -166,6 +167,7 @@ function doPost(e) {
     if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
+    if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -4944,20 +4946,172 @@ function writeFeedbackHeaders(sheet) {
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
+var LEADS_HEADERS = [
+  'Lead ID','Client Name','Contact No.','Referred By',
+  'Validation Check','Lead Status','Contacted By',
+  'Lead Creation Date','Last Contacted','Lead Manager',
+  'Remarks','Lost Reasons','24hr Contact Done',
+  'Lead Source','Briefing Date','Proposal Date',
+];
 function writeLeadsHeaders(sheet) {
-  // Matches LMS structure from IDS Google Form
-  var h = [
-    'Lead ID','Client Name','Contact No.','Referred By',
-    'Validation Check','Lead Status','Contacted By',
-    'Lead Creation Date','Last Contacted','Lead Manager',
-    'Remarks','Lost Reasons','24hr Contact Done',
-  ];
+  // Matches LMS structure from IDS Google Form (+ source & SLA dates)
+  var h = LEADS_HEADERS;
   sheet.getRange(1,1,1,h.length).setValues([h])
     .setBackground('#1565C0').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
-  var widths=[120,200,140,200,120,200,160,130,130,160,300,200,130];
+  var widths=[120,200,140,200,120,200,160,130,130,160,300,200,130,150,120,120];
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
+}
+
+// Non-destructive: adds the new N/O/P headers to an existing LEADS tab.
+function migrateLeadsColumns(sheet) {
+  if (!sheet) return;
+  var lastCol = sheet.getLastColumn();
+  if (lastCol >= LEADS_HEADERS.length) return;  // already migrated
+  var have = lastCol > 0
+    ? sheet.getRange(1,1,1,lastCol).getValues()[0].map(function(x){ return String(x||'').trim(); })
+    : [];
+  for (var c = 0; c < LEADS_HEADERS.length; c++) {
+    if (have[c] !== LEADS_HEADERS[c]) {
+      sheet.getRange(1, c+1).setValue(LEADS_HEADERS[c])
+        .setBackground('#1565C0').setFontColor('#FFFFFF').setFontWeight('bold').setFontSize(10);
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// getLeadsAnalytics — funnel, conversion, sources, lost reasons & SLA
+// action=getLeadsAnalytics&month=2026-06  (month optional → current)
+// Goal: never miss a lead (24h/48h SLA radar) + raise conversion rate.
+// ════════════════════════════════════════════════════════════════
+var MONTH_NAMES = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+function diffDays(a, b){ // a,b = 'YYYY-MM-DD' strings
+  if (!a || !b) return null;
+  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
+}
+function getLeadsAnalytics(month) {
+  var sheet = db().getSheetByName(LEADS_TAB);
+  if (!sheet) return {error:'LEADS tab not found'};
+  migrateLeadsColumns(sheet);
+
+  var today = dateStr();
+  var curMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : today.substring(0,7);
+  var yy = parseInt(curMonth.substring(0,4),10), mm = parseInt(curMonth.substring(5,7),10);
+  var monthLabel = MONTH_NAMES[mm-1] + ' ' + yy;
+
+  var rows = sheet.getLastRow() > 1 ? sheet.getDataRange().getValues() : [[]];
+
+  // Accumulators
+  var monthLeads = [];      // leads created in the selected month
+  var bySource = {}, byManager = {}, lostByReason = {};
+  var funnel = {contacted:0, briefing:0, proposal:0, converted:0, lost:0, invalid:0};
+  var sla24 = {met:0, missed:0, pending:0};
+  var sla48 = {met:0, late:0, breaching:0, pending:0};
+  var needsAttention = [];
+  var trend = {}; // 'YYYY-MM' → {created, converted}
+
+  // Last 6 months keys
+  var trendKeys = [];
+  for (var k = 5; k >= 0; k--) {
+    var d = new Date(yy, mm-1-k, 1);
+    var key = d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2);
+    trendKeys.push(key);
+    trend[key] = {label: MONTH_NAMES[d.getMonth()].substring(0,3)+' '+String(d.getFullYear()).substring(2),
+                  month:key, created:0, converted:0};
+  }
+
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!String(r[0]||'').trim() && !String(r[1]||'').trim()) continue;
+    var name    = String(r[1]||'').trim();
+    var status  = String(r[5]||'').trim();
+    var manager = String(r[9]||'').trim() || 'Unassigned';
+    var lostRsn = String(r[11]||'').trim() || 'Unspecified';
+    var c24     = String(r[12]||'').trim();
+    var source  = String(r[13]||'').trim() || 'Unspecified';
+    var created = cellDate(r[7]);
+    var briefing= cellDate(r[14]);
+    var proposal= cellDate(r[15]);
+    var isInvalid = status === 'Invalid' || String(r[4]||'').trim() === 'Invalid';
+
+    // 6-month trend
+    if (created) {
+      var cm = created.substring(0,7);
+      if (trend[cm]) { trend[cm].created++; if (status === 'Lead Converted') trend[cm].converted++; }
+    }
+
+    // ── Needs-attention radar (ALL open leads, any month) ──
+    var ageC = created ? diffDays(created, today) : null;
+    if (!isInvalid && status !== 'Lost' && status !== 'Lead Converted') {
+      if (status === 'Not Contacted' && c24 !== 'Yes' && created && created < today) {
+        needsAttention.push({leadId:String(r[0]||''), name:name, manager:manager,
+          issue:'No first contact', ageDays:ageC, status:status, sla:'24h'});
+      } else if (briefing && !proposal) {
+        var ageB = diffDays(briefing, today);
+        if (ageB !== null && ageB > 2) needsAttention.push({leadId:String(r[0]||''), name:name,
+          manager:manager, issue:'Briefing '+ageB+'d ago, no proposal', ageDays:ageB, status:status, sla:'48h'});
+      }
+    }
+
+    // ── Per-month metrics ──
+    if (created && created.substring(0,7) === curMonth) {
+      monthLeads.push(r);
+      bySource[source]   = (bySource[source]||0)+1;
+      byManager[manager] = (byManager[manager]||0)+1;
+
+      if (isInvalid) funnel.invalid++;
+      else {
+        if (status === 'Lost') { funnel.lost++; lostByReason[lostRsn] = (lostByReason[lostRsn]||0)+1; }
+        if (['Contacted over call','Briefing Meeting Done','Design Proposal Shared','Fee Proposal Shared','Lead Converted'].indexOf(status) > -1) funnel.contacted++;
+        if (leadReachedBriefing(status) || briefing) funnel.briefing++;
+        if (leadReachedProposal(status) || proposal) funnel.proposal++;
+        if (status === 'Lead Converted') funnel.converted++;
+      }
+
+      // 24h SLA
+      if (c24 === 'Yes') sla24.met++;
+      else if (c24 === 'No') sla24.missed++;
+      else if (created < today) sla24.missed++;   // Pending past the window
+      else sla24.pending++;
+
+      // 48h proposal SLA (only leads that had a briefing)
+      if (briefing) {
+        if (proposal) { (diffDays(briefing, proposal) <= 2) ? sla48.met++ : sla48.late++; }
+        else if (diffDays(briefing, today) > 2) sla48.breaching++;
+        else sla48.pending++;
+      }
+    }
+  }
+
+  var totalMonth = monthLeads.length;
+  var validMonth = totalMonth - funnel.invalid;
+  var conversionRate = validMonth > 0 ? Math.round(funnel.converted / validMonth * 1000)/10 : 0;
+
+  needsAttention.sort(function(a,b){ return (b.ageDays||0) - (a.ageDays||0); });
+  var trendArr = trendKeys.map(function(key){
+    var t = trend[key];
+    t.rate = t.created > 0 ? Math.round(t.converted / t.created * 1000)/10 : 0;
+    return t;
+  });
+
+  function toArr(obj){ return Object.keys(obj).map(function(k){ return {label:k, count:obj[k]}; })
+                              .sort(function(a,b){ return b.count - a.count; }); }
+
+  return {
+    month: curMonth, monthLabel: monthLabel,
+    totalLeads: totalMonth, validLeads: validMonth,
+    conversionRate: conversionRate,
+    funnel: funnel,
+    bySource: toArr(bySource),
+    byManager: toArr(byManager),
+    lostByReason: toArr(lostByReason),
+    sla24: sla24, sla48: sla48,
+    needsAttention: needsAttention,
+    needsAttentionCount: needsAttention.length,
+    trend: trendArr,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -5157,26 +5311,31 @@ function submitAmanCRM(data) {
 
     // ── 2. Write new leads to LEADS sheet ─────────────────────
     var leadsSheet = getOrCreate(LEADS_TAB, writeLeadsHeaders);
+    migrateLeadsColumns(leadsSheet);
     newLeads.forEach(function(lead) {
       if (!lead.clientName) return;
       var leadId = nextId(leadsSheet, 'LEAD-');
+      var st = lead.leadStatus || 'Not Contacted';
       leadsSheet.appendRow([
         leadId,
         lead.clientName  || '',
         lead.contactNo   || '',
         lead.referredBy  || '',
         lead.validation  || 'Not checked',
-        lead.leadStatus  || 'Not Contacted',
+        st,
         member,                    // Contacted By = Aman
         today,                     // Lead Creation Date
-        '',                        // Last Contacted (blank — not contacted yet)
+        st === 'Not Contacted' ? '' : today,  // Last Contacted
         lead.leadManager || '',
         lead.remarks     || '',
         lead.lostReasons || '',
-        'Pending',                 // 24hr Contact Done — to be confirmed next day
+        st === 'Not Contacted' ? 'Pending' : 'Yes',  // 24hr Contact Done
+        lead.leadSource  || '',                       // N Lead Source
+        leadReachedBriefing(st) ? today : '',         // O Briefing Date
+        leadReachedProposal(st) ? today : '',         // P Proposal Date
       ]);
       // Promote serious leads (briefing done or further) to PROJECTS tab
-      if (isPromoteLeadStage(lead.leadStatus)) promoteLeadToProject(lead.clientName, member);
+      if (isPromoteLeadStage(st)) promoteLeadToProject(lead.clientName, member);
     });
     Logger.log('Leads written: ' + newLeads.length);
 
@@ -5191,6 +5350,13 @@ function submitAmanCRM(data) {
           if (f.contacted) {
             leadsSheet.getRange(i+1, 6).setValue(f.newStatus || '');   // F Lead Status
             leadsSheet.getRange(i+1, 9).setValue(today);               // I Last Contacted
+            if (f.newStatus === 'Lost' && f.lostReasons)
+              leadsSheet.getRange(i+1, 12).setValue(f.lostReasons);    // L Lost Reasons
+            // Stamp SLA dates when the stage is reached (only if not already set)
+            if (leadReachedBriefing(f.newStatus) && !String(leadsData[i][14]||'').trim())
+              leadsSheet.getRange(i+1, 15).setValue(today);            // O Briefing Date
+            if (leadReachedProposal(f.newStatus) && !String(leadsData[i][15]||'').trim())
+              leadsSheet.getRange(i+1, 16).setValue(today);            // P Proposal Date
             // Promote to PROJECTS once it reaches briefing-done or further
             if (isPromoteLeadStage(f.newStatus)) promoteLeadToProject(String(leadsData[i][1]||''), member);
           }
@@ -5382,6 +5548,12 @@ var CRM_PROMOTE_STAGES = ['Briefing Meeting Done','Design Proposal Shared',
 function isPromoteLeadStage(status) {
   return CRM_PROMOTE_STAGES.indexOf(String(status||'').trim()) > -1;
 }
+// SLA stage helpers — a briefing is "done" at briefing or any later stage;
+// a proposal is "shared" at proposal stages or conversion.
+var LEAD_BRIEFING_STAGES = ['Briefing Meeting Done','Design Proposal Shared','Fee Proposal Shared','Lead Converted'];
+var LEAD_PROPOSAL_STAGES = ['Design Proposal Shared','Fee Proposal Shared','Lead Converted'];
+function leadReachedBriefing(status){ return LEAD_BRIEFING_STAGES.indexOf(String(status||'').trim()) > -1; }
+function leadReachedProposal(status){ return LEAD_PROPOSAL_STAGES.indexOf(String(status||'').trim()) > -1; }
 // CRM adds projects not yet in the PROJECTS tab (name + type + stage + client).
 // Persists them so Aman can raise issues/deliverables without Siddharth's help.
 //   PROJECTS cols: A ID, B Name, C Status(stage), D Discipline(type), E Mult, F Lead, G Client

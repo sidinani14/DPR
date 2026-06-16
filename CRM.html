@@ -580,6 +580,8 @@ const LEAD_STATUSES = [
   {key:'Invalid',              color:'#6B6860', bg:'#F5F3EE'},
 ];
 
+const LEAD_SOURCES   = ['BNI Referral','Client Referral','Vendor Referral','Lead Manager Referral','Business Associate','Friends & Family','Walk-in','Others'];
+const LOST_REASONS   = ['High Fee','Project on Hold','Portfolio Shortage','Design Proposal Not at Par','Looking for Different Plot','Low Scale Project','No Response / Lost Contact','Other'];
 const CONTACT_TYPES  = ['📞 Call','💬 WhatsApp','👥 Meeting','🏗️ Site Visit','📧 Email'];
 const CRM_ISS_TYPES  = ['CRM/Process','Design','Finance','Contractor','Client'];
 const TEAM_MEMBERS   = Object.values(EMAIL_MAP).filter((v,i,a)=>a.indexOf(v)===i).sort();
@@ -867,6 +869,13 @@ function renderOpenLeads() {
       <div class="lead-act-btns">
         ${LEAD_ACTIONS.map(a=>`<div class="lead-act ${a.cls}" data-key="${a.key}" onclick="setLeadAction(${i},this.dataset.key)">${a.label}</div>`).join('')}
       </div>
+      <div class="field" id="lc-lost-${i}" style="display:none;margin-top:8px">
+        <span class="lbl" style="font-size:10px">Lost Reason <span style="color:var(--red)">*</span></span>
+        <select onchange="openLeads[${i}]._lostReason=this.value">
+          <option value="">Why was this lead lost?…</option>
+          ${LOST_REASONS.map(s=>`<option value="${s}">${s}</option>`).join('')}
+        </select>
+      </div>
     </div>`).join('');
 }
 
@@ -875,6 +884,8 @@ function setLeadAction(i, statusKey) {
   document.querySelectorAll('#lc-'+i+' .lead-act').forEach(b=>{
     b.classList.toggle('on', b.dataset.key===statusKey);
   });
+  const lostWrap=document.getElementById('lc-lost-'+i);
+  if(lostWrap) lostWrap.style.display = statusKey==='Lost' ? 'block' : 'none';
 }
 
 // ════════════════════════════════════════
@@ -902,9 +913,18 @@ function addLeadBlock() {
         <input type="text" id="lb-phone-${id}" placeholder="Mobile…">
       </div>
     </div>
-    <div class="field">
-      <span class="lbl">Referred By</span>
-      <input type="text" id="lb-ref-${id}" placeholder="Who referred this lead?">
+    <div class="field-row">
+      <div class="field">
+        <span class="lbl">Referred By</span>
+        <input type="text" id="lb-ref-${id}" placeholder="Who referred this lead?">
+      </div>
+      <div class="field">
+        <span class="lbl">Lead Source</span>
+        <select id="lb-src-${id}">
+          <option value="">Select source…</option>
+          ${LEAD_SOURCES.map(s=>`<option value="${s}">${s}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="field">
       <span class="lbl">Validation Check</span>
@@ -940,8 +960,11 @@ function addLeadBlock() {
       <textarea id="lb-remarks-${id}" placeholder="Project type, requirements, notes…" style="min-height:48px"></textarea>
     </div>
     <div class="field" id="lb-lost-${id}" style="display:none">
-      <span class="lbl">Lost Reason</span>
-      <input type="text" id="lb-lostrsn-${id}" placeholder="High Fee / Portfolio Shortage / Project on hold…">
+      <span class="lbl">Lost Reason <span style="color:var(--red)">*</span></span>
+      <select id="lb-lostrsn-${id}">
+        <option value="">Why was this lead lost?…</option>
+        ${LOST_REASONS.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
     </div>`;
   document.getElementById('lead-blocks').appendChild(div);
   setLeadStatus(id,'Not Contacted');
@@ -1480,11 +1503,12 @@ function collectLeads() {
       clientName : nm,
       contactNo  : (document.getElementById('lb-phone-'+id)?.value||'').trim(),
       referredBy : (document.getElementById('lb-ref-'+id)?.value||'').trim(),
+      leadSource : document.getElementById('lb-src-'+id)?.value||'',
       validation : document.getElementById('lb-val-'+id)?.value||'Not checked',
       leadStatus : document.getElementById('lb-status-'+id)?.value||'Not Contacted',
       leadManager: document.getElementById('lb-mgr-'+id)?.value||'',
       remarks    : (document.getElementById('lb-remarks-'+id)?.value||'').trim(),
-      lostReasons: (document.getElementById('lb-lostrsn-'+id)?.value||'').trim(),
+      lostReasons: document.getElementById('lb-lostrsn-'+id)?.value||'',
     });
   });
   return out;
@@ -1494,9 +1518,11 @@ function collectLeadUpdates() {
   return openLeads
     .filter(l=>l._newStatus && l._newStatus !== l.leadStatus)
     .map(l=>({
-      leadId   : l.leadId||'',
-      newStatus: l._newStatus,
-      contacted: l._newStatus !== 'Not Contacted',
+      leadId    : l.leadId||'',
+      clientName: l.clientName||'',
+      newStatus : l._newStatus,
+      contacted : l._newStatus !== 'Not Contacted',
+      lostReasons: l._lostReason||'',
     }));
 }
 
@@ -1595,6 +1621,16 @@ async function submitAll() {
     // 2. Main CRM submission
     const leads    = collectLeads();
     const followups= collectLeadUpdates();
+
+    // Validation: a Lost lead must carry a reason
+    const lostNoReason = leads.find(l => l.leadStatus === 'Lost' && !l.lostReasons)
+                      || followups.find(l => l.newStatus === 'Lost' && !l.lostReasons);
+    if (lostNoReason) {
+      toast('Pick a Lost Reason for: ' + (lostNoReason.clientName || lostNoReason.leadId || 'lost lead'));
+      document.getElementById('submit-btn').disabled=false;
+      document.getElementById('submit-status').textContent='';
+      return;
+    }
     const contacts = collectContacts();
     const agendas  = collectAgendas();
     const finance  = collectFinance();
