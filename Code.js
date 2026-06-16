@@ -299,6 +299,8 @@ function readConfig() {
   var stages = [], discs = [], visits = [], leads = [];
   var sw = {points:35, ontime:25, dpr:20, attendance:10, quality:10};
   var rp = {internal:1.5, client:0.75};
+  var taskGroups = [];   // [{name, tasks:[labels]}] — from the — SECTION — headers in col A
+  var curGroup = null;
 
   var SKIP_A = ['STAGE WEIGHTS','TASK / STAGE TYPE','TOTAL',''];
   var SKIP_E = ['DISCIPLINE MULTIPLIERS','DISCIPLINE & SCALE',''];
@@ -321,9 +323,17 @@ function readConfig() {
     var tv = String(r[19] || '').trim();
     var uv = String(r[20] || '').trim();
 
+    // Section header (— ARCHITECTURE —, — TOWNSHIP —, …) → starts a task-category group
+    if (a.startsWith('—') && !a.startsWith('←')) {
+      var gname = a.replace(/[—–-]/g, '').trim();
+      if (gname && isNaN(parseFloat(gname))) { curGroup = {name: gname, tasks: []}; taskGroups.push(curGroup); }
+    }
+
     if (a && SKIP_A.indexOf(a.toUpperCase()) === -1 && !a.startsWith('—') &&
-        !a.startsWith('←') && !isNaN(parseFloat(b)))
+        !a.startsWith('←') && !isNaN(parseFloat(b))) {
       stages.push({label:a, pts:parseFloat(b), category:c});
+      if (curGroup) curGroup.tasks.push(a);
+    }
 
     if (e && SKIP_E.indexOf(e.toUpperCase()) === -1 &&
         !e.startsWith('←') && !isNaN(parseFloat(f)))
@@ -355,7 +365,7 @@ function readConfig() {
 
   Logger.log('readConfig: found ' + leads.length + ' leads: ' + leads.map(function(l){return l.name;}).join(', '));
   return {stages:stages, disciplines:discs, visits:visits,
-          leads:leads, scoringWeights:sw, revPenalties:rp};
+          leads:leads, scoringWeights:sw, revPenalties:rp, taskGroups:taskGroups};
 }
 
 // writeTaskLog and writeTaskLogHeaders removed — TASK_LOG tab is obsolete.

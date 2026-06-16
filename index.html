@@ -326,7 +326,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 
-let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[];
+let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[], TASK_GROUPS=[], STAGE_IDX={};
 let EMAIL_MAP  = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"}; // hardcoded fallback — overridden by live data
 let googleUser = null;
 let assignedTasks = [];
@@ -516,6 +516,8 @@ async function fetchAll() {
       TEAM     = l.team     || [];
       PROJECTS = l.projects || [];
       STAGES   = (c.stages  || []).filter(s=>s.pts>0);
+      TASK_GROUPS = c.taskGroups || [];
+      STAGE_IDX = {}; STAGES.forEach((s,i)=>{ STAGE_IDX[s.label]=i; });
       VISITS   = c.visits   || [];
       window._EMAILS = l.emails || [];
       if (window._EMAILS.length > 0) {
@@ -787,6 +789,22 @@ function stageOptions() {
   return '<option value="">— select task type —</option>'+
     STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
 }
+function catOptions() {
+  if (!TASK_GROUPS.length) return '<option value="__all">All tasks</option>';
+  return '<option value="">— select category —</option>'+
+    TASK_GROUPS.map(g=>`<option value="${g.name}">${g.name}</option>`).join('');
+}
+function fillTypes(catSel) {
+  const row = catSel.closest('.task-entry');
+  const typeSel = row.querySelector('.t-type');
+  let labels;
+  if (catSel.value === '__all' || !TASK_GROUPS.length) labels = STAGES.map(s=>s.label);
+  else { const g = TASK_GROUPS.find(x=>x.name===catSel.value); labels = g ? g.tasks : []; }
+  typeSel.innerHTML = '<option value="">— select task —</option>' +
+    labels.map(lb => { const idx = STAGE_IDX[lb]; return idx==null ? '' :
+      `<option value="${idx}">${STAGES[idx].label} · ${STAGES[idx].pts}pts</option>`; }).join('');
+  refreshTaskPts(typeSel); calcScore();
+}
 // visitDurOptions removed — replaced by hours number input
 
 function addProject(removable=true) {
@@ -871,8 +889,9 @@ function addTask(containerId) {
   row.className='task-entry';
   row.style.cssText='border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;background:var(--surface2)';
   row.innerHTML=`
+    <select class="t-cat" onchange="fillTypes(this)" style="width:100%;font-size:12px;padding:6px 10px;margin-bottom:6px">${catOptions()}</select>
     <div style="display:grid;grid-template-columns:1fr 60px 44px 22px;gap:6px;align-items:center;margin-bottom:7px">
-      <select class="t-type" onchange="refreshTaskPts(this);calcScore()">${stageOptions()}</select>
+      <select class="t-type" onchange="refreshTaskPts(this);calcScore()"><option value="">— select category first —</option></select>
       <input type="number" class="t-units" min="0.25" max="30" step="any" value="1" oninput="calcScore()" placeholder="Units">
       <div class="task-pts t-pts-display" style="font-size:11px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace">—</div>
       <button class="rm-task" type="button" onclick="this.closest('.task-entry').remove();calcScore()">×</button>

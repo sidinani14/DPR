@@ -142,7 +142,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
-let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[];
+let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[], TASK_GROUPS=[], STAGE_IDX={};
 let projBlockCount = 0;
 let taskCount=0;
 
@@ -307,6 +307,8 @@ async function fetchAll() {
       ALL_MEMBERS = l.allMembers || l.team || []; // fallback to team if allMembers not present
       PROJECTS    = l.projects   || [];
       STAGES   = (c.stages  || []).filter(s => s.pts > 0); // skip category headers
+      TASK_GROUPS = c.taskGroups || [];
+      STAGE_IDX = {}; STAGES.forEach((s,i)=>{ STAGE_IDX[s.label]=i; });
     }
     buildForm();
   } catch(e) {
@@ -344,6 +346,22 @@ function projOptions() {
 function stageOpts() {
   return '<option value="">— select task type —</option>'+
     STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
+}
+function catOpts() {
+  if (!TASK_GROUPS.length) return '<option value="__all">All tasks</option>';
+  return '<option value="">— select category —</option>'+
+    TASK_GROUPS.map(g=>`<option value="${g.name}">${g.name}</option>`).join('');
+}
+function fillStages(catSel) {
+  const block = catSel.closest('.task-block');
+  const taskSel = block.querySelector('.t-stage');
+  let labels;
+  if (catSel.value === '__all' || !TASK_GROUPS.length) labels = STAGES.map(s=>s.label);
+  else { const g = TASK_GROUPS.find(x=>x.name===catSel.value); labels = g ? g.tasks : []; }
+  taskSel.innerHTML = '<option value="">— select task —</option>' +
+    labels.map(lb => { const idx = STAGE_IDX[lb]; return idx==null ? '' :
+      `<option value="${idx}">${STAGES[idx].label} · ${STAGES[idx].pts}pts</option>`; }).join('');
+  recalcAll();
 }
 
 function addProjectBlock() {
@@ -416,9 +434,15 @@ function addTaskToBlock(pid) {
       <button class="task-remove" onclick="document.getElementById('${taskId}').remove();recalcAll()">✕ Remove</button>
     </div>
     <div class="task-block-body">
-      <div class="field">
-        <div class="lbl">Task type / stage <span class="req">*</span></div>
-        <select class="t-stage" onchange="recalcAll()">${stageOpts()}</select>
+      <div class="row2">
+        <div class="field">
+          <div class="lbl">Category <span class="req">*</span></div>
+          <select class="t-cat" onchange="fillStages(this)">${catOpts()}</select>
+        </div>
+        <div class="field">
+          <div class="lbl">Task type / stage <span class="req">*</span></div>
+          <select class="t-stage" onchange="recalcAll()"><option value="">— select category first —</option></select>
+        </div>
       </div>
       <div class="row2">
         <div class="field">
