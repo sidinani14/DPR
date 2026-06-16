@@ -163,11 +163,26 @@
 - Section order: Open Issues, Report Date, Client Connections, Issues/Deliverables,
   Tomorrow's Meetings, (WhatsApp agendas), Finance, Other Activities, Lead Management, Monthly Feedback.
 
-## Sheet structure — LEADS (matches LMS Google Sheet format)
+## Sheet structure — LEADS (matches LMS Google Sheet format; 16 cols A–P)
 - A: Lead ID (LEAD-001…), B: Client Name, C: Contact No., D: Referred By
 - E: Validation Check (Valid/Invalid/Not checked)
 - F: Lead Status, G: Contacted By, H: Lead Creation Date, I: Last Contacted
-- J: Lead Manager, K: Remarks, L: Lost Reasons, M: 24hr Contact Done (Pending/Yes/No)
+- J: Lead Manager, K: Remarks, L: Lost Reasons, M: 24hr Contact Done
+- N: Lead Source (BNI/Client/Vendor/Lead Manager/Business Associate/Friends & Family/Walk-in/Others)
+- O: Briefing Date, P: Proposal Date — stamped on stage transition (SLA clocks)
+- migrateLeadsColumns(sheet) adds N/O/P to existing tabs (non-destructive).
+- Lost leads MUST carry a Lost Reason (8 standard: High Fee, Project on Hold,
+  Portfolio Shortage, Design Proposal Not at Par, Looking for Different Plot,
+  Low Scale Project, No Response/Lost Contact, Other) — enforced in CRM form.
+- SLAs: contact within 24h (col M), proposal within 48h of Briefing Date (O→P).
+
+## Leads analytics & dashboard
+- getLeadsAnalytics(month='YYYY-MM') → funnel (contacted/briefing/proposal/converted/
+  lost/invalid), conversionRate (converted/valid), bySource, byManager, lostByReason,
+  sla24 {met/missed/pending}, sla48 {met/late/breaching/pending}, needsAttention list
+  (open leads breaching 24h/48h, all months), 6-month trend. Routes: GET+POST.
+- leads.html → deployed at /DPR/leads (month selector, KPIs, SLA radar, funnel,
+  source/reason/manager breakdowns, trend). Uses the Forms deployment. (Pending/Yes/No)
 
 ## CRM form — recent additions (Aman feedback)
 - Add New Project: Section 4 captures name + type(discipline from getConfig) + stage + client;
