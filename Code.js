@@ -42,6 +42,7 @@ var CONFIG_TAB    = 'CONFIG';
 var PROJECTS_TAB  = 'PROJECTS';
 var ASSIGN_TAB    = 'TASK_ASSIGNMENTS';
 var TEAM_TAB      = 'TEAM';
+var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal'];  // departed — hidden from all forms & dashboards
 var SCORECARD_TAB = 'TEAM_SCORECARD';
 var APPROVAL_FORM_URL = 'https://sidinani14.github.io/dpr/approval.html';
 var DAYS_BEFORE_ARCH  = 90;
@@ -250,6 +251,8 @@ function getLists() {
       var email  = String(tRows[i][4] || '').trim();
       var active = String(tRows[i][5] || '').trim().toLowerCase();
       if (!name) continue;
+      // Departed — removed from all forms & dashboards
+      if (EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
       // All members regardless of active status
       allMembers.push(name);
       allEmails.push(email);
@@ -4090,6 +4093,7 @@ function getDeepakWeeklyStats(weekStart) {
   var asSheet = s.getSheetByName(ASSIGN_TAB);
   var tasksAssignedThisWeek = 0, tasksCompletedThisWeek = 0;
   var taskDetails = [];
+  var dLate = 0, dWnd = 0;   // reliability: late/overdue and Work-Not-Done tasks
 
   if (asSheet && asSheet.getLastRow() > 1) {
     var asRows   = asSheet.getDataRange().getValues();
@@ -4129,6 +4133,22 @@ function getDeepakWeeklyStats(weekStart) {
           doneDate  : doneDate,
         });
       }
+    }
+
+    // Reliability — Deepak's OWN tasks with a deadline in this week (same rule
+    // as the team): late/overdue = −1, "Work Not Done" (reassigned) = −2.
+    var nowD = dateStr();
+    for (var k = 1; k < asRows.length; k++) {
+      var rr = asRows[k];
+      if (String(rr[3] || '').trim() !== 'Deepak Soni') continue;
+      var dl = cellDate(rr[10]); // K Deadline
+      if (!dl || dl < mon || dl > sat) continue;
+      var ss = String(rr[13] || '').trim();
+      if (ss === 'Work Not Done') { dWnd++; continue; }
+      if (dl >= nowD) continue;                       // not yet due — not late
+      var dd = (COL_ACTDT > -1 ? cellDate(rr[COL_ACTDT]) : '') || cellDate(rr[COL_STATDT]);
+      var ot = String(rr[COL_LEADAP] || '').trim() === 'Yes' && dd && dd <= dl;
+      if (!ot) dLate++;
     }
   }
 
@@ -4170,15 +4190,19 @@ function getDeepakWeeklyStats(weekStart) {
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
   var s_dper   = Math.min(15, Math.round(dperDaysCount / 6 * 15 * 10) / 10);
 
-  // Punctuality /20 — same base as team: punctScore(/15) scaled to /20
+  // Punctuality /15 — same base as team (punctBase already on a /15 scale)
   var punctBase   = Math.max(0, 15 - lateCount * 2 - absentDays * 2);
-  var s_punct     = Math.min(20, Math.round(punctBase / 15 * 20 * 10) / 10);
+  var s_punct     = Math.min(15, Math.round(punctBase * 10) / 10);
 
-  // Hours /15 — same base as team: hrsScore(/10) scaled to /15
+  // Hours /10 — same base as team (hrsBase already on a /10 scale)
   var hrsBase  = Math.max(0, Math.round((daysPresent / 6 * 10 - absentDays * 1.5) * 10) / 10);
-  var s_hrs    = Math.min(15, Math.round(hrsBase / 10 * 15 * 10) / 10);
+  var s_hrs    = Math.min(10, Math.round(hrsBase * 10) / 10);
 
-  var total = Math.round((s_visit + s_client + s_tasks + s_dper + s_punct + s_hrs) * 10) / 10;
+  // Reliability /10 — −1 per late/overdue task, −2 per Work Not Done
+  var reliabilityPenalty = dLate * 1 + dWnd * 2;
+  var s_reliability = Math.max(0, Math.round((10 - reliabilityPenalty) * 10) / 10);
+
+  var total = Math.round((s_visit + s_client + s_tasks + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
 
   return {
     weekStart      : mon,
@@ -4194,6 +4218,9 @@ function getDeepakWeeklyStats(weekStart) {
     tasksCompleted : tasksCompletedThisWeek,
     taskDetails    : taskDetails,
     perProject     : perProject,
+    lateTaskCount  : dLate,
+    workNotDone    : dWnd,
+    reliabilityPenalty : reliabilityPenalty,
     scores: {
       s_visit  : s_visit,
       s_client : s_client,
@@ -4201,6 +4228,7 @@ function getDeepakWeeklyStats(weekStart) {
       s_dper   : s_dper,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
+      s_reliability : s_reliability,
       total    : total,
     },
   };
@@ -4319,6 +4347,8 @@ function getAmanWeeklyStats(weekStart, member) {
   var OPEN_LEAD = ['', 'Not Contacted', 'Contacted over call'];
   var leadWorked = 0, leadOpenUntouched = 0;
   var leadsThisWeek = 0, leads24 = 0;   // kept for display only
+  var leadSlaMissed = 0;                // reliability: 24hr first-contact misses
+  var nowD = dateStr();
   var leadsSheet = s.getSheetByName(LEADS_TAB);
   if (leadsSheet && leadsSheet.getLastRow() > 1) {
     var lRows = leadsSheet.getDataRange().getValues();
@@ -4332,7 +4362,10 @@ function getAmanWeeklyStats(weekStart, member) {
       else if (isOpen) leadOpenUntouched++;
       if (lCreated && lCreated >= mon && lCreated <= sat) {
         leadsThisWeek++;
-        if (String(lRows[li][12]||'').trim() === 'Yes') leads24++;  // M 24hr Contact Done
+        var m24 = String(lRows[li][12]||'').trim();        // M 24hr Contact Done
+        if (m24 === 'Yes') leads24++;
+        else if (m24 === 'No') leadSlaMissed++;            // explicitly missed
+        else if (lCreated < nowD) leadSlaMissed++;         // Pending/blank past the 24h window
       }
     }
   }
@@ -4390,10 +4423,15 @@ function getAmanWeeklyStats(weekStart, member) {
 
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
   var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
-  var s_punct  = Math.min(20, r1(punctBase/15*20));
+  var s_punct  = Math.min(15, r1(punctBase));          // /15 (base already on /15 scale)
   var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
-  var s_hrs    = Math.min(15, r1(hrsBase/10*15));
-  var total    = r1(output + s_dpr + s_punct + s_hrs);
+  var s_hrs    = Math.min(10, r1(hrsBase));            // /10 (base already on /10 scale)
+
+  // Reliability /10 — 24hr lead first-contact SLA: −1 per missed lead
+  var reliabilityPenalty = leadSlaMissed * 1;
+  var s_reliability = Math.max(0, r1(10 - reliabilityPenalty));
+
+  var total    = r1(output + s_dpr + s_punct + s_hrs + s_reliability);
 
   return {
     member        : who,
@@ -4405,6 +4443,7 @@ function getAmanWeeklyStats(weekStart, member) {
     meetingsDone  : meetingsDone,
     leadsThisWeek : leadsThisWeek,
     leads24       : leads24,
+    leadSlaMissed : leadSlaMissed,
     leadWorked    : leadWorked,
     leadBase      : leadBase,
     collectionPct : (collRatio === null) ? null : Math.round(collRatio*100),
@@ -4416,6 +4455,7 @@ function getAmanWeeklyStats(weekStart, member) {
     daysPresent   : daysPresent,
     lateCount     : lateCount,
     absentDays    : absentDays,
+    reliabilityPenalty : reliabilityPenalty,
     perProject    : perProject,
     scores: {
       s_client : s_client,
@@ -4425,6 +4465,7 @@ function getAmanWeeklyStats(weekStart, member) {
       s_dpr    : s_dpr,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
+      s_reliability : s_reliability,
       total    : total,
     },
   };

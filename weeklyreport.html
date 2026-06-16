@@ -549,8 +549,9 @@ function buildDeepakPage(d){
       ${pCard('Client Comm',s.s_client,10,`${d.clientCount} of ${d.totalSites} projects updated`)}
       ${pCard('Task<br>Completion',s.s_tasks,20,`${d.tasksCompleted} of ${d.tasksAssigned} assigned this week completed`)}
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of 6 days · ≥1 submission/day`)}
-      ${pCard('Punctuality<br>Biometric',s.s_punct,20,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
-      ${pCard('Hours<br>Biometric',s.s_hrs,15,`${d.daysPresent}/6 days present`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
+      ${pCard('Reliability<br>Delays',s.s_reliability,10,`${d.lateTaskCount||0} late/overdue · ${d.workNotDone||0} work not done`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm">
@@ -648,8 +649,9 @@ function buildAmanPage(d){
       ${d.leadActive ? pCard('Lead<br>Management',s.s_lead,15,leadDetail) : naCard('Lead<br>Management','No open leads — excluded')}
       ${d.revActive ? pCard('Revenue<br>Collection',s.s_rev,15,collDetail) : naCard('Revenue<br>Collection','Nothing billed yet — excluded')}
       ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of 6 days · ≥1 CRM report/day`)}
-      ${pCard('Punctuality<br>Biometric',s.s_punct,20,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
-      ${pCard('Hours<br>Biometric',s.s_hrs,15,`${d.daysPresent}/6 days present`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
+      ${pCard('Reliability<br>Lead SLA',s.s_reliability,10,`${d.leadSlaMissed||0} of ${d.leadsThisWeek||0} new leads missed 24h contact`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:4mm;margin-top:4mm">

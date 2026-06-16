@@ -175,10 +175,11 @@ window.addEventListener('DOMContentLoaded', loadTasks);
 // ── HEATMAP ──────────────────────────────────────────────────
 let hmView = 'week';
 
+const EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal'];  // departed — hidden from dashboard
 const TEAM_TARGETS = {
   'Aaditya Koshti':48,'Aashi Agrawal':48,'Achal Rathore':72,
-  'Bhavesh Bhagwat':72,'Himanshu Malviya':72,'Khushi Agrawal':48,
-  'Poorvi Goyal':48,'Sahil Maurya':48,'Simi':48,
+  'Bhavesh Bhagwat':72,'Himanshu Malviya':72,
+  'Poorvi Goyal':48,'Sahil Maurya':48,
   'Aman Raghuwanshi':24,'Deepak Soni':30,
 };
 const DAILY_TARGETS = Object.fromEntries(
@@ -242,7 +243,7 @@ function renderHeatmap() {
     [...openTasks, ...doneTasks].map(t=>
       t.assignedTo.split(',').map(a=>a.trim())
     ).flat()
-  )].filter(m=>m && m!=='Unassigned').sort();
+  )].filter(m=>m && m!=='Unassigned' && !EXCLUDED_MEMBERS.includes(m)).sort();
 
   function hmColor(pts, target) {
     if (!target || pts === 0) return 'hm-empty';
@@ -557,7 +558,7 @@ async function loadTasks() {
     allTasks.forEach(t => {
       t.assignedTo.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>memberSet.add(a));
     });
-    const members = [...memberSet].sort();
+    const members = [...memberSet].filter(m=>!EXCLUDED_MEMBERS.includes(m)).sort();
     document.getElementById('member-filter').innerHTML='<option value="all">All team</option>'+members.map(m=>`<option value="${m}">${m}</option>`).join('');
     // Restore previous member selection if still valid
     if (prevMember && prevMember !== 'all' && members.includes(prevMember)) {
@@ -745,7 +746,8 @@ function renderTaskList(tasks) {
 
 // ── REASSIGN (lead only) ─────────────────────────────────────
 function allMembers(){
-  return [...new Set(allTasks.flatMap(t=>t.assignedTo.split(',').map(a=>a.trim())).filter(Boolean))].sort();
+  return [...new Set(allTasks.flatMap(t=>t.assignedTo.split(',').map(a=>a.trim())).filter(Boolean))]
+    .filter(m=>!EXCLUDED_MEMBERS.includes(m)).sort();
 }
 function memberOpenPts(name){
   return allTasks
