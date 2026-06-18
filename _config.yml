@@ -1,0 +1,14 @@
+# GitHub Pages build config.
+# Keep backend + tooling source OUT of the public Pages site. These files stay
+# in the repo (needed for clasp) but are NOT served at sidinani14.github.io/DPR.
+exclude:
+  - Code.js
+  - appsscript.json
+  - .clasp.json
+  - .claspignore
+  - "*.md"
+  - "*_backup_*.gs"
+  - "*_FINAL.html"
+  - "*_FINAL.md"
+  - "Weekly_Report_*"
+  - ".git"
