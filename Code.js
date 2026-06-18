@@ -214,6 +214,28 @@ function doGet(e) {
       return respond({ok:true, scope:'authorized', code:rr.getResponseCode()});
     } catch (er) { return respond({ok:false, scope:'NOT-authorized', error:String(er)}); }
   }
+  // Pre-gate diagnostic: explains exactly why a real token is accepted/rejected.
+  if (p.action === 'whoami') {
+    var tk = p.idToken || '';
+    var out = { hasToken: !!tk };
+    if (!tk) return respond(out);
+    try {
+      var wr = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(tk), {muteHttpExceptions:true});
+      out.tokeninfoHttp = wr.getResponseCode();
+      var wi = {}; try { wi = JSON.parse(wr.getContentText()); } catch (e) { out.parseError = true; }
+      var em = String(wi.email || '').toLowerCase();
+      var allow = getAllowedEmails();
+      out.email = em;
+      out.aud = wi.aud;
+      out.audExpected = AUTH_CLIENT_ID;
+      out.audMatch = wi.aud === AUTH_CLIENT_ID;
+      out.emailVerified = wi.email_verified;
+      out.inAllowlist = !!allow[em];
+      out.allowedCount = Object.keys(allow).length;
+      out.wouldPass = out.audMatch && (String(wi.email_verified) !== 'false') && out.inAllowlist;
+    } catch (e) { out.error = String(e); }
+    return respond(out);
+  }
   var authEmail = verifyIdToken(p.idToken);
   if (!authEmail) return respondUnauthorized();
   var action = p.action || '', member = p.member || '';

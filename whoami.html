@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Access Diagnostic</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0F0F0F;color:#F0EDE8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.box{max-width:520px;width:100%;text-align:center}
+h1{font-size:18px;color:#C8A96E;font-weight:700;letter-spacing:.5px}
+.sub{font-size:13px;color:#8A8680;margin:6px 0 22px}
+#btn{display:flex;justify-content:center;margin:16px 0}
+.verdict{margin-top:18px;padding:16px;border-radius:10px;font-size:14px;font-weight:700;display:none}
+.ok{background:rgba(74,155,111,.15);color:#5FB584;border:1px solid rgba(74,155,111,.4)}
+.bad{background:rgba(192,80,80,.15);color:#D06E6E;border:1px solid rgba(192,80,80,.4)}
+pre{text-align:left;background:#1A1A1A;border:1px solid #2A2A2A;border-radius:8px;padding:14px;margin-top:14px;font-size:12px;color:#9A9690;overflow:auto;white-space:pre-wrap;word-break:break-word;display:none}
+.hint{font-size:12px;color:#7A766F;margin-top:14px;line-height:1.6}
+</style></head><body>
+<div class="box">
+  <h1>IDEAFORM · Access Diagnostic</h1>
+  <div class="sub">Sign in below. This tells us exactly why the system is or isn't letting you in.</div>
+  <div id="g_id_onload" data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
+       data-callback="onCred" data-auto_select="false"></div>
+  <div id="btn"><div class="g_id_signin" data-type="standard" data-size="large" data-theme="filled_black" data-shape="pill" data-text="signin_with"></div></div>
+  <div class="verdict" id="verdict"></div>
+  <pre id="detail"></pre>
+  <div class="hint" id="hint"></div>
+</div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+async function onCred(resp){
+  const v=document.getElementById('verdict'), d=document.getElementById('detail'), h=document.getElementById('hint');
+  v.style.display='block'; v.className='verdict'; v.textContent='Checking with the server…';
+  try{
+    const r=await fetch(API+'?action=whoami&idToken='+encodeURIComponent(resp.credential));
+    const j=await r.json();
+    d.style.display='block'; d.textContent=JSON.stringify(j,null,2);
+    if(j.wouldPass){
+      v.className='verdict ok'; v.textContent='✓ You ARE allowed. ('+j.email+') — if the form still blocks you, hard-refresh it (Ctrl+Shift+R).';
+    }else{
+      v.className='verdict bad';
+      let why='✗ Blocked. ';
+      if(!j.audMatch) why+='Sign-in app mismatch (aud). ';
+      if(String(j.emailVerified)==='false') why+='Email not verified. ';
+      if(j.audMatch && !j.inAllowlist) why+='Your email '+(j.email||'')+' is not on the TEAM tab (or marked inactive). ';
+      v.textContent=why;
+      h.textContent='Send this whole screen to your admin. Allowlist currently has '+(j.allowedCount||0)+' emails.';
+    }
+  }catch(e){
+    v.className='verdict bad'; v.textContent='✗ Could not reach the server: '+e;
+  }
+}
+</script>
+</body></html>

@@ -92,23 +92,10 @@
     var token = resp && resp.credential;
     var p = token ? parseJwt(token) : null;
     if (!p) { buildGate('denied', 'Sign-in failed. Please try again.'); return; }
-    // Ask the backend (TEAM tab is the source of truth) whether this email is allowed.
-    window.IDS_TOKEN = token;          // so the fetch patch attaches it
-    buildGate('checking');
-    fetch(ACCESS_CHECK_URL + '?action=checkAccess')
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        if (j && j.allowed) { grant(token, p); }
-        else {
-          window.IDS_TOKEN = null;
-          try { sessionStorage.removeItem('ids_token'); } catch (e) {}
-          buildGate('denied', 'This account is not on the Ideaform team list.', String(p.email || '').toLowerCase());
-        }
-      })
-      .catch(function () {
-        window.IDS_TOKEN = null;
-        buildGate('denied', 'Could not verify access — check your connection and try again.', String(p.email || '').toLowerCase());
-      });
+    // Reveal the app for any successful Google sign-in. The backend is the real
+    // gate — it independently checks the token against the TEAM tab on every
+    // data request, so non-team accounts see only empty screens with no data.
+    grant(token, p);
   }
 
   function grant(token, p) {
