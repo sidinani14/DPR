@@ -3,5 +3,7 @@
 **/*.json
 !appsscript.json
 *_backup_*.gs
-clasp-auth.js
 Code_backup_25May2026.gs
+# Browser JS (auth.js etc.) must NOT be pushed as server code — push only Code.js
+**/*.js
+!Code.js

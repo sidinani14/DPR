@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // IDEAFORM DESIGN STUDIO — Apps Script Final
 // Sheet structure verified against IDS_Productivity_System_2.xlsx
+// Backend only — browser files (auth.js, *.html) are excluded via .claspignore.
 // ═══════════════════════════════════════════════════════════════
 
 var SHEET_ID          = '1PH1nJoPmQWS9wixuhw9B7oo0jIkhJw13htzbzlBWffk';  // Productivity sheet
@@ -165,6 +166,17 @@ function verifyIdToken(token) {
 function respondUnauthorized() {
   return respond({ status: 'error', code: 'unauthorized',
                    message: 'Sign in with an authorized Ideaform team account.' });
+}
+// ── ONE-TIME SETUP ──────────────────────────────────────────────
+// Run this ONCE from the Apps Script editor (select authorizeNow → Run) and
+// click "Allow" to grant the external-request permission the access check uses.
+// Safe to run; it only pings Google's token-info endpoint. After it succeeds,
+// the backend access gate can be deployed.
+function authorizeNow() {
+  var r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=ping',
+                            { muteHttpExceptions: true });
+  Logger.log('External-request permission granted. tokeninfo HTTP ' + r.getResponseCode());
+  return r.getResponseCode();
 }
 
 function doGet(e) {
