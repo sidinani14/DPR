@@ -15,11 +15,13 @@
   // The gate asks it via checkAccess — no hardcoded list to keep in sync.
   var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 
-  // ── 1. Hide the page immediately (no content flash before auth) ──
+  // ── 1. Cover the page with an opaque overlay until auth ──
+  // (NOT visibility:hidden — Google's sign-in button won't render inside a
+  //  hidden page, which blocks sign-in. The opaque #ids-gate hides content.)
   try {
     var st = document.createElement('style');
     st.id = 'ids-lock-style';
-    st.textContent = 'html{visibility:hidden!important}#ids-gate,#ids-gate *{visibility:visible!important}';
+    st.textContent = 'html{background:#0F0F0F}';
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
 
