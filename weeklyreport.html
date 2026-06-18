@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>IDS Weekly Performance Report — 1–6 June 2026</title>
+<script src="auth.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -758,6 +759,6 @@ async function loadAndRender(){
   app.innerHTML = outHtml;
 }
 
-loadAndRender();</script>
+window.idsOnAuth = loadAndRender;   // gated by auth.js</script>
 </body>
 </html>

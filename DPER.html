@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>IDS · Daily Project Execution Report</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -168,11 +169,7 @@ textarea{min-height:62px;resize:vertical;}
 <div class="header">
   <img src="https://sidinani14.github.io/DPR/ideaform-logo.png" style="height:26px;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
   <span class="header-title">Daily Project <span>Execution Report</span></span>
-  <div id="login-area" style="margin-left:auto">
-    <div id="g_id_onload" data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com"
-      data-callback="onGoogleSignIn" data-auto_select="true"></div>
-    <div class="g_id_signin" data-type="standard" data-size="small" data-theme="outline" data-shape="pill"></div>
-  </div>
+  <div id="login-area" style="margin-left:auto"><!-- sign-in handled by auth.js gate --></div>
   <div id="user-pill" class="user-pill hidden">
     <span class="user-dot"></span><span id="user-name-display">—</span>
   </div>
@@ -277,6 +274,8 @@ let ibCount      = 0;
 let issueActions = {};
 
 // ── Auth ──────────────────────────────────────────────────
+// auth.js gate calls this once an allowlisted team account has signed in
+window.idsOnAuth = function(){ onGoogleSignIn({credential: window.IDS_TOKEN}); };
 function onGoogleSignIn(resp) {
   const payload = JSON.parse(atob(resp.credential.split('.')[1]));
   const email   = (payload.email||'').toLowerCase();

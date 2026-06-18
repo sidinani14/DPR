@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>IDS · Lead Approval</title>
+<script src="auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -222,7 +223,7 @@ let allTasksRaw = [];   // all tasks loaded from sheet
 let decisions   = {};   // {rowIndex: {decision, note}}
 
 // ── Init ───────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('ids-auth', () => {   // gated by auth.js
   // Set date
   document.getElementById('header-date').textContent =
     new Date().toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'});

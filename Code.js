@@ -126,10 +126,60 @@ function doOptions(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// ════════════════════════════════════════════════════════════════
+// ACCESS CONTROL — every request must carry a Google ID token from an
+// allowlisted Ideaform account. Verified via Google's tokeninfo endpoint
+// (audience must match our OAuth client + email on the team list).
+// ════════════════════════════════════════════════════════════════
+var AUTH_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
+var AUTH_ALLOWED = {
+  'ar.deepaksoni@gmail.com':1, 'achal.rathore@ideaform.in':1, 'himanshu.malviya@ideaform.in':1,
+  'poorvi.goyal@ideaform.in':1, 'sahil.maurya@ideaform.in':1, 'aaditya.koshti@ideaform.in':1,
+  'aman.raghuwanshi@ideaform.in':1, 'bhavesh.bhagwat@ideaform.in':1, 'aashi.agrawal@ideaform.in':1,
+  'siddharth@ideaform.in':1, 'sidinani14@gmail.com':1, 'astha@ideaform.in':1, 'astha.uch@gmail.com':1
+};
+// Returns the verified allowlisted email, or null. Caches results (token is
+// short-lived) to avoid an external fetch on every single API call.
+function verifyIdToken(token) {
+  if (!token) return null;
+  var cache = CacheService.getScriptCache();
+  var key = 'auth_' + Utilities.base64EncodeWebSafe(
+              Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, token));
+  var cached = cache.get(key);
+  if (cached) return cached === '-' ? null : cached;
+  try {
+    var resp = UrlFetchApp.fetch(
+      'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
+      { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) { cache.put(key, '-', 300); return null; }
+    var info  = JSON.parse(resp.getContentText());
+    var email = String(info.email || '').toLowerCase();
+    var ok = (info.aud === AUTH_CLIENT_ID) &&
+             (String(info.email_verified) !== 'false') &&
+             AUTH_ALLOWED[email];
+    if (!ok) { cache.put(key, '-', 300); return null; }
+    cache.put(key, email, 1800);  // 30 min (token itself expires ~1 hr)
+    return email;
+  } catch (err) { return null; }
+}
+function respondUnauthorized() {
+  return respond({ status: 'error', code: 'unauthorized',
+                   message: 'Sign in with an authorized Ideaform team account.' });
+}
+
 function doGet(e) {
   // Handle CORS preflight — Apps Script handles this automatically
   // but we ensure JSON content type is always set
   var p = e && e.parameter ? e.parameter : {};
+  // Pre-gate scope diagnostic (no sensitive data) — confirms the external_request
+  // OAuth scope is authorized before we rely on token verification.
+  if (p.action === 'authDiag') {
+    try {
+      var rr = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=ping', {muteHttpExceptions:true});
+      return respond({ok:true, scope:'authorized', code:rr.getResponseCode()});
+    } catch (er) { return respond({ok:false, scope:'NOT-authorized', error:String(er)}); }
+  }
+  if (!verifyIdToken(p.idToken)) return respondUnauthorized();
   var action = p.action || '', member = p.member || '';
   if (action === 'getLists')              return safeRespond(getLists);
   if (action === 'getConfig')             return safeRespond(readConfig);
@@ -155,6 +205,7 @@ function doPost(e) {
   try {
     var raw  = e && e.postData ? e.postData.contents : '';
     var data = JSON.parse(raw);
+    if (!verifyIdToken(data.idToken)) return respondUnauthorized();
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
 
     // GET-style actions sent via POST to bypass CORS
