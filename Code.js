@@ -139,6 +139,29 @@ var AUTH_ALLOWED = {
   'aman.raghuwanshi@ideaform.in':1, 'bhavesh.bhagwat@ideaform.in':1, 'aashi.agrawal@ideaform.in':1,
   'siddharth@ideaform.in':1, 'sidinani14@gmail.com':1, 'astha@ideaform.in':1, 'astha.uch@gmail.com':1
 };
+// Single source of truth for access = the TEAM tab's Email column (active rows)
+// UNIONED with the hardcoded directors list (fallback so a sheet read failure
+// can never lock everyone out). Cached 5 min. Add someone to TEAM → they get in.
+function getAllowedEmails() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('allowed_emails');
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  var set = {};
+  for (var k in AUTH_ALLOWED) set[k] = 1;            // directors fallback
+  try {
+    var tSheet = db().getSheetByName(TEAM_TAB);       // TEAM cols: …Email(E,4) Active(F,5)
+    if (tSheet && tSheet.getLastRow() > 1) {
+      var rows = tSheet.getDataRange().getValues();
+      for (var i = 1; i < rows.length; i++) {
+        var email  = String(rows[i][4] || '').trim().toLowerCase();
+        var active = String(rows[i][5] || '').trim().toLowerCase();
+        if (email && active !== 'no') set[email] = 1;
+      }
+    }
+  } catch (e) {}
+  cache.put('allowed_emails', JSON.stringify(set), 300);
+  return set;
+}
 // Returns the verified allowlisted email, or null. Caches results (token is
 // short-lived) to avoid an external fetch on every single API call.
 function verifyIdToken(token) {
@@ -157,7 +180,7 @@ function verifyIdToken(token) {
     var email = String(info.email || '').toLowerCase();
     var ok = (info.aud === AUTH_CLIENT_ID) &&
              (String(info.email_verified) !== 'false') &&
-             AUTH_ALLOWED[email];
+             getAllowedEmails()[email];
     if (!ok) { cache.put(key, '-', 300); return null; }
     cache.put(key, email, 1800);  // 30 min (token itself expires ~1 hr)
     return email;
@@ -191,8 +214,11 @@ function doGet(e) {
       return respond({ok:true, scope:'authorized', code:rr.getResponseCode()});
     } catch (er) { return respond({ok:false, scope:'NOT-authorized', error:String(er)}); }
   }
-  if (!verifyIdToken(p.idToken)) return respondUnauthorized();
+  var authEmail = verifyIdToken(p.idToken);
+  if (!authEmail) return respondUnauthorized();
   var action = p.action || '', member = p.member || '';
+  // Lightweight access check used by the sign-in gate (auth.js)
+  if (action === 'checkAccess') return respond({ allowed: true, email: authEmail });
   if (action === 'getLists')              return safeRespond(getLists);
   if (action === 'getConfig')             return safeRespond(readConfig);
   if (action === 'getPendingTasks')       return safeRespond(getPendingTasks);

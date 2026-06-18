@@ -10,23 +10,10 @@
    ============================================================ */
 (function () {
   var CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
-  // Single source of truth for who may use the system (lowercase).
-  var ALLOWED = [
-    'ar.deepaksoni@gmail.com',
-    'achal.rathore@ideaform.in',
-    'himanshu.malviya@ideaform.in',
-    'poorvi.goyal@ideaform.in',
-    'sahil.maurya@ideaform.in',
-    'aaditya.koshti@ideaform.in',
-    'aman.raghuwanshi@ideaform.in',
-    'bhavesh.bhagwat@ideaform.in',
-    'aashi.agrawal@ideaform.in',
-    'siddharth@ideaform.in',
-    'sidinani14@gmail.com',
-    'astha@ideaform.in',
-    'astha.uch@gmail.com'
-  ];
   var API_HOST = 'script.google.com/macros';
+  // The backend decides who's allowed (driven by the TEAM tab + directors).
+  // The gate asks it via checkAccess — no hardcoded list to keep in sync.
+  var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 
   // ── 1. Hide the page immediately (no content flash before auth) ──
   try {
@@ -105,13 +92,23 @@
     var token = resp && resp.credential;
     var p = token ? parseJwt(token) : null;
     if (!p) { buildGate('denied', 'Sign-in failed. Please try again.'); return; }
-    var em = String(p.email || '').toLowerCase();
-    if (ALLOWED.indexOf(em) === -1) {
-      try { sessionStorage.removeItem('ids_token'); } catch (e) {}
-      buildGate('denied', 'This account is not on the Ideaform team list.', em);
-      return;
-    }
-    grant(token, p);
+    // Ask the backend (TEAM tab is the source of truth) whether this email is allowed.
+    window.IDS_TOKEN = token;          // so the fetch patch attaches it
+    buildGate('checking');
+    fetch(ACCESS_CHECK_URL + '?action=checkAccess')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j && j.allowed) { grant(token, p); }
+        else {
+          window.IDS_TOKEN = null;
+          try { sessionStorage.removeItem('ids_token'); } catch (e) {}
+          buildGate('denied', 'This account is not on the Ideaform team list.', String(p.email || '').toLowerCase());
+        }
+      })
+      .catch(function () {
+        window.IDS_TOKEN = null;
+        buildGate('denied', 'Could not verify access — check your connection and try again.', String(p.email || '').toLowerCase());
+      });
   }
 
   function grant(token, p) {
@@ -132,8 +129,8 @@
       var saved = sessionStorage.getItem('ids_token');
       if (saved) {
         var sp = parseJwt(saved);
-        if (sp && sp.exp && sp.exp * 1000 > Date.now() + 60000 &&
-            ALLOWED.indexOf(String(sp.email || '').toLowerCase()) > -1) {
+        // A saved token already passed the backend check this session — trust until expiry.
+        if (sp && sp.exp && sp.exp * 1000 > Date.now() + 60000) {
           grant(saved, sp);
           return;
         }
