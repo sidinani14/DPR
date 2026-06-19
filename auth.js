@@ -25,12 +25,15 @@
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
 
-  // ── 2. Patch fetch so every backend call carries the ID token ──
+  // ── 2. Patch fetch so every backend call carries the ID token, and so an
+  //       "unauthorized" reply surfaces as a clear access-denied screen
+  //       (instead of forms silently showing empty data). ──
   var _fetch = window.fetch;
   window.fetch = function (url, opts) {
     opts = opts || {};
     var tok = window.IDS_TOKEN;
-    if (typeof url === 'string' && url.indexOf(API_HOST) > -1 && tok) {
+    var isBackend = typeof url === 'string' && url.indexOf(API_HOST) > -1;
+    if (isBackend && tok) {
       var m = (opts.method || 'GET').toUpperCase();
       if (m === 'GET') {
         url += (url.indexOf('?') > -1 ? '&' : '?') + 'idToken=' + encodeURIComponent(tok);
@@ -38,7 +41,23 @@
         try { var b = JSON.parse(opts.body); b.idToken = tok; opts.body = JSON.stringify(b); } catch (e) {}
       }
     }
-    return _fetch.call(this, url, opts);
+    return _fetch.call(this, url, opts).then(function (resp) {
+      if (isBackend && !window.__idsDenied) {
+        try {
+          resp.clone().json().then(function (j) {
+            if (j && j.code === 'unauthorized') {
+              window.__idsDenied = true;
+              window.IDS_TOKEN = null;
+              try { sessionStorage.removeItem('ids_token'); google.accounts.id.disableAutoSelect(); } catch (e) {}
+              buildGate('denied',
+                'Your account isn’t authorized for this system. Ask your admin to add your exact Google email to the TEAM tab (and mark it active).',
+                (window.IDS_USER && window.IDS_USER.email) || '');
+            }
+          }).catch(function () {});
+        } catch (e) {}
+      }
+      return resp;
+    });
   };
 
   function parseJwt(t) {

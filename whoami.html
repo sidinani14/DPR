@@ -35,7 +35,19 @@ async function onCred(resp){
     const j=await r.json();
     d.style.display='block'; d.textContent=JSON.stringify(j,null,2);
     if(j.wouldPass){
-      v.className='verdict ok'; v.textContent='✓ You ARE allowed. ('+j.email+') — if the form still blocks you, hard-refresh it (Ctrl+Shift+R).';
+      v.className='verdict ok'; v.textContent='✓ You ARE allowed ('+j.email+'). Testing data access…';
+      // Test the actual failing call end-to-end
+      try{
+        const lr=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists',idToken:resp.credential})});
+        const ld=await lr.json();
+        if(ld.code==='unauthorized'){
+          v.textContent='⚠ Allowed by token, but data call returned UNAUTHORIZED — send this screen to admin.';
+          d.textContent=JSON.stringify({verdict:j, getLists:ld},null,2);
+        }else{
+          v.textContent='✓ All good ('+j.email+'): '+((ld.projects||[]).length)+' projects, '+((ld.team||[]).length)+' team members load. If a form still shows empty, hard-refresh it (Ctrl+Shift+R) and sign in again.';
+          d.textContent=JSON.stringify({email:j.email, projects:(ld.projects||[]).length, team:(ld.team||[]).length, allMembers:(ld.allMembers||[]).length},null,2);
+        }
+      }catch(e){ v.textContent='✓ Allowed, but data call errored: '+e; }
     }else{
       v.className='verdict bad';
       let why='✗ Blocked. ';
