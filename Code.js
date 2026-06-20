@@ -644,6 +644,9 @@ function getAllTasks() {
     if (selfStatus === 'Work Not Done') {
       status = 'Work Not Done';  // lead closed it off the assignee (reassigned) — penalty applies
     }
+    else if (selfStatus === 'Blocked') {
+      status = 'Blocked';        // assignee flagged a blocker — needs a lead to unblock
+    }
     else if (selfStatus === 'Done') {
       if      (leadApproved === 'Yes') {
         // Completed — only show if completed this week (Mon onwards)
@@ -765,7 +768,7 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
     var newStatus = '';
     if      (a.status === 'Done')    newStatus = 'Done';
     else if (a.status === 'Ongoing') newStatus = 'In Progress';
-    else if (a.status === 'Blocked') newStatus = 'In Progress';
+    else if (a.status === 'Blocked') newStatus = 'Blocked';
     else return; // Not Started — no change needed
 
     for (var i = 1; i < rows.length; i++) {
