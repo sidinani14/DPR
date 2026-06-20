@@ -184,7 +184,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
-let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='';
+let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='', dueFilter='';
+// Local (IST) date — backend due dates are IST, so never use UTC toISOString here
+function localDateStr(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function weekEndStr(){ const d=new Date(); d.setDate(d.getDate()+(6-d.getDay())); return localDateStr(d); }
+// Shared member/project/(status)/due/date filtering used by metrics + task list
+function applyScopeFilters(tasks, includeStatus){
+  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
+  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
+  if (includeStatus && statusFilter!=='all') tasks=tasks.filter(t=>t.status===statusFilter);
+  const today=localDateStr();
+  if (dueFilter==='today')      tasks=tasks.filter(t=> t.targetDate===today || t.status==='Delayed');
+  else if (dueFilter==='week')  { const we=weekEndStr(); tasks=tasks.filter(t=> (t.targetDate>=today && t.targetDate<=we) || t.status==='Delayed'); }
+  else if (dateFilter)          tasks=tasks.filter(t=> t.targetDate===dateFilter || (dateFilter<=today && t.status==='Delayed'));
+  return tasks;
+}
 
 window.idsOnAuth = loadTasks;   // gated: runs after authorized sign-in (auth.js)
 
@@ -591,19 +605,7 @@ async function loadTasks() {
 }
 
 function updateMetrics() {
-  let tasks=allTasks;
-  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
-  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
-  if (dateFilter) {
-    const today2 = new Date().toISOString().substring(0,10);
-    tasks = tasks.filter(t => {
-      // Always show tasks due on the selected date
-      if (t.targetDate === dateFilter) return true;
-      // If filtering for today or a past date, also show all delayed (overdue) tasks
-      if (dateFilter <= today2 && t.status === 'Delayed') return true;
-      return false;
-    });
-  }
+  const tasks=applyScopeFilters(allTasks, false);   // member/project/due/date — not status
   document.getElementById('m-upcoming').textContent  = tasks.filter(t=>t.status==='Upcoming').length;
   document.getElementById('m-ongoing').textContent   = tasks.filter(t=>t.status==='Ongoing').length;
   document.getElementById('m-completed').textContent = tasks.filter(t=>t.status==='Completed').length;
@@ -672,60 +674,26 @@ function applyFilters() {
   memberFilter  = document.getElementById('member-filter').value;
   projectFilter = document.getElementById('project-filter').value;
   dateFilter    = document.getElementById('date-filter').value || '';
+  if (dateFilter) dueFilter = '';   // a manual date overrides the Due-today/week mode
   updateMetrics(); renderTasks();
 }
 
 function setDueToday() {
-  const today = new Date().toISOString().substring(0,10);
-  document.getElementById('date-filter').value = today;
-  dateFilter = today;
-  document.getElementById('due-today-btn').classList.add('on');
-  document.getElementById('due-week-btn').classList.remove('on');
-  // Show tasks due today + all delayed tasks
+  dueFilter = dueFilter==='today' ? '' : 'today';   // toggle
+  document.getElementById('date-filter').value = ''; dateFilter = '';
   updateMetrics(); renderTasks();
 }
 
 function setDueWeek() {
-  // Clear date filter and show all this week's tasks
-  const today = new Date().toISOString().substring(0,10);
-  const endOfWeek = new Date(); endOfWeek.setDate(endOfWeek.getDate() + (6-endOfWeek.getDay()));
-  document.getElementById('date-filter').value = '';
-  dateFilter = '';
-  // Filter tasks where targetDate is between today and end of week
-  document.getElementById('due-today-btn').classList.remove('on');
-  document.getElementById('due-week-btn').classList.add('on');
-  const weekEnd = endOfWeek.toISOString().substring(0,10);
-  let tasks = allTasks;
-  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
-  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
-  if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
-  // Include tasks due this week + all delayed tasks
-  tasks = tasks.filter(t=>
-    (t.targetDate>=today && t.targetDate<=weekEnd) ||
-    t.status === 'Delayed'
-  );
-  renderTaskList(tasks);
-  return;
+  dueFilter = dueFilter==='week' ? '' : 'week';      // toggle
+  document.getElementById('date-filter').value = ''; dateFilter = '';
+  updateMetrics(); renderTasks();
 }
 
 function renderTasks() {
-  document.getElementById('due-today-btn')?.classList.remove('on');
-  document.getElementById('due-week-btn')?.classList.remove('on');
-  let tasks=allTasks;
-  if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
-  if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
-  if (statusFilter!=='all')  tasks=tasks.filter(t=>t.status===statusFilter);
-  if (dateFilter) {
-    const today2 = new Date().toISOString().substring(0,10);
-    tasks = tasks.filter(t => {
-      // Always show tasks due on the selected date
-      if (t.targetDate === dateFilter) return true;
-      // If filtering for today or a past date, also show all delayed (overdue) tasks
-      if (dateFilter <= today2 && t.status === 'Delayed') return true;
-      return false;
-    });
-  }
-  renderTaskList(tasks);
+  document.getElementById('due-today-btn')?.classList.toggle('on', dueFilter==='today');
+  document.getElementById('due-week-btn')?.classList.toggle('on', dueFilter==='week');
+  renderTaskList(applyScopeFilters(allTasks, true));
 }
 
 function renderTaskList(tasks) {
