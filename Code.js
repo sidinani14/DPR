@@ -268,6 +268,8 @@ function doGet(e) {
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
   if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
   if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
+  if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
+  if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
@@ -295,6 +297,8 @@ function doPost(e) {
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
     if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
+    if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
+    if (data.action === 'getProjectDetail')       return respond(getProjectDetail(data.project||''));
     if (data.action === 'disposeBlock')           return respond(disposeBlock(data));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
@@ -4140,6 +4144,185 @@ function getBlockersThisWeek() {
   }
   out.sort(function(a, b){ return String(b.date||'').localeCompare(String(a.date||'')); });
   return { weekStart:monStr, weekEnd:sunStr, count:out.length, blockers:out };
+}
+
+// ════════════════════════════════════════════════════════════════
+// PROJECTS HEALTH — "which projects need attention today" (EPIC B)
+// Stages (PROJECTS col C): Briefing · Arch Design · Arch WDs · Civil Execution ·
+//   Interior Design · Interior WDs · Interiors Execution · Finishing/Handover ·
+//   On hold · New Lead · Completed · Dead
+// No money amounts are returned — bill STATUS + dates only.
+// ════════════════════════════════════════════════════════════════
+var DESIGN_STAGES = ['Briefing','Arch Design','Arch WDs','Interior Design','Interior WDs'];
+function pjDaysAgo(d, today){ return d ? Math.round((new Date(today)-new Date(d))/86400000) : 9999; }
+function engagementOverdue(stage, p, today){
+  if (stage === 'Civil Execution')      return pjDaysAgo(p.lastVisit, today) > 15;
+  if (stage === 'Interiors Execution')  return pjDaysAgo(p.lastVisit, today) > 7;
+  if (stage === 'Finishing/Handover')   return pjDaysAgo(p.lastConn,  today) > 15;
+  if (DESIGN_STAGES.indexOf(stage) > -1){
+    var last = [p.lastConn, p.lastVisit, p.lastMeeting].filter(Boolean).sort().pop() || '';
+    return pjDaysAgo(last, today) > 7;
+  }
+  return false;
+}
+function getProjectsHealth(){
+  var s = db(), today = dateStr();
+  var mon = dateStr(mondayOf(new Date())), sun = addDaysToStr(mon, 6);
+
+  var pSheet = s.getSheetByName(PROJECTS_TAB);
+  var pr = pSheet ? pSheet.getDataRange().getValues() : [[]];
+  var P = {}, order = [];
+  for (var i=1;i<pr.length;i++){
+    var name = String(pr[i][1]||'').trim(); if(!name) continue;
+    var key = name.toLowerCase();
+    P[key] = { name:name, stage:String(pr[i][2]||'').trim(), discipline:String(pr[i][3]||''),
+      lead:String(pr[i][5]||''), client:String(pr[i][6]||''),
+      openTasks:0, tasksThisWeek:0, delayedTasks:0, openIssues:0,
+      lastTask:'', lastVisit:'', lastConn:'', lastMeeting:'', connBy:'',
+      lastBillRaised:'', lastPayCleared:'', billOverdue:false, dperPct:'' };
+    order.push(key);
+  }
+  function newer(o,f,d){ if(d && o[f] < d) o[f]=d; }
+
+  var aSheet = s.getSheetByName(ASSIGN_TAB);
+  if(aSheet){ var ar=aSheet.getDataRange().getValues();
+    for(var j=1;j<ar.length;j++){ var pk=String(ar[j][2]||'').trim().toLowerCase(); if(!P[pk])continue;
+      var ss=String(ar[j][13]||'').trim(), ssd=cellDate(ar[j][14]), td=cellDate(ar[j][10]);
+      var dispo=String(ar[j][COL_BLK_DISPO-1]||'').trim();
+      if(ssd) newer(P[pk],'lastTask',ssd);
+      var inactive=(ss==='Blocked'&&dispo==='Cancelled')||ss==='Parked'||ss==='Reassigned'||ss==='Work Not Done';
+      if(ss!=='Done' && !inactive){ P[pk].openTasks++; if(td && td<today) P[pk].delayedTasks++; }
+      if(ssd>=mon && ssd<=sun) P[pk].tasksThisWeek++;
+    }
+  }
+  var iSheet=s.getSheetByName(SITE_ISSUES_TAB);
+  if(iSheet){ var ir=iSheet.getDataRange().getValues();
+    for(var k=1;k<ir.length;k++){ var pk=String(ir[k][3]||'').trim().toLowerCase(); if(!P[pk])continue;
+      if(String(ir[k][10]||'').trim()!=='Resolved') P[pk].openIssues++; }
+  }
+  var cSheet=s.getSheetByName(CRM_LOG_TAB);
+  if(cSheet){ var cr=cSheet.getDataRange().getValues();
+    for(var m=1;m<cr.length;m++){ var pk=String(cr[m][6]||'').trim().toLowerCase(); if(!P[pk])continue;
+      if(String(cr[m][4]||'').trim()!=='Client Connection') continue;
+      var cd=cellDate(cr[m][2]), typ=String(cr[m][5]||'');
+      if(cd && cd>P[pk].lastConn){ P[pk].lastConn=cd; P[pk].connBy=String(cr[m][3]||''); }
+      if(/meet|visit/i.test(typ)) newer(P[pk],'lastMeeting',cd);
+    }
+  }
+  var eSheet=s.getSheetByName(SITE_EXEC_TAB);
+  if(eSheet){ var er=eSheet.getDataRange().getValues();
+    for(var n=1;n<er.length;n++){ var pk=String(er[n][3]||'').trim().toLowerCase(); if(!P[pk])continue;
+      var ed=cellDate(er[n][1]); if(ed) newer(P[pk],'lastVisit',ed);
+      var pct=String(er[n][9]||'').trim(); if(pct) P[pk].dperPct=pct; }
+  }
+  var bSheet=s.getSheetByName(BILLING_TAB);
+  if(bSheet){ var br=bSheet.getDataRange().getValues();
+    for(var q=1;q<br.length;q++){ var pk=String(br[q][2]||'').trim().toLowerCase(); if(!P[pk])continue;
+      var bd=cellDate(br[q][3]), rd=cellDate(br[q][6]);
+      var amt=parseFloat(br[q][4])||0, rec=parseFloat(br[q][5])||0, st=String(br[q][8]||'').trim().toLowerCase();
+      if(bd) newer(P[pk],'lastBillRaised',bd);
+      if(rd) newer(P[pk],'lastPayCleared',rd);
+      var unpaid = rec < amt && !/clear|paid|received|complete/.test(st);
+      if(unpaid && bd && pjDaysAgo(bd,today)>30) P[pk].billOverdue=true;
+    }
+  }
+
+  var cards=[], newLeadKeys=[];
+  order.forEach(function(key){
+    var p=P[key]; if(p.stage==='Dead') return;
+    if(p.stage==='New Lead'){ newLeadKeys.push(p); return; }
+    var la=[p.lastTask,p.lastVisit,p.lastConn].filter(Boolean).sort().pop()||'';
+    p.lastActivity=la; p.lastActivityDays = la?pjDaysAgo(la,today):null;
+    var inactive = p.stage==='On hold'||p.stage==='Completed';
+    p.neglected = !inactive && (!la || pjDaysAgo(la,today)>7);
+    p.engagementOverdue = inactive ? false : engagementOverdue(p.stage, p, today);
+    p.paymentOverdue = p.billOverdue;
+    p.behind = p.delayedTasks>0;
+    var rag='green';
+    if(inactive) rag='grey';
+    else if(p.billOverdue || p.engagementOverdue || (la && pjDaysAgo(la,today)>14)) rag='red';
+    else if(p.neglected || p.behind || p.openIssues>0) rag='amber';
+    p.rag=rag;
+    p.billStatus = p.billOverdue ? 'overdue'
+      : (p.lastPayCleared && (!p.lastBillRaised || p.lastPayCleared>=p.lastBillRaised) ? 'cleared'
+      : (p.lastBillRaised ? 'due' : '—'));
+    cards.push(p);
+  });
+  var rank={red:0,amber:1,green:2,grey:3};
+  cards.sort(function(a,b){ return (rank[a.rag]-rank[b.rag]) || (b.openIssues-a.openIssues) ||
+    ((b.lastActivityDays||0)-(a.lastActivityDays||0)); });
+
+  // New Leads pipeline — status/last-connection from LEADS, joined by client/project name
+  var leadIdx={};
+  var lSheet=s.getSheetByName(LEADS_TAB);
+  if(lSheet){ var lr=lSheet.getDataRange().getValues();
+    for(var x=1;x<lr.length;x++){ var nm=String(lr[x][1]||'').trim().toLowerCase(); if(!nm)continue;
+      leadIdx[nm]={ status:String(lr[x][5]||''), lastContacted:cellDate(lr[x][8]), by:String(lr[x][6]||'') }; }
+  }
+  var newLeads = newLeadKeys.map(function(p){
+    var L = leadIdx[p.name.toLowerCase()] || leadIdx[(p.client||'').toLowerCase()] || {};
+    return { project:p.name, status:L.status||'—', lastConnection:L.lastContacted||p.lastConn||'',
+      connBy:L.by||p.connBy||'', tasks:p.openTasks };
+  });
+
+  return { today:today, weekStart:mon, projects:cards, newLeads:newLeads, counts:{
+      total:cards.length,
+      neglected:cards.filter(c=>c.neglected).length,
+      paymentOverdue:cards.filter(c=>c.paymentOverdue).length,
+      engagementOverdue:cards.filter(c=>c.engagementOverdue).length,
+      behind:cards.filter(c=>c.behind).length }};
+}
+
+// Per-project drawer detail
+function getProjectDetail(project){
+  var s=db(), pj=String(project||'').trim(), pjl=pj.toLowerCase(), today=dateStr();
+  var mon=dateStr(mondayOf(new Date())), sun=addDaysToStr(mon,6);
+  var out={ project:pj, openIssues:[], tasks:[], siteVisits:[], connections:[],
+    lastBillRaised:'', lastPayCleared:'', dperPct:'' };
+
+  var iSheet=s.getSheetByName(SITE_ISSUES_TAB);
+  if(iSheet){ var ir=iSheet.getDataRange().getValues();
+    for(var k=1;k<ir.length;k++){ if(String(ir[k][3]||'').trim().toLowerCase()!==pjl)continue;
+      var st=String(ir[k][10]||'').trim(); if(st==='Resolved')continue;
+      out.openIssues.push({ desc:String(ir[k][6]||''), type:String(ir[k][5]||''), status:st,
+        assignedTo:String(ir[k][7]||''), targetDate:cellDate(ir[k][9]), date:cellDate(ir[k][2]) }); }
+    var iord={Open:0,Escalated:1}; out.openIssues.sort((a,b)=>(iord[a.status]??2)-(iord[b.status]??2));
+  }
+  var aSheet=s.getSheetByName(ASSIGN_TAB);
+  if(aSheet){ var ar=aSheet.getDataRange().getValues();
+    for(var j=1;j<ar.length;j++){ if(String(ar[j][2]||'').trim().toLowerCase()!==pjl)continue;
+      var ss=String(ar[j][13]||'').trim(), ssd=cellDate(ar[j][14]), tt=String(ar[j][4]||'');
+      var dispo=String(ar[j][COL_BLK_DISPO-1]||'').trim();
+      if((ss==='Blocked'&&dispo==='Cancelled')||ss==='Reassigned') continue; // exclude approved-blocked
+      var done = ss==='Done';
+      if(done && !(ssd>=mon && ssd<=sun)) continue;  // only this week's done
+      // visit task → hours from col G when done
+      if(isVisitTask(tt) && done){ out.siteVisits.push({ who:String(ar[j][3]||''), hours:parseFloat(ar[j][6])||'', date:ssd, type:tt }); }
+      out.tasks.push({ taskType:tt, assignedTo:String(ar[j][3]||''), selfStatus:ss, date:ssd, deadline:cellDate(ar[j][10]) });
+    }
+  }
+  var eSheet=s.getSheetByName(SITE_EXEC_TAB);
+  if(eSheet){ var er=eSheet.getDataRange().getValues();
+    for(var n=1;n<er.length;n++){ if(String(er[n][3]||'').trim().toLowerCase()!==pjl)continue;
+      var ed=cellDate(er[n][1]); out.siteVisits.push({ who:String(er[n][4]||''), hours:'', date:ed, type:'Site report (DPER)' });
+      var pct=String(er[n][9]||'').trim(); if(pct) out.dperPct=pct; }
+  }
+  out.siteVisits.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  var cSheet=s.getSheetByName(CRM_LOG_TAB);
+  if(cSheet){ var cr=cSheet.getDataRange().getValues();
+    for(var m=1;m<cr.length;m++){ if(String(cr[m][6]||'').trim().toLowerCase()!==pjl)continue;
+      if(String(cr[m][4]||'').trim()!=='Client Connection')continue;
+      out.connections.push({ date:cellDate(cr[m][2]), by:String(cr[m][3]||''), type:String(cr[m][5]||''), notes:String(cr[m][7]||'') }); }
+    out.connections.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  }
+  var bSheet=s.getSheetByName(BILLING_TAB);
+  if(bSheet){ var br=bSheet.getDataRange().getValues();
+    for(var q=1;q<br.length;q++){ if(String(br[q][2]||'').trim().toLowerCase()!==pjl)continue;
+      var bd=cellDate(br[q][3]), rd=cellDate(br[q][6]);
+      if(bd && bd>out.lastBillRaised) out.lastBillRaised=bd;
+      if(rd && rd>out.lastPayCleared) out.lastPayCleared=rd; }
+  }
+  return out;
 }
 
 // ── getSiteExecutionSummary — per project ──────────────────
