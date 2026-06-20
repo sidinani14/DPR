@@ -254,6 +254,7 @@ function doGet(e) {
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
+  if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
@@ -279,6 +280,7 @@ function doPost(e) {
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
+    if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -3927,6 +3929,65 @@ function getSiteIssues(project) {
     });
   }
   return {issues: issues};
+}
+
+// ════════════════════════════════════════════════════════════════
+// getBlockersThisWeek — everything blocking work right now, collected from
+// all three forms, for the current week (Mon–Sun):
+//   • Tasks explicitly marked "Blocked" in the DPR (active, any date)
+//   • DPR daily "Anything blocking you?"  (DAILY_SUMMARY col G)
+//   • DPER "Blocking Tomorrow"            (SITE_EXECUTION col T)
+// ════════════════════════════════════════════════════════════════
+function latestNoteText(n) {
+  if (!n) return '';
+  var last = String(n).split('|').pop().trim();
+  return last.replace(/^\d{4}-\d{2}-\d{2}:\s*/, '');
+}
+function getBlockersThisWeek() {
+  var s = db();
+  var mon = mondayOf(new Date());
+  var monStr = dateStr(mon);
+  var sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  var sunStr = dateStr(sun);
+  function inWeek(d) { return d && d >= monStr && d <= sunStr; }
+  var out = [];
+
+  // 1. Explicitly blocked TASKS (active until unblocked)
+  var aSheet = s.getSheetByName(ASSIGN_TAB);
+  if (aSheet && aSheet.getLastRow() > 1) {
+    var ar = aSheet.getDataRange().getValues();
+    for (var i = 1; i < ar.length; i++) {
+      if (String(ar[i][13] || '').trim() === 'Blocked') {       // N SelfStatus
+        out.push({ type:'Task', who:String(ar[i][3]||''), project:String(ar[i][2]||''),
+          detail:String(ar[i][4]||''), reason:latestNoteText(ar[i][20]) || 'No reason given',
+          date:dateStr(ar[i][14]) });                            // O SelfStatusDate
+      }
+    }
+  }
+  // 2. DPR daily blockers this week
+  var dSheet = s.getSheetByName(SUMMARY_TAB);
+  if (dSheet && dSheet.getLastRow() > 1) {
+    var dr = dSheet.getDataRange().getValues();
+    for (var j = 1; j < dr.length; j++) {
+      var bl = String(dr[j][6] || '').trim();                    // G Anything Blocking
+      var dt = dateStr(dr[j][0]);                                // A Date
+      if (bl && inWeek(dt)) out.push({ type:'Daily', who:String(dr[j][2]||''), project:'',
+        detail:'Daily report', reason:bl, date:dt });
+    }
+  }
+  // 3. DPER site blockers this week
+  var eSheet = s.getSheetByName(SITE_EXEC_TAB);
+  if (eSheet && eSheet.getLastRow() > 1) {
+    var er = eSheet.getDataRange().getValues();
+    for (var k = 1; k < er.length; k++) {
+      var sb = String(er[k][19] || '').trim();                   // T Blocking Tomorrow
+      var edt = dateStr(er[k][1]);                               // B Date
+      if (sb && inWeek(edt)) out.push({ type:'Site', who:String(er[k][4]||''),
+        project:String(er[k][3]||''), detail:'Site execution', reason:sb, date:edt });
+    }
+  }
+  out.sort(function(a, b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  return { weekStart:monStr, weekEnd:sunStr, count:out.length, blockers:out };
 }
 
 // ── getSiteExecutionSummary — per project ──────────────────

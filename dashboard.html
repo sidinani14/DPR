@@ -584,7 +584,7 @@ async function loadTasks() {
     // Build project filter based on current member selection
     rebuildProjectFilter();
 
-    updateMetrics(); renderTasks(); renderHeatmap();
+    updateMetrics(); renderTasks(); renderHeatmap(); loadBlockers();
   } catch(e) {
     document.getElementById('task-list').innerHTML=`<div style="color:var(--red);padding:20px;font-size:13px">Failed: ${e.message}</div>`;
   }
@@ -611,27 +611,28 @@ function updateMetrics() {
   document.getElementById('m-revision').textContent  = tasks.filter(t=>t.status==='Revision Required').length;
   document.getElementById('m-blocked').textContent   = tasks.filter(t=>t.status==='Blocked').length;
   document.getElementById('m-approval').textContent  = tasks.filter(t=>t.status==='Approval Pending').length;
-  renderBlockedAlert(tasks);
 }
 
-// ⛔ Blocked tasks — prominent flag for leads to unblock
-function renderBlockedAlert(tasks) {
+// ⛔ Blockers this week — collected from blocked tasks + DPR + DPER reports
+const BLK_TAG = {Task:'Blocked task', Daily:'DPR report', Site:'Site (DPER)'};
+async function loadBlockers() {
   const el = document.getElementById('blocked-alert');
   if (!el) return;
-  const blocked = tasks.filter(t => t.status === 'Blocked');
-  if (!blocked.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  el.style.display = 'block';
-  // Pull the latest note as the blocker reason (notes are appended "date: text | …")
-  const reason = t => {
-    const n = (t.notes || '').split('|').pop().trim();
-    return n ? n.replace(/^\d{4}-\d{2}-\d{2}:\s*/, '') : 'No reason given';
-  };
-  el.innerHTML =
-    `<div class="blocked-alert-title">⛔ ${blocked.length} blocked task${blocked.length>1?'s':''} — needs unblocking</div>` +
-    blocked.map(t => `<div class="blocked-item">
-        <span class="blocked-who">${t.assignedTo}</span>
-        <span class="blocked-task">${t.project} · ${t.taskType}<br><span class="blocked-reason">“${reason(t)}”</span></span>
-      </div>`).join('');
+  if (APPS_SCRIPT_URL==='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') return;
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBlockersThisWeek'})});
+    const d = await res.json();
+    const list = (d && d.blockers) || [];
+    if (!list.length) { el.style.display='none'; el.innerHTML=''; return; }
+    el.style.display='block';
+    el.innerHTML =
+      `<div class="blocked-alert-title">⛔ ${list.length} blocker${list.length>1?'s':''} this week — needs attention</div>` +
+      list.map(b => `<div class="blocked-item">
+          <span class="blocked-who">${b.who||'—'}</span>
+          <span class="blocked-task"><span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">${BLK_TAG[b.type]||b.type}</span>${b.project?' · '+b.project:''}${b.detail&&b.type==='Task'?' · '+b.detail:''}<br><span class="blocked-reason">“${b.reason||''}”</span></span>
+          <span style="font-size:10px;color:var(--text3);flex-shrink:0;font-family:'DM Mono',monospace">${(b.date||'').slice(5)}</span>
+        </div>`).join('');
+  } catch(e) { /* leave panel hidden on error */ }
 }
 
 function filterStatus(s,btn) {
