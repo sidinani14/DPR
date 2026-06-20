@@ -179,6 +179,9 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
     </div>
   </div>
 
+  <!-- Block requests (assignees waiting on a lead decision) -->
+  <div id="block-section"></div>
+
   <!-- Task list -->
   <div id="task-list">
     <div class="skeleton"></div>
@@ -248,12 +251,16 @@ async function fetchAll() {
         {row:7, subId:'G7H8I9', date:'2026-05-01', member:'Bhavesh Bhagwat',project:'Narmada Township',   discipline:'Township / Plotted',   taskType:'Coordination / Approvals',         units:3, pts:10.8, visit:false},
       ];
     } else {
-      const [taskRes, configRes] = await Promise.all([
+      const [taskRes, configRes, blockRes, listRes] = await Promise.all([
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getPendingTasks'})}),
-        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})})
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBlockRequests'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})})
       ]);
       const taskData   = await taskRes.json();
       const configData = await configRes.json();
+      try { window.blockRequests = (await blockRes.json()).requests || []; } catch(e){ window.blockRequests = []; }
+      try { window.ALL_MEMBERS = (await listRes.json()).allMembers || []; } catch(e){ window.ALL_MEMBERS = []; }
       if (taskData.error)   throw new Error(taskData.error);
       if (configData.error) throw new Error(configData.error);
       tasks = taskData.tasks || [];
@@ -282,6 +289,7 @@ async function fetchAll() {
       LEADS.map(l => `<option value="${l}">${l}</option>`).join('');
 
     renderTasks();
+    renderBlockRequests();
 
   } catch(err) {
     document.getElementById('task-list').innerHTML =
@@ -290,6 +298,51 @@ async function fetchAll() {
        </div>`;
     document.getElementById('header-count').textContent = 'failed to load';
   }
+}
+
+// ── Block requests — lead disposes each (reschedule/reassign/park/cancel/reject) ──
+function renderBlockRequests(){
+  const host=document.getElementById('block-section');
+  const reqs=window.blockRequests||[];
+  if(!host) return;
+  if(!reqs.length){ host.innerHTML=''; return; }
+  const memberOpts=(window.ALL_MEMBERS||[]).map(m=>`<option value="${m}">${m}</option>`).join('');
+  host.innerHTML=`<style>.bd{padding:5px 9px;border:none;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;color:#fff}</style>
+   <div class="card" style="border:1px solid rgba(224,90,90,.45)">
+    <div class="card-head"><div class="card-title" style="color:#C0392B">⛔ Block requests (${reqs.length})</div><div class="card-sub">decide each</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">`
+    + reqs.map(b=>`
+      <div id="blk-${b.row}" style="border:1px solid var(--border);border-radius:8px;padding:11px 12px">
+        <div style="font-weight:600;font-size:13px">${b.member} · ${b.project}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${b.taskType}${b.area?' · '+b.area:''}</div>
+        <div style="font-size:12px;color:#C0392B;font-style:italic;margin-top:4px">“${b.reason||'no reason given'}”</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace">was: ${b.priorStatus||'—'} · due ${b.deadline||'—'} · raised ${b.raisedDate||'—'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center">
+          <input type="date" id="blk-date-${b.row}" value="${b.deadline||''}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px">
+          <button class="bd" style="background:#1565C0" onclick="disposeBlockAction(${b.row},'reschedule')">Reschedule</button>
+          <select id="blk-asg-${b.row}" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:5px"><option value="">reassign to…</option>${memberOpts}</select>
+          <button class="bd" style="background:#7A5000" onclick="disposeBlockAction(${b.row},'reassign')">Reassign</button>
+          <button class="bd" style="background:#555" onclick="disposeBlockAction(${b.row},'park')">Park</button>
+          <button class="bd" style="background:#8B2020" onclick="disposeBlockAction(${b.row},'cancel')">Cancel / not needed</button>
+          <button class="bd" style="background:#C0392B" onclick="disposeBlockAction(${b.row},'reject')">Reject</button>
+        </div>
+        <div id="blk-msg-${b.row}" style="font-size:11px;margin-top:6px"></div>
+      </div>`).join('')
+    + `</div></div>`;
+}
+async function disposeBlockAction(row, disposition){
+  const lead=document.getElementById('lead-name').value;
+  if(!lead){ alert('Select your name (Approving as) first.'); return; }
+  const payload={action:'disposeBlock', row, disposition, reviewedBy:lead};
+  if(disposition==='reschedule'){ payload.newDeadline=document.getElementById('blk-date-'+row).value; if(!payload.newDeadline){ alert('Pick a new date.'); return; } }
+  if(disposition==='reassign'){ payload.newAssignee=document.getElementById('blk-asg-'+row).value; if(!payload.newAssignee){ alert('Pick who to reassign to.'); return; } payload.newDeadline=document.getElementById('blk-date-'+row).value||''; }
+  const msg=document.getElementById('blk-msg-'+row); if(msg){ msg.textContent='Saving…'; msg.style.color='var(--text3)'; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
+    const j=await r.json();
+    if(j.status==='ok'){ const card=document.getElementById('blk-'+row); if(card){ card.style.opacity=.55; card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.disposition+'</div>'; } }
+    else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
+  }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
 }
 
 // ── Render task cards ──────────────────────────────────────────

@@ -73,6 +73,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sp-revision{background:var(--purple-light);color:var(--purple)}
 .sp-blocked{background:rgba(224,90,90,.22);color:#FF6B6B;font-weight:700}
 .task-card.blocked{border-left:3px solid #E05A5A}
+.sp-parked{background:rgba(120,120,130,.22);color:#A6AAB5}
+.task-card.parked{border-left:3px solid #7A7E88}
 /* Blocked alert banner */
 .blocked-alert{margin:0 18px 4px;padding:12px 16px;background:rgba(224,90,90,.1);border:1px solid rgba(224,90,90,.4);border-radius:10px;}
 .blocked-alert-title{font-size:12px;font-weight:700;color:#FF6B6B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
@@ -170,6 +172,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="fb green" onclick="filterStatus('Completed',this)">Completed</div>
   <div class="fb red" onclick="filterStatus('Delayed',this)">Delayed</div>
   <div class="fb" onclick="filterStatus('Blocked',this)" style="background:rgba(224,90,90,.12);color:#FF6B6B;border-color:rgba(224,90,90,.35)">⛔ Blocked</div>
+  <div class="fb" onclick="filterStatus('Parked',this)" style="background:rgba(120,120,130,.12);color:#A6AAB5;border-color:rgba(120,120,130,.35)">⏸ Parked</div>
   <div class="fb purple" onclick="filterStatus('Revision Required',this)">Revision Required</div>
 </div>
 
@@ -187,11 +190,20 @@ let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', da
 // Local (IST) date — backend due dates are IST, so never use UTC toISOString here
 function localDateStr(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function weekEndStr(){ const d=new Date(); d.setDate(d.getDate()+(6-d.getDay())); return localDateStr(d); }
+function mondayStr(){ const d=new Date(); d.setDate(d.getDate()-((d.getDay()+6)%7)); return localDateStr(d); }
 // Shared member/project/(status)/due/date filtering used by metrics + task list
 function applyScopeFilters(tasks, includeStatus){
   if (memberFilter!=='all')  tasks=tasks.filter(t=>t.assignedTo.split(',').map(a=>a.trim()).includes(memberFilter));
   if (projectFilter!=='all') tasks=tasks.filter(t=>t.project===projectFilter);
-  if (includeStatus && statusFilter!=='all') tasks=tasks.filter(t=>t.status===statusFilter);
+  const blockedView = includeStatus && statusFilter==='Blocked';
+  // Cancelled-block records are kept as history but hidden everywhere except the Blocked (this-week) view
+  if (!blockedView) tasks=tasks.filter(t=> !(t.status==='Blocked' && t.blockDisposition==='Cancelled'));
+  if (includeStatus && statusFilter!=='all') {
+    if (statusFilter==='Blocked') {            // Blocked filter = this week's blocks (log)
+      const mon=mondayStr(), we=weekEndStr();
+      tasks=tasks.filter(t=> t.status==='Blocked' && t.blockedDate>=mon && t.blockedDate<=we);
+    } else tasks=tasks.filter(t=>t.status===statusFilter);
+  }
   const today=localDateStr();
   if (dueFilter==='today')      tasks=tasks.filter(t=> t.targetDate===today || t.status==='Delayed');
   else if (dueFilter==='week')  { const we=weekEndStr(); tasks=tasks.filter(t=> (t.targetDate>=today && t.targetDate<=we) || t.status==='Delayed'); }
@@ -697,8 +709,9 @@ function renderTasks() {
 
 function renderTaskList(tasks) {
 
-  const order={'Blocked':0,'Delayed':1,'Revision Required':2,'Ongoing':3,'Upcoming':4,'Completed':5};
-  tasks.sort((a,b)=>(order[a.status]??6)-(order[b.status]??6));
+  // Blocked (pending lead approval) surfaces first as needs-attention, then the agreed order
+  const order={'Blocked':0,'Delayed':1,'Ongoing':2,'Approval Pending':3,'Completed':4,'Upcoming':5,'Parked':6,'Revision Required':7};
+  tasks.sort((a,b)=>(order[a.status]??8)-(order[b.status]??8));
 
   if (!tasks.length) {
     document.getElementById('task-list').innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No tasks found</div><div class="empty-sub">No tasks match the current filter.</div></div>`;
@@ -709,12 +722,12 @@ function renderTaskList(tasks) {
   const pillMap={
     'Upcoming':'sp-upcoming','Ongoing':'sp-ongoing','Completed':'sp-completed',
     'Delayed':'sp-delayed','Revision Required':'sp-revision',
-    'Approval Pending':'sp-approval','Blocked':'sp-blocked'
+    'Approval Pending':'sp-approval','Blocked':'sp-blocked','Parked':'sp-parked'
   };
   const cardMap={
     'Upcoming':'upcoming','Ongoing':'ongoing','Completed':'completed',
     'Delayed':'delayed','Revision Required':'revision',
-    'Approval Pending':'approval','Blocked':'blocked'
+    'Approval Pending':'approval','Blocked':'blocked','Parked':'parked'
   };
   const priMap={'Low':'p-low','Medium':'p-med','High':'p-high'};
 
@@ -745,6 +758,7 @@ function renderTaskList(tasks) {
         ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
         ${t.completedDate?`<div class="task-done-date">✓ Completed ${t.completedDate}</div>`:''}
         ${(isOverdue||t.status==='Delayed')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" onclick="openReassign(${t.row},this)">↪ Work Not Done — reassign</button></div>`:''}
+        ${(t.status==='Parked')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" style="color:var(--blue);border-color:var(--blue)" onclick="openReassign(${t.row},this)">↪ Assign parked task to…</button></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -784,9 +798,14 @@ async function doReassign(row){
     if(!leadName) return; localStorage.setItem('dpr_lead_name', leadName); }
   const host = document.getElementById('ra-host-'+row);
   if(host) host.innerHTML = '<span class="reassign-busy">Reassigning…</span>';
+  // Parked tasks go through the block-reassign path (no Work-Not-Done penalty); others use reassignTask
+  const task = allTasks.find(t=>t.row===row);
+  const body = (task && task.status==='Parked')
+    ? {action:'disposeBlock', row, disposition:'reassign', newAssignee, reviewedBy:leadName}
+    : {action:'reassignTask', row, newAssignee, leadName};
   try{
     const res = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({action:'reassignTask', row, newAssignee, leadName})});
+      body: JSON.stringify(body)});
     const j = await res.json();
     if(j.status==='ok'){ if(host) host.innerHTML='<span class="reassign-ok">✓ Reassigned to '+newAssignee+'</span>'; setTimeout(loadTasks, 900); }
     else { if(host) host.innerHTML='<span class="reassign-err">✗ '+(j.message||'Failed')+'</span>'; }

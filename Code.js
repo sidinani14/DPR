@@ -42,7 +42,19 @@ var SUMMARY_TAB   = 'DAILY_SUMMARY';
 var CONFIG_TAB    = 'CONFIG';
 var PROJECTS_TAB  = 'PROJECTS';
 var ASSIGN_TAB    = 'TASK_ASSIGNMENTS';
+var BLOCK_LOG_TAB = 'BLOCK_LOG';   // audit of every block raised + lead disposition
 var TEAM_TAB      = 'TEAM';
+// TASK_ASSIGNMENTS appended block-workflow columns (1-indexed): X=24 prior status,
+// Y=25 original deadline, Z=26 disposition (Pending/Rescheduled/Parked/Cancelled/Reassigned/Rejected),
+// AA=27 review date. These are added beyond the 23 core cols, so existing index reads are unaffected.
+var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26;  // X,Y,Z (within A–Z). Review date lives in BLOCK_LOG.
+function ensureCols(sheet, n){ var m=sheet.getMaxColumns(); if (m < n) sheet.insertColumnsAfter(m, n-m); }
+function writeBlockLogHeaders(sheet){
+  var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
+         'Reason','Prior Status','Original Deadline','Disposition','Reviewed By','Review Date','Note'];
+  sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#8B2020').setFontColor('#FFF').setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
 var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal'];  // departed — hidden from all forms & dashboards
 var SCORECARD_TAB = 'TEAM_SCORECARD';
 var APPROVAL_FORM_URL = 'https://sidinani14.github.io/dpr/approval.html';
@@ -255,6 +267,7 @@ function doGet(e) {
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
   if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
+  if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
@@ -281,6 +294,8 @@ function doPost(e) {
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
+    if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
+    if (data.action === 'disposeBlock')           return respond(disposeBlock(data));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -643,11 +658,18 @@ function getAllTasks() {
     var monOfWeek = cellDate(mondayOf(new Date()));
 
     var status = 'Upcoming';
+    var blockDispo = String(r[COL_BLK_DISPO-1] || '').trim();   // Z disposition
     if (selfStatus === 'Work Not Done') {
       status = 'Work Not Done';  // lead closed it off the assignee (reassigned) — penalty applies
     }
+    else if (selfStatus === 'Reassigned') {
+      status = 'Hidden';         // original row of an approved-block reassignment — drop it
+    }
+    else if (selfStatus === 'Parked') {
+      status = 'Parked';         // lead parked it — no deadline, off the workload map
+    }
     else if (selfStatus === 'Blocked') {
-      status = 'Blocked';        // assignee flagged a blocker — needs a lead to unblock
+      status = 'Blocked';        // pending lead approval (or kept as a cancelled record)
     }
     else if (selfStatus === 'Done') {
       if      (leadApproved === 'Yes') {
@@ -695,6 +717,8 @@ function getAllTasks() {
       approvalDate     : cellDate(r[is23col ? 18 : 17]),
       isRejected       : leadApproved === 'No',
       rejectionNote    : leadApproved === 'No' ? String(r[COL_NOTES]||'').trim() : '',
+      blockDisposition : blockDispo,                  // ''|Pending|Cancelled|Parked|…
+      blockedDate      : (status === 'Blocked' || status === 'Parked') ? cellDate(r[COL_STATUSDATE]) : '',
     });
   }
   return {tasks:tasks};
@@ -787,6 +811,16 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
                   rS !== 'Done';
 
       if (match) {
+        // ── Block raised: snapshot prior state + log it (don't re-snapshot if already pending) ──
+        if (newStatus === 'Blocked' && String(rows[i][COL_BLK_DISPO-1]||'').trim() !== 'Pending') {
+          ensureCols(sheet, COL_BLK_DISPO);
+          var priorStatus  = rS || 'Not Started';
+          var origDeadline = cellDate(rows[i][10]); // K Deadline (keeps running until approved)
+          sheet.getRange(i+1, COL_BLK_PRIOR ).setValue(priorStatus);
+          sheet.getRange(i+1, COL_BLK_ORIGDL).setValue(origDeadline);
+          sheet.getRange(i+1, COL_BLK_DISPO ).setValue('Pending');
+          logBlockRaised(String(rows[i][0]||''), i+1, a.member, a.project, a.taskType, now, a.note||'', priorStatus, origDeadline);
+        }
         sheet.getRange(i+1, 14).setValue(newStatus); // N SelfStatus
         sheet.getRange(i+1, 15).setValue(now);       // O SelfStatusDate always
 
@@ -885,6 +919,122 @@ function getPendingTasks() {
   return {tasks: tasks};
 }
 // findTaskAssignRow removed — was only used by TASK_LOG approval path (now obsolete)
+
+// ════════════════════════════════════════════════════════════════
+// BLOCK WORKFLOW — a Blocked task is a request the lead approves/rejects.
+// ════════════════════════════════════════════════════════════════
+function logBlockRaised(taskId, assignRow, member, project, taskType, raisedDate, reason, priorStatus, origDeadline){
+  var sheet = getOrCreate(BLOCK_LOG_TAB, writeBlockLogHeaders);
+  sheet.appendRow([ nextId(sheet,'BLK-'), taskId, assignRow, member, project, taskType,
+    raisedDate, reason||'', priorStatus||'', origDeadline||'', 'Pending', '', '', '' ]);
+}
+function updateBlockLog(taskId, dispoLabel, reviewedBy, reviewDate, note){
+  var sheet = db().getSheetByName(BLOCK_LOG_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length-1; i >= 1; i--){   // most-recent pending row for this task
+    if (String(rows[i][1]||'') === taskId && String(rows[i][10]||'').trim() === 'Pending'){
+      sheet.getRange(i+1,11).setValue(dispoLabel);
+      sheet.getRange(i+1,12).setValue(reviewedBy||'');
+      sheet.getRange(i+1,13).setValue(reviewDate||'');
+      sheet.getRange(i+1,14).setValue(note||'');
+      break;
+    }
+  }
+}
+// Tasks awaiting a lead's block decision — for the approval form
+function getBlockRequests(){
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {requests:[]};
+  var rows = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < rows.length; i++){
+    if (String(rows[i][13]||'').trim() !== 'Blocked') continue;
+    if (String(rows[i][COL_BLK_DISPO-1]||'').trim() !== 'Pending') continue;
+    out.push({
+      row:i+1, taskId:String(rows[i][0]||''), member:String(rows[i][3]||''),
+      project:String(rows[i][2]||''), taskType:String(rows[i][4]||''),
+      area:String(rows[i][11]||''), drawing:String(rows[i][12]||''),
+      weightedPts:parseFloat(rows[i][8])||0,
+      priorStatus:String(rows[i][COL_BLK_PRIOR-1]||''),
+      origDeadline:cellDate(rows[i][COL_BLK_ORIGDL-1]),
+      deadline:cellDate(rows[i][10]),
+      raisedDate:cellDate(rows[i][14]),
+      reason:latestNoteText(rows[i][20])
+    });
+  }
+  return {requests:out};
+}
+// Lead disposition of a block: reschedule | park | cancel | reassign | reject
+function disposeBlock(data){
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var row = parseInt(data.row,10);
+  if (!row) return {status:'error', message:'no row'};
+  ensureCols(sheet, COL_BLK_DISPO);
+  var r = sheet.getRange(row,1,1,Math.max(sheet.getLastColumn(),COL_BLK_DISPO)).getValues()[0];
+  var st = String(r[13]||'').trim(), dp = String(r[COL_BLK_DISPO-1]||'').trim();
+  // Accept a pending block, OR a parked task being reassigned from the dashboard
+  if (!((st === 'Blocked' && dp === 'Pending') || st === 'Parked'))
+    return {status:'error', message:'not a pending block or parked task'};
+  var dispo = String(data.disposition||'').trim();
+  var reviewedBy = data.reviewedBy || '';
+  var today = dateStr();
+  var priorStatus  = String(r[COL_BLK_PRIOR-1]||'').trim() || 'In Progress';
+  var origDeadline = cellDate(r[COL_BLK_ORIGDL-1]);
+  var label, note = data.note || '';
+
+  if (dispo === 'reschedule'){
+    sheet.getRange(row,14).setValue(priorStatus);
+    sheet.getRange(row,11).setValue(data.newDeadline || origDeadline);
+    sheet.getRange(row,COL_BLK_DISPO).setValue('Rescheduled'); label='Rescheduled';
+  } else if (dispo === 'park'){
+    sheet.getRange(row,14).setValue('Parked');
+    sheet.getRange(row,11).setValue('');                        // no deadline
+    sheet.getRange(row,COL_BLK_DISPO).setValue('Parked'); label='Parked';
+  } else if (dispo === 'cancel'){
+    sheet.getRange(row,14).setValue('Blocked');                 // keep as record
+    sheet.getRange(row,COL_BLK_DISPO).setValue('Cancelled'); label='Cancelled';
+  } else if (dispo === 'reassign'){
+    if (!data.newAssignee) return {status:'error', message:'newAssignee required'};
+    sheet.getRange(row,14).setValue('Reassigned');              // original released (no penalty)
+    sheet.getRange(row,COL_BLK_DISPO).setValue('Reassigned'); label='Reassigned';
+    var n = r.slice(0,23);
+    n[0]=nextId(sheet,'T-'); n[3]=data.newAssignee; n[9]=today;
+    n[10]=data.newDeadline || origDeadline; n[13]='Not Started';
+    n[14]=''; n[15]=''; n[16]='Pending'; n[17]=''; n[18]=''; n[19]='';
+    n[20]='Reassigned from '+String(r[3]||'')+' (approved block)'; n[21]=reviewedBy+' (block reassign)';
+    sheet.appendRow(n);
+  } else if (dispo === 'reject'){
+    sheet.getRange(row,14).setValue(priorStatus);
+    sheet.getRange(row,11).setValue(origDeadline);              // original deadline stands
+    sheet.getRange(row,COL_BLK_DISPO).setValue('Rejected'); label='Rejected';
+  } else {
+    return {status:'error', message:'unknown disposition: '+dispo};
+  }
+  if (note){
+    var ex = String(sheet.getRange(row,21).getValue()||'').trim();
+    sheet.getRange(row,21).setValue(ex ? ex+' | '+today+' (lead): '+note : today+' (lead): '+note);
+  }
+  updateBlockLog(String(r[0]||''), label, reviewedBy, today, note);
+  return {status:'ok', disposition:label};
+}
+// Reliability penalty: rejected blocks this week, per member (−1 each)
+function rejectedBlocksThisWeek(name){
+  var sheet = db().getSheetByName(BLOCK_LOG_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  var mon = dateStr(mondayOf(new Date()));
+  var sun = new Date(mondayOf(new Date())); sun.setDate(sun.getDate()+6);
+  var sunStr = dateStr(sun);
+  var rows = sheet.getDataRange().getValues(), c = 0;
+  for (var i = 1; i < rows.length; i++){
+    if (String(rows[i][3]||'').trim() !== name) continue;
+    if (String(rows[i][10]||'').trim() !== 'Rejected') continue;
+    var rd = dateStr(rows[i][12]);
+    if (rd >= mon && rd <= sunStr) c++;
+  }
+  return c;
+}
 
 // ════════════════════════════════════════════════════════════════
 // SUBMIT APPROVALS
@@ -3300,7 +3450,8 @@ function getWeeklyStats(weekStart) {
       var onTime   = String(r[COL_LEADAPPR]||'').trim() === 'Yes' && doneDate && doneDate <= dl;
       if (!onTime) lateCount++;
     });
-    var reliabilityPenalty = lateCount * 1 + wndCount * 2;
+    var rejBlk = rejectedBlocksThisWeek(name);   // −1 each (gaming a block)
+    var reliabilityPenalty = lateCount * 1 + wndCount * 2 + rejBlk * 1;
 
     results.push({
       name           : name,
@@ -3314,6 +3465,7 @@ function getWeeklyStats(weekStart) {
       dprDays        : dprDays,
       lateCount      : lateCount,
       workNotDone    : wndCount,
+      rejectedBlocks : rejBlk,
       reliabilityPenalty: reliabilityPenalty,
       completedTasks : completedTasks,
     });
