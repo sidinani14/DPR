@@ -400,7 +400,7 @@ function buildIndividualPage(m, taskData){
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${s.presentDays} present days filed`)}
       ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
       ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
-      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`${s.lateCount||0} late (−1) · ${s.workNotDone||0} reassigned (−2)`)}
+      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned. <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 170px;gap:4mm;margin-bottom:3mm;">
@@ -500,7 +500,7 @@ function buildDeepakPage(d){
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of 6 days · ≥1 submission/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
-      ${pCard('Reliability<br>Delays',s.s_reliability,10,`${d.lateTaskCount||0} late/overdue · ${d.workNotDone||0} work not done`)}
+      ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done. <b>To improve:</b> set realistic target dates and close site tasks on time.`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm">
@@ -564,10 +564,8 @@ function buildAmanPage(d){
     ? ` <span style="font-size:7px;color:rgba(255,255,255,0.4);font-weight:400;text-transform:none;letter-spacing:0">· output rescaled across active metrics (${excluded.join(', ')} N/A)</span>`
     : '';
 
-  const projRows=d.perProject.length ? d.perProject.map(p=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-    <td style="font-size:9px;font-weight:600;padding:6px 8px">${p.project}</td>
-    <td style="text-align:center;padding:6px 8px"><span style="color:${p.connected?'#2ED573':'#EA4335'};font-weight:700;font-size:11px">${p.connected?'✓':'✗'}</span></td>
-  </tr>`).join('') : `<tr><td colspan="2" style="padding:10px 8px;font-size:8.5px;color:rgba(255,255,255,0.35);text-align:center">No ongoing projects found</td></tr>`;
+  const connList   = d.perProject.filter(p=>p.connected).map(p=>p.project);
+  const notConnList= (d.missedProjects && d.missedProjects.length) ? d.missedProjects : d.perProject.filter(p=>!p.connected).map(p=>p.project);
 
   return `<div class="page">
     ${hdr()}
@@ -598,22 +596,16 @@ function buildAmanPage(d){
       ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of 6 days · ≥1 CRM report/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
-      ${pCard('Reliability<br>Lead SLA',s.s_reliability,10,`${d.leadSlaMissed||0} of ${d.leadsThisWeek||0} new leads missed 24h contact`)}
+      ${pCard('Reliability<br>Lead SLA',s.s_reliability,10,`Starts at 10 → −1 per new lead not contacted within 24 h. This week: ${d.leadSlaMissed||0} of ${d.leadsThisWeek||0} missed. <b>To improve:</b> contact every new lead within 24 hours.`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:4mm;margin-top:4mm">
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Client Connection — Per Ongoing Project</div>
-        ${d.missedProjects && d.missedProjects.length
-          ? `<div style="font-size:8.5px;color:#EA4335;margin-bottom:5px;line-height:1.4">⚠ <b>Not connected this week (${d.missedProjects.length}):</b> ${d.missedProjects.join(', ')}</div>`
-          : `<div style="font-size:8.5px;color:#2ED573;margin-bottom:5px">✓ All ${d.totalOngoing} ongoing projects connected this week</div>`}
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr style="background:rgba(245,166,35,0.12)">
-            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
-            <th style="padding:5px 8px;font-size:7px;font-weight:700;color:#F5A623;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Connected</th>
-          </tr></thead>
-          <tbody>${projRows}</tbody>
-        </table>
+        <div class="section-title" style="margin-bottom:2mm">Client Connections — Ongoing Projects (${d.connectedCount}/${d.totalOngoing})</div>
+        <div style="font-size:10px;line-height:1.7;color:rgba(255,255,255,0.85)">
+          <b style="color:#2ED573">Connected (${connList.length}):</b> ${connList.length ? connList.join(', ') : '—'}<br><br>
+          <b style="color:#EA4335">Not connected (${notConnList.length}):</b> ${notConnList.length ? notConnList.join(', ') : 'all ongoing projects connected ✓'}
+        </div>
       </div>
       <div>
         <div class="section-title" style="margin-bottom:2mm">Weekly Activity</div>

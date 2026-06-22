@@ -270,6 +270,7 @@ function doGet(e) {
   if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
+  if (action === 'getWeeklyDiag')            return safeRespond(function(){ return getWeeklyDiag(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
@@ -4569,28 +4570,29 @@ function getDeepakWeeklyStats(weekStart) {
     var eRows = execSheet.getDataRange().getValues();
     for (var i = 1; i < eRows.length; i++) {
       var eDate   = cellDate(eRows[i][1]);
-      var eProj   = String(eRows[i][3] || '').trim();
-      var eLead   = String(eRows[i][4] || '').trim();
-      var eVisit  = String(eRows[i][5] || '').trim();
-      var eClient = String(eRows[i][17]|| '').trim();
-      if (eLead !== 'Deepak Soni') continue;
+      var eProj   = String(eRows[i][3] || '').trim().toLowerCase();
+      var eLead   = String(eRows[i][4] || '').trim().toLowerCase();
+      var eVisit  = String(eRows[i][5] || '').trim().toLowerCase();
+      var eClient = String(eRows[i][17]|| '').trim().toLowerCase();
+      if (eLead.indexOf('deepak') === -1) continue;   // tolerate "Deepak"/"Deepak Soni"/case
       if (!eDate || eDate < mon || eDate > sat) continue;
 
       dperDaysSet[eDate] = true;
       if (!projectDays[eProj]) projectDays[eProj] = {};
       projectDays[eProj][eDate] = true;
-      if (eVisit  === 'Yes') visitedSet[eProj] = true;
-      if (eClient === 'Yes') clientSet[eProj]  = true;
+      if (eVisit  === 'yes') visitedSet[eProj] = true;
+      if (eClient === 'yes') clientSet[eProj]  = true;
     }
   }
 
-  // ── 3. Per-project breakdown ──────────────────────────────
+  // ── 3. Per-project breakdown (match CONFIG names case-insensitively) ──
   var perProject = activeProjects.map(function(proj) {
+    var k = proj.toLowerCase();
     return {
       project       : proj,
-      visited       : !!visitedSet[proj],
-      clientUpdated : !!clientSet[proj],
-      dperDays      : projectDays[proj] ? Object.keys(projectDays[proj]).length : 0,
+      visited       : !!visitedSet[k],
+      clientUpdated : !!clientSet[k],
+      dperDays      : projectDays[k] ? Object.keys(projectDays[k]).length : 0,
     };
   });
 
@@ -4765,7 +4767,7 @@ function getAmanWeeklyStats(weekStart, member) {
 
   // ── 1. Ongoing projects (denominator) — active design/WD/execution stages only ──
   // Excludes New Lead, On hold, Completed, Dead (and legacy closed/cancelled/proposal).
-  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead','hold','on hold'];
+  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover'];
   function isExcluded(stat){
     stat = String(stat||'').toLowerCase();
     for (var i=0;i<EXCL.length;i++){ if (stat.indexOf(EXCL[i]) > -1) return true; }
@@ -4783,13 +4785,14 @@ function getAmanWeeklyStats(weekStart, member) {
   }
   var totalOngoing = ongoing.length;
 
-  // ── 2a. DPR days — AMAN_DAILY submission rows ──
+  // ── 2a. DPR days — distinct days Aman filed a CRM report (CRM_LOG, by member) ──
+  // (AMAN_DAILY is deprecated — merged into CRM_LOG.)
   var dprDaysSet = {};     // date → true
-  var dailySheet = s.getSheetByName(AMAN_DAILY_TAB);
-  if (dailySheet && dailySheet.getLastRow() > 1) {
-    var dRows = dailySheet.getDataRange().getValues();
+  var dLogSheet = s.getSheetByName(CRM_LOG_TAB);
+  if (dLogSheet && dLogSheet.getLastRow() > 1) {
+    var dRows = dLogSheet.getDataRange().getValues();
     for (var di = 1; di < dRows.length; di++) {
-      var dDate = cellDate(dRows[di][1]);          // B Date
+      var dDate = cellDate(dRows[di][2]);          // C Date
       var dMem  = String(dRows[di][3]||'').trim(); // D Member
       if (dMem !== who) continue;
       if (!dDate || dDate < mon || dDate > sat) continue;
@@ -4984,6 +4987,45 @@ function getAmanWeeklyStats(weekStart, member) {
       total    : total,
     },
   };
+}
+
+// ════════════════════════════════════════════════════════════════
+// getWeeklyDiag — read-only dump of what the Deepak/Aman weekly functions see,
+// for debugging a "showing 0" week. action=getWeeklyDiag&weekStart=YYYY-MM-DD
+// ════════════════════════════════════════════════════════════════
+function getWeeklyDiag(weekStart){
+  var s = db();
+  var mon = weekStart || dateStr(mondayOf(new Date()));
+  var sat = addDaysToStr(mon, 5);
+  var out = { week:[mon,sat], deepak:{}, aman:{} };
+
+  var cfg = s.getSheetByName(CONFIG_TAB), active = [];
+  if (cfg){ var cr=cfg.getDataRange().getValues(), inSec=false;
+    for (var i=0;i<cr.length;i++){ var c=String(cr[i][0]||'').trim();
+      if (!inSec){ if (c.toUpperCase()==='DEEPAK ACTIVE PROJECTS') inSec=true; }
+      else { if (!c) break; active.push(c); } } }
+  out.deepak.activeProjects = active;
+  var ex = s.getSheetByName(SITE_EXEC_TAB), erows = [];
+  if (ex){ var er=ex.getDataRange().getValues();
+    for (var j=1;j<er.length;j++){ var d=cellDate(er[j][1]); if(!d||d<mon||d>sat) continue;
+      erows.push({date:d, project:String(er[j][3]||''), lead:String(er[j][4]||''), visit:String(er[j][5]||''), client:String(er[j][17]||'')}); } }
+  out.deepak.execRowsThisWeek = erows;
+
+  var EXCL=['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover'];
+  function exc(st){ st=String(st||'').toLowerCase(); return EXCL.some(function(e){ return st.indexOf(e)>-1; }); }
+  var pj = s.getSheetByName(PROJECTS_TAB), proj = [];
+  if (pj){ var pr=pj.getDataRange().getValues();
+    for (var k=1;k<pr.length;k++){ var nm=String(pr[k][1]||'').trim(); if(!nm) continue;
+      proj.push({name:nm, stage:String(pr[k][2]||''), ongoing:!exc(pr[k][2])}); } }
+  out.aman.projects = proj;
+  out.aman.ongoingCount = proj.filter(function(p){ return p.ongoing; }).length;
+  var lg = s.getSheetByName(CRM_LOG_TAB), conns = [];
+  if (lg){ var lr=lg.getDataRange().getValues();
+    for (var m=1;m<lr.length;m++){ var dt=cellDate(lr[m][2]); var mem=String(lr[m][3]||'').trim();
+      if (mem!=='Aman Raghuwanshi') continue; if(!dt||dt<mon||dt>sat) continue;
+      conns.push({date:dt, category:String(lr[m][4]||''), project:String(lr[m][6]||'')}); } }
+  out.aman.connectionsThisWeek = conns;
+  return out;
 }
 
 // ════════════════════════════════════════════════════════════════
