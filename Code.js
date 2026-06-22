@@ -4999,11 +4999,16 @@ function getWeeklyDiag(weekStart){
   var sat = addDaysToStr(mon, 5);
   var out = { week:[mon,sat], deepak:{}, aman:{} };
 
-  var cfg = s.getSheetByName(CONFIG_TAB), active = [];
-  if (cfg){ var cr=cfg.getDataRange().getValues(), inSec=false;
-    for (var i=0;i<cr.length;i++){ var c=String(cr[i][0]||'').trim();
-      if (!inSec){ if (c.toUpperCase()==='DEEPAK ACTIVE PROJECTS') inSec=true; }
-      else { if (!c) break; active.push(c); } } }
+  // Deepak active projects — scan ALL columns of CONFIG for the header
+  var cfg = s.getSheetByName(CONFIG_TAB), active = [], hdrAt = null;
+  if (cfg){ var cr=cfg.getDataRange().getValues();
+    found: for (var i=0;i<cr.length;i++){ for (var cj=0;cj<cr[i].length;cj++){
+      if (String(cr[i][cj]||'').trim().toUpperCase()==='DEEPAK ACTIVE PROJECTS'){
+        hdrAt = {row:i+1, col:cj+1};
+        for (var rr=i+1;rr<cr.length;rr++){ var v=String(cr[rr][cj]||'').trim(); if(!v) break; active.push(v); }
+        break found;
+      } } } }
+  out.deepak.headerFoundAt = hdrAt;
   out.deepak.activeProjects = active;
   var ex = s.getSheetByName(SITE_EXEC_TAB), erows = [];
   if (ex){ var er=ex.getDataRange().getValues();
@@ -5011,20 +5016,22 @@ function getWeeklyDiag(weekStart){
       erows.push({date:d, project:String(er[j][3]||''), lead:String(er[j][4]||''), visit:String(er[j][5]||''), client:String(er[j][17]||'')}); } }
   out.deepak.execRowsThisWeek = erows;
 
-  var EXCL=['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover'];
-  function exc(st){ st=String(st||'').toLowerCase(); return EXCL.some(function(e){ return st.indexOf(e)>-1; }); }
+  // Aman — show ALL CRM_LOG rows this week (raw member values), AMAN_DAILY rows, and project stages
+  var lg = s.getSheetByName(CRM_LOG_TAB), conns = [];
+  if (lg){ var lr=lg.getDataRange().getValues();
+    for (var m=1;m<lr.length;m++){ var dt=cellDate(lr[m][2]); if(!dt||dt<mon||dt>sat) continue;
+      conns.push({date:dt, member:String(lr[m][3]||''), category:String(lr[m][4]||''), project:String(lr[m][6]||'')}); } }
+  out.aman.crmLogThisWeek = conns;
+  var ad = s.getSheetByName(AMAN_DAILY_TAB), adr = [];
+  if (ad){ var arr=ad.getDataRange().getValues();
+    for (var a=1;a<arr.length;a++){ var dd=cellDate(arr[a][1]); if(!dd||dd<mon||dd>sat) continue;
+      adr.push({date:dd, member:String(arr[a][3]||'')}); } }
+  out.aman.amanDailyThisWeek = adr;
   var pj = s.getSheetByName(PROJECTS_TAB), proj = [];
   if (pj){ var pr=pj.getDataRange().getValues();
     for (var k=1;k<pr.length;k++){ var nm=String(pr[k][1]||'').trim(); if(!nm) continue;
-      proj.push({name:nm, stage:String(pr[k][2]||''), ongoing:!exc(pr[k][2])}); } }
+      proj.push({name:nm, stage:String(pr[k][2]||'')}); } }
   out.aman.projects = proj;
-  out.aman.ongoingCount = proj.filter(function(p){ return p.ongoing; }).length;
-  var lg = s.getSheetByName(CRM_LOG_TAB), conns = [];
-  if (lg){ var lr=lg.getDataRange().getValues();
-    for (var m=1;m<lr.length;m++){ var dt=cellDate(lr[m][2]); var mem=String(lr[m][3]||'').trim();
-      if (mem!=='Aman Raghuwanshi') continue; if(!dt||dt<mon||dt>sat) continue;
-      conns.push({date:dt, category:String(lr[m][4]||''), project:String(lr[m][6]||'')}); } }
-  out.aman.connectionsThisWeek = conns;
   return out;
 }
 

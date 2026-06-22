@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Weekly Diagnostic</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0F0F0F;color:#F0EDE8;padding:24px;max-width:900px;margin:0 auto}
+h1{font-size:18px;color:#C8A96E;font-weight:700}
+.sub{font-size:12px;color:#8A8680;margin:4px 0 18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+input{font-size:13px;padding:7px 10px;border:1px solid #2A2A2A;border-radius:6px;background:#1A1A1A;color:#F0EDE8}
+#btn{margin:8px 0}
+h2{font-size:14px;color:#C8A96E;margin:20px 0 6px;border-bottom:1px solid #2A2A2A;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+th{text-align:left;color:#7A766F;font-size:10px;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #2A2A2A}
+td{padding:4px 8px;border-bottom:1px solid #1d1d1d;color:#C9C4BC}
+.ok{color:#5FB584;font-weight:600}.bad{color:#E0556B;font-weight:600}
+.note{font-size:12px;color:#9A9690;margin:6px 0}
+pre{background:#161616;border:1px solid #2A2A2A;border-radius:8px;padding:12px;font-size:11px;overflow:auto;white-space:pre-wrap;word-break:break-word;display:none}
+.flag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:5px}
+.f-on{background:rgba(95,181,132,.18);color:#5FB584}.f-off{background:rgba(224,85,107,.18);color:#E0556B}
+</style></head><body>
+<h1>IDEAFORM · Weekly Diagnostic</h1>
+<div class="sub">Signs you in and prints exactly what the Deepak/Aman weekly functions see — to debug "showing 0".</div>
+<div class="row">
+  <label style="font-size:12px;color:#9A9690">Week start (Mon):</label>
+  <input type="date" id="ws" value="2026-06-15">
+  <div id="g_id_onload" data-client_id="48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com" data-callback="onCred" data-auto_select="false"></div>
+  <div id="btn"><div class="g_id_signin" data-type="standard" data-size="medium" data-theme="filled_black" data-shape="pill" data-text="signin_with"></div></div>
+</div>
+<div id="out"><div class="note">Sign in to run the diagnostic.</div></div>
+<pre id="raw"></pre>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+function esc(s){return String(s==null?'':s).replace(/</g,'&lt;');}
+async function onCred(resp){
+  const out=document.getElementById('out'); out.innerHTML='<div class="note">Running…</div>';
+  const ws=document.getElementById('ws').value||'2026-06-15';
+  try{
+    const r=await fetch(API+'?action=getWeeklyDiag&weekStart='+ws+'&idToken='+encodeURIComponent(resp.credential));
+    const d=await r.json();
+    if(d.code==='unauthorized'){ out.innerHTML='<div class="bad">Access denied — sign in with a team account.</div>'; return; }
+    document.getElementById('raw').style.display='block';
+    document.getElementById('raw').textContent=JSON.stringify(d,null,2);
+    render(d);
+  }catch(e){ out.innerHTML='<div class="bad">Error: '+esc(e.message)+'</div>'; }
+}
+function render(d){
+  const ongoingEXCL=['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover'];
+  const isOngoing=st=>{st=String(st||'').toLowerCase();return !ongoingEXCL.some(e=>st.indexOf(e)>-1);};
+  const dp=d.deepak||{}, am=d.aman||{};
+  let h=`<div class="note">Week: ${esc(d.week&&d.week[0])} → ${esc(d.week&&d.week[1])}</div>`;
+
+  h+=`<h2>DEEPAK — active projects (header found at: ${dp.headerFoundAt?('row '+dp.headerFoundAt.row+', col '+dp.headerFoundAt.col):'<span class="bad">NOT FOUND</span>'})</h2>`;
+  h+=`<div class="note">${(dp.activeProjects||[]).length?esc((dp.activeProjects||[]).join(', ')):'<span class="bad">empty — this is why his ratios are 0</span>'}</div>`;
+  h+=`<h2>DEEPAK — SITE_EXECUTION rows this week (${(dp.execRowsThisWeek||[]).length})</h2>`;
+  if((dp.execRowsThisWeek||[]).length){ h+='<table><tr><th>Date</th><th>Project</th><th>Lead</th><th>Visit</th><th>Client</th></tr>';
+    dp.execRowsThisWeek.forEach(r=>{h+=`<tr><td>${esc(r.date)}</td><td>${esc(r.project)}</td><td>${esc(r.lead)}</td><td class="${/yes/i.test(r.visit)?'ok':'bad'}">${esc(r.visit)}</td><td>${esc(r.client)}</td></tr>`;}); h+='</table>'; }
+  else h+='<div class="bad note">No SITE_EXECUTION rows for this week.</div>';
+
+  h+=`<h2>AMAN — CRM_LOG rows this week (${(am.crmLogThisWeek||[]).length})</h2>`;
+  if((am.crmLogThisWeek||[]).length){ h+='<table><tr><th>Date</th><th>Member</th><th>Category</th><th>Project</th></tr>';
+    am.crmLogThisWeek.forEach(r=>{const exact=r.member==='Aman Raghuwanshi';h+=`<tr><td>${esc(r.date)}</td><td class="${exact?'ok':'bad'}">${esc(r.member)}${exact?'':'<span class="flag f-off">≠ expected</span>'}</td><td>${esc(r.category)}</td><td>${esc(r.project)}</td></tr>`;}); h+='</table>'; }
+  else h+='<div class="bad note">No CRM_LOG rows this week.</div>';
+
+  h+=`<h2>AMAN — AMAN_DAILY rows this week (${(am.amanDailyThisWeek||[]).length})</h2>`;
+  h+=`<div class="note">${(am.amanDailyThisWeek||[]).map(r=>esc(r.date)+' ('+esc(r.member)+')').join(', ')||'none'}</div>`;
+
+  h+=`<h2>PROJECTS — stages (ongoing flag for Aman's denominator)</h2>`;
+  h+='<table><tr><th>Project</th><th>Stage</th><th>Ongoing?</th></tr>';
+  (am.projects||[]).forEach(p=>{const on=isOngoing(p.stage);h+=`<tr><td>${esc(p.name)}</td><td>${esc(p.stage)}</td><td class="${on?'ok':'bad'}">${on?'YES':'no'}</td></tr>`;});
+  h+='</table>';
+
+  document.getElementById('out').innerHTML=h;
+}
+</script>
+</body></html>
