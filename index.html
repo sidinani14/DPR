@@ -809,8 +809,10 @@ function fillTypes(catSel) {
   if (catSel.value === '__all' || !TASK_GROUPS.length) labels = STAGES.map(s=>s.label);
   else { const g = TASK_GROUPS.find(x=>x.name===catSel.value); labels = g ? g.tasks : []; }
   typeSel.innerHTML = '<option value="">— select task —</option>' +
-    labels.map(lb => { const idx = STAGE_IDX[lb]; return idx==null ? '' :
-      `<option value="${idx}">${STAGES[idx].label} · ${STAGES[idx].pts}pts</option>`; }).join('');
+    labels.map(lb => { const idx = STAGE_IDX[lb];
+      // Site visits / meetings are logged via the per-project visit toggle, not as task rows
+      if (idx==null || isVisitType(STAGES[idx].label)) return '';
+      return `<option value="${idx}">${STAGES[idx].label} · ${STAGES[idx].pts}pts</option>`; }).join('');
   refreshTaskPts(typeSel); calcScore();
 }
 // visitDurOptions removed — replaced by hours number input
