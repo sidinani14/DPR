@@ -4539,18 +4539,23 @@ function getDeepakWeeklyStats(weekStart) {
   var sat = addDaysToStr(mon, 5);
 
   // ── 1. Read active projects from CONFIG tab ───────────────
-  // Scans col A for "DEEPAK ACTIVE PROJECTS" header,
-  // reads names until the next blank cell.
+  // Scans ALL columns for the "DEEPAK ACTIVE PROJECTS" header (it lives in
+  // col T, not col A), then reads names down that same column until blank.
   var activeProjects = [];
   var configSheet = s.getSheetByName(CONFIG_TAB);
   if (configSheet) {
     var cRows = configSheet.getDataRange().getValues();
-    var inSection = false;
-    for (var ci = 0; ci < cRows.length; ci++) {
-      var cell = String(cRows[ci][0] || '').trim();
-      if (!inSection) {
-        if (cell.toUpperCase() === 'DEEPAK ACTIVE PROJECTS') { inSection = true; }
-      } else {
+    var hdrRow = -1, hdrCol = -1;
+    for (var hr = 0; hr < cRows.length && hdrRow === -1; hr++) {
+      for (var hc = 0; hc < cRows[hr].length; hc++) {
+        if (String(cRows[hr][hc] || '').trim().toUpperCase() === 'DEEPAK ACTIVE PROJECTS') {
+          hdrRow = hr; hdrCol = hc; break;
+        }
+      }
+    }
+    if (hdrRow > -1) {
+      for (var ci = hdrRow + 1; ci < cRows.length; ci++) {
+        var cell = String((cRows[ci] || [])[hdrCol] || '').trim();
         if (!cell) break;
         activeProjects.push(cell);
       }
@@ -4763,6 +4768,7 @@ function getAmanWeeklyStats(weekStart, member) {
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
   var who = member || 'Aman Raghuwanshi';
+  var whoLC = who.toLowerCase();   // CRM_LOG stores "aman raghuwanshi" (lowercase) — match case-insensitively
   var COLLECTION_TARGET = 0.70;  // 70% of bills raised cleared = full marks
 
   // ── 1. Ongoing projects (denominator) — active design/WD/execution stages only ──
@@ -4793,8 +4799,8 @@ function getAmanWeeklyStats(weekStart, member) {
     var dRows = dLogSheet.getDataRange().getValues();
     for (var di = 1; di < dRows.length; di++) {
       var dDate = cellDate(dRows[di][2]);          // C Date
-      var dMem  = String(dRows[di][3]||'').trim(); // D Member
-      if (dMem !== who) continue;
+      var dMem  = String(dRows[di][3]||'').trim().toLowerCase(); // D Member
+      if (dMem !== whoLC) continue;
       if (!dDate || dDate < mon || dDate > sat) continue;
       dprDaysSet[dDate] = true;
     }
@@ -4808,9 +4814,9 @@ function getAmanWeeklyStats(weekStart, member) {
     var cRows = logSheet.getDataRange().getValues();
     for (var ci = 1; ci < cRows.length; ci++) {
       var cDate = cellDate(cRows[ci][2]);          // C Date
-      var cMem  = String(cRows[ci][3]||'').trim(); // D Member
+      var cMem  = String(cRows[ci][3]||'').trim().toLowerCase(); // D Member
       var cCat  = String(cRows[ci][4]||'').trim(); // E Category
-      if (cMem !== who || cCat !== 'Client Connection') continue;
+      if (cMem !== whoLC || cCat !== 'Client Connection') continue;
       if (!cDate || cDate < mon || cDate > sat) continue;
       var pr = String(cRows[ci][6]||'').trim();    // G Project
       if (pr) connected[pr.toLowerCase()] = true;
@@ -4843,7 +4849,7 @@ function getAmanWeeklyStats(weekStart, member) {
     for (var fi = 1; fi < fRows.length; fi++) {
       var fDate = cellDate(fRows[fi][2]);               // C Date Recorded
       var fProj = String(fRows[fi][4] || '').trim();    // E Project
-      if (String(fRows[fi][3]||'').trim() !== who) continue; // D Recorded By
+      if (String(fRows[fi][3]||'').trim().toLowerCase() !== whoLC) continue; // D Recorded By
       if (!fDate || fDate < mon || fDate > sat) continue;
       if (fProj) connected[fProj.toLowerCase()] = true;
     }
@@ -4908,8 +4914,8 @@ function getAmanWeeklyStats(weekStart, member) {
     var smRows = sumSheet.getDataRange().getValues();
     for (var mi = 1; mi < smRows.length; mi++) {
       var rDate = cellDate(smRows[mi][0]);
-      var rName = String(smRows[mi][2]||'').trim();
-      if (rName !== who) continue;
+      var rName = String(smRows[mi][2]||'').trim().toLowerCase();
+      if (rName !== whoLC) continue;
       if (!rDate || rDate < mon || rDate > sat) continue;
       daysPresent++;
       var arr = String(smRows[mi][1]||'').trim();
