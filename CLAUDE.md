@@ -80,7 +80,8 @@
 - Punctuality: /20 (same base as team, biometric)
 - Hours: /15 (same base as team, biometric)
 - Total: /100
-- Active projects list: CONFIG tab col A, under "DEEPAK ACTIVE PROJECTS" header
+- Active projects list: CONFIG tab, under "DEEPAK ACTIVE PROJECTS" header (lives in
+  col T — getDeepakWeeklyStats scans ALL columns for the header, not just col A)
 
 ## Weekly targets by role
 - Junior Architect / Junior ID: 48 pts/week
