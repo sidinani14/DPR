@@ -1117,6 +1117,18 @@ function collectData() {
     const hasVisit=document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
     const vhrs_collect=parseFloat(pb.querySelector('.p-vdur')?.value)||0;
     const vtype=pb.querySelector('.p-vtype')?.value||'';
+    // The per-project site-visit/meeting toggle must also create a Done visit task in
+    // TASK_ASSIGNMENTS (hours-based pts), so it shows as completed and earns points.
+    if (hasVisit && vhrs_collect>0) {
+      const isSiteVisit = vtype.toLowerCase().includes('site visit');
+      doneTasks.push({
+        taskType: isSiteVisit ? 'Site Visit' : 'Meeting',
+        area:'', drawing:'', units:1, basePts:0,
+        project: proj.name, member: member, discipline: proj.discipline,
+        date: new Date().toISOString().substring(0,10),
+        visitHours: vhrs_collect,
+      });
+    }
     data[`P${pi} Visit Hours`] = vhrs_collect;
     data[`P${pi} Name`]        = proj.name;
     data[`P${pi} Discipline`]  = proj.discipline;
