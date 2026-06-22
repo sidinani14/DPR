@@ -4763,8 +4763,9 @@ function getAmanWeeklyStats(weekStart, member) {
   var who = member || 'Aman Raghuwanshi';
   var COLLECTION_TARGET = 0.70;  // 70% of bills raised cleared = full marks
 
-  // ── 1. Ongoing projects (denominator) — same filter as the CRM form ──
-  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
+  // ── 1. Ongoing projects (denominator) — active design/WD/execution stages only ──
+  // Excludes New Lead, On hold, Completed, Dead (and legacy closed/cancelled/proposal).
+  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead','hold','on hold'];
   function isExcluded(stat){
     stat = String(stat||'').toLowerCase();
     for (var i=0;i<EXCL.length;i++){ if (stat.indexOf(EXCL[i]) > -1) return true; }
@@ -4929,9 +4930,10 @@ function getAmanWeeklyStats(weekStart, member) {
   var s_rev    = revActive
                  ? r1(Math.min(collRatio, COLLECTION_TARGET)/COLLECTION_TARGET*15) : 0;
 
-  var activeMax   = (clientActive?20:0) + (leadActive?15:0) + (revActive?15:0);
-  var activeScore = (clientActive?s_client:0) + (leadActive?s_lead:0) + (revActive?s_rev:0);
-  var output      = activeMax > 0 ? r1(activeScore/activeMax*50) : 0;
+  // Output /50 = client-connection coverage of ONGOING projects only (lead-mgmt &
+  // collection are shown for context but do not drive output this week — per spec).
+  var output      = totalOngoing > 0 ? r1(connectedCount/totalOngoing*50) : 50;
+  var missedProjects = perProject.filter(function(p){ return !p.connected; }).map(function(p){ return p.project; });
 
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
   var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
@@ -4969,6 +4971,7 @@ function getAmanWeeklyStats(weekStart, member) {
     absentDays    : absentDays,
     reliabilityPenalty : reliabilityPenalty,
     perProject    : perProject,
+    missedProjects: missedProjects,
     scores: {
       s_client : s_client,
       s_lead   : s_lead,
