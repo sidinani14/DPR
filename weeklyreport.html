@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>IDS Weekly Performance Report — 1–6 June 2026</title>
+<title>IDS Weekly Performance Report — 15–20 June 2026</title>
 <script src="auth.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -123,7 +123,14 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
 .loading{text-align:center;padding:40px;color:rgba(255,255,255,0.4);font-size:14px;}
 .edit-btn{position:fixed;bottom:20px;right:20px;background:rgba(245,166,35,0.9);color:#000;padding:10px 18px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;z-index:1000;border:none;font-family:inherit;}
 .edit-btn:hover{background:#F5A623;}
-@media print{.edit-btn{display:none;}@page{size:A4 landscape;margin:0;}}
+@media print{
+  .edit-btn{display:none;}
+  @page{size:297mm 210mm;margin:0;}
+  html,body{width:297mm;background:#0F1923;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  /* Lock every page to EXACTLY one landscape sheet so nothing spills onto a blank next page */
+  .page{width:297mm;height:210mm;min-height:210mm;max-height:210mm;margin:0;overflow:hidden;page-break-after:always;break-after:page;page-break-inside:avoid;}
+  .page:last-child{page-break-after:auto;break-after:auto;}
+}
 [contenteditable]{outline:none;cursor:text;border-bottom:1px dashed rgba(245,166,35,0.3);}
 [contenteditable]:focus{background:rgba(245,166,35,0.06);border-radius:3px;}
 </style>
