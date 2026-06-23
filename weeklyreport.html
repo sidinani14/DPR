@@ -185,8 +185,8 @@ const BIO = {
     {d:'Mon 15',t:'08:57',s:'P',l:false},{d:'Tue 16',t:'09:04',s:'P',l:false},{d:'Wed 17',t:'09:04',s:'P',l:false},{d:'Thu 18',t:'09:03',s:'P',l:false},{d:'Fri 19',t:'09:02',s:'P',l:false},{d:'Sat 20',t:'08:59',s:'P',l:false} ]},
   'Sahil Maurya': { days:5, lateCount:5, avgHrs:'07:13', hrsScore:7, punctScore:6, att:[
     {d:'Mon 15',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Tue 16',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Wed 17',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Thu 18',t:'10:00',s:'HD',l:true,n:'Half day'},{d:'Fri 19',t:'09:47',s:'P',l:true,n:'37 min late'},{d:'Sat 20',t:'—',s:'A',l:false,n:'Absent'} ]},
-  'Deepak Soni': { days:4, lateCount:1, avgHrs:'06:49', hrsScore:4, punctScore:12, att:[
-    {d:'Mon 15',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 16',t:'09:03',s:'P',l:false},{d:'Wed 17',t:'14:08',s:'HD',l:true,n:'Half day'},{d:'Thu 18',t:'—',s:'A',l:false,n:'Absent'},{d:'Fri 19',t:'09:09',s:'P',l:false},{d:'Sat 20',t:'09:08',s:'P',l:false} ]},
+  'Deepak Soni': { days:4, lateCount:0, avgHrs:'07:30', hrsScore:7, punctScore:15, att:[
+    {d:'Mon 15',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 16',t:'09:03',s:'P',l:false},{d:'Wed 17',t:'09:00',s:'P',l:false,n:'Site visits'},{d:'Thu 18',t:'—',s:'A',l:false,n:'Absent'},{d:'Fri 19',t:'09:09',s:'P',l:false},{d:'Sat 20',t:'09:08',s:'P',l:false} ]},
   'Aman Raghuwanshi': { days:5, lateCount:2, avgHrs:'07:20', hrsScore:7, punctScore:9, att:[
     {d:'Mon 15',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 16',t:'08:58',s:'P',l:false},{d:'Wed 17',t:'08:59',s:'P',l:false},{d:'Thu 18',t:'08:58',s:'P',l:false},{d:'Fri 19',t:'10:30',s:'P',l:true,n:'80 min late'},{d:'Sat 20',t:'11:13',s:'HD',l:true,n:'Half day'} ]},
 };
@@ -704,6 +704,7 @@ async function loadAndRender(){
         s_dpr   : ds.s_dper,
         s_punct : ds.s_punct,
         s_hrs   : ds.s_hrs,
+        s_reliability: ds.s_reliability,
         total   : ds.total,
       },
     });
@@ -727,6 +728,7 @@ async function loadAndRender(){
         s_dpr   : as.s_dpr,
         s_punct : as.s_punct,
         s_hrs   : as.s_hrs,
+        s_reliability: as.s_reliability,
         total   : as.total,
       },
     });
