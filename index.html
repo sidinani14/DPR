@@ -8,7 +8,7 @@
 <script src="auth.js"></script>
 <script src="searchselect.js"></script>
 <style>:root{--ss-bg:#FFFFFF;--ss-fg:#1A1917;--ss-pop-bg:#FFFFFF;--ss-border:#E2DFD8;--ss-accent:#1F3A5F;--ss-muted:#9E9B94;--ss-hover:rgba(31,58,95,0.10)}</style>
-<script>SearchSelect.auto('.p-name, .t-cat, .t-type');</script>
+<script>SearchSelect.auto('.p-name, .t-cat, .t-type, .conn-proj, .bill-proj, .bill-stage');</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;--border:#E2DFD8;--border2:#CBC7BC;--text:#1A1917;--text2:#6B6860;--text3:#9E9B94;--accent:#1F3A5F;--accent-light:#E8EDF4;--green:#2D6A2D;--green-light:#EAF3EA;--amber:#7A4F0A;--amber-light:#FDF3E3;--red:#8B2020;--red-light:#FDEAEA;--radius:10px;--radius-sm:6px;--shadow:0 1px 3px rgba(0,0,0,.06)}
@@ -120,6 +120,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .visit-detail{display:none;padding-top:10px;border-top:1px solid var(--border);margin-top:4px}
 .visit-detail.open{display:block}
 .add-proj{width:100%;padding:11px;font-size:13px;color:var(--accent);background:var(--accent-light);border:1px dashed rgba(31,58,95,.3);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
+.rm-block{margin-top:6px;font-size:11px;color:var(--red);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .add-proj:hover{background:#dce5f0}
 .add-proj:disabled{opacity:.35;cursor:not-allowed}
 .radio-group{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
@@ -240,9 +241,33 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 4: Accountability -->
+  <!-- Section 4: Client connections (EPIC G) -->
   <div class="card">
-    <div class="card-head"><div class="card-num">4</div><div class="card-title">Accountability</div></div>
+    <div class="card-head"><div class="card-num">4</div><div class="card-title">Client connections today</div><div class="card-sub">optional</div></div>
+    <div class="card-body">
+      <div id="conn-blocks"></div>
+      <button class="add-proj" onclick="addConnection()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+        Add a connection
+      </button>
+    </div>
+  </div>
+
+  <!-- Section 5: Billables reached (EPIC H) -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">5</div><div class="card-title">Billables reached today</div><div class="card-sub">optional · needs approval</div></div>
+    <div class="card-body">
+      <div id="bill-blocks"></div>
+      <button class="add-proj" onclick="addBillable()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+        Add a billable
+      </button>
+    </div>
+  </div>
+
+  <!-- Section 6: Accountability -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">6</div><div class="card-title">Accountability</div></div>
     <div class="card-body">
       <div class="field">
         <div class="lbl">Arrived on time today? <span class="req">*</span></div>
@@ -262,9 +287,9 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 5: Summary -->
+  <!-- Section 7: Summary -->
   <div class="card">
-    <div class="card-head"><div class="card-num">5</div><div class="card-title">Today's summary</div></div>
+    <div class="card-head"><div class="card-num">7</div><div class="card-title">Today's summary</div></div>
     <div class="card-body">
       <div class="field">
         <div class="lbl">Full list of deliverables released today <span class="req">*</span></div>
@@ -322,6 +347,9 @@ const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomV
 const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 
 let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[], TASK_GROUPS=[], STAGE_IDX={};
+let PAYMENT_STAGES={}, PAYMENT_DISCIPLINES=[];   // EPIC H — from CONFIG V/W
+let connCount=0, billCount=0;
+const CONN_TYPES=['Call','WhatsApp','Meeting','Site Visit','Email','Other'];
 let EMAIL_MAP  = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"}; // hardcoded fallback — overridden by live data
 let googleUser = null;
 let assignedTasks = [];
@@ -515,6 +543,8 @@ async function fetchAll() {
       TASK_GROUPS = c.taskGroups || [];
       STAGE_IDX = {}; STAGES.forEach((s,i)=>{ STAGE_IDX[s.label]=i; });
       VISITS   = c.visits   || [];
+      PAYMENT_STAGES = c.paymentStages || {};
+      PAYMENT_DISCIPLINES = c.paymentDisciplines || [];
       window._EMAILS = l.emails || [];
       if (window._EMAILS.length > 0) {
         TEAM.forEach((name,i)=>{ if(window._EMAILS[i]) EMAIL_MAP[name]=window._EMAILS[i]; });
@@ -795,6 +825,64 @@ function renderAssignedTasks() {
 function projOptions() {
   return '<option value="">— select project —</option>'+
     PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
+}
+// Project options whose VALUE is the project name (used by connections + billables)
+function projNameOptions() {
+  return '<option value="">— select project —</option>'+
+    PROJECTS.map(p=>`<option value="${(p.name||'').replace(/"/g,'&quot;')}">${p.name}</option>`).join('');
+}
+
+// ── EPIC G: client connections (DPR) ─────────────────────────
+function addConnection(){
+  connCount++; const id=connCount;
+  const div=document.createElement('div'); div.className='proj-block'; div.id='cn-'+id;
+  div.innerHTML=
+    `<div class="field"><div class="lbl">Project</div><select class="conn-proj" id="cn-proj-${id}">${projNameOptions()}</select></div>`+
+    `<div class="field"><div class="lbl">Type of contact</div><select id="cn-type-${id}">${CONN_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div>`+
+    `<div class="field"><div class="lbl">Notes <span class="opt">what was discussed</span></div><textarea id="cn-notes-${id}" placeholder="Outcome, action items…"></textarea></div>`+
+    `<button type="button" class="rm-block" onclick="document.getElementById('cn-${id}').remove()">✕ Remove</button>`;
+  document.getElementById('conn-blocks').appendChild(div);
+}
+function collectConnections(){
+  const out=[];
+  document.querySelectorAll('#conn-blocks > .proj-block').forEach(d=>{
+    const id=d.id.replace('cn-','');
+    const project=(document.getElementById('cn-proj-'+id)||{}).value||'';
+    const type=(document.getElementById('cn-type-'+id)||{}).value||'';
+    const notes=(document.getElementById('cn-notes-'+id)||{}).value||'';
+    if(project||notes) out.push({project,type,notes});
+  });
+  return out;
+}
+
+// ── EPIC H: billables reached (DPR) ──────────────────────────
+function fillBillStages(catSel){
+  const id=catSel.id.replace('bill-cat-','');
+  const stages=PAYMENT_STAGES[catSel.value]||[];
+  const ss=document.getElementById('bill-stage-'+id);
+  ss.innerHTML='<option value="">— select stage —</option>'+stages.map(s=>`<option>${s}</option>`).join('');
+}
+function addBillable(){
+  billCount++; const id=billCount;
+  const cats=(PAYMENT_DISCIPLINES.length?PAYMENT_DISCIPLINES:['Architecture','Interiors','Town Planning']);
+  const div=document.createElement('div'); div.className='proj-block'; div.id='bl-'+id;
+  div.innerHTML=
+    `<div class="field"><div class="lbl">Project</div><select class="bill-proj" id="bill-proj-${id}">${projNameOptions()}</select></div>`+
+    `<div class="field"><div class="lbl">Category</div><select id="bill-cat-${id}" onchange="fillBillStages(this)"><option value="">— select —</option>${cats.map(c=>`<option>${c}</option>`).join('')}</select></div>`+
+    `<div class="field"><div class="lbl">Payment stage reached</div><select class="bill-stage" id="bill-stage-${id}"><option value="">— select category first —</option></select></div>`+
+    `<button type="button" class="rm-block" onclick="document.getElementById('bl-${id}').remove()">✕ Remove</button>`;
+  document.getElementById('bill-blocks').appendChild(div);
+}
+function collectBillables(){
+  const out=[];
+  document.querySelectorAll('#bill-blocks > .proj-block').forEach(d=>{
+    const id=d.id.replace('bl-','');
+    const project=(document.getElementById('bill-proj-'+id)||{}).value||'';
+    const discipline=(document.getElementById('bill-cat-'+id)||{}).value||'';
+    const stage=(document.getElementById('bill-stage-'+id)||{}).value||'';
+    if(project&&stage) out.push({project,discipline,stage});
+  });
+  return out;
 }
 function stageOptions() {
   return '<option value="">— select task type —</option>'+
@@ -1170,6 +1258,13 @@ async function submitForm() {
         headers: {'Content-Type': 'text/plain'},
         body: JSON.stringify(data),
       });
+      // EPIC G/H — log client connections + billable requests (separate writes)
+      const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
+      const conns = collectConnections(), bills = collectBillables();
+      if (conns.length) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'logConnections', member, connections:conns})}).catch(()=>{});
+      if (bills.length) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'submitBillables', member, billables:bills})}).catch(()=>{});
     }
     document.getElementById('sending').classList.remove('show');
     document.getElementById('fin-pts').textContent=data['Total Weighted Pts'].toFixed(1);

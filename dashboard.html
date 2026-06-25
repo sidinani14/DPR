@@ -99,6 +99,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .reassign-busy{font-size:11px;color:var(--text3)}
 .reassign-ok{font-size:11px;font-weight:600;color:var(--green)}
 .reassign-err{font-size:11px;font-weight:600;color:var(--red)}
+.park-btn{font-size:11px;font-weight:600;color:#A6AAB5;background:transparent;border:1px solid #7A7E88;border-radius:5px;padding:5px 10px;cursor:pointer}
+.park-btn:hover{background:rgba(120,120,130,.10)}
+.unpark-btn{font-size:11px;font-weight:600;color:var(--green);background:transparent;border:1px solid var(--green);border-radius:5px;padding:5px 10px;cursor:pointer}
+.park-reason{font-size:11px;color:#A6AAB5;margin-top:6px;font-style:italic}
 .empty{text-align:center;padding:60px 20px}
 .empty-icon{font-size:40px;margin-bottom:12px}
 .empty-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
@@ -697,6 +701,8 @@ function renderTaskList(tasks) {
     'Approval Pending':'approval','Blocked':'blocked','Parked':'parked'
   };
   const priMap={'Low':'p-low','Medium':'p-med','High':'p-high'};
+  const canPark = isSiddharth();
+  const PARKABLE = ['Upcoming','Ongoing','Delayed','Approval Pending','Revision Required'];
 
   document.getElementById('task-list').innerHTML=tasks.map(t=>{
     const isOverdue = t.targetDate && t.targetDate<today && t.status!=='Completed';
@@ -724,11 +730,40 @@ function renderTaskList(tasks) {
         </div>
         ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
         ${t.completedDate?`<div class="task-done-date">✓ Completed ${t.completedDate}</div>`:''}
+        ${(t.status==='Parked')?`<div class="park-reason">⏸ ${t.blockDisposition==='Parked (Stalled)'?'Auto-parked — project stalled':('Parked'+(t.parkReason?': '+t.parkReason:''))}</div>`:''}
         ${(isOverdue||t.status==='Delayed')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" onclick="openReassign(${t.row},this)">↪ Work Not Done — reassign</button></div>`:''}
         ${(t.status==='Parked')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" style="color:var(--blue);border-color:var(--blue)" onclick="openReassign(${t.row},this)">↪ Assign parked task to…</button></div>`:''}
+        ${(canPark&&PARKABLE.includes(t.status))?`<div class="reassign-host"><button class="park-btn" onclick="doPark(${t.row})">⏸ Park</button></div>`:''}
+        ${(canPark&&t.status==='Parked'&&t.blockDisposition!=='Parked (Stalled)')?`<div style="margin-top:6px"><button class="unpark-btn" onclick="doUnpark(${t.row})">▶ Un-park (resume)</button></div>`:''}
       </div>
     </div>`;
   }).join('');
+}
+
+// ── PARK / UN-PARK (Siddharth only) ──────────────────────────
+const DIRECTOR_EMAILS = ['sidinani14@gmail.com','siddharth@ideaform.in'];
+function isSiddharth(){
+  return !!(window.IDS_USER && DIRECTOR_EMAILS.includes(String(window.IDS_USER.email||'').toLowerCase()));
+}
+async function doPark(row){
+  const reason = (prompt('Reason for parking (e.g. pending payment):')||'').trim();
+  if(reason===null) return;
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'parkTask', row, reason, by:(window.IDS_USER&&window.IDS_USER.name)||''})});
+    const j = await res.json();
+    if(j.status==='ok') setTimeout(loadTasks, 600);
+    else alert('Could not park: '+(j.message||'failed'));
+  }catch(e){ alert('Network error'); }
+}
+async function doUnpark(row){
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'unparkTask', row})});
+    const j = await res.json();
+    if(j.status==='ok') setTimeout(loadTasks, 600);
+    else alert('Could not un-park: '+(j.message||'failed'));
+  }catch(e){ alert('Network error'); }
 }
 
 // ── REASSIGN (lead only) ─────────────────────────────────────

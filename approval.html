@@ -181,6 +181,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
 
   <!-- Block requests (assignees waiting on a lead decision) -->
   <div id="block-section"></div>
+  <div id="bill-section"></div>
 
   <!-- Task list -->
   <div id="task-list">
@@ -251,15 +252,17 @@ async function fetchAll() {
         {row:7, subId:'G7H8I9', date:'2026-05-01', member:'Bhavesh Bhagwat',project:'Narmada Township',   discipline:'Township / Plotted',   taskType:'Coordination / Approvals',         units:3, pts:10.8, visit:false},
       ];
     } else {
-      const [taskRes, configRes, blockRes, listRes] = await Promise.all([
+      const [taskRes, configRes, blockRes, listRes, billRes] = await Promise.all([
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getPendingTasks'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBlockRequests'})}),
-        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})})
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBillRequests'})})
       ]);
       const taskData   = await taskRes.json();
       const configData = await configRes.json();
       try { window.blockRequests = (await blockRes.json()).requests || []; } catch(e){ window.blockRequests = []; }
+      try { window.billRequests = (await billRes.json()).requests || []; } catch(e){ window.billRequests = []; }
       try { window.ALL_MEMBERS = (await listRes.json()).allMembers || []; } catch(e){ window.ALL_MEMBERS = []; }
       if (taskData.error)   throw new Error(taskData.error);
       if (configData.error) throw new Error(configData.error);
@@ -290,6 +293,7 @@ async function fetchAll() {
 
     renderTasks();
     renderBlockRequests();
+    renderBillRequests();
 
   } catch(err) {
     document.getElementById('task-list').innerHTML =
@@ -341,6 +345,43 @@ async function disposeBlockAction(row, disposition){
     const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
     const j=await r.json();
     if(j.status==='ok'){ const card=document.getElementById('blk-'+row); if(card){ card.style.opacity=.55; card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.disposition+'</div>'; } }
+    else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
+  }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
+}
+
+// ── Billing requests (EPIC H) — approve creates a CRM raise-bill task ──
+function renderBillRequests(){
+  const host=document.getElementById('bill-section');
+  if(!host) return;
+  const reqs=window.billRequests||[];
+  if(!reqs.length){ host.innerHTML=''; return; }
+  host.innerHTML=`<style>.bbtn{padding:5px 11px;border:none;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;color:#fff}</style>
+   <div class="card" style="border:1px solid rgba(46,125,50,.45)">
+    <div class="card-head"><div class="card-title" style="color:#1B5E20">🧾 Billing requests (${reqs.length})</div><div class="card-sub">approve → CRM raises the bill</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">`
+    + reqs.map(b=>`
+      <div id="br-${b.row}" style="border:1px solid var(--border);border-radius:8px;padding:11px 12px">
+        <div style="font-weight:600;font-size:13px">${b.project}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${b.discipline||'—'} · <b>${b.stage}</b></div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace">raised by ${b.raisedBy||'—'} · ${b.date||'—'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">
+          <button class="bbtn" style="background:#2E7D32" onclick="disposeBillAction(${b.row},'approve')">Approve → raise bill</button>
+          <button class="bbtn" style="background:#C0392B" onclick="disposeBillAction(${b.row},'reject')">Reject</button>
+        </div>
+        <div id="br-msg-${b.row}" style="font-size:11px;margin-top:6px"></div>
+      </div>`).join('')
+    + `</div></div>`;
+}
+async function disposeBillAction(row, disposition){
+  const lead=document.getElementById('lead-name').value;
+  if(!lead){ alert('Select your name (Approving as) first.'); return; }
+  const msg=document.getElementById('br-msg-'+row); if(msg){ msg.textContent='Saving…'; msg.style.color='var(--text3)'; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'disposeBillRequest', row, disposition, reviewedBy:lead})});
+    const j=await r.json();
+    if(j.status==='ok'){ const card=document.getElementById('br-'+row); if(card){ card.style.opacity=.55;
+      card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.disposition+(j.taskId?' — CRM task created':'')+'</div>'; } }
     else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
   }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
 }

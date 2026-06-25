@@ -38,6 +38,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .f-red{background:rgba(224,85,107,.16);color:var(--red)}
 .f-amber{background:rgba(217,162,59,.16);color:var(--amber)}
 .f-blue{background:rgba(74,127,200,.16);color:var(--blue)}
+.f-grey{background:rgba(120,120,130,.18);color:#7A7E88}
 .lead{font-size:10px;color:var(--text3);margin-top:7px}
 h2.sec{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin:26px 0 10px}
 table.leads{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
@@ -82,6 +83,7 @@ table.leads tr:hover td{background:var(--surface2)}
       <option value="payment">Payment Overdue</option>
       <option value="behind">Behind Schedule</option>
       <option value="visit">Site Visit / Meeting Overdue</option>
+      <option value="stalled">Stalled</option>
     </select>
     <button class="btn" onclick="load()">↻ Refresh</button>
   </div>
@@ -124,6 +126,7 @@ function passStatus(p,f){
   if(f==='payment') return p.paymentOverdue;
   if(f==='behind') return p.behind;
   if(f==='visit') return p.engagementOverdue;
+  if(f==='stalled') return p.stalled;
   return true;
 }
 
@@ -153,6 +156,7 @@ function render(){
 
 function cardHtml(p){
   const flags=[];
+  if(p.stalled) flags.push('<span class="flag f-grey">⏸ Stalled</span>');
   if(p.neglected) flags.push('<span class="flag f-red">🔴 Neglected</span>');
   if(p.paymentOverdue) flags.push('<span class="flag f-red">💰 Payment overdue</span>');
   if(p.behind) flags.push('<span class="flag f-amber">⚠ Behind</span>');

@@ -45,9 +45,13 @@ var ASSIGN_TAB    = 'TASK_ASSIGNMENTS';
 var BLOCK_LOG_TAB = 'BLOCK_LOG';   // audit of every block raised + lead disposition
 var TEAM_TAB      = 'TEAM';
 // TASK_ASSIGNMENTS appended block-workflow columns (1-indexed): X=24 prior status,
-// Y=25 original deadline, Z=26 disposition (Pending/Rescheduled/Parked/Cancelled/Reassigned/Rejected),
-// AA=27 review date. These are added beyond the 23 core cols, so existing index reads are unaffected.
-var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26;  // X,Y,Z (within A–Z). Review date lives in BLOCK_LOG.
+// Y=25 original deadline, Z=26 disposition (Pending/Rescheduled/Parked/Parked (Stalled)/Cancelled/Reassigned/Rejected),
+// AA=27 park reason (free text for manual parks; auto-set for stalled). Added beyond the 23
+// core cols, so existing index reads are unaffected. Review date lives in BLOCK_LOG.
+var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26, COL_PARK_REASON=27;  // X,Y,Z,AA
+var BILL_REQ_TAB  = 'BILL_REQUESTS';  // billables raised on DPR → approved → CRM raise-bill task
+// Only Siddharth may park tasks directly from the dashboard (EPIC I).
+var DIRECTOR_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1 };
 function ensureCols(sheet, n){ var m=sheet.getMaxColumns(); if (m < n) sheet.insertColumnsAfter(m, n-m); }
 function writeBlockLogHeaders(sheet){
   var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
@@ -268,6 +272,8 @@ function doGet(e) {
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
   if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
   if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
+  if (action === 'getBillRequests')          return safeRespond(getBillRequests);
+  if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
   if (action === 'getWeeklyDiag')            return safeRespond(function(){ return getWeeklyDiag(p.weekStart||''); });
@@ -282,7 +288,8 @@ function doPost(e) {
   try {
     var raw  = e && e.postData ? e.postData.contents : '';
     var data = JSON.parse(raw);
-    if (!verifyIdToken(data.idToken)) return respondUnauthorized();
+    var authEmail = verifyIdToken(data.idToken);
+    if (!authEmail) return respondUnauthorized();
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
 
     // GET-style actions sent via POST to bypass CORS
@@ -301,6 +308,11 @@ function doPost(e) {
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
     if (data.action === 'getProjectDetail')       return respond(getProjectDetail(data.project||''));
     if (data.action === 'disposeBlock')           return respond(disposeBlock(data));
+    if (data.action === 'parkTask')               return respond(parkTask(data, authEmail));
+    if (data.action === 'unparkTask')             return respond(unparkTask(data, authEmail));
+    if (data.action === 'reconcileStalled')       return respond(reconcileStalledParks());
+    if (data.action === 'getBillRequests')        return respond(getBillRequests());
+    if (data.action === 'disposeBillRequest')     return respond(disposeBillRequest(data));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -312,6 +324,8 @@ function doPost(e) {
     if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
     if (data.action === 'updateIssueStatus')   return respond(updateIssueStatus(data.issueId||'', data.status||'', data.targetDate||''));
     if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
+    if (data.action === 'logConnections')      return respond(logConnections(data));
+    if (data.action === 'submitBillables')     return respond(submitBillables(data));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
 
@@ -502,9 +516,24 @@ function readConfig() {
     }
   }
 
+  // ── Payment stages (EPIC H) — CONFIG cols V(21)=Discipline, W(22)=Milestone ──
+  // Under a "PAYMENT STAGES" marker. Tolerate blank spacer rows between
+  // disciplines; skip the marker + the "Discipline"/"Milestone" header row.
+  var paymentStages = {}, paymentDisciplines = [];
+  for (var pj = 0; pj < rows.length; pj++) {
+    var disc = String(rows[pj][21] || '').trim();   // col V
+    var mile = String(rows[pj][22] || '').trim();   // col W
+    if (!disc || !mile) continue;
+    var dU = disc.toUpperCase();
+    if (dU === 'PAYMENT STAGES' || dU === 'DISCIPLINE') continue;  // marker / header
+    if (!paymentStages[disc]) { paymentStages[disc] = []; paymentDisciplines.push(disc); }
+    paymentStages[disc].push(mile);
+  }
+
   Logger.log('readConfig: found ' + leads.length + ' leads: ' + leads.map(function(l){return l.name;}).join(', '));
   return {stages:stages, disciplines:discs, visits:visits,
-          leads:leads, scoringWeights:sw, revPenalties:rp, taskGroups:taskGroups};
+          leads:leads, scoringWeights:sw, revPenalties:rp, taskGroups:taskGroups,
+          paymentStages:paymentStages, paymentDisciplines:paymentDisciplines};
 }
 
 // writeTaskLog and writeTaskLogHeaders removed — TASK_LOG tab is obsolete.
@@ -561,6 +590,7 @@ function assignTasks(data) {
   var tasks = data.tasks || [];
   var today = dateStr();
   var written = 0;
+  var stalledSet = stalledProjectSet();
 
   tasks.forEach(function(t) {
     var tUnits      = parseFloat(t.units) || 1;
@@ -590,6 +620,7 @@ function assignTasks(data) {
       data.assignedBy   || '',        // V AssignedBy
       t.priority        || 'Medium',  // W Priority
     ]);
+    parkRowIfStalled(sheet, data.project || '', stalledSet);  // stalled project → auto-park
     written++;
   });
   return {status:'ok', written:written};
@@ -722,7 +753,8 @@ function getAllTasks() {
       approvalDate     : cellDate(r[is23col ? 18 : 17]),
       isRejected       : leadApproved === 'No',
       rejectionNote    : leadApproved === 'No' ? String(r[COL_NOTES]||'').trim() : '',
-      blockDisposition : blockDispo,                  // ''|Pending|Cancelled|Parked|…
+      blockDisposition : blockDispo,                  // ''|Pending|Cancelled|Parked|Parked (Stalled)|…
+      parkReason       : String(r[COL_PARK_REASON-1] || ''),   // AA — why parked
       blockedDate      : (status === 'Blocked' || status === 'Parked') ? cellDate(r[COL_STATUSDATE]) : '',
     });
   }
@@ -1039,6 +1071,232 @@ function rejectedBlocksThisWeek(name){
     if (rd >= mon && rd <= sunStr) c++;
   }
   return c;
+}
+
+// ════════════════════════════════════════════════════════════════
+// EPIC I — Park / un-park a task directly from the dashboard (Siddharth only).
+// Mirrors the approval-form park, but needs no prior Block. Snapshots the
+// prior status + deadline (X/Y), sets status Parked (N) with no deadline (K),
+// disposition Parked (Z) and a free-text reason (AA), and audits to BLOCK_LOG.
+// ════════════════════════════════════════════════════════════════
+function isDirector(email){ return !!DIRECTOR_EMAILS[String(email||'').toLowerCase()]; }
+
+function parkTask(data, authEmail){
+  if (!isDirector(authEmail)) return {status:'error', code:'forbidden', message:'Only Siddharth can park tasks.'};
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var row = parseInt(data.row,10);
+  if (!row) return {status:'error', message:'no row'};
+  ensureCols(sheet, COL_PARK_REASON);
+  var r = sheet.getRange(row,1,1,Math.max(sheet.getLastColumn(),COL_PARK_REASON)).getValues()[0];
+  var st = String(r[13]||'').trim();
+  if (st === 'Parked') return {status:'ok', already:true};
+  if (['Done','Reassigned','Work Not Done'].indexOf(st) > -1)
+    return {status:'error', message:'cannot park a '+st.toLowerCase()+' task'};
+  var today = dateStr();
+  if (!String(r[COL_BLK_PRIOR-1]||'').trim()){
+    sheet.getRange(row, COL_BLK_PRIOR ).setValue(st || 'In Progress');
+    sheet.getRange(row, COL_BLK_ORIGDL).setValue(cellDate(r[10]) || '');
+  }
+  sheet.getRange(row,14).setValue('Parked');                       // N selfStatus
+  sheet.getRange(row,11).setValue('');                             // K no deadline
+  sheet.getRange(row,COL_BLK_DISPO).setValue('Parked');            // Z disposition
+  sheet.getRange(row,COL_PARK_REASON).setValue(data.reason || ''); // AA reason
+  var lg = getOrCreate(BLOCK_LOG_TAB, writeBlockLogHeaders);
+  lg.appendRow([ nextId(lg,'BLK-'), String(r[0]||''), row, String(r[3]||''),
+    String(r[2]||''), String(r[4]||''), today, data.reason||'',
+    String(r[COL_BLK_PRIOR-1]||st||''), cellDate(r[COL_BLK_ORIGDL-1])||'',
+    'Parked', data.by||authEmail, today, data.reason||'' ]);
+  return {status:'ok'};
+}
+
+function unparkTask(data, authEmail){
+  if (!isDirector(authEmail)) return {status:'error', code:'forbidden', message:'Only Siddharth can un-park tasks.'};
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var row = parseInt(data.row,10);
+  if (!row) return {status:'error', message:'no row'};
+  ensureCols(sheet, COL_PARK_REASON);
+  var r = sheet.getRange(row,1,1,Math.max(sheet.getLastColumn(),COL_PARK_REASON)).getValues()[0];
+  if (String(r[13]||'').trim() !== 'Parked') return {status:'error', message:'not parked'};
+  var prior = String(r[COL_BLK_PRIOR-1]||'').trim() || 'In Progress';
+  sheet.getRange(row,14).setValue(prior);                          // N restore
+  sheet.getRange(row,11).setValue(cellDate(r[COL_BLK_ORIGDL-1])||''); // K restore deadline
+  sheet.getRange(row,COL_BLK_DISPO).setValue('');                  // Z clear
+  sheet.getRange(row,COL_PARK_REASON).setValue('');                // AA clear
+  sheet.getRange(row,COL_BLK_PRIOR).setValue('');
+  sheet.getRange(row,COL_BLK_ORIGDL).setValue('');
+  return {status:'ok', restoredTo:prior};
+}
+
+// ════════════════════════════════════════════════════════════════
+// EPIC J — "Stalled" project stage. Stalled = paused, no client response.
+// Open tasks on a stalled project are auto-parked with disposition
+// "Parked (Stalled)"; when the project un-stalls, only those revive.
+// ════════════════════════════════════════════════════════════════
+function stalledProjectSet(){
+  var set = {};
+  var pSheet = db().getSheetByName(PROJECTS_TAB);
+  if (pSheet && pSheet.getLastRow() > 1){
+    var pr = pSheet.getDataRange().getValues();
+    for (var i=1;i<pr.length;i++){
+      if (String(pr[i][2]||'').trim().toLowerCase() === 'stalled'){
+        var nm = String(pr[i][1]||'').trim().toLowerCase();
+        if (nm) set[nm] = 1;
+      }
+    }
+  }
+  return set;
+}
+// Park a just-appended task row if its project is currently stalled.
+function parkRowIfStalled(sheet, projectName, stalledSet){
+  if (!projectName) return false;
+  var set = stalledSet || stalledProjectSet();
+  if (!set[String(projectName).trim().toLowerCase()]) return false;
+  var row = sheet.getLastRow();
+  ensureCols(sheet, COL_PARK_REASON);
+  var prior = String(sheet.getRange(row,14).getValue()||'').trim() || 'Not Started';
+  if (prior === 'Parked') return false;
+  sheet.getRange(row,COL_BLK_PRIOR ).setValue(prior);
+  sheet.getRange(row,COL_BLK_ORIGDL).setValue(cellDate(sheet.getRange(row,11).getValue())||'');
+  sheet.getRange(row,14).setValue('Parked');
+  sheet.getRange(row,11).setValue('');
+  sheet.getRange(row,COL_BLK_DISPO).setValue('Parked (Stalled)');
+  sheet.getRange(row,COL_PARK_REASON).setValue('Project stalled — no client response');
+  return true;
+}
+// Reconcile every task against the current stalled-project list (park new,
+// revive un-stalled). Runs from the Monday trigger + callable on demand.
+function reconcileStalledParks(){
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {status:'ok', parked:0, unparked:0};
+  ensureCols(sheet, COL_PARK_REASON);
+  var stalled = stalledProjectSet();
+  var rows = sheet.getDataRange().getValues();
+  var parked=0, unparked=0;
+  var SKIP = ['Done','Reassigned','Work Not Done'];
+  for (var i=1;i<rows.length;i++){
+    var r = rows[i];
+    var proj  = String(r[2]||'').trim().toLowerCase();
+    var st    = String(r[13]||'').trim();
+    var dispo = String(r[COL_BLK_DISPO-1]||'').trim();
+    var isStalled = !!stalled[proj];
+    if (isStalled && st !== 'Parked' && SKIP.indexOf(st) === -1){
+      if (!String(r[COL_BLK_PRIOR-1]||'').trim()){
+        sheet.getRange(i+1,COL_BLK_PRIOR ).setValue(st || 'In Progress');
+        sheet.getRange(i+1,COL_BLK_ORIGDL).setValue(cellDate(r[10])||'');
+      }
+      sheet.getRange(i+1,14).setValue('Parked');
+      sheet.getRange(i+1,11).setValue('');
+      sheet.getRange(i+1,COL_BLK_DISPO).setValue('Parked (Stalled)');
+      sheet.getRange(i+1,COL_PARK_REASON).setValue('Project stalled — no client response');
+      parked++;
+    } else if (!isStalled && st === 'Parked' && dispo === 'Parked (Stalled)'){
+      var prior = String(r[COL_BLK_PRIOR-1]||'').trim() || 'In Progress';
+      sheet.getRange(i+1,14).setValue(prior);
+      sheet.getRange(i+1,11).setValue(cellDate(r[COL_BLK_ORIGDL-1])||'');
+      sheet.getRange(i+1,COL_BLK_DISPO).setValue('');
+      sheet.getRange(i+1,COL_PARK_REASON).setValue('');
+      sheet.getRange(i+1,COL_BLK_PRIOR).setValue('');
+      sheet.getRange(i+1,COL_BLK_ORIGDL).setValue('');
+      unparked++;
+    }
+  }
+  return {status:'ok', parked:parked, unparked:unparked};
+}
+
+// ════════════════════════════════════════════════════════════════
+// EPIC G — shared connection logger. DPR + DPER call this once to append
+// client connections to CRM_LOG (same schema as the CRM form). The author
+// is the signed-in DPR/DPER member. Visibility-only — does not score.
+// ════════════════════════════════════════════════════════════════
+function appendConnections(member, day, connections, subId){
+  if (!member || !connections || !connections.length) return 0;
+  var logSheet = getOrCreate(CRM_LOG_TAB, writeCrmLogHeaders);
+  var n = 0;
+  connections.forEach(function(c){
+    if (!c || (!c.project && !c.type && !c.notes)) return;
+    logSheet.appendRow([ nextId(logSheet,'LOG-'), subId||'', day, member,
+      'Client Connection', c.type||'', c.project||'', c.notes||'' ]);
+    n++;
+  });
+  return n;
+}
+function logConnections(data){
+  var conns = data.connections;
+  if (typeof conns === 'string'){ try { conns = JSON.parse(conns); } catch(e){ conns = []; } }
+  var n = appendConnections(data.member||'', dateStr(data.date||''), conns||[]);
+  return {status:'ok', written:n};
+}
+
+// ════════════════════════════════════════════════════════════════
+// EPIC H — billables raised on DPR → BILL_REQUESTS (Pending) → approval
+// panel approves → 0-pt "Raise Bill" CRM task. No points / no SLA on that
+// task (billing timing is outside CRM's control), so it is created with
+// no deadline and 0 weighted pts → never counts as delayed or in output.
+// ════════════════════════════════════════════════════════════════
+function writeBillReqHeaders(sheet){
+  var h = ['Request ID','Date','Raised By','Project','Discipline','Stage',
+           'Status','Approved By','Approval Date','Task ID','Note'];
+  sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
+function submitBillables(data){
+  var bills = data.billables;
+  if (typeof bills === 'string'){ try { bills = JSON.parse(bills); } catch(e){ bills = []; } }
+  if (!bills || !bills.length) return {status:'ok', written:0};
+  var sheet = getOrCreate(BILL_REQ_TAB, writeBillReqHeaders);
+  var member = data.member || '', today = dateStr(data.date||''), n = 0;
+  bills.forEach(function(b){
+    if (!b || !b.project || !b.stage) return;
+    sheet.appendRow([ nextId(sheet,'BR-'), today, member, b.project,
+      b.discipline||'', b.stage, 'Pending', '', '', '', '' ]);
+    n++;
+  });
+  return {status:'ok', written:n};
+}
+function getBillRequests(){
+  var sheet = db().getSheetByName(BILL_REQ_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {requests:[]};
+  var rows = sheet.getDataRange().getValues(), out = [];
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][6]||'').trim() !== 'Pending') continue;
+    out.push({ row:i+1, reqId:String(rows[i][0]||''), date:cellDate(rows[i][1]),
+      raisedBy:String(rows[i][2]||''), project:String(rows[i][3]||''),
+      discipline:String(rows[i][4]||''), stage:String(rows[i][5]||'') });
+  }
+  return {requests:out};
+}
+function disposeBillRequest(data){
+  var sheet = db().getSheetByName(BILL_REQ_TAB);
+  if (!sheet) return {status:'error', message:'BILL_REQUESTS not found'};
+  var row = parseInt(data.row,10);
+  if (!row) return {status:'error', message:'no row'};
+  var r = sheet.getRange(row,1,1,11).getValues()[0];
+  if (String(r[6]||'').trim() !== 'Pending') return {status:'error', message:'already '+String(r[6]||'')};
+  var today = dateStr(), action = String(data.disposition||'').trim();
+  if (action === 'reject'){
+    sheet.getRange(row,7).setValue('Rejected');
+    sheet.getRange(row,8).setValue(data.reviewedBy||'');
+    sheet.getRange(row,9).setValue(today);
+    if (data.note) sheet.getRange(row,11).setValue(data.note);
+    return {status:'ok', disposition:'Rejected'};
+  }
+  if (action === 'approve'){
+    var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+    var taskId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
+    var note = 'Raise bill — ' + String(r[4]||'') + ' · ' + String(r[5]||'');
+    aSheet.appendRow([ taskId, '', String(r[3]||''), 'Aman Raghuwanshi', 'Raise Bill',
+      1, 0, 1, 0, today, '', '', '', 'Not Started', '', '', 'Pending', '', '', '',
+      note, (data.reviewedBy||'') + ' (bill approval)', 'Medium' ]);
+    parkRowIfStalled(aSheet, String(r[3]||''));
+    sheet.getRange(row,7).setValue('Approved');
+    sheet.getRange(row,8).setValue(data.reviewedBy||'');
+    sheet.getRange(row,9).setValue(today);
+    sheet.getRange(row,10).setValue(taskId);
+    return {status:'ok', disposition:'Approved', taskId:taskId};
+  }
+  return {status:'error', message:'unknown disposition: '+action};
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2956,6 +3214,10 @@ function runVisitScheduler() { syncVisitSchedule(); }
 function syncVisitSchedule() {
   Logger.log('=== syncVisitSchedule: '+new Date().toISOString()+' ===');
 
+  // Reconcile stalled-project parks every run (park new, revive un-stalled).
+  try { var rc = reconcileStalledParks(); Logger.log('reconcileStalledParks: '+JSON.stringify(rc)); }
+  catch(e){ Logger.log('reconcileStalledParks error: '+e); }
+
   var planSheet = getOrMakeTab(PLANNER_TAB, setupPlannerTab);
 
   // 1. Load all data
@@ -3235,6 +3497,7 @@ function createSelfAssignedTask(data) {
     data.member       || '',   // V AssignedBy (self)
     'Medium',                  // W Priority
   ]);
+  parkRowIfStalled(sheet, data.project || '');  // stalled project → auto-park
 
   Logger.log('Self-assigned task created: '+data.member+' / '+data.taskType+' → '+newId);
   return {status:'ok', taskId:newId};
@@ -4013,6 +4276,7 @@ function createIssueTask(iss, project, date, onTrack) {
     srcLabel + ' — ' + (iss.reportedBy||'Execution Lead'), // V AssignedBy
     priority,                 // W Priority
   ]);
+  parkRowIfStalled(sheet, project || '');  // stalled project → auto-park
 
   Logger.log('Issue task created: ' + newId + ' → ' + iss.assignedTo + ' / ' + taskType);
   return newId;
@@ -4234,7 +4498,8 @@ function getProjectsHealth(){
     if(p.stage==='New Lead'){ newLeadKeys.push(p); return; }
     var la=[p.lastTask,p.lastVisit,p.lastConn].filter(Boolean).sort().pop()||'';
     p.lastActivity=la; p.lastActivityDays = la?pjDaysAgo(la,today):null;
-    var inactive = p.stage==='On hold'||p.stage==='Completed';
+    p.stalled = p.stage==='Stalled';
+    var inactive = p.stage==='On hold'||p.stage==='Completed'||p.stalled;
     p.neglected = !inactive && (!la || pjDaysAgo(la,today)>7);
     p.engagementOverdue = inactive ? false : engagementOverdue(p.stage, p, today);
     p.paymentOverdue = p.billOverdue;
@@ -4773,7 +5038,7 @@ function getAmanWeeklyStats(weekStart, member) {
 
   // ── 1. Ongoing projects (denominator) — active design/WD/execution stages only ──
   // Excludes New Lead, On hold, Completed, Dead (and legacy closed/cancelled/proposal).
-  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover'];
+  var EXCL = ['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover','stalled'];
   function isExcluded(stat){
     stat = String(stat||'').toLowerCase();
     for (var i=0;i<EXCL.length;i++){ if (stat.indexOf(EXCL[i]) > -1) return true; }

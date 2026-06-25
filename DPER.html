@@ -8,7 +8,7 @@
 <script src="auth.js"></script>
 <script src="searchselect.js"></script>
 <style>:root{--ss-bg:#FFFFFF;--ss-fg:#1A1917;--ss-pop-bg:#FFFFFF;--ss-border:#E2DFD8;--ss-accent:#1F3A5F;--ss-muted:#9E9B94;--ss-hover:rgba(31,58,95,0.10)}</style>
-<script>SearchSelect.auto('.pb-proj-select,[id^="ib-assign-"]');</script>
+<script>SearchSelect.auto('.pb-proj-select,[id^="ib-assign-"],.conn-proj');</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -229,6 +229,16 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
+  <!-- S3: Client connections (EPIC G) -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">3</span><span class="section-title">Client Connections Today</span></div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Calls, meetings, site coordination with clients — log these even on days without a site visit.</p>
+      <div id="conn-blocks"></div>
+      <button class="add-proj-btn" onclick="addConnection()">+ Add a connection</button>
+    </div>
+  </div>
+
   <!-- S4: WhatsApp -->
   <div class="section">
     <div class="section-head" style="background:#1B5E20">
@@ -274,6 +284,33 @@ let leadName     = '';
 let projects     = [];
 let pbCount      = 0;
 let ibCount      = 0;
+let connCount    = 0;
+const CONN_TYPES = ['Call','WhatsApp','Meeting','Site Visit','Email','Other'];
+
+// ── EPIC G: client connections (DPER) ────────────────────────
+function addConnection(){
+  connCount++; const id=connCount;
+  const projOpts = '<option value="">Select project…</option>'+projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  const div=document.createElement('div'); div.className='pb-block'; div.id='cn-'+id;
+  div.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px';
+  div.innerHTML=
+    `<div class="field"><label>Project</label><select class="conn-proj" id="cn-proj-${id}">${projOpts}</select></div>`+
+    `<div class="field"><label>Type of contact</label><select id="cn-type-${id}">${CONN_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div>`+
+    `<div class="field"><label>Notes</label><textarea id="cn-notes-${id}" placeholder="What was discussed? Any action items?" style="min-height:45px"></textarea></div>`+
+    `<button type="button" onclick="document.getElementById('cn-${id}').remove()" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer">✕ Remove</button>`;
+  document.getElementById('conn-blocks').appendChild(div);
+}
+function collectConnections(){
+  const out=[];
+  document.querySelectorAll('#conn-blocks > .pb-block').forEach(d=>{
+    const id=d.id.replace('cn-','');
+    const project=(document.getElementById('cn-proj-'+id)||{}).value||'';
+    const type=(document.getElementById('cn-type-'+id)||{}).value||'';
+    const notes=(document.getElementById('cn-notes-'+id)||{}).value||'';
+    if(project||notes) out.push({project,type,notes});
+  });
+  return out;
+}
 let issueActions = {};
 
 // ── Auth ──────────────────────────────────────────────────
@@ -665,6 +702,11 @@ async function submitAll(){
         if(p.siddharthPending && r.siddharthTaskId) console.log('Siddharth task created:', r.siddharthTaskId);
       } catch(e){ console.log('Could not parse submitDPER response', e); }
     }
+
+    // EPIC G — log client connections once (member = the DPER lead)
+    const conns = collectConnections();
+    if (conns.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'logConnections', member:leadName, connections:conns})}).catch(()=>{});
 
     // Clear draft on successful submit
     clearDraft();
