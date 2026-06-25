@@ -1205,6 +1205,30 @@ function reconcileStalledParks(){
   return {status:'ok', parked:parked, unparked:unparked};
 }
 
+// Installable onEdit handler — fires the instant a PROJECTS stage cell (col C)
+// is edited, so setting a project to "Stalled" auto-parks its tasks immediately
+// (no wait for the Monday sync). Reconcile is idempotent; wrapped so an edit
+// never fails. (This is a standalone script, so the trigger must be installed
+// once via setupStalledTrigger() — a simple onEdit would not fire here.)
+function onProjectsStageEdit(e){
+  try {
+    if (!e || !e.range) return;
+    if (e.range.getSheet().getName() !== PROJECTS_TAB) return;
+    if (e.range.getColumn() !== 3) return;     // col C = Stage
+    reconcileStalledParks();
+  } catch (err) { /* never block the user's edit */ }
+}
+// Run ONCE from the Apps Script editor (select setupStalledTrigger → Run) to
+// install the edit trigger. Removes any prior copy so it's safe to re-run.
+function setupStalledTrigger(){
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    if (t.getHandlerFunction() === 'onProjectsStageEdit') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onProjectsStageEdit')
+    .forSpreadsheet(SHEET_ID).onEdit().create();
+  return 'onProjectsStageEdit trigger installed for PROJECTS edits.';
+}
+
 // ════════════════════════════════════════════════════════════════
 // EPIC G — shared connection logger. DPR + DPER call this once to append
 // client connections to CRM_LOG (same schema as the CRM form). The author
