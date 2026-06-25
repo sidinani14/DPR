@@ -337,6 +337,8 @@ function buildOverviewPage(team){
 function buildIndividualPage(m, taskData){
   const s=m._sc, bio=BIO[m.name]||{}, tgt=TARGETS[m.name]||48;
   const col=sc(s.total,100);
+  const bs=(taskData&&taskData.blockStats)||{};
+  const blkLine = bs.raised ? `<br><b>Blocks:</b> ${bs.raised} raised · ${bs.approved||0} approved · ${bs.rejected||0} rejected${bs.pending?' · '+bs.pending+' pending':''}` : '';
 
   // Editable IMPROVE suggestions
   const improve=(IMPROVE[m.name]||['Keep up the good work','Aim to file DPR consistently','Target full weekly points'])
@@ -409,7 +411,7 @@ function buildIndividualPage(m, taskData){
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${s.presentDays} present days filed`)}
       ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
       ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
-      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned. <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
+      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 170px;gap:4mm;margin-bottom:3mm;">

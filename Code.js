@@ -1072,6 +1072,28 @@ function rejectedBlocksThisWeek(name){
   }
   return c;
 }
+// Per-member block stats for a given week (for the weekly scorecard line).
+// Counts only member-RAISED blocks (Pending → a real disposition); direct
+// dashboard parks (logged as "Parked (Direct)") and stalled auto-parks are
+// excluded so they don't inflate someone's "blocks raised".
+function blockStatsForWeek(name, mon, sat){
+  var out = {raised:0, approved:0, rejected:0, pending:0};
+  var sheet = db().getSheetByName(BLOCK_LOG_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  var APPROVED = {'Rescheduled':1,'Reassigned':1,'Parked':1,'Cancelled':1};
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++){
+    if (String(rows[i][3]||'').trim() !== name) continue;     // Member
+    var rd = cellDate(rows[i][6]);                            // Raised Date
+    if (!rd || rd < mon || rd > sat) continue;
+    var dispo = String(rows[i][10]||'').trim();               // Disposition
+    if (dispo === '' || dispo === 'Pending'){ out.raised++; out.pending++; }
+    else if (dispo === 'Rejected'){ out.raised++; out.rejected++; }
+    else if (APPROVED[dispo]){ out.raised++; out.approved++; }
+    // else: "Parked (Direct)" / other non-member-raised audit rows → skip
+  }
+  return out;
+}
 
 // ════════════════════════════════════════════════════════════════
 // EPIC I — Park / un-park a task directly from the dashboard (Siddharth only).
@@ -1106,7 +1128,7 @@ function parkTask(data, authEmail){
   lg.appendRow([ nextId(lg,'BLK-'), String(r[0]||''), row, String(r[3]||''),
     String(r[2]||''), String(r[4]||''), today, data.reason||'',
     String(r[COL_BLK_PRIOR-1]||st||''), cellDate(r[COL_BLK_ORIGDL-1])||'',
-    'Parked', data.by||authEmail, today, data.reason||'' ]);
+    'Parked (Direct)', data.by||authEmail, today, data.reason||'' ]);
   return {status:'ok'};
 }
 
@@ -3758,6 +3780,7 @@ function getWeeklyStats(weekStart) {
       lateCount      : lateCount,
       workNotDone    : wndCount,
       rejectedBlocks : rejBlk,
+      blockStats     : blockStatsForWeek(name, mon, sat),
       reliabilityPenalty: reliabilityPenalty,
       completedTasks : completedTasks,
     });
