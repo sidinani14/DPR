@@ -37,6 +37,24 @@
 - P: MaterialsRequired, Q: MaterialDelays, R: ClientUpdated
 - S: ClientConcerns, T: BlockingTomorrow, U: DecisionsPendingSiddharth, V: AdditionalRemarks
 
+## EPIC G/H/I/J (built 2026-06-25)
+- TASK_ASSIGNMENTS appended cols: X(24) prior status · Y(25) original deadline ·
+  Z(26) disposition (…/Parked/Parked (Stalled)) · AA(27) park reason (free text).
+- Park: `parkTask`/`unparkTask` (POST) — Siddharth-only (DIRECTOR_EMAILS, verified
+  from idToken). Direct park from dashboard, no prior block needed.
+- Stalled stage (PROJECTS col C = "Stalled"): open tasks auto-park as
+  "Parked (Stalled)"; un-stalling revives only those. `reconcileStalledParks()`
+  runs in syncVisitSchedule + callable (action=reconcileStalled). New tasks on a
+  stalled project park on creation via parkRowIfStalled().
+- Connections: DPR + DPER post `logConnections {member, connections[]}` →
+  appendConnections() writes CRM_LOG (Client Connection rows, author=submitter).
+  Visibility-only (not scored). Surfaces on projects dashboard (read path existed).
+- Billables: DPR posts `submitBillables {member, billables[{project,discipline,stage}]}`
+  → BILL_REQUESTS tab (Pending). Approval form panel (getBillRequests +
+  disposeBillRequest approve/reject); approve → 0-pt no-deadline "Raise Bill" task
+  for Aman (never scored as delayed). Payment stages read from CONFIG cols V(Discipline)/
+  W(Milestone) under a "PAYMENT STAGES" marker → readConfig.paymentStages/paymentDisciplines.
+
 ## Scoring framework (current)
 - Output: /50 (approvedPts / weeklyTarget × 50)
 - DPR Consistency: /15 (dprDays / 6 × 15)
