@@ -1454,8 +1454,10 @@ function submitMeetingLog(data, authEmail){
   ['Client','IDS','Contractor','Other'].forEach(function(cat){
     (actions[cat]||[]).forEach(function(it){
       var t = String(it.text||'').trim(); if(!t) return;
+      // Unique per item — nextId() would return the SAME id for each (rows aren't
+      // appended until later), which collapsed every action item to one text.
       flat.push({ cat:cat, owner:String(it.owner||'').trim(), text:t, deadline:String(it.deadline||'').trim(),
-                  itemId: nextId(decSheet,'DEC-') });
+                  itemId: 'DEC-'+Utilities.getUuid().substring(0,8).toUpperCase() });
     });
   });
 
@@ -5021,7 +5023,7 @@ function getProjectDetail(project){
   var s=db(), pj=String(project||'').trim(), pjl=pj.toLowerCase(), today=dateStr();
   var mon=dateStr(mondayOf(new Date())), sun=addDaysToStr(mon,6);
   var out={ project:pj, openIssues:[], actionItems:[], tasks:[], siteVisits:[], connections:[],
-    lastBillRaised:'', lastPayCleared:'', dperPct:'' };
+    otherActivities:[], billables:[], lastBillRaised:'', lastPayCleared:'', dperPct:'' };
 
   // Action items raised in meeting / site-visit logs (DECISION_LOG) — shown under Issues.
   var dlSheet=s.getSheetByName(DECISION_LOG_TAB);
@@ -5063,9 +5065,12 @@ function getProjectDetail(project){
   var cSheet=s.getSheetByName(CRM_LOG_TAB);
   if(cSheet){ var cr=cSheet.getDataRange().getValues();
     for(var m=1;m<cr.length;m++){ if(String(cr[m][6]||'').trim().toLowerCase()!==pjl)continue;
-      if(String(cr[m][4]||'').trim()!=='Client Connection')continue;
-      out.connections.push({ date:cellDate(cr[m][2]), by:String(cr[m][3]||''), type:String(cr[m][5]||''), notes:String(cr[m][7]||'') }); }
+      var cat=String(cr[m][4]||'').trim();
+      var rec={ date:cellDate(cr[m][2]), by:String(cr[m][3]||''), type:String(cr[m][5]||''), notes:String(cr[m][7]||'') };
+      if(cat==='Client Connection') out.connections.push(rec);
+      else out.otherActivities.push(rec); }   // Vendor / Site issues / TnCP / BNI etc.
     out.connections.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    out.otherActivities.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   }
   var bSheet=s.getSheetByName(BILLING_TAB);
   if(bSheet){ var br=bSheet.getDataRange().getValues();
@@ -5073,6 +5078,14 @@ function getProjectDetail(project){
       var bd=cellDate(br[q][3]), rd=cellDate(br[q][6]);
       if(bd && bd>out.lastBillRaised) out.lastBillRaised=bd;
       if(rd && rd>out.lastPayCleared) out.lastPayCleared=rd; }
+  }
+  // Billables raised on DPR (BILL_REQUESTS) — stage + status only, NO amounts.
+  var brq=s.getSheetByName(BILL_REQ_TAB);
+  if(brq && brq.getLastRow()>1){ var qr=brq.getDataRange().getValues();
+    for(var bi=1;bi<qr.length;bi++){ if(String(qr[bi][3]||'').trim().toLowerCase()!==pjl)continue;
+      out.billables.push({ date:cellDate(qr[bi][1]), raisedBy:String(qr[bi][2]||''),
+        discipline:String(qr[bi][4]||''), stage:String(qr[bi][5]||''), status:String(qr[bi][6]||'') }); }
+    out.billables.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   }
   return out;
 }
