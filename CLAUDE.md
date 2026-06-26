@@ -55,6 +55,23 @@
   for Aman (never scored as delayed). Payment stages read from CONFIG cols V(Discipline)/
   W(Milestone) under a "PAYMENT STAGES" marker → readConfig.paymentStages/paymentDisciplines.
 
+## EPIC K — Site Visit / Meeting log (built 2026-06-25)
+- meetlog.html (deploy at /DPR/meetlog) — unified form, replaces the two Google Forms.
+- Tabs: MEETING_LOG (20 cols: id,date,time,type,project,loggedBy,team,clients,purpose,
+  bodyRaw,bodyPolished,duration,driveFolder,photoIds,videoLinks,leadApproved,approvedBy,
+  approvalDate,whatChanged,reportPdfId) + DECISION_LOG (id,logId,project,date,category,
+  owner,task,deadline,status[Open|Done|Revised|Carried]).
+- Flow: submitMeetingLog → aiPolishLog (Claude Haiku 4.5, UrlFetchApp to
+  api.anthropic.com/v1/messages, key = Script Property ANTHROPIC_API_KEY; tone/clarity
+  only, graceful fallback) → IDS items become tasks, log becomes a CRM_LOG connection →
+  Pending → approval.html panel (edit polished, approve) → generateProjectReportPDF
+  (cumulative, newest-first, cover index, photos inlined base64, saved to Drive "IDS Logs").
+- uploadMeetingPhoto: base64 → per-project/date Drive folder. Routes: submitMeetingLog,
+  uploadMeetingPhoto, getMeetingApprovals, approveMeetingLog, getMeetingTimeline.
+- DPER site visit auto-publishes a Site Visit Log (skipTasks=true; DPER already tasks issues).
+- One-time: paste ANTHROPIC_API_KEY in Script Properties; run authorizeEpicK() for
+  Drive + Anthropic scopes.
+
 ## Scoring framework (current)
 - Output: /50 (approvedPts / weeklyTarget × 50)
 - DPR Consistency: /15 (dprDays / 6 × 15)
