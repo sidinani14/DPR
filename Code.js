@@ -1390,10 +1390,12 @@ function aiPolishLog(payload){
   var sys = "You are an editor for Ideaform Design Studio (architecture & interiors). Rewrite the provided "
     + "site-visit / meeting notes into clear, professional, courteous, client-ready English. ONLY improve tone, "
     + "grammar, clarity and structure. NEVER add, remove or change facts, numbers, measurements, names, dates, "
-    + "deadlines or technical content. Keep it concise. Return STRICT JSON only — no prose, no markdown fences.";
+    + "deadlines or technical content. Format the minutes/observations as concise discrete POINTS — one point per "
+    + "line, separated by a single newline, with NO leading numbers or bullets (the report numbers them). Keep it "
+    + "concise. Return STRICT JSON only — no prose, no markdown fences.";
   var items = payload.items || [];
   var userText = 'Return JSON exactly in this shape: '
-    + '{"body":"<polished observations or minutes>","items":{"<id>":"<polished item text>"},'
+    + '{"body":"<polished minutes/observations as separate points, ONE per line, no numbering or bullets>","items":{"<id>":"<polished item text>"},'
     + '"whatChanged":"<one or two neutral sentences on how decisions changed versus the earlier open items below, or an empty string>"}.'
     + '\n\nNOTES:\n' + (payload.body || '(none)')
     + '\n\nACTION ITEMS (id: text):\n' + items.map(function(it){ return it.id+': '+it.text; }).join('\n')
@@ -1567,62 +1569,104 @@ function generateProjectReportPDF(project){
       var cat=String(decRows[j][4]||'Other'); (by[cat]||by.Other).push({owner:String(decRows[j][5]||''),text:String(decRows[j][6]||''),deadline:cellDate(decRows[j][7]),status:String(decRows[j][8]||'')}); }
     return by;
   }
+  // Action plan — numbered; NO target dates on the client report (deadlines stay
+  // internal on the created tasks). Owner in bold; status only when not Open.
   function planBlock(title,arr){ if(!arr.length) return '';
     return '<div class="ap"><div class="ap-t">'+title+'</div><ol>'+arr.map(function(x){
-      return '<li>'+(x.owner?'<b>'+esc(x.owner)+':</b> ':'')+esc(x.text)+(x.deadline?' <i>(by '+esc(x.deadline)+')</i>':'')
+      return '<li>'+(x.owner?'<b>'+esc(x.owner)+':</b> ':'')+esc(x.text)
         +(x.status&&x.status!=='Open'?' <span class="st">['+esc(x.status)+']</span>':'')+'</li>'; }).join('')+'</ol></div>'; }
+  // Body → discrete points (AI returns one per line); strip any leading number/
+  // bullet the writer added so the <ol> numbers cleanly.
+  function bodyPoints(t){ return String(t||'').split(/\r?\n/).map(function(l){
+      return l.replace(/^\s*(?:\d+[.)]|[-•*])\s*/,'').trim(); }).filter(Boolean); }
+  function bodyBlock(e){
+    var pts=bodyPoints(e.body); if(!pts.length) return '';
+    var head=(e.type==='Site Visit')?'Key Observations / Issues':'Minutes of Meeting';
+    return '<div class="bh">'+head+'</div><ol class="body">'+pts.map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ol>';
+  }
 
-  // cover index
-  var index = entries.map(function(e){ return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.type)+'</td><td>'+esc([e.team,e.clients].filter(Boolean).join(' · '))+'</td></tr>'; }).join('');
+  // Estimate each entry's START page for the cover index: cover = page 1, then per
+  // entry 1 text page + ceil(images/2) image pages (2 photos per A4 page).
+  var running=2;
+  entries.forEach(function(e){
+    e.imgIds=e.photoIds.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    e.startPage=running; running += 1 + Math.ceil(e.imgIds.length/2);
+  });
+
+  // cover index — Date · Type · Attendees · Page (page LAST)
+  var index = entries.map(function(e){ return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.type)+'</td><td>'
+      +esc([e.team,e.clients].filter(Boolean).join(', ')||'—')+'</td><td class="pg">'+e.startPage+'</td></tr>'; }).join('');
 
   var sections = entries.map(function(e,idx){
     var d=decsFor(e.logId);
-    var imgs='';
-    e.photoIds.split(',').forEach(function(id){ id=id.trim(); if(!id) return;
-      try{ var f=DriveApp.getFileById(id); var b=f.getBlob();
-        imgs += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(b.getBytes())+'">'; }catch(er){} });
+    var imgPages='';
+    for (var k=0;k<e.imgIds.length;k+=2){
+      var pair='';
+      [e.imgIds[k], e.imgIds[k+1]].forEach(function(id){ if(!id) return;
+        try{ var f=DriveApp.getFileById(id); var b=f.getBlob();
+          pair += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(b.getBytes())+'">'; }catch(er){} });
+      if (pair) imgPages += '<div class="imgpage">'+pair+'</div>';
+    }
     return '<div class="sec'+(idx>0?' brk':'')+'">'
-      + '<div class="sh">'+esc(e.type)+' — '+esc(e.date)+(idx===0?' <span class="latest">LATEST</span>':'')+'</div>'
-      + '<div class="meta">Attendees: '+esc([e.team,e.clients].filter(Boolean).join(' · ')||'—')+(e.purpose?' &nbsp;·&nbsp; Purpose: '+esc(e.purpose):'')+'</div>'
-      + (e.whatChanged?'<div class="chg"><b>What changed since the previous meeting:</b> '+esc(e.whatChanged)+'</div>':'')
-      + (e.body?'<div class="body">'+esc(e.body).replace(/\n/g,'<br>')+'</div>':'')
+      + '<div class="sh">'+esc(e.type)+' &mdash; '+esc(e.date)+(idx===0?' <span class="latest">Latest</span>':'')+'</div>'
+      + (e.purpose?'<div class="meta">Purpose: '+esc(e.purpose)+'</div>':'')
+      + bodyBlock(e)
       + planBlock('Action Plan — Client', d.Client) + planBlock('Action Plan — IDS Team', d.IDS)
       + planBlock('Action Plan — Contractors', d.Contractor) + planBlock('Action Plan — Other', d.Other)
-      + (imgs?'<div class="imgs">'+imgs+'</div>':'')
       + (e.videos?'<div class="vids"><b>Videos:</b> '+e.videos.split('|').map(function(v){v=v.trim();return v?'<a href="'+esc(v)+'">'+esc(v)+'</a>':'';}).join(' &nbsp; ')+'</div>':'')
+      + imgPages
       + '</div>';
   }).join('');
 
+  var logoImg = (typeof IDS_LOGO_B64!=='undefined' && IDS_LOGO_B64)
+    ? '<img class="logo" src="'+IDS_LOGO_B64+'">'
+    : '<div class="logotext"><span style="color:#4D4D4F">IDEA</span><span style="color:#F2A03D">FORM</span></div>';
+
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
-    + 'body{font-family:Georgia,serif;color:#1A1917;margin:0;padding:28px 34px}'
-    + 'h1{font-size:20px;color:#1F3A5F;margin:0 0 2px}.sub{color:#6B6860;font-size:11px;margin-bottom:14px}'
-    + 'table.idx{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:11px}'
-    + 'table.idx th{background:#1F3A5F;color:#fff;text-align:left;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.5px}'
-    + 'table.idx td{border-bottom:1px solid #E2DFD8;padding:5px 8px}'
-    + '.sec{padding-top:10px}.brk{page-break-before:always}'
-    + '.sh{font-size:14px;font-weight:bold;color:#1F3A5F;border-bottom:2px solid #1F3A5F;padding-bottom:3px;margin-bottom:5px}'
-    + '.latest{font-size:8px;background:#1F3A5F;color:#fff;padding:1px 6px;border-radius:8px;vertical-align:middle}'
-    + '.meta{font-size:10px;color:#6B6860;margin-bottom:6px}'
-    + '.chg{background:#F4F1EA;border-left:3px solid #C8863A;padding:6px 9px;font-size:11px;margin:6px 0}'
-    + '.body{font-size:12px;line-height:1.55;margin:6px 0;white-space:normal}'
-    + '.ap{margin:6px 0}.ap-t{font-size:10px;font-weight:bold;color:#1F3A5F;text-transform:uppercase;letter-spacing:.5px}'
-    + '.ap ol{margin:3px 0 0;padding-left:20px;font-size:11.5px;line-height:1.5}.st{color:#2E7D32;font-size:9px}'
-    + '.imgs{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px}.imgs img{max-width:240px;max-height:200px;border:1px solid #E2DFD8;border-radius:4px}'
-    + '.vids{font-size:10px;margin-top:6px}.foot{margin-top:18px;border-top:1px solid #E2DFD8;padding-top:8px;font-size:9px;color:#9E9B94}'
+    + 'body{font-family:Georgia,\'Times New Roman\',serif;color:#2A2A2A;margin:0;padding:34px 40px;font-size:13px;line-height:1.6}'
+    + '.cover{min-height:980px;display:flex;flex-direction:column;text-align:center;page-break-after:always}'
+    + '.logo{max-width:300px;max-height:120px;margin:46px auto 0;display:block}'
+    + '.logotext{font-family:Arial,sans-serif;font-size:40px;font-weight:700;letter-spacing:8px;margin-top:64px}'
+    + '.rule{height:2px;background:#F2A03D;width:70px;margin:30px auto}'
+    + '.cv-lbl{font-size:13px;letter-spacing:4px;color:#9E9B94;text-transform:uppercase;margin-top:30px}'
+    + '.cv-proj{font-size:30px;color:#3F3F41;margin-top:12px}'
+    + '.cv-title{font-size:22px;color:#E08A1E;font-style:italic;margin-top:26px}'
+    + '.idxwrap{margin-top:auto}'
+    + '.idx-h{font-size:13px;letter-spacing:3px;color:#4D4D4F;text-transform:uppercase;border-bottom:1.5px solid #F2A03D;padding-bottom:6px;text-align:left}'
+    + 'table.idx{width:100%;border-collapse:collapse;font-size:12.5px}'
+    + 'table.idx th{background:#4D4D4F;color:#fff;text-align:left;padding:7px 9px;font-weight:normal}'
+    + 'table.idx th.pg,table.idx td.pg{text-align:center;width:48px}'
+    + 'table.idx td{border-bottom:1px solid #E7E3DA;padding:7px 9px;text-align:left;vertical-align:top}'
+    + '.sec{padding-top:6px}.brk{page-break-before:always}'
+    + '.sh{font-size:18px;font-weight:bold;color:#4D4D4F;border-bottom:2px solid #F2A03D;padding-bottom:5px;margin-bottom:8px}'
+    + '.latest{font-size:11px;background:#F2A03D;color:#fff;padding:2px 8px;border-radius:9px;vertical-align:middle;font-family:Arial,sans-serif}'
+    + '.meta{font-size:12px;color:#6B6860;margin-bottom:10px}'
+    + '.bh{font-size:15px;font-weight:bold;color:#4D4D4F;margin:12px 0 4px}'
+    + 'ol.body{margin:4px 0 8px;padding-left:24px;font-size:13px;line-height:1.65}ol.body li{margin-bottom:4px}'
+    + '.ap{margin:10px 0}.ap-t{font-size:12px;font-weight:bold;color:#E08A1E;text-transform:uppercase;letter-spacing:.5px}'
+    + '.ap ol{margin:4px 0 0;padding-left:24px;font-size:13px;line-height:1.6}.ap li{margin-bottom:3px}.st{color:#3B6D11;font-size:11px}'
+    + '.imgpage{page-break-before:always;text-align:center}'
+    + '.imgpage img{display:block;width:100%;max-height:430px;object-fit:contain;margin:0 auto 16px;border:1px solid #E2DFD8}'
+    + '.vids{font-size:12px;margin-top:8px}'
+    + '.foot{margin-top:22px;border-top:1px solid #E7E3DA;padding-top:7px;font-size:10px;color:#9E9B94;text-align:center}'
     + '</style></head><body>'
-    + '<h1>'+esc(project)+' — Meeting &amp; Site Visit Log</h1>'
-    + '<div class="sub">Ideaform Design Studio · Cumulative record · Generated '+esc(nowStr())+'</div>'
-    + '<table class="idx"><tr><th>Date</th><th>Type</th><th>Attendees</th></tr>'+index+'</table>'
+    + '<div class="cover">'+logoImg
+    + '<div class="rule"></div>'
+    + '<div class="cv-lbl">Project</div><div class="cv-proj">'+esc(project)+'</div>'
+    + '<div class="cv-title">Meeting &amp; Site Visit Logs</div>'
+    + '<div class="idxwrap"><div class="idx-h">Index of logs</div>'
+    + '<table class="idx"><tr><th>Date</th><th>Type</th><th>Attendees</th><th class="pg">Page</th></tr>'+index+'</table></div>'
+    + '</div>'
     + sections
-    + '<div class="foot">This is a cumulative record. The most recent meeting/visit appears first. All tasks, observations and action plans are subject to follow-up and verification. © Ideaform Design Studio | Confidential</div>'
+    + '<div class="foot">All action plans are subject to follow-up and verification. For clarifications, please contact the project manager. &copy; Ideaform Design Studio &middot; Confidential</div>'
     + '</body></html>';
 
   var pdf = Utilities.newBlob(html, 'text/html', project+' — IDS Log.html').getAs('application/pdf')
-            .setName(project+' — IDS Meeting Log ('+entries[0].date+').pdf');
+            .setName(project+' — Meeting & Site Visit Log.pdf');
   var folder, it = DriveApp.getFoldersByName(LOGS_ROOT_FOLDER);
   var root = it.hasNext()?it.next():DriveApp.createFolder(LOGS_ROOT_FOLDER);
   var pc = root.getFoldersByName(project||'Unfiled'); folder = pc.hasNext()?pc.next():root.createFolder(project||'Unfiled');
-  // replace the prior cumulative PDF for this project
+  // stable filename → each submission cleanly REPLACES the single cumulative PDF
   var old = folder.getFilesByName(pdf.getName()); while(old.hasNext()){ old.next().setTrashed(true); }
   var saved = folder.createFile(pdf);
   return { fileId:saved.getId(), url:saved.getUrl() };
