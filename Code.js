@@ -346,6 +346,7 @@ function doPost(e) {
     if (data.action === 'submitMeetingLog')    return respond(submitMeetingLog(data, authEmail));
     if (data.action === 'getMeetingApprovals') return respond(getMeetingApprovals());
     if (data.action === 'approveMeetingLog')   return respond(approveMeetingLog(data, authEmail));
+    if (data.action === 'finalizeMeetingLog')  return respond(finalizeMeetingLog(data, authEmail));
     if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
@@ -1372,7 +1373,8 @@ function disposeBillRequest(data){
 function writeMeetingLogHeaders(sheet){
   var h=['Log ID','Date','Time','Type','Project','Logged By','Team Attendees','Client Attendees',
          'Purpose','Body (raw)','Body (polished)','Duration (hrs)','Drive Folder','Photo IDs',
-         'Video Links','Lead Approved','Approved By','Approval Date','What Changed','Report PDF ID'];
+         'Video Links','Status','Approved By','Approval Date','What Changed','Report PDF ID',
+         'Frozen Snapshot','Lead Reviewed'];
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
 }
@@ -1473,7 +1475,7 @@ function submitMeetingLog(data, authEmail){
   logSheet.appendRow([ logId, day, String(data.time||''), type, project, loggedBy,
     (data.teamAttendees||[]).join(', '), String(data.clientAttendees||''),
     (data.purpose||[]).join(', '), bodyRaw, bodyPolished, String(data.duration||''),
-    folderId, photoIds, videoLinks, 'Pending', '', '', whatChanged, '' ]);
+    folderId, photoIds, videoLinks, 'Draft', '', '', whatChanged, '', '', '' ]);
 
   // Decision items → DECISION_LOG (store polished text where available); IDS items → tasks
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
@@ -1492,7 +1494,63 @@ function submitMeetingLog(data, authEmail){
   // Register as a client connection so it shows on the projects dashboard
   appendConnections(loggedBy, day, [{ project:project, type:type, notes:'Logged '+type+(data.clientAttendees?(' with '+data.clientAttendees):'') }], logId);
 
-  return { status:'ok', logId:logId, polished: !!polished };
+  // Return the AI-polished content so the author can review/edit it before the
+  // shareable PDF is generated (Option A — review-then-generate).
+  return { status:'ok', logId:logId, polished: !!polished, bodyPolished: bodyPolished,
+    items: flat.map(function(f){ return { id:f.itemId, cat:f.cat, owner:f.owner, text:(f.textPolished||f.text) }; }) };
+}
+
+// Finalize an entry after the author has reviewed/edited the polished text:
+// apply edits, freeze the immutable snapshot, mark Final, regenerate the
+// cumulative PDF, and return its link so the team can share immediately.
+function finalizeMeetingLog(data, authEmail){
+  var s = db();
+  var logSheet = s.getSheetByName(MEETING_LOG_TAB);
+  var decSheet = s.getSheetByName(DECISION_LOG_TAB);
+  if (!logSheet) return {status:'error', message:'MEETING_LOG not found'};
+  var logId = String(data.logId||'').trim();
+  if (!logId) return {status:'error', message:'no logId'};
+  var rows = logSheet.getDataRange().getValues(), rIdx=-1;
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===logId){ rIdx=i; break; } }
+  if (rIdx<0) return {status:'error', message:'log not found'};
+  var rowNum = rIdx+1;
+
+  // apply edited body
+  if (typeof data.bodyPolished === 'string') logSheet.getRange(rowNum,11).setValue(data.bodyPolished);
+  // apply edited action-item texts
+  var edits = data.items || {};
+  if (decSheet && decSheet.getLastRow()>1){
+    var dr = decSheet.getDataRange().getValues();
+    for (var j=1;j<dr.length;j++){ var id=String(dr[j][0]||''); if(edits[id]!=null && String(edits[id]).trim()) decSheet.getRange(j+1,7).setValue(String(edits[id])); }
+  }
+
+  // build the entry from current (edited) values, freeze its text snapshot
+  var entry = {
+    logId:logId, date:cellDate(rows[rIdx][1]), type:String(rows[rIdx][3]||''),
+    purpose:String(rows[rIdx][8]||''), body:String(data.bodyPolished!=null?data.bodyPolished:rows[rIdx][10]||'') };
+  var snapshot = buildEntryBodyHTML(entry, decisionsForLog(logId, edits));
+  logSheet.getRange(rowNum,21).setValue(snapshot);   // U frozen snapshot
+  logSheet.getRange(rowNum,16).setValue('Final');    // P status → shareable
+  logSheet.getRange(rowNum,17).setValue(authEmail||''); logSheet.getRange(rowNum,18).setValue(dateStr());
+
+  var project = String(rows[rIdx][4]||'').trim();
+  var pdf = generateProjectReportPDF(project);
+  if (pdf && pdf.fileId) logSheet.getRange(rowNum,20).setValue(pdf.fileId);
+  return { status:'ok', logId:logId, pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
+}
+
+// Current decision items for a log (id/cat/owner/text), applying any pending edits.
+function decisionsForLog(logId, edits){
+  var sheet = db().getSheetByName(DECISION_LOG_TAB);
+  var by={Client:[],IDS:[],Contractor:[],Other:[]};
+  if (!sheet || sheet.getLastRow()<2) return by;
+  edits = edits||{};
+  var rows = sheet.getDataRange().getValues();
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][1]||'')!==logId) continue;
+    var id=String(rows[i][0]||''), cat=String(rows[i][4]||'Other');
+    (by[cat]||by.Other).push({ owner:String(rows[i][5]||''), text:(edits[id]!=null&&String(edits[id]).trim())?String(edits[id]):String(rows[i][6]||'') });
+  }
+  return by;
 }
 
 // Concatenated open decisions for a project (feeds AI "what changed" + report continuity)
@@ -1541,8 +1599,27 @@ function approveMeetingLog(data, authEmail){
   return {status:'ok', disposition:'Approved', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
 
+// ── Frozen-snapshot helpers (shared by finalize + report) ────────────────────
+function mlEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function mlBodyPoints(t){ return String(t||'').split(/\r?\n/).map(function(l){
+    return l.replace(/^\s*(?:\d+[.)]|[-•*])\s*/,'').trim(); }).filter(Boolean); }
+function mlPlanBlock(title,arr){ if(!arr||!arr.length) return '';
+  return '<div class="ap"><div class="ap-t">'+title+'</div><ol>'+arr.map(function(x){
+    return '<li>'+(x.owner?'<b>'+mlEsc(x.owner)+':</b> ':'')+mlEsc(x.text)+'</li>'; }).join('')+'</ol></div>'; }
+// The immutable body of one entry: purpose + numbered minutes/observations +
+// action plans (NO status, NO dates). Header/badge/images are added by the report.
+function buildEntryBodyHTML(e, decsBy){
+  var pts=mlBodyPoints(e.body);
+  var head=(e.type==='Site Visit')?'Key Observations / Issues':'Minutes of Meeting';
+  var bodyHtml = pts.length ? '<div class="bh">'+head+'</div><ol class="body">'+pts.map(function(p){return '<li>'+mlEsc(p)+'</li>';}).join('')+'</ol>' : '';
+  return (e.purpose?'<div class="meta">Purpose: '+mlEsc(e.purpose)+'</div>':'')
+    + bodyHtml
+    + mlPlanBlock('Action Plan — Client', decsBy.Client) + mlPlanBlock('Action Plan — IDS Team', decsBy.IDS)
+    + mlPlanBlock('Action Plan — Contractors', decsBy.Contractor) + mlPlanBlock('Action Plan — Other', decsBy.Other);
+}
+
 // Build the cumulative, newest-first client PDF for a project: cover index of all
-// visits/meetings (date + attendees) + each approved entry, photos inlined as base64.
+// visits/meetings (date + attendees) + each finalized entry, photos inlined as base64.
 function generateProjectReportPDF(project){
   var sheet = db().getSheetByName(MEETING_LOG_TAB);
   if (!sheet || sheet.getLastRow()<2) return null;
@@ -1552,37 +1629,23 @@ function generateProjectReportPDF(project){
   var entries=[];
   for (var i=1;i<rows.length;i++){
     if (String(rows[i][4]||'').toLowerCase() !== pl) continue;
-    if (String(rows[i][15]||'').trim() !== 'Approved') continue;
+    var st = String(rows[i][15]||'').trim();
+    if (st !== 'Final' && st !== 'Approved') continue;   // shareable entries only
     entries.push({
       logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
       team:String(rows[i][6]||''), clients:String(rows[i][7]||''), purpose:String(rows[i][8]||''),
       body:String(rows[i][10]||''), photoIds:String(rows[i][13]||''), videos:String(rows[i][14]||''),
-      whatChanged:String(rows[i][18]||'') });
+      snapshot:String(rows[i][20]||'') });   // U — frozen text snapshot (immutable history)
   }
   if (!entries.length) return null;
   entries.sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); }); // newest first
 
-  function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function esc(t){ return mlEsc(t); }
   function decsFor(logId){
     var by={Client:[],IDS:[],Contractor:[],Other:[]};
     for (var j=1;j<decRows.length;j++){ if(String(decRows[j][1]||'')!==logId) continue;
-      var cat=String(decRows[j][4]||'Other'); (by[cat]||by.Other).push({owner:String(decRows[j][5]||''),text:String(decRows[j][6]||''),deadline:cellDate(decRows[j][7]),status:String(decRows[j][8]||'')}); }
+      var cat=String(decRows[j][4]||'Other'); (by[cat]||by.Other).push({owner:String(decRows[j][5]||''),text:String(decRows[j][6]||'')}); }
     return by;
-  }
-  // Action plan — numbered; NO target dates on the client report (deadlines stay
-  // internal on the created tasks). Owner in bold; status only when not Open.
-  function planBlock(title,arr){ if(!arr.length) return '';
-    return '<div class="ap"><div class="ap-t">'+title+'</div><ol>'+arr.map(function(x){
-      return '<li>'+(x.owner?'<b>'+esc(x.owner)+':</b> ':'')+esc(x.text)
-        +(x.status&&x.status!=='Open'?' <span class="st">['+esc(x.status)+']</span>':'')+'</li>'; }).join('')+'</ol></div>'; }
-  // Body → discrete points (AI returns one per line); strip any leading number/
-  // bullet the writer added so the <ol> numbers cleanly.
-  function bodyPoints(t){ return String(t||'').split(/\r?\n/).map(function(l){
-      return l.replace(/^\s*(?:\d+[.)]|[-•*])\s*/,'').trim(); }).filter(Boolean); }
-  function bodyBlock(e){
-    var pts=bodyPoints(e.body); if(!pts.length) return '';
-    var head=(e.type==='Site Visit')?'Key Observations / Issues':'Minutes of Meeting';
-    return '<div class="bh">'+head+'</div><ol class="body">'+pts.map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ol>';
   }
 
   // Estimate each entry's START page for the cover index: cover = page 1, then per
@@ -1607,12 +1670,13 @@ function generateProjectReportPDF(project){
           pair += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(b.getBytes())+'">'; }catch(er){} });
       if (pair) imgPages += '<div class="imgpage">'+pair+'</div>';
     }
+    // Frozen snapshot = the entry's immutable text (built at finalize). Older
+    // entries are reproduced exactly as shared; only the header/badge/images are
+    // positional. Fallback to a live build for any legacy entry without a snapshot.
+    var bodyHtml = e.snapshot || buildEntryBodyHTML(e, d);
     return '<div class="sec'+(idx>0?' brk':'')+'">'
       + '<div class="sh">'+esc(e.type)+' &mdash; '+esc(e.date)+(idx===0?' <span class="latest">Latest</span>':'')+'</div>'
-      + (e.purpose?'<div class="meta">Purpose: '+esc(e.purpose)+'</div>':'')
-      + bodyBlock(e)
-      + planBlock('Action Plan — Client', d.Client) + planBlock('Action Plan — IDS Team', d.IDS)
-      + planBlock('Action Plan — Contractors', d.Contractor) + planBlock('Action Plan — Other', d.Other)
+      + bodyHtml
       + (e.videos?'<div class="vids"><b>Videos:</b> '+e.videos.split('|').map(function(v){v=v.trim();return v?'<a href="'+esc(v)+'">'+esc(v)+'</a>':'';}).join(' &nbsp; ')+'</div>':'')
       + imgPages
       + '</div>';
@@ -4956,8 +5020,17 @@ function getProjectsHealth(){
 function getProjectDetail(project){
   var s=db(), pj=String(project||'').trim(), pjl=pj.toLowerCase(), today=dateStr();
   var mon=dateStr(mondayOf(new Date())), sun=addDaysToStr(mon,6);
-  var out={ project:pj, openIssues:[], tasks:[], siteVisits:[], connections:[],
+  var out={ project:pj, openIssues:[], actionItems:[], tasks:[], siteVisits:[], connections:[],
     lastBillRaised:'', lastPayCleared:'', dperPct:'' };
+
+  // Action items raised in meeting / site-visit logs (DECISION_LOG) — shown under Issues.
+  var dlSheet=s.getSheetByName(DECISION_LOG_TAB);
+  if(dlSheet && dlSheet.getLastRow()>1){ var dl=dlSheet.getDataRange().getValues();
+    for(var di=1;di<dl.length;di++){ if(String(dl[di][2]||'').trim().toLowerCase()!==pjl)continue;
+      out.actionItems.push({ category:String(dl[di][4]||''), owner:String(dl[di][5]||''),
+        text:String(dl[di][6]||''), date:cellDate(dl[di][3]), status:String(dl[di][8]||'Open') }); }
+    out.actionItems.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  }
 
   var iSheet=s.getSheetByName(SITE_ISSUES_TAB);
   if(iSheet){ var ir=iSheet.getDataRange().getValues();

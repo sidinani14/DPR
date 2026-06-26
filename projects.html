@@ -191,12 +191,15 @@ async function openDrawer(project){
     const mHtml = meets.length? meets.map(m=>`<div class="ditem"><b>${shortD(m.date)}</b> · ${m.type||''} · ${m.loggedBy||''} <span class="dpill ${m.approved==='Approved'?'di-esc':'di-open'}">${m.approved||'Pending'}</span>${m.whatChanged?'<br><span style="font-size:11px;color:var(--amber,#C8863A)">'+m.whatChanged+'</span>':''}${m.pdfId?' <a href="https://drive.google.com/file/d/'+m.pdfId+'/view" target="_blank" style="font-size:11px">PDF</a>':''}</div>`).join('') : '<div class="dempty">No meetings/visits logged</div>';
     const tord={Delayed:0,'In Progress':1,Ongoing:1,Done:3};
     const issHtml = iss.length? iss.map(i=>`<div class="ditem"><b>${i.desc||i.type||'Issue'}</b><span class="dpill ${i.status==='Open'?'di-open':'di-esc'}">${i.status}</span><br><span style="font-size:11px">${i.assignedTo||'—'} · due ${shortD(i.targetDate)}</span></div>`).join('') : '<div class="dempty">No open issues 🎉</div>';
+    const acts=(x.actionItems||[]);
+    const actHtml = acts.length? acts.map(a=>`<div class="ditem"><b>${a.category||'—'}</b>${a.owner?' · '+a.owner:''} <span class="dpill ${a.status==='Open'?'di-open':'di-esc'}">${a.status||'Open'}</span><br><span style="font-size:11px">${a.text||''}</span> <span style="color:var(--text3);font-size:10px">${shortD(a.date)}</span></div>`).join('') : '<div class="dempty">No action items from logs</div>';
     const tHtml = tasks.length? tasks.map(t=>`<div class="ditem"><b>${t.taskType}</b> · ${t.selfStatus||'—'}<br><span style="font-size:11px">${t.assignedTo} · due ${shortD(t.deadline)}</span></div>`).join('') : '<div class="dempty">No tasks this week</div>';
     const vHtml = visits.length? visits.map(v=>`<div class="ditem"><b>${shortD(v.date)}</b> · ${v.who||'—'}${v.hours?' · '+v.hours+'h':''} <span style="color:var(--text3)">${v.type||''}</span></div>`).join('') : '<div class="dempty">No site visits logged</div>';
     const cHtml = conns.length? conns.slice(0,12).map(co=>`<div class="ditem"><b>${shortD(co.date)}</b> · ${co.type||''} · ${co.by||''}${co.notes?'<br><span style="font-size:11px">'+co.notes+'</span>':''}</div>`).join('') : '<div class="dempty">No connections logged</div>';
     d.innerHTML=`<div class="dh"><h3>${project}</h3><button class="dclose" onclick="closeDrawer()">×</button></div>
       <div class="dsub">Last bill raised: ${shortD(x.lastBillRaised)} · Last payment cleared: ${shortD(x.lastPayCleared)}${x.dperPct?' · Progress: '+x.dperPct+'%':''}</div>
       <div class="dsec">Open Issues (${iss.length})</div>${issHtml}
+      <div class="dsec">Action Items — from meeting/site logs (${acts.length})</div>${actHtml}
       <div class="dsec">Tasks this week (${tasks.length})</div>${tHtml}
       <div class="dsec">Site visits done (${visits.length})</div>${vHtml}
       <div class="dsec">Meetings & Decisions (${meets.length})</div>${mHtml}
