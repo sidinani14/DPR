@@ -149,7 +149,7 @@
     buildGate('checking');
     loadGis(function () {
       try {
-        google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: true });
+        google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: true, use_fedcm_for_prompt: true });
       } catch (e) {}
       buildGate('signin');
       try { google.accounts.id.prompt(); } catch (e) {}

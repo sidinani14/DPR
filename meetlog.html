@@ -36,6 +36,7 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 <script>
 const API='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
 let TEAM=[], PROJECTS=[], LOG_TYPE='Meeting', actCount=0, photoFiles=[];
+const EXTRA_ATTENDEES=['Siddharth Inani'];   // directors not in the active TEAM list
 const PURPOSE={
   Meeting:['Project requirement gathering','Design presentation/ feedback','Approvals and decision making','Project progress review','Issue resolution','Material or Vendor selection','Weekly or regular call','Other'],
   'Site Visit':['Measurement / Survey','Client meeting','Contractor coordination','Vendor coordination','Quality check','Progress review','Other']
@@ -52,7 +53,8 @@ window.idsOnAuth = async function(){
 function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
 function projOpts(){return '<option value="">Select project…</option>'+PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');}
 function teamOpts(){const me=(window.IDS_USER&&window.IDS_USER.name)||'';return TEAM.map(t=>`<option ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
-function teamChecks(){return TEAM.map((t,i)=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}">${esc(t)}</label>`).join('');}
+function attendeeList(){const seen={};return TEAM.concat(EXTRA_ATTENDEES).filter(t=>{const k=t.toLowerCase();if(seen[k])return false;seen[k]=1;return !!t;});}
+function teamChecks(){return attendeeList().map(t=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}">${esc(t)}</label>`).join('');}
 
 function render(){
   const today=new Date().toISOString().substring(0,10);
