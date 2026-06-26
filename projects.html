@@ -185,8 +185,10 @@ async function openDrawer(project){
   bg.classList.add('open'); d.classList.add('open');
   d.innerHTML=`<div class="dh"><h3>${project}</h3><button class="dclose" onclick="closeDrawer()">×</button></div><div class="dsub">loading…</div>`;
   try{
-    const x=await api('getProjectDetail',{project});
+    const [x, mt]=await Promise.all([api('getProjectDetail',{project}), api('getMeetingTimeline',{project}).catch(()=>({meetings:[]}))]);
     const iss=(x.openIssues||[]), tasks=(x.tasks||[]), visits=(x.siteVisits||[]), conns=(x.connections||[]);
+    const meets=(mt&&mt.meetings)||[];
+    const mHtml = meets.length? meets.map(m=>`<div class="ditem"><b>${shortD(m.date)}</b> · ${m.type||''} · ${m.loggedBy||''} <span class="dpill ${m.approved==='Approved'?'di-esc':'di-open'}">${m.approved||'Pending'}</span>${m.whatChanged?'<br><span style="font-size:11px;color:var(--amber,#C8863A)">'+m.whatChanged+'</span>':''}${m.pdfId?' <a href="https://drive.google.com/file/d/'+m.pdfId+'/view" target="_blank" style="font-size:11px">PDF</a>':''}</div>`).join('') : '<div class="dempty">No meetings/visits logged</div>';
     const tord={Delayed:0,'In Progress':1,Ongoing:1,Done:3};
     const issHtml = iss.length? iss.map(i=>`<div class="ditem"><b>${i.desc||i.type||'Issue'}</b><span class="dpill ${i.status==='Open'?'di-open':'di-esc'}">${i.status}</span><br><span style="font-size:11px">${i.assignedTo||'—'} · due ${shortD(i.targetDate)}</span></div>`).join('') : '<div class="dempty">No open issues 🎉</div>';
     const tHtml = tasks.length? tasks.map(t=>`<div class="ditem"><b>${t.taskType}</b> · ${t.selfStatus||'—'}<br><span style="font-size:11px">${t.assignedTo} · due ${shortD(t.deadline)}</span></div>`).join('') : '<div class="dempty">No tasks this week</div>';
@@ -197,6 +199,7 @@ async function openDrawer(project){
       <div class="dsec">Open Issues (${iss.length})</div>${issHtml}
       <div class="dsec">Tasks this week (${tasks.length})</div>${tHtml}
       <div class="dsec">Site visits done (${visits.length})</div>${vHtml}
+      <div class="dsec">Meetings & Decisions (${meets.length})</div>${mHtml}
       <div class="dsec">Connections (${conns.length})</div>${cHtml}`;
   }catch(e){ d.querySelector('.dsub').textContent='Error: '+e.message; }
 }

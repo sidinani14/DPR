@@ -182,6 +182,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
   <!-- Block requests (assignees waiting on a lead decision) -->
   <div id="block-section"></div>
   <div id="bill-section"></div>
+  <div id="meeting-section"></div>
 
   <!-- Task list -->
   <div id="task-list">
@@ -252,17 +253,19 @@ async function fetchAll() {
         {row:7, subId:'G7H8I9', date:'2026-05-01', member:'Bhavesh Bhagwat',project:'Narmada Township',   discipline:'Township / Plotted',   taskType:'Coordination / Approvals',         units:3, pts:10.8, visit:false},
       ];
     } else {
-      const [taskRes, configRes, blockRes, listRes, billRes] = await Promise.all([
+      const [taskRes, configRes, blockRes, listRes, billRes, meetRes] = await Promise.all([
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getPendingTasks'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBlockRequests'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})}),
-        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBillRequests'})})
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBillRequests'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getMeetingApprovals'})})
       ]);
       const taskData   = await taskRes.json();
       const configData = await configRes.json();
       try { window.blockRequests = (await blockRes.json()).requests || []; } catch(e){ window.blockRequests = []; }
       try { window.billRequests = (await billRes.json()).requests || []; } catch(e){ window.billRequests = []; }
+      try { window.meetingApprovals = (await meetRes.json()).logs || []; } catch(e){ window.meetingApprovals = []; }
       try { window.ALL_MEMBERS = (await listRes.json()).allMembers || []; } catch(e){ window.ALL_MEMBERS = []; }
       if (taskData.error)   throw new Error(taskData.error);
       if (configData.error) throw new Error(configData.error);
@@ -294,6 +297,7 @@ async function fetchAll() {
     renderTasks();
     renderBlockRequests();
     renderBillRequests();
+    renderMeetingApprovals();
 
   } catch(err) {
     document.getElementById('task-list').innerHTML =
@@ -384,6 +388,60 @@ async function disposeBillAction(row, disposition){
       card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.disposition+(j.taskId?' — CRM task created':'')+'</div>'; } }
     else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
   }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
+}
+
+// ── Meeting / Site Visit logs (EPIC K) — review polished text, approve → cumulative PDF ──
+function renderMeetingApprovals(){
+  const host=document.getElementById('meeting-section'); if(!host) return;
+  const logs=window.meetingApprovals||[];
+  if(!logs.length){ host.innerHTML=''; return; }
+  function esc(s){return String(s==null?'':s).replace(/</g,'&lt;');}
+  host.innerHTML=`<style>.mbtn{padding:5px 11px;border:none;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;color:#fff}
+   .mraw{font-size:11px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px;white-space:pre-wrap;max-height:90px;overflow:auto}
+   .mpol{width:100%;font:inherit;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:6px;min-height:90px}</style>
+   <div class="card" style="border:1px solid rgba(31,58,95,.45)">
+    <div class="card-head"><div class="card-title" style="color:#1F3A5F">📝 Meeting / Site Visit logs (${logs.length})</div><div class="card-sub">review wording · approve → client PDF</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:12px">`
+    + logs.map(m=>`
+      <div id="ml-${m.row}" style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="font-weight:600;font-size:13px">${esc(m.type)} · ${esc(m.project)} · ${esc(m.date)}</div>
+        <div style="font-size:11px;color:var(--text3);margin:2px 0 7px">by ${esc(m.loggedBy)}${m.clients?' · with '+esc(m.clients):''}${m.purpose?' · '+esc(m.purpose):''}</div>
+        ${m.whatChanged?`<div style="font-size:11px;color:#C8863A;font-style:italic;margin-bottom:6px">What changed: ${esc(m.whatChanged)}</div>`:''}
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:3px">Team's raw text</div>
+        <div class="mraw">${esc(m.bodyRaw)||'<i>—</i>'}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#1F3A5F;margin:8px 0 3px">Client-ready (edit if needed)</div>
+        <textarea class="mpol" id="ml-pol-${m.row}">${esc(m.bodyPolished)}</textarea>
+        <div style="display:flex;gap:6px;margin-top:9px">
+          <button class="mbtn" style="background:#2E7D32" onclick="approveMeeting(${m.row})">Approve → generate PDF</button>
+          <button class="mbtn" style="background:#C0392B" onclick="rejectMeeting(${m.row})">Reject</button>
+        </div>
+        <div id="ml-msg-${m.row}" style="font-size:11px;margin-top:6px"></div>
+      </div>`).join('')
+    + `</div></div>`;
+}
+async function approveMeeting(row){
+  const lead=document.getElementById('lead-name').value;
+  if(!lead){ alert('Select your name (Approving as) first.'); return; }
+  const msg=document.getElementById('ml-msg-'+row); if(msg){ msg.textContent='Approving & building PDF…'; msg.style.color='var(--text3)'; }
+  const bodyPolished=(document.getElementById('ml-pol-'+row)||{}).value||'';
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'approveMeetingLog', row, disposition:'approve', reviewedBy:lead, bodyPolished})});
+    const j=await r.json();
+    if(j.status==='ok'){ const card=document.getElementById('ml-'+row); if(card){ card.style.opacity=.6;
+      card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ Approved — client PDF generated'+(j.pdfUrl?' · <a href="'+j.pdfUrl+'" target="_blank">open</a>':'')+'</div>'; } }
+    else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
+  }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
+}
+async function rejectMeeting(row){
+  const lead=document.getElementById('lead-name').value;
+  if(!lead){ alert('Select your name first.'); return; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'approveMeetingLog', row, disposition:'reject', reviewedBy:lead})});
+    const j=await r.json();
+    if(j.status==='ok'){ const card=document.getElementById('ml-'+row); if(card){ card.style.opacity=.5; card.innerHTML='<div style="color:#C0392B;font-weight:600;font-size:12px">✗ Rejected</div>'; } }
+  }catch(e){}
 }
 
 // ── Render task cards ──────────────────────────────────────────

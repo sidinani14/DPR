@@ -52,6 +52,10 @@ var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26, COL_PARK_REASON=27;  
 var BILL_REQ_TAB  = 'BILL_REQUESTS';  // billables raised on DPR → approved → CRM raise-bill task
 // Only Siddharth may park tasks directly from the dashboard (EPIC I).
 var DIRECTOR_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1 };
+// EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
+var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
+var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
+var LOGS_ROOT_FOLDER = 'IDS Logs';      // Drive root for per-project report folders
 function ensureCols(sheet, n){ var m=sheet.getMaxColumns(); if (m < n) sheet.insertColumnsAfter(m, n-m); }
 function writeBlockLogHeaders(sheet){
   var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
@@ -217,6 +221,16 @@ function authorizeNow() {
   Logger.log('External-request permission granted. tokeninfo HTTP ' + r.getResponseCode());
   return r.getResponseCode();
 }
+// EPIC K — run ONCE from the editor (select authorizeEpicK → Run, approve the
+// Drive + external-request consent screen) so the Meeting Log can write to Drive
+// and call the Anthropic API. Also reports whether the API key is set.
+function authorizeEpicK() {
+  var folder = (function(){ var it=DriveApp.getFoldersByName(LOGS_ROOT_FOLDER); return it.hasNext()?it.next():DriveApp.createFolder(LOGS_ROOT_FOLDER); })();
+  UrlFetchApp.fetch('https://api.anthropic.com/v1/models', { muteHttpExceptions:true, headers:{'anthropic-version':'2023-06-01'} });
+  var hasKey = !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  Logger.log('EPIC K authorized. Drive folder "'+LOGS_ROOT_FOLDER+'" ready: '+folder.getId()+'. ANTHROPIC_API_KEY set: '+hasKey);
+  return { driveFolderId: folder.getId(), anthropicKeySet: hasKey };
+}
 
 function doGet(e) {
   // Handle CORS preflight — Apps Script handles this automatically
@@ -273,6 +287,8 @@ function doGet(e) {
   if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
   if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
   if (action === 'getBillRequests')          return safeRespond(getBillRequests);
+  if (action === 'getMeetingApprovals')      return safeRespond(getMeetingApprovals);
+  if (action === 'getMeetingTimeline')       return safeRespond(function(){ return getMeetingTimeline(p.project||''); });
   if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
@@ -326,6 +342,11 @@ function doPost(e) {
     if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
     if (data.action === 'logConnections')      return respond(logConnections(data));
     if (data.action === 'submitBillables')     return respond(submitBillables(data));
+    if (data.action === 'uploadMeetingPhoto')  return respond(uploadMeetingPhoto(data));
+    if (data.action === 'submitMeetingLog')    return respond(submitMeetingLog(data, authEmail));
+    if (data.action === 'getMeetingApprovals') return respond(getMeetingApprovals());
+    if (data.action === 'approveMeetingLog')   return respond(approveMeetingLog(data, authEmail));
+    if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
 
@@ -1343,6 +1364,281 @@ function disposeBillRequest(data){
     return {status:'ok', disposition:'Approved', taskId:taskId};
   }
   return {status:'error', message:'unknown disposition: '+action};
+}
+
+// ════════════════════════════════════════════════════════════════
+// EPIC K — Site Visit / Meeting Log → AI polish → lead approval → cumulative client PDF
+// ════════════════════════════════════════════════════════════════
+function writeMeetingLogHeaders(sheet){
+  var h=['Log ID','Date','Time','Type','Project','Logged By','Team Attendees','Client Attendees',
+         'Purpose','Body (raw)','Body (polished)','Duration (hrs)','Drive Folder','Photo IDs',
+         'Video Links','Lead Approved','Approved By','Approval Date','What Changed','Report PDF ID'];
+  sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
+function writeDecisionLogHeaders(sheet){
+  var h=['Item ID','Log ID','Project','Date','Category','Owner','Task','Deadline','Status'];
+  sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
+
+// AI polish via Claude Haiku 4.5. Returns {body, items:{id:text}, whatChanged} or null
+// (null → caller falls back to the raw text). Key in Script Properties; never in code.
+function aiPolishLog(payload){
+  var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) return null;
+  var sys = "You are an editor for Ideaform Design Studio (architecture & interiors). Rewrite the provided "
+    + "site-visit / meeting notes into clear, professional, courteous, client-ready English. ONLY improve tone, "
+    + "grammar, clarity and structure. NEVER add, remove or change facts, numbers, measurements, names, dates, "
+    + "deadlines or technical content. Keep it concise. Return STRICT JSON only — no prose, no markdown fences.";
+  var items = payload.items || [];
+  var userText = 'Return JSON exactly in this shape: '
+    + '{"body":"<polished observations or minutes>","items":{"<id>":"<polished item text>"},'
+    + '"whatChanged":"<one or two neutral sentences on how decisions changed versus the earlier open items below, or an empty string>"}.'
+    + '\n\nNOTES:\n' + (payload.body || '(none)')
+    + '\n\nACTION ITEMS (id: text):\n' + items.map(function(it){ return it.id+': '+it.text; }).join('\n')
+    + (payload.prevContext ? '\n\nEARLIER OPEN DECISIONS (context for whatChanged only — do not rewrite these):\n'+payload.prevContext : '');
+  try {
+    var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method:'post', contentType:'application/json', muteHttpExceptions:true,
+      headers:{ 'x-api-key':key, 'anthropic-version':'2023-06-01' },
+      payload: JSON.stringify({ model:'claude-haiku-4-5', max_tokens:1500, system:sys,
+                                messages:[{ role:'user', content:userText }] })
+    });
+    if (resp.getResponseCode() !== 200){ Logger.log('aiPolish HTTP '+resp.getResponseCode()+': '+resp.getContentText().substring(0,200)); return null; }
+    var d = JSON.parse(resp.getContentText());
+    if (d.stop_reason === 'refusal') return null;
+    var txt=''; (d.content||[]).forEach(function(b){ if(b.type==='text') txt+=b.text; });
+    var m = txt.match(/\{[\s\S]*\}/); if(!m) return null;
+    return JSON.parse(m[0]);
+  } catch(e){ Logger.log('aiPolish error: '+e); return null; }
+}
+
+// Drive: per-project / per-date folder under "IDS Logs"
+function meetingDriveFolder(project, day){
+  var root, it = DriveApp.getFoldersByName(LOGS_ROOT_FOLDER);
+  root = it.hasNext() ? it.next() : DriveApp.createFolder(LOGS_ROOT_FOLDER);
+  function child(parent, name){ var c=parent.getFoldersByName(name); return c.hasNext()?c.next():parent.createFolder(name); }
+  return child(child(root, project||'Unfiled'), day||dateStr());
+}
+// Upload one base64 image to the visit's Drive folder. Called once per photo.
+function uploadMeetingPhoto(data){
+  try {
+    var folder = meetingDriveFolder(data.project||'', dateStr(data.date||''));
+    var b64 = String(data.dataUrl||'').replace(/^data:[^,]*,/,'');
+    var blob = Utilities.newBlob(Utilities.base64Decode(b64), data.mime||'image/jpeg', data.name||('photo-'+Date.now()+'.jpg'));
+    var f = folder.createFile(blob);
+    return { status:'ok', fileId:f.getId(), folderId:folder.getId() };
+  } catch(e){ return { status:'error', message:String(e) }; }
+}
+
+// Main submission. Writes MEETING_LOG (raw + AI-polished), DECISION_LOG items, creates
+// IDS-team tasks, registers a CRM_LOG connection, leaves it "Pending" lead approval.
+function submitMeetingLog(data, authEmail){
+  var s = db();
+  var logSheet = getOrCreate(MEETING_LOG_TAB, writeMeetingLogHeaders);
+  var decSheet = getOrCreate(DECISION_LOG_TAB, writeDecisionLogHeaders);
+  var logId = nextId(logSheet, 'ML-');
+  var day = dateStr(data.date || '');
+  var project = String(data.project || '').trim();
+  var loggedBy = String(data.loggedBy || '').trim();
+  var type = (data.type === 'Site Visit') ? 'Site Visit' : 'Meeting';
+
+  // Action plans: data.actions = {Client:[{owner,text,deadline}], IDS:[...], Contractor:[...], Other:[...]}
+  var actions = data.actions || {};
+  var flat = [];   // {cat, owner, text, deadline, itemId}
+  ['Client','IDS','Contractor','Other'].forEach(function(cat){
+    (actions[cat]||[]).forEach(function(it){
+      var t = String(it.text||'').trim(); if(!t) return;
+      flat.push({ cat:cat, owner:String(it.owner||'').trim(), text:t, deadline:String(it.deadline||'').trim(),
+                  itemId: nextId(decSheet,'DEC-') });
+    });
+  });
+
+  // AI polish (raw kept; polished used for the client report). Falls back to raw if no key / failure.
+  var bodyRaw = String(data.body || '').trim();
+  var prev = openDecisionsText(project);
+  var polished = aiPolishLog({ body:bodyRaw, items:flat.map(function(f){return {id:f.itemId, text:f.text};}), prevContext:prev });
+  var bodyPolished = (polished && polished.body) ? polished.body : bodyRaw;
+  var whatChanged  = (polished && polished.whatChanged) ? polished.whatChanged : '';
+  if (polished && polished.items){ flat.forEach(function(f){ if(polished.items[f.itemId]) f.textPolished = polished.items[f.itemId]; }); }
+
+  // Photos already uploaded via uploadMeetingPhoto → data.photoIds; folder id passed through
+  var photoIds = (data.photoIds||[]).join(',');
+  var folderId = data.folderId || '';
+  var videoLinks = (data.videoLinks||[]).join(' | ');
+
+  logSheet.appendRow([ logId, day, String(data.time||''), type, project, loggedBy,
+    (data.teamAttendees||[]).join(', '), String(data.clientAttendees||''),
+    (data.purpose||[]).join(', '), bodyRaw, bodyPolished, String(data.duration||''),
+    folderId, photoIds, videoLinks, 'Pending', '', '', whatChanged, '' ]);
+
+  // Decision items → DECISION_LOG (store polished text where available); IDS items → tasks
+  var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  flat.forEach(function(f){
+    decSheet.appendRow([ f.itemId, logId, project, day, f.cat, f.owner, f.textPolished||f.text, f.deadline, 'Open' ]);
+    if (f.cat === 'IDS' && f.owner && !data.skipTasks){
+      var assignee = resolveAssignee(f.owner, project) || f.owner;
+      var taskId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
+      aSheet.appendRow([ taskId, '', project, assignee, 'MoM Action', 1, 1, 1, 1, day,
+        f.deadline || addDaysToStr(day,3), '', '', 'Not Started', '', '', 'Pending', '', '', '',
+        (f.textPolished||f.text)+' [From '+type+' '+day+']', loggedBy+' (MoM)', 'Medium' ]);
+      parkRowIfStalled(aSheet, project);
+    }
+  });
+
+  // Register as a client connection so it shows on the projects dashboard
+  appendConnections(loggedBy, day, [{ project:project, type:type, notes:'Logged '+type+(data.clientAttendees?(' with '+data.clientAttendees):'') }], logId);
+
+  return { status:'ok', logId:logId, polished: !!polished };
+}
+
+// Concatenated open decisions for a project (feeds AI "what changed" + report continuity)
+function openDecisionsText(project){
+  var sheet = db().getSheetByName(DECISION_LOG_TAB);
+  if (!sheet || sheet.getLastRow()<2) return '';
+  var rows = sheet.getDataRange().getValues(), out=[], pl=String(project||'').toLowerCase();
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][2]||'').toLowerCase() !== pl) continue;
+    if (String(rows[i][8]||'').trim() !== 'Open') continue;
+    out.push('- ['+String(rows[i][4]||'')+'] '+String(rows[i][6]||'')+(rows[i][7]?(' (due '+cellDate(rows[i][7])+')'):''));
+  }
+  return out.slice(-30).join('\n');
+}
+
+// Pending lead approvals — for the approval form
+function getMeetingApprovals(){
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet || sheet.getLastRow()<2) return {logs:[]};
+  var rows = sheet.getDataRange().getValues(), out=[];
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][15]||'').trim() !== 'Pending') continue;
+    out.push({ row:i+1, logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
+      project:String(rows[i][4]||''), loggedBy:String(rows[i][5]||''), team:String(rows[i][6]||''),
+      clients:String(rows[i][7]||''), purpose:String(rows[i][8]||''),
+      bodyRaw:String(rows[i][9]||''), bodyPolished:String(rows[i][10]||''), whatChanged:String(rows[i][18]||'') });
+  }
+  return {logs:out};
+}
+
+// Lead approves (optionally edits the polished text), then the cumulative PDF is generated.
+function approveMeetingLog(data, authEmail){
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
+  var row = parseInt(data.row,10); if(!row) return {status:'error', message:'no row'};
+  var today = dateStr();
+  if (data.disposition === 'reject'){
+    sheet.getRange(row,16).setValue('Rejected'); sheet.getRange(row,17).setValue(data.reviewedBy||authEmail||''); sheet.getRange(row,18).setValue(today);
+    return {status:'ok', disposition:'Rejected'};
+  }
+  if (typeof data.bodyPolished === 'string' && data.bodyPolished.trim()) sheet.getRange(row,11).setValue(data.bodyPolished);
+  sheet.getRange(row,16).setValue('Approved'); sheet.getRange(row,17).setValue(data.reviewedBy||authEmail||''); sheet.getRange(row,18).setValue(today);
+  var project = String(sheet.getRange(row,5).getValue()||'').trim();
+  var pdf = generateProjectReportPDF(project);
+  if (pdf && pdf.fileId) sheet.getRange(row,20).setValue(pdf.fileId);
+  return {status:'ok', disposition:'Approved', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
+}
+
+// Build the cumulative, newest-first client PDF for a project: cover index of all
+// visits/meetings (date + attendees) + each approved entry, photos inlined as base64.
+function generateProjectReportPDF(project){
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet || sheet.getLastRow()<2) return null;
+  var rows = sheet.getDataRange().getValues(), pl=String(project||'').toLowerCase();
+  var decSheet = db().getSheetByName(DECISION_LOG_TAB);
+  var decRows = decSheet ? decSheet.getDataRange().getValues() : [];
+  var entries=[];
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][4]||'').toLowerCase() !== pl) continue;
+    if (String(rows[i][15]||'').trim() !== 'Approved') continue;
+    entries.push({
+      logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
+      team:String(rows[i][6]||''), clients:String(rows[i][7]||''), purpose:String(rows[i][8]||''),
+      body:String(rows[i][10]||''), photoIds:String(rows[i][13]||''), videos:String(rows[i][14]||''),
+      whatChanged:String(rows[i][18]||'') });
+  }
+  if (!entries.length) return null;
+  entries.sort(function(a,b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); }); // newest first
+
+  function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function decsFor(logId){
+    var by={Client:[],IDS:[],Contractor:[],Other:[]};
+    for (var j=1;j<decRows.length;j++){ if(String(decRows[j][1]||'')!==logId) continue;
+      var cat=String(decRows[j][4]||'Other'); (by[cat]||by.Other).push({owner:String(decRows[j][5]||''),text:String(decRows[j][6]||''),deadline:cellDate(decRows[j][7]),status:String(decRows[j][8]||'')}); }
+    return by;
+  }
+  function planBlock(title,arr){ if(!arr.length) return '';
+    return '<div class="ap"><div class="ap-t">'+title+'</div><ol>'+arr.map(function(x){
+      return '<li>'+(x.owner?'<b>'+esc(x.owner)+':</b> ':'')+esc(x.text)+(x.deadline?' <i>(by '+esc(x.deadline)+')</i>':'')
+        +(x.status&&x.status!=='Open'?' <span class="st">['+esc(x.status)+']</span>':'')+'</li>'; }).join('')+'</ol></div>'; }
+
+  // cover index
+  var index = entries.map(function(e){ return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.type)+'</td><td>'+esc([e.team,e.clients].filter(Boolean).join(' · '))+'</td></tr>'; }).join('');
+
+  var sections = entries.map(function(e,idx){
+    var d=decsFor(e.logId);
+    var imgs='';
+    e.photoIds.split(',').forEach(function(id){ id=id.trim(); if(!id) return;
+      try{ var f=DriveApp.getFileById(id); var b=f.getBlob();
+        imgs += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(b.getBytes())+'">'; }catch(er){} });
+    return '<div class="sec'+(idx>0?' brk':'')+'">'
+      + '<div class="sh">'+esc(e.type)+' — '+esc(e.date)+(idx===0?' <span class="latest">LATEST</span>':'')+'</div>'
+      + '<div class="meta">Attendees: '+esc([e.team,e.clients].filter(Boolean).join(' · ')||'—')+(e.purpose?' &nbsp;·&nbsp; Purpose: '+esc(e.purpose):'')+'</div>'
+      + (e.whatChanged?'<div class="chg"><b>What changed since the previous meeting:</b> '+esc(e.whatChanged)+'</div>':'')
+      + (e.body?'<div class="body">'+esc(e.body).replace(/\n/g,'<br>')+'</div>':'')
+      + planBlock('Action Plan — Client', d.Client) + planBlock('Action Plan — IDS Team', d.IDS)
+      + planBlock('Action Plan — Contractors', d.Contractor) + planBlock('Action Plan — Other', d.Other)
+      + (imgs?'<div class="imgs">'+imgs+'</div>':'')
+      + (e.videos?'<div class="vids"><b>Videos:</b> '+e.videos.split('|').map(function(v){v=v.trim();return v?'<a href="'+esc(v)+'">'+esc(v)+'</a>':'';}).join(' &nbsp; ')+'</div>':'')
+      + '</div>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+    + 'body{font-family:Georgia,serif;color:#1A1917;margin:0;padding:28px 34px}'
+    + 'h1{font-size:20px;color:#1F3A5F;margin:0 0 2px}.sub{color:#6B6860;font-size:11px;margin-bottom:14px}'
+    + 'table.idx{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:11px}'
+    + 'table.idx th{background:#1F3A5F;color:#fff;text-align:left;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.5px}'
+    + 'table.idx td{border-bottom:1px solid #E2DFD8;padding:5px 8px}'
+    + '.sec{padding-top:10px}.brk{page-break-before:always}'
+    + '.sh{font-size:14px;font-weight:bold;color:#1F3A5F;border-bottom:2px solid #1F3A5F;padding-bottom:3px;margin-bottom:5px}'
+    + '.latest{font-size:8px;background:#1F3A5F;color:#fff;padding:1px 6px;border-radius:8px;vertical-align:middle}'
+    + '.meta{font-size:10px;color:#6B6860;margin-bottom:6px}'
+    + '.chg{background:#F4F1EA;border-left:3px solid #C8863A;padding:6px 9px;font-size:11px;margin:6px 0}'
+    + '.body{font-size:12px;line-height:1.55;margin:6px 0;white-space:normal}'
+    + '.ap{margin:6px 0}.ap-t{font-size:10px;font-weight:bold;color:#1F3A5F;text-transform:uppercase;letter-spacing:.5px}'
+    + '.ap ol{margin:3px 0 0;padding-left:20px;font-size:11.5px;line-height:1.5}.st{color:#2E7D32;font-size:9px}'
+    + '.imgs{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px}.imgs img{max-width:240px;max-height:200px;border:1px solid #E2DFD8;border-radius:4px}'
+    + '.vids{font-size:10px;margin-top:6px}.foot{margin-top:18px;border-top:1px solid #E2DFD8;padding-top:8px;font-size:9px;color:#9E9B94}'
+    + '</style></head><body>'
+    + '<h1>'+esc(project)+' — Meeting &amp; Site Visit Log</h1>'
+    + '<div class="sub">Ideaform Design Studio · Cumulative record · Generated '+esc(nowStr())+'</div>'
+    + '<table class="idx"><tr><th>Date</th><th>Type</th><th>Attendees</th></tr>'+index+'</table>'
+    + sections
+    + '<div class="foot">This is a cumulative record. The most recent meeting/visit appears first. All tasks, observations and action plans are subject to follow-up and verification. © Ideaform Design Studio | Confidential</div>'
+    + '</body></html>';
+
+  var pdf = Utilities.newBlob(html, 'text/html', project+' — IDS Log.html').getAs('application/pdf')
+            .setName(project+' — IDS Meeting Log ('+entries[0].date+').pdf');
+  var folder, it = DriveApp.getFoldersByName(LOGS_ROOT_FOLDER);
+  var root = it.hasNext()?it.next():DriveApp.createFolder(LOGS_ROOT_FOLDER);
+  var pc = root.getFoldersByName(project||'Unfiled'); folder = pc.hasNext()?pc.next():root.createFolder(project||'Unfiled');
+  // replace the prior cumulative PDF for this project
+  var old = folder.getFilesByName(pdf.getName()); while(old.hasNext()){ old.next().setTrashed(true); }
+  var saved = folder.createFile(pdf);
+  return { fileId:saved.getId(), url:saved.getUrl() };
+}
+
+// Per-project meeting timeline for the projects dashboard drawer
+function getMeetingTimeline(project){
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet || sheet.getLastRow()<2) return {meetings:[]};
+  var rows = sheet.getDataRange().getValues(), pl=String(project||'').toLowerCase(), out=[];
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][4]||'').toLowerCase()!==pl) continue;
+    out.push({ date:cellDate(rows[i][1]), type:String(rows[i][3]||''), loggedBy:String(rows[i][5]||''),
+      clients:String(rows[i][7]||''), approved:String(rows[i][15]||''), whatChanged:String(rows[i][18]||''),
+      pdfId:String(rows[i][19]||'') }); }
+  out.sort(function(a,b){ return a.date<b.date?1:(a.date>b.date?-1:0); });
+  return {meetings:out};
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -4099,10 +4395,36 @@ function handleDPERSubmission(data) {
       ]);
     }
 
+    // EPIC K — a DPER site visit auto-publishes a client Site Visit Log (no second form).
+    // Tasks are already created by writeSiteIssues above, so skipTasks=true here.
+    var meetingLogId = null;
+    try {
+      if (String(data.siteVisit||'').toLowerCase() === 'yes') {
+        var mlActions = { Client:[], IDS:[], Contractor:[], Other:[] };
+        issues.forEach(function(iss){
+          var item = { owner:String(iss.assignedTo||''), text:String(iss.description||''), deadline:cellDate(iss.targetDate)||'' };
+          if (!item.text) return;
+          if ((iss.issueType||'')==='Design') mlActions.IDS.push(item); else mlActions.Contractor.push(item);
+        });
+        if (data.clientConcerns) mlActions.Client.push({ owner:'', text:String(data.clientConcerns), deadline:'' });
+        if (data.blocking)       mlActions.Other.push({ owner:'', text:String(data.blocking), deadline:'' });
+        var mlRes = submitMeetingLog({
+          type:'Site Visit', project:data.project||'', date:data.date||dateStr(),
+          time:data.time||'', loggedBy:data.lead||'Deepak Soni',
+          teamAttendees:(data.lead?[data.lead]:[]), clientAttendees:'',
+          purpose:['Progress review','Quality check'],
+          body:String(data.worksToday||''), actions:mlActions,
+          duration:'', photoIds:[], videoLinks:[], skipTasks:true
+        }, '');
+        meetingLogId = mlRes && mlRes.logId;
+      }
+    } catch(mlErr){ Logger.log('DPER→meetingLog error: '+mlErr); }
+
     Logger.log('DPER submitted: ' + subId + ' / ' + (data.project||''));
     return {
       status           : 'ok',
       subId            : subId,
+      meetingLogId     : meetingLogId,
       siddharthTaskId  : siddharthTaskId,
       siddharthError   : siddharthError,
     };

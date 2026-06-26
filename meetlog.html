@@ -1,0 +1,167 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Site Visit / Meeting Log</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<script src="searchselect.js"></script>
+<style>:root{--ss-bg:#FFFFFF;--ss-fg:#1A1917;--ss-pop-bg:#FFFFFF;--ss-border:#E2DFD8;--ss-accent:#1F3A5F;--ss-muted:#9E9B94;--ss-hover:rgba(31,58,95,0.10)}</style>
+<script>SearchSelect.auto('.proj-sel');</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',system-ui,sans-serif;background:#F5F3EE;color:#1A1917;padding:18px;max-width:760px;margin:0 auto}
+h1{font-size:18px;color:#1F3A5F}.sub{font-size:12px;color:#6B6860;margin:3px 0 16px}
+.card{background:#fff;border:1px solid #E2DFD8;border-radius:12px;padding:16px;margin-bottom:14px}
+.ch{display:flex;align-items:center;gap:9px;margin-bottom:12px}.cn{width:21px;height:21px;border-radius:50%;background:#1F3A5F;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center}
+.ct{font-weight:600;font-size:14px}.field{margin-bottom:11px}.lbl{font-size:12px;font-weight:600;margin-bottom:5px;color:#3A3733}.opt{font-weight:400;color:#9E9B94}
+input,select,textarea{width:100%;font:inherit;font-size:13px;padding:8px 10px;border:1px solid #E2DFD8;border-radius:8px;background:#fff;color:#1A1917}
+textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:5px 11px;border-radius:20px;font-size:12px;cursor:pointer;border:1.5px solid #E2DFD8;background:#fff;color:#6B6860;user-select:none}
+.chip.on{background:#1F3A5F;border-color:#1F3A5F;color:#fff}
+.add{width:100%;padding:9px;font-size:12px;color:#1F3A5F;background:rgba(31,58,95,.07);border:1px dashed rgba(31,58,95,.3);border-radius:8px;cursor:pointer;margin-top:6px}
+.ai{margin-top:4px;border:1px solid #E2DFD8;border-radius:8px;padding:9px;background:#FAF8F4}
+.ai .lbl{color:#1F3A5F}
+.rm{font-size:11px;color:#C0392B;background:transparent;border:1px solid #E2DFD8;border-radius:5px;padding:3px 9px;cursor:pointer;margin-top:5px}
+.site-only{display:none}.is-site .site-only{display:block}
+#bar{position:sticky;bottom:0;background:#F5F3EE;padding:12px 0}
+#go{width:100%;padding:13px;font-size:14px;font-weight:600;color:#fff;background:#1F3A5F;border:none;border-radius:10px;cursor:pointer}
+#go:disabled{opacity:.5}.msg{font-size:12px;text-align:center;margin-top:8px;color:#6B6860}
+.toggle{display:flex;gap:0;border:1.5px solid #1F3A5F;border-radius:9px;overflow:hidden;width:fit-content}
+.toggle div{padding:7px 18px;font-size:13px;cursor:pointer;color:#1F3A5F}.toggle div.on{background:#1F3A5F;color:#fff}
+.ph-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.ph-list .t{font-size:10px;background:#EEE;border-radius:5px;padding:3px 7px}
+</style></head><body>
+<h1>Site Visit / Meeting Log</h1>
+<div class="sub">Ideaform Design Studio · replaces the Google Forms · sign in to begin.</div>
+<div id="app"><div class="card">Sign in with your Ideaform account to load the form…</div></div>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+let TEAM=[], PROJECTS=[], LOG_TYPE='Meeting', actCount=0, photoFiles=[];
+const PURPOSE={
+  Meeting:['Project requirement gathering','Design presentation/ feedback','Approvals and decision making','Project progress review','Issue resolution','Material or Vendor selection','Weekly or regular call','Other'],
+  'Site Visit':['Measurement / Survey','Client meeting','Contractor coordination','Vendor coordination','Quality check','Progress review','Other']
+};
+const CATS=[['Client','Action plan — Client'],['IDS','Action plan — IDS team'],['Contractor','Action plan — Contractors'],['Other','Action plan — Other']];
+
+window.idsOnAuth = async function(){
+  try{
+    const r = await fetch(API+'?action=getLists').then(x=>x.json());
+    TEAM=r.team||[]; PROJECTS=r.projects||[];
+  }catch(e){}
+  render();
+};
+function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
+function projOpts(){return '<option value="">Select project…</option>'+PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');}
+function teamOpts(){const me=(window.IDS_USER&&window.IDS_USER.name)||'';return TEAM.map(t=>`<option ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
+function teamChecks(){return TEAM.map((t,i)=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}">${esc(t)}</label>`).join('');}
+
+function render(){
+  const today=new Date().toISOString().substring(0,10);
+  document.getElementById('app').innerHTML=`
+  <div class="card">
+    <div class="ch"><div class="cn">1</div><div class="ct">Type & project</div></div>
+    <div class="field"><div class="lbl">Log type</div>
+      <div class="toggle"><div id="t-m" class="on" onclick="setType('Meeting')">Meeting</div><div id="t-s" onclick="setType('Site Visit')">Site Visit</div></div></div>
+    <div class="field"><div class="lbl">Project</div><select class="proj-sel" id="project">${projOpts()}</select></div>
+    <div class="row"><div class="field"><div class="lbl">Date</div><input type="date" id="date" value="${today}"></div>
+      <div class="field"><div class="lbl">Time</div><input type="time" id="time"></div>
+      <div class="field"><div class="lbl">Duration (hrs)</div><input type="number" id="duration" min="0" step="0.5" placeholder="e.g. 1.5"></div></div>
+    <div class="field"><div class="lbl">Logged by</div><select id="loggedBy">${teamOpts()}</select></div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><div class="cn">2</div><div class="ct">Attendees</div></div>
+    <div class="field"><div class="lbl">IDS team present</div><div>${teamChecks()}</div></div>
+    <div class="field"><div class="lbl">Client / other attendees <span class="opt">names</span></div><input id="clientAttendees" placeholder="e.g. Mr. Aaveg Bhandari, Mrs. Avni Bhandari"></div>
+    <div class="field"><div class="lbl">Purpose</div><div class="chips" id="purpose"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><div class="cn">3</div><div class="ct" id="body-title">Minutes of meeting</div></div>
+    <div class="field"><div class="lbl" id="body-lbl">Write area-wise minutes (numbered)</div><textarea id="body" placeholder="1. ...&#10;2. ..."></textarea>
+      <div class="opt" style="font-size:11px;margin-top:4px">✨ Your wording is automatically cleaned up into clear, client-ready language before it reaches the client.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><div class="cn">4</div><div class="ct">Action plans</div></div>
+    <div id="act-blocks"></div>
+    ${CATS.map(c=>`<div style="margin-bottom:10px"><div class="lbl">${c[1]}</div><div id="act-${c[0]}"></div><button class="add" onclick="addAction('${c[0]}')">+ Add ${c[0]} item</button></div>`).join('')}
+  </div>
+
+  <div class="card site-only">
+    <div class="ch"><div class="cn">5</div><div class="ct">Site photos & videos</div></div>
+    <div class="field"><div class="lbl">Photos <span class="opt">added to the client report & Drive</span></div>
+      <input type="file" id="photos" accept="image/*" multiple onchange="onPhotos(this)"><div class="ph-list" id="ph-list"></div></div>
+    <div class="field"><div class="lbl">Video links <span class="opt">Drive/YouTube URLs, one per line</span></div><textarea id="videos" placeholder="https://drive.google.com/..."></textarea></div>
+  </div>
+
+  <div id="bar"><button id="go" onclick="submitLog()">Submit log</button><div class="msg" id="msg"></div></div>`;
+  setType(LOG_TYPE);
+}
+function setType(t){
+  LOG_TYPE=t; const app=document.getElementById('app');
+  document.body.classList.toggle('is-site', t==='Site Visit');
+  document.getElementById('t-m').classList.toggle('on',t==='Meeting');
+  document.getElementById('t-s').classList.toggle('on',t==='Site Visit');
+  document.getElementById('body-title').textContent = t==='Site Visit'?'Key observations / issues':'Minutes of meeting';
+  document.getElementById('body-lbl').textContent = t==='Site Visit'?'Note observations & issues (numbered)':'Write area-wise minutes (numbered)';
+  const pc=document.getElementById('purpose');
+  pc.innerHTML=PURPOSE[t].map(p=>`<div class="chip" data-v="${esc(p)}" onclick="this.classList.toggle('on')">${esc(p)}</div>`).join('');
+}
+function addAction(cat){
+  actCount++; const id=cat+'-'+actCount;
+  const div=document.createElement('div'); div.id='ab-'+id; div.style.cssText='border:1px solid #E2DFD8;border-radius:8px;padding:9px;margin-bottom:7px';
+  const ownerField = cat==='IDS'
+    ? `<select id="ow-${id}"><option value="">— assign to —</option>${TEAM.map(t=>`<option>${esc(t)}</option>`).join('')}</select>`
+    : `<input id="ow-${id}" placeholder="${cat==='Client'?'client name (optional)':cat+' / agency name'}">`;
+  div.innerHTML=`<div class="row"><div class="field" style="margin:0">${ownerField}</div><div class="field" style="margin:0;max-width:150px"><input type="date" id="dl-${id}"></div></div>
+    <div class="field" style="margin:6px 0 0"><input id="tx-${id}" placeholder="What needs to be done"></div>
+    <button class="rm" onclick="document.getElementById('ab-${id}').remove()">✕ Remove</button>`;
+  document.getElementById('act-'+cat).appendChild(div);
+}
+function onPhotos(input){
+  for(const f of input.files){
+    const reader=new FileReader();
+    reader.onload=e=>{ photoFiles.push({name:f.name,mime:f.type,dataUrl:e.target.result});
+      document.getElementById('ph-list').innerHTML=photoFiles.map(p=>`<span class="t">${esc(p.name)}</span>`).join(''); };
+    reader.readAsDataURL(f);
+  }
+  input.value='';
+}
+function collectActions(){
+  const out={Client:[],IDS:[],Contractor:[],Other:[]};
+  CATS.forEach(c=>{ document.querySelectorAll('#act-'+c[0]+' > div').forEach(d=>{
+    const id=d.id.replace('ab-',''); const text=(document.getElementById('tx-'+id)||{}).value||'';
+    if(!text.trim())return;
+    out[c[0]].push({owner:(document.getElementById('ow-'+id)||{}).value||'',text:text,deadline:(document.getElementById('dl-'+id)||{}).value||''});
+  });});
+  return out;
+}
+async function submitLog(){
+  const project=document.getElementById('project').value;
+  if(!project){ msg('Pick a project first.'); return; }
+  const go=document.getElementById('go'); go.disabled=true;
+  const date=document.getElementById('date').value;
+  try{
+    // upload photos one-by-one
+    const photoIds=[]; let folderId='';
+    for(let i=0;i<photoFiles.length;i++){ msg('Uploading photo '+(i+1)+'/'+photoFiles.length+'…');
+      const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project,date,name:photoFiles[i].name,mime:photoFiles[i].mime,dataUrl:photoFiles[i].dataUrl})}).then(x=>x.json());
+      if(r.fileId){photoIds.push(r.fileId); folderId=r.folderId||folderId;}
+    }
+    msg('Cleaning up wording & saving…');
+    const payload={action:'submitMeetingLog', type:LOG_TYPE, project, date,
+      time:document.getElementById('time').value, loggedBy:document.getElementById('loggedBy').value,
+      teamAttendees:[...document.querySelectorAll('.ta:checked')].map(c=>c.value),
+      clientAttendees:document.getElementById('clientAttendees').value,
+      purpose:[...document.querySelectorAll('#purpose .chip.on')].map(c=>c.dataset.v),
+      body:document.getElementById('body').value, actions:collectActions(),
+      duration:document.getElementById('duration').value, photoIds, folderId,
+      videoLinks:(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean)};
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
+    if(res.status==='ok'){ document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#2E7D32">✓ Submitted</h1><div class="sub">Your ${LOG_TYPE.toLowerCase()} for <b>${esc(project)}</b> has been logged and sent for lead approval. Once approved, the cumulative client report PDF is generated automatically.${res.polished?'':'<br><br><i>Note: wording was saved as-is (AI clean-up unavailable).</i>'}</div></div>`; window.scrollTo(0,0); }
+    else { msg('Error: '+(res.message||'failed')); go.disabled=false; }
+  }catch(e){ msg('Network error — try again.'); go.disabled=false; }
+}
+function msg(t){document.getElementById('msg').textContent=t;}
+</script>
+</body></html>
