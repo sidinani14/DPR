@@ -44,10 +44,9 @@
       '.ss-trigger .ss-cur.ss-ph{color:var(--ss-muted,rgba(255,255,255,0.4))}' +
       '.ss-caret{flex-shrink:0;width:0;height:0;border-left:4px solid transparent;' +
         'border-right:4px solid transparent;border-top:5px solid var(--ss-muted,rgba(255,255,255,0.45))}' +
-      '.ss-pop{position:absolute;z-index:9999;left:0;right:0;top:calc(100% + 4px);' +
+      '.ss-pop{position:fixed;z-index:99999;' +
         'background:var(--ss-pop-bg,#161616);border:1px solid var(--ss-border,rgba(255,255,255,0.16));' +
         'border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;display:none}' +
-      '.ss-pop.ss-up{top:auto;bottom:calc(100% + 4px)}' +
       '.ss-pop.ss-show{display:block}' +
       '.ss-search-wrap{padding:8px;border-bottom:1px solid var(--ss-border,rgba(255,255,255,0.1))}' +
       '.ss-search{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:8px 10px;' +
@@ -161,18 +160,33 @@
       close();
     }
 
+    // Position the (position:fixed) popup against the trigger. Fixed positioning
+    // escapes ancestor overflow:hidden (cards/sections clip an absolute popup).
+    function position() {
+      var r = trigger.getBoundingClientRect();
+      var vh = window.innerHeight, gap = 4, pad = 10;
+      pop.style.left = r.left + 'px';
+      pop.style.width = r.width + 'px';
+      var below = vh - r.bottom - gap - pad;
+      var above = r.top - gap - pad;
+      var up = below < 220 && above > below;
+      if (up) { pop.style.top = 'auto'; pop.style.bottom = (vh - r.top + gap) + 'px'; }
+      else    { pop.style.bottom = 'auto'; pop.style.top = (r.bottom + gap) + 'px'; }
+      // let the option list scroll within the space available in the viewport
+      list.style.maxHeight = Math.max(96, (up ? above : below) - 52) + 'px';
+    }
+    var _reposition = function () { if (pop.classList.contains('ss-show')) position(); };
     function open() {
       if (pop.classList.contains('ss-show')) return;
       closeAll();
       injectStyles();
-      // flip up if not enough room below
-      var r = trigger.getBoundingClientRect();
-      var below = window.innerHeight - r.bottom;
-      pop.classList.toggle('ss-up', below < 280 && r.top > below);
       pop.classList.add('ss-show');
       trigger.classList.add('ss-open');
       search.value = '';
       buildList();
+      position();
+      window.addEventListener('scroll', _reposition, true);
+      window.addEventListener('resize', _reposition);
       // focus the search box → opens the mobile keyboard
       setTimeout(function () { search.focus(); }, 0);
       openInstance = api;
@@ -180,6 +194,8 @@
     function close() {
       pop.classList.remove('ss-show');
       trigger.classList.remove('ss-open');
+      window.removeEventListener('scroll', _reposition, true);
+      window.removeEventListener('resize', _reposition);
       if (openInstance === api) openInstance = null;
     }
 
