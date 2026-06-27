@@ -753,6 +753,13 @@ async function loadAndRender(){
   app.innerHTML = outHtml;
 }
 
-window.idsOnAuth = loadAndRender;   // gated by auth.js</script>
+window.idsOnAuth = function(u){   // gated by auth.js; weekly report = Siddharth & Astha only
+  var email=String((u&&u.email)||'').toLowerCase();
+  if(['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'].indexOf(email)===-1){
+    document.body.innerHTML='<div style="max-width:430px;margin:16vh auto;text-align:center;font-family:system-ui,sans-serif;color:#444;padding:20px"><div style="font-size:42px">🔒</div><h2 style="color:#C0392B;margin:12px 0 6px">Access restricted</h2><p style="color:#666;font-size:14px">The weekly report is available to <b>Siddharth &amp; Astha</b> only.</p><a href="index.html" style="color:#1F3A5F;font-size:13px;text-decoration:none">← Back to workspace</a></div>';
+    return;
+  }
+  loadAndRender();
+};</script>
 </body>
 </html>

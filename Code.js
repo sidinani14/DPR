@@ -52,6 +52,14 @@ var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26, COL_PARK_REASON=27;  
 var BILL_REQ_TAB  = 'BILL_REQUESTS';  // billables raised on DPR → approved → CRM raise-bill task
 // Only Siddharth may park tasks directly from the dashboard (EPIC I).
 var DIRECTOR_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1 };
+// Approval form + weekly report are restricted to Siddharth & Astha only.
+var MANAGER_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1, 'astha@ideaform.in':1, 'astha.uch@gmail.com':1 };
+function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase()]; }
+// Actions used ONLY by the approval form / weekly report (verified not shared
+// with the dashboard) — callable by managers only.
+var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
+  getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
+  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -269,6 +277,8 @@ function doGet(e) {
   var authEmail = verifyIdToken(p.idToken);
   if (!authEmail) return respondUnauthorized();
   var action = p.action || '', member = p.member || '';
+  if (MANAGER_ONLY[action] && !isManager(authEmail))
+    return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
   // Lightweight access check used by the sign-in gate (auth.js)
   if (action === 'checkAccess') return respond({ allowed: true, email: authEmail });
   if (action === 'getLists')              return safeRespond(getLists);
@@ -306,6 +316,8 @@ function doPost(e) {
     var data = JSON.parse(raw);
     var authEmail = verifyIdToken(data.idToken);
     if (!authEmail) return respondUnauthorized();
+    if (MANAGER_ONLY[data.action] && !isManager(authEmail))
+      return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
 
     // GET-style actions sent via POST to bypass CORS
