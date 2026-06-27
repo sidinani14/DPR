@@ -178,35 +178,60 @@ async function submitLog(){
   }catch(e){ msg('Network error — try again.'); go.disabled=false; }
 }
 let REVIEW=null;
+const qattr=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 function showReview(res, project){
-  REVIEW={logId:res.logId, items:res.items||[], project:project};
-  const q=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  const itemsHtml=(res.items||[]).map(it=>`
+  REVIEW={logId:res.logId, project:project, body:res.bodyPolished||'',
+    items:(res.items||[]).map(it=>({id:it.id,cat:it.cat,owner:it.owner,text:it.text}))};
+  renderReview();
+}
+function renderReview(){
+  const itemsHtml=(REVIEW.items||[]).map(it=>`
     <div class="field"><div class="lbl" style="font-size:11px;color:#6E6E70">${esc(it.cat)}${it.owner?' · '+esc(it.owner):''}</div>
-      <input type="text" id="rv-it-${it.id}" value="${q(it.text)}"></div>`).join('');
+      <input type="text" id="rv-it-${it.id}" value="${qattr(it.text)}"></div>`).join('');
   document.getElementById('app').innerHTML=`
     <div class="card">
       <h1>Review &amp; edit before sharing</h1>
-      <div class="sub">Your wording was cleaned up. Edit anything below, then generate the shareable PDF for <b>${esc(project)}</b>.</div>
+      <div class="sub">Edit anything below, then generate the shareable PDF for <b>${esc(REVIEW.project)}</b>.</div>
       <div class="field"><div class="lbl">${LOG_TYPE==='Site Visit'?'Key observations / issues':'Minutes of meeting'}</div>
-        <textarea id="rv-body" style="min-height:160px">${esc(res.bodyPolished||'')}</textarea></div>
+        <textarea id="rv-body" style="min-height:160px" onkeydown="numKey(event)" onfocus="numFocus(event)">${esc(REVIEW.body||'')}</textarea></div>
       ${itemsHtml?'<div class="lbl" style="margin:10px 0 2px">Action items</div>'+itemsHtml:''}
       <button id="genbtn" onclick="finalizeLog()" style="background:#1F3A5F;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-size:14px;cursor:pointer;width:100%;margin-top:12px">Generate shareable PDF</button>
       <div id="msg" class="sub" style="margin-top:8px"></div>
     </div>`;
 }
+function captureReview(){
+  (REVIEW.items||[]).forEach(it=>{ const el=document.getElementById('rv-it-'+it.id); if(el) it.text=el.value; });
+  const b=document.getElementById('rv-body'); if(b) REVIEW.body=b.value;
+}
 async function finalizeLog(){
   const gb=document.getElementById('genbtn'); gb.disabled=true; msg('Generating the report PDF…');
-  const items={}; (REVIEW.items||[]).forEach(it=>{ const el=document.getElementById('rv-it-'+it.id); if(el) items[it.id]=el.value; });
-  const body=document.getElementById('rv-body').value;
+  captureReview();
+  const items={}; (REVIEW.items||[]).forEach(it=>{ items[it.id]=it.text; });
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'finalizeMeetingLog',logId:REVIEW.logId,bodyPolished:body,items})}).then(x=>x.json());
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'finalizeMeetingLog',logId:REVIEW.logId,bodyPolished:REVIEW.body,items})}).then(x=>x.json());
     if(res.status==='ok'){
       const link=res.pdfUrl?`<a href="${res.pdfUrl}" target="_blank" style="color:#1F3A5F;font-weight:600">Open / share the PDF ↗</a>`:'PDF generated.';
-      document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#2E7D32">✓ Report ready</h1><div class="sub">The cumulative report for <b>${esc(REVIEW.project)}</b> now has this ${LOG_TYPE.toLowerCase()} at the front.<br><br>${link}<br><br><a href="meetlog.html" style="color:#6E6E70">Log another</a></div></div>`;
+      document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#2E7D32">✓ Report ready</h1>
+        <div class="sub">The report for <b>${esc(REVIEW.project)}</b> is updated with this ${LOG_TYPE.toLowerCase()} at the front.<br><br>${link}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px">
+          <button onclick="editLog()" style="background:#1F3A5F;color:#fff;border:none;border-radius:8px;padding:10px 15px;font-size:13px;cursor:pointer">Missed something? Edit &amp; regenerate</button>
+          <button onclick="deleteLog()" style="background:#fff;color:#C0392B;border:1px solid #E2DFD8;border-radius:8px;padding:10px 15px;font-size:13px;cursor:pointer">Delete this log</button>
+          <a href="meetlog.html" style="color:#6E6E70">Log another</a>
+        </div>
+        <div id="msg" class="sub" style="margin-top:8px"></div></div>`;
       window.scrollTo(0,0);
     } else { msg('Error: '+(res.message||'failed')); gb.disabled=false; }
   }catch(e){ msg('Network error — try again.'); gb.disabled=false; }
+}
+function editLog(){ renderReview(); window.scrollTo(0,0); }   // fix without re-filling the form
+async function deleteLog(){
+  if(!confirm('Delete this log and remove it from the report? You can log it again fresh.')) return;
+  msg('Deleting…');
+  try{
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteMeetingLog',logId:REVIEW.logId})}).then(x=>x.json());
+    if(res.status==='ok'){ document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#C0392B">Log deleted</h1><div class="sub">Removed from <b>${esc(REVIEW.project)}</b>'s report.<br><br><a href="meetlog.html" style="color:#1F3A5F;font-weight:600">Log it again →</a></div></div>`; window.scrollTo(0,0); }
+    else { msg('Could not delete: '+(res.message||'failed')); }
+  }catch(e){ msg('Network error.'); }
 }
 function msg(t){const m=document.getElementById('msg'); if(m) m.textContent=t;}
 </script>

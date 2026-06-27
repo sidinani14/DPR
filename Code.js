@@ -1755,14 +1755,25 @@ function getMeetingTimeline(project){
 
 // Delete an incorrect log (Siddharth only): mark it Deleted (excluded from the
 // report + timeline), void its action items, and regenerate the cumulative PDF.
+// Map a signed-in email → TEAM member name (so an author can manage their own logs).
+function nameForEmail(email){
+  email=String(email||'').toLowerCase(); if(!email) return '';
+  var t=db().getSheetByName(TEAM_TAB); if(!t||t.getLastRow()<2) return '';
+  var r=t.getDataRange().getValues();
+  for(var i=1;i<r.length;i++){ if(String(r[i][4]||'').trim().toLowerCase()===email) return String(r[i][0]||'').trim(); }
+  return '';
+}
 function deleteMeetingLog(data, authEmail){
-  if(!isDirector(authEmail)) return {status:'error', code:'forbidden', message:'Only Siddharth can delete logs.'};
   var s=db(), sheet=s.getSheetByName(MEETING_LOG_TAB);
   if(!sheet) return {status:'error', message:'MEETING_LOG not found'};
   var logId=String(data.logId||'').trim(); if(!logId) return {status:'error', message:'no logId'};
   var rows=sheet.getDataRange().getValues(), rIdx=-1;
   for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===logId){ rIdx=i; break; } }
   if(rIdx<0) return {status:'error', message:'log not found'};
+  // The author of the log, or a director, may delete it.
+  var loggedBy=String(rows[rIdx][5]||'').trim();
+  if(!isDirector(authEmail) && nameForEmail(authEmail)!==loggedBy)
+    return {status:'error', code:'forbidden', message:'Only the author or Siddharth can delete this log.'};
   var project=String(rows[rIdx][4]||'').trim();
   sheet.getRange(rIdx+1,16).setValue('Deleted');
   var dec=s.getSheetByName(DECISION_LOG_TAB);
