@@ -347,6 +347,7 @@ function doPost(e) {
     if (data.action === 'getMeetingApprovals') return respond(getMeetingApprovals());
     if (data.action === 'approveMeetingLog')   return respond(approveMeetingLog(data, authEmail));
     if (data.action === 'finalizeMeetingLog')  return respond(finalizeMeetingLog(data, authEmail));
+    if (data.action === 'deleteMeetingLog')    return respond(deleteMeetingLog(data, authEmail));
     if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
@@ -1744,11 +1745,31 @@ function getMeetingTimeline(project){
   if (!sheet || sheet.getLastRow()<2) return {meetings:[]};
   var rows = sheet.getDataRange().getValues(), pl=String(project||'').toLowerCase(), out=[];
   for (var i=1;i<rows.length;i++){ if(String(rows[i][4]||'').toLowerCase()!==pl) continue;
-    out.push({ date:cellDate(rows[i][1]), type:String(rows[i][3]||''), loggedBy:String(rows[i][5]||''),
-      clients:String(rows[i][7]||''), approved:String(rows[i][15]||''), whatChanged:String(rows[i][18]||''),
+    if(String(rows[i][15]||'').trim()==='Deleted') continue;   // hide deleted logs
+    out.push({ logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''), loggedBy:String(rows[i][5]||''),
+      clients:String(rows[i][7]||''), status:String(rows[i][15]||''), approved:String(rows[i][15]||''),
       pdfId:String(rows[i][19]||'') }); }
   out.sort(function(a,b){ return a.date<b.date?1:(a.date>b.date?-1:0); });
   return {meetings:out};
+}
+
+// Delete an incorrect log (Siddharth only): mark it Deleted (excluded from the
+// report + timeline), void its action items, and regenerate the cumulative PDF.
+function deleteMeetingLog(data, authEmail){
+  if(!isDirector(authEmail)) return {status:'error', code:'forbidden', message:'Only Siddharth can delete logs.'};
+  var s=db(), sheet=s.getSheetByName(MEETING_LOG_TAB);
+  if(!sheet) return {status:'error', message:'MEETING_LOG not found'};
+  var logId=String(data.logId||'').trim(); if(!logId) return {status:'error', message:'no logId'};
+  var rows=sheet.getDataRange().getValues(), rIdx=-1;
+  for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===logId){ rIdx=i; break; } }
+  if(rIdx<0) return {status:'error', message:'log not found'};
+  var project=String(rows[rIdx][4]||'').trim();
+  sheet.getRange(rIdx+1,16).setValue('Deleted');
+  var dec=s.getSheetByName(DECISION_LOG_TAB);
+  if(dec && dec.getLastRow()>1){ var dr=dec.getDataRange().getValues();
+    for(var j=1;j<dr.length;j++){ if(String(dr[j][1]||'')===logId) dec.getRange(j+1,9).setValue('Deleted'); } }
+  var pdf=generateProjectReportPDF(project);
+  return {status:'ok', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
 
 // ════════════════════════════════════════════════════════════════

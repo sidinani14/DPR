@@ -182,13 +182,17 @@ function cardHtml(p){
 
 async function openDrawer(project){
   const bg=document.getElementById('drawer-bg'), d=document.getElementById('drawer');
-  bg.classList.add('open'); d.classList.add('open');
+  bg.classList.add('open'); d.classList.add('open'); window._drawerProject=project;
   d.innerHTML=`<div class="dh"><h3>${project}</h3><button class="dclose" onclick="closeDrawer()">×</button></div><div class="dsub">loading…</div>`;
   try{
     const [x, mt]=await Promise.all([api('getProjectDetail',{project}), api('getMeetingTimeline',{project}).catch(()=>({meetings:[]}))]);
     const iss=(x.openIssues||[]), tasks=(x.tasks||[]), visits=(x.siteVisits||[]), conns=(x.connections||[]);
     const meets=(mt&&mt.meetings)||[];
-    const mHtml = meets.length? meets.map(m=>`<div class="ditem"><b>${shortD(m.date)}</b> · ${m.type||''} · ${m.loggedBy||''} <span class="dpill ${m.approved==='Approved'?'di-esc':'di-open'}">${m.approved||'Pending'}</span>${m.whatChanged?'<br><span style="font-size:11px;color:var(--amber,#C8863A)">'+m.whatChanged+'</span>':''}${m.pdfId?' <a href="https://drive.google.com/file/d/'+m.pdfId+'/view" target="_blank" style="font-size:11px">PDF</a>':''}</div>`).join('') : '<div class="dempty">No meetings/visits logged</div>';
+    const canDel=isSiddharth();
+    const mHtml = meets.length? meets.map(m=>`<div class="ditem"><b>${shortD(m.date)}</b> · ${m.type||''} · ${m.loggedBy||''} <span class="dpill ${m.status==='Final'?'di-esc':'di-open'}">${m.status||m.approved||'Draft'}</span>${m.pdfId?' <a href="https://drive.google.com/file/d/'+m.pdfId+'/view" target="_blank" style="font-size:11px">PDF</a>':''}${canDel&&m.logId?` <button onclick="doDeleteLog('${m.logId}')" style="font-size:10px;color:#C0392B;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;margin-left:4px">Delete</button>`:''}</div>`).join('') : '<div class="dempty">No meetings/visits logged</div>';
+    const bills=(x.billables||[]), others=(x.otherActivities||[]);
+    const billHtml = bills.length? bills.map(b=>`<div class="ditem"><b>${shortD(b.date)}</b> · ${b.discipline||''} · ${b.stage||''} <span class="dpill di-open">${b.status||''}</span> <span style="font-size:11px;color:var(--text3)">${b.raisedBy||''}</span></div>`).join('') : '<div class="dempty">No billables raised</div>';
+    const othHtml = others.length? others.slice(0,12).map(o=>`<div class="ditem"><b>${shortD(o.date)}</b> · ${o.type||''} · ${o.by||''}${o.notes?'<br><span style="font-size:11px">'+o.notes+'</span>':''}</div>`).join('') : '<div class="dempty">No other activities</div>';
     const tord={Delayed:0,'In Progress':1,Ongoing:1,Done:3};
     const issHtml = iss.length? iss.map(i=>`<div class="ditem"><b>${i.desc||i.type||'Issue'}</b><span class="dpill ${i.status==='Open'?'di-open':'di-esc'}">${i.status}</span><br><span style="font-size:11px">${i.assignedTo||'—'} · due ${shortD(i.targetDate)}</span></div>`).join('') : '<div class="dempty">No open issues 🎉</div>';
     const acts=(x.actionItems||[]);
@@ -203,10 +207,22 @@ async function openDrawer(project){
       <div class="dsec">Tasks this week (${tasks.length})</div>${tHtml}
       <div class="dsec">Site visits done (${visits.length})</div>${vHtml}
       <div class="dsec">Meetings & Decisions (${meets.length})</div>${mHtml}
-      <div class="dsec">Connections (${conns.length})</div>${cHtml}`;
+      <div class="dsec">Connections (${conns.length})</div>${cHtml}
+      <div class="dsec">Billables (${bills.length})</div>${billHtml}
+      <div class="dsec">Other activities (${others.length})</div>${othHtml}`;
   }catch(e){ d.querySelector('.dsub').textContent='Error: '+e.message; }
 }
 function closeDrawer(){ document.getElementById('drawer-bg').classList.remove('open'); document.getElementById('drawer').classList.remove('open'); }
+const DIRECTOR_EMAILS=['sidinani14@gmail.com','siddharth@ideaform.in'];
+function isSiddharth(){ return !!(window.IDS_USER && DIRECTOR_EMAILS.includes(String(window.IDS_USER.email||'').toLowerCase())); }
+async function doDeleteLog(logId){
+  if(!confirm('Delete this log permanently and regenerate the PDF? This cannot be undone.')) return;
+  try{
+    const r=await api('deleteMeetingLog',{logId});
+    if(r.status==='ok'){ openDrawer(window._drawerProject); }
+    else alert('Could not delete: '+(r.message||'failed'));
+  }catch(e){ alert('Network error'); }
+}
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
 
 window.idsOnAuth = load;   // gated by auth.js

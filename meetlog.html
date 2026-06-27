@@ -79,13 +79,19 @@ function render(){
 
   <div class="card">
     <div class="ch"><div class="cn">3</div><div class="ct" id="body-title">Minutes of meeting</div></div>
-    <div class="field"><div class="lbl" id="body-lbl">Write area-wise minutes (numbered)</div><textarea id="body" placeholder="1. ...&#10;2. ..."></textarea></div>
+    <div class="field"><div class="lbl" id="body-lbl">Write area-wise minutes (numbered)</div><textarea id="body" placeholder="1. ...&#10;2. ..." onkeydown="numKey(event)" onfocus="numFocus(event)"></textarea></div>
   </div>
 
   <div class="card">
     <div class="ch"><div class="cn">4</div><div class="ct">Action plans</div></div>
-    <div id="act-blocks"></div>
-    ${CATS.map(c=>`<div style="margin-bottom:10px"><div class="lbl">${c[1]}</div><div id="act-${c[0]}"></div><button class="add" onclick="addAction('${c[0]}')">+ Add ${c[0]} item</button></div>`).join('')}
+    <div class="sub" style="margin:-2px 0 10px">One action per line — they auto-number. Set "assign to" only when it's for a specific person.</div>
+    ${CATS.map(c=>`<div style="margin-bottom:12px">
+      <div class="lbl">${c[1]}</div>
+      ${c[0]==='IDS'
+        ? `<select id="own-${c[0]}" style="margin-bottom:6px"><option value="">— assign all to (optional) —</option>${TEAM.map(t=>`<option>${esc(t)}</option>`).join('')}</select>`
+        : `<input id="own-${c[0]}" placeholder="${c[0]==='Client'?'client name (optional)':c[0]+' / agency (optional)'}" style="margin-bottom:6px">`}
+      <textarea class="act-ta" id="actt-${c[0]}" placeholder="1. ...&#10;2. ..." style="min-height:64px" onkeydown="numKey(event)" onfocus="numFocus(event)"></textarea>
+    </div>`).join('')}
   </div>
 
   <div class="card site-only">
@@ -108,17 +114,19 @@ function setType(t){
   const pc=document.getElementById('purpose');
   pc.innerHTML=PURPOSE[t].map(p=>`<div class="chip" data-v="${esc(p)}" onclick="this.classList.toggle('on')">${esc(p)}</div>`).join('');
 }
-function addAction(cat){
-  actCount++; const id=cat+'-'+actCount;
-  const div=document.createElement('div'); div.id='ab-'+id; div.style.cssText='border:1px solid #E2DFD8;border-radius:8px;padding:9px;margin-bottom:7px';
-  const ownerField = cat==='IDS'
-    ? `<select id="ow-${id}"><option value="">— assign to —</option>${TEAM.map(t=>`<option>${esc(t)}</option>`).join('')}</select>`
-    : `<input id="ow-${id}" placeholder="${cat==='Client'?'client name (optional)':cat+' / agency name'}">`;
-  div.innerHTML=`<div class="row"><div class="field" style="margin:0">${ownerField}</div><div class="field" style="margin:0;max-width:150px"><input type="date" id="dl-${id}"></div></div>
-    <div class="field" style="margin:6px 0 0"><input id="tx-${id}" placeholder="What needs to be done"></div>
-    <button class="rm" onclick="document.getElementById('ab-${id}').remove()">✕ Remove</button>`;
-  document.getElementById('act-'+cat).appendChild(div);
+// Auto-number a textarea: hitting Enter inserts the next "N. " so points are
+// never missed; focusing an empty box seeds "1. ".
+function numKey(e){
+  if(e.key!=='Enter'||e.shiftKey) return;
+  e.preventDefault();
+  const ta=e.target, pos=ta.selectionStart;
+  const before=ta.value.slice(0,pos), after=ta.value.slice(pos);
+  const ins='\n'+(before.split('\n').length+1)+'. ';
+  ta.value=before+ins+after;
+  const np=before.length+ins.length; ta.setSelectionRange(np,np);
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
 }
+function numFocus(e){ const ta=e.target; if(!ta.value.trim()){ ta.value='1. '; ta.setSelectionRange(3,3); } }
 function onPhotos(input){
   for(const f of input.files){
     const reader=new FileReader();
@@ -130,11 +138,17 @@ function onPhotos(input){
 }
 function collectActions(){
   const out={Client:[],IDS:[],Contractor:[],Other:[]};
-  CATS.forEach(c=>{ document.querySelectorAll('#act-'+c[0]+' > div').forEach(d=>{
-    const id=d.id.replace('ab-',''); const text=(document.getElementById('tx-'+id)||{}).value||'';
-    if(!text.trim())return;
-    out[c[0]].push({owner:(document.getElementById('ow-'+id)||{}).value||'',text:text,deadline:(document.getElementById('dl-'+id)||{}).value||''});
-  });});
+  CATS.forEach(c=>{
+    const cat=c[0], ta=document.getElementById('actt-'+cat); if(!ta) return;
+    const defOwner=(document.getElementById('own-'+cat)||{}).value||'';
+    ta.value.split('\n').map(l=>l.replace(/^\s*\d+[.)]\s*/,'').trim()).filter(Boolean).forEach(line=>{
+      let owner=defOwner, text=line;
+      // "Name: task" → assign that line to a specific team member (IDS only)
+      const mm=line.match(/^([^:]{2,40}):\s*(.+)$/);
+      if(mm && cat==='IDS' && TEAM.some(t=>t.toLowerCase()===mm[1].trim().toLowerCase())){ owner=mm[1].trim(); text=mm[2].trim(); }
+      out[cat].push({owner:owner, text:text, deadline:''});
+    });
+  });
   return out;
 }
 async function submitLog(){
