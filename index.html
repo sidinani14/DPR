@@ -48,10 +48,10 @@ const TOOLS=[
   {t:'Meeting / Site Visit Log', d:'Log meetings & visits → client PDF', u:'meetlog.html', i:'🧾', g:'forms'},
   {t:'Site Execution — DPER', d:'Daily site execution report', u:'DPER.html', i:'🏗️', g:'forms'},
   {t:'CRM', d:'Client connections, leads & billing', u:'CRM.html', i:'🤝', g:'forms'},
-  {t:'Task Dashboard', d:'All tasks, status & workload', u:'dashboard.html', i:'📊', g:'admin'},
-  {t:'Projects Health', d:'Per-project status & activity', u:'projects.html', i:'🏢', g:'admin'},
-  {t:'Assign Tasks', d:'Create & assign work to the team', u:'tasks.html', i:'📋', g:'admin'},
-  {t:'Leads', d:'Lead pipeline & analytics', u:'leads.html', i:'🎯', g:'admin'},
+  {t:'Task Dashboard', d:'All tasks, status & workload', u:'dashboard.html', i:'📊', g:'tools'},
+  {t:'Projects Health', d:'Per-project status & activity', u:'projects.html', i:'🏢', g:'tools'},
+  {t:'Assign Tasks', d:'Create & assign work to the team', u:'tasks.html', i:'📋', g:'tools'},
+  {t:'Leads', d:'Lead pipeline & analytics', u:'leads.html', i:'🎯', g:'tools'},
   {t:'Approvals', d:'Tasks, blocks & billing requests', u:'approval.html', i:'✅', g:'manager'},
   {t:'Weekly Report', d:'Team performance scorecards', u:'weeklyreport.html', i:'📈', g:'manager'},
 ];
@@ -61,13 +61,13 @@ function switchAccount(){ try{sessionStorage.removeItem('ids_token'); google.acc
 window.idsOnAuth = function(user){
   const email=String((user&&user.email)||'').toLowerCase();
   const first=String((user&&user.name)||'').split(' ')[0]||'there';
-  const isAdmin=ADMIN_EMAILS.includes(email), isMgr=MANAGER_EMAILS.includes(email);
+  const isMgr=MANAGER_EMAILS.includes(email);   // Approvals + Weekly Report only
   document.getElementById('who').innerHTML=`<b>${esc(user.name||email)}</b><br><a onclick="switchAccount()">not you? switch</a>`;
   document.getElementById('hello').innerHTML=`Hi <b>${esc(first)}</b> — pick a tool to get started.`;
   const forms=TOOLS.filter(x=>x.g==='forms').map(tileHtml).join('');
-  const mgmt=TOOLS.filter(x=>(x.g==='admin'&&isAdmin)||(x.g==='manager'&&isMgr)).map(tileHtml).join('');
+  const tools=TOOLS.filter(x=>x.g==='tools' || (x.g==='manager'&&isMgr)).map(tileHtml).join('');
   let html=`<div class="grouptitle">Daily forms</div><div class="grid">${forms}</div>`;
-  if(mgmt) html+=`<div class="grouptitle">Management</div><div class="grid">${mgmt}</div>`;
+  if(tools) html+=`<div class="grouptitle">Dashboards &amp; tools</div><div class="grid">${tools}</div>`;
   document.getElementById('tiles').innerHTML=html;
 };
 </script>

@@ -115,7 +115,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <body>
 <header class="header">
   <div class="header-inner">
-    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Task Dashboard</div></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="background:#fff;border-radius:6px;padding:4px 8px;display:inline-flex;align-items:center"><img src="ideaform-logo.png" alt="Ideaform Design Studio" style="height:22px;display:block" onerror="this.parentNode.outerHTML='&lt;div class=\'logo-text\'&gt;Ideaform Design Studio&lt;/div&gt;'"></span>
+      <div class="logo-sub">Task Dashboard</div>
+    </div>
     <div class="header-controls">
       <select class="filter-sel" id="member-filter" onchange="onMemberChange()"><option value="all">All team</option></select>
       <select class="filter-sel" id="project-filter" onchange="applyFilters()"><option value="all">All projects</option></select>
