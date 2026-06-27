@@ -65,7 +65,7 @@ function writeBlockLogHeaders(sheet){
 }
 var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal'];  // departed — hidden from all forms & dashboards
 var SCORECARD_TAB = 'TEAM_SCORECARD';
-var APPROVAL_FORM_URL = 'https://sidinani14.github.io/dpr/approval.html';
+var APPROVAL_FORM_URL = 'https://team.ideaformdesignstudio.com/approval.html';
 var DAYS_BEFORE_ARCH  = 90;
 
 // ── Helpers ───────────────────────────────────────────────────

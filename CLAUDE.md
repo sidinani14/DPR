@@ -9,7 +9,7 @@
 - Apps Script: https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec
 - Productivity Sheet ID: 1PH1nJoPmQWS9wixuhw9B7oo0jIkhJw13htzbzlBWffk
 - Scorecard Sheet ID: 198sgwhnp2GY5KYyVITMZAPLEoiEuMrHIFUat5deG3vk
-- GitHub Pages: sidinani14.github.io/DPR
+- Live site (custom domain): https://team.ideaformdesignstudio.com (served from the GitHub Pages repo root; old sidinani14.github.io/DPR path no longer serves)
 
 ## Files in this repo
 - IDS_Script_final.js — Google Apps Script backend (deploy via Apps Script editor)
