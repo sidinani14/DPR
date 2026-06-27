@@ -1520,6 +1520,13 @@ function finalizeMeetingLog(data, authEmail){
 
   // apply edited body
   if (typeof data.bodyPolished === 'string') logSheet.getRange(rowNum,11).setValue(data.bodyPolished);
+  // apply edited attendees / purpose / photos (so a missed detail can be added
+  // on the review screen without re-filling the whole form)
+  function csv(v){ return Array.isArray(v) ? v.join(', ') : String(v||''); }
+  if (data.teamAttendees   != null) logSheet.getRange(rowNum,7 ).setValue(csv(data.teamAttendees));
+  if (data.clientAttendees != null) logSheet.getRange(rowNum,8 ).setValue(String(data.clientAttendees||''));
+  if (data.purpose         != null) logSheet.getRange(rowNum,9 ).setValue(csv(data.purpose));
+  if (data.photoIds        != null) logSheet.getRange(rowNum,14).setValue(Array.isArray(data.photoIds)?data.photoIds.join(','):String(data.photoIds||''));
   // apply edited action-item texts
   var edits = data.items || {};
   if (decSheet && decSheet.getLastRow()>1){
@@ -1528,9 +1535,10 @@ function finalizeMeetingLog(data, authEmail){
   }
 
   // build the entry from current (edited) values, freeze its text snapshot
+  var purposeVal = (data.purpose!=null) ? csv(data.purpose) : String(rows[rIdx][8]||'');
   var entry = {
     logId:logId, date:cellDate(rows[rIdx][1]), type:String(rows[rIdx][3]||''),
-    purpose:String(rows[rIdx][8]||''), body:String(data.bodyPolished!=null?data.bodyPolished:rows[rIdx][10]||'') };
+    purpose:purposeVal, body:String(data.bodyPolished!=null?data.bodyPolished:rows[rIdx][10]||'') };
   var snapshot = buildEntryBodyHTML(entry, decisionsForLog(logId, edits));
   logSheet.getRange(rowNum,21).setValue(snapshot);   // U frozen snapshot
   logSheet.getRange(rowNum,16).setValue('Final');    // P status → shareable

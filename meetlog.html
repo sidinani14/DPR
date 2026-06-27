@@ -173,28 +173,39 @@ async function submitLog(){
       duration:document.getElementById('duration').value, photoIds, folderId,
       videoLinks:(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean)};
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
-    if(res.status==='ok'){ showReview(res, project); window.scrollTo(0,0); }
+    if(res.status==='ok'){ showReview(res, payload); window.scrollTo(0,0); }
     else { msg('Error: '+(res.message||'failed')); go.disabled=false; }
   }catch(e){ msg('Network error — try again.'); go.disabled=false; }
 }
 let REVIEW=null;
 const qattr=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-function showReview(res, project){
-  REVIEW={logId:res.logId, project:project, body:res.bodyPolished||'',
-    items:(res.items||[]).map(it=>({id:it.id,cat:it.cat,owner:it.owner,text:it.text}))};
+function showReview(res, payload){
+  REVIEW={logId:res.logId, project:payload.project, date:payload.date, type:payload.type,
+    body:res.bodyPolished||'', items:(res.items||[]).map(it=>({id:it.id,cat:it.cat,owner:it.owner,text:it.text})),
+    teamAttendees:payload.teamAttendees||[], clientAttendees:payload.clientAttendees||'',
+    purpose:payload.purpose||[], photoIds:payload.photoIds||[], folderId:payload.folderId||''};
   renderReview();
 }
 function renderReview(){
   const itemsHtml=(REVIEW.items||[]).map(it=>`
     <div class="field"><div class="lbl" style="font-size:11px;color:#6E6E70">${esc(it.cat)}${it.owner?' · '+esc(it.owner):''}</div>
       <input type="text" id="rv-it-${it.id}" value="${qattr(it.text)}"></div>`).join('');
+  const purposeHtml=(PURPOSE[REVIEW.type]||[]).map(p=>`<div class="chip ${REVIEW.purpose.includes(p)?'on':''}" data-v="${qattr(p)}" onclick="this.classList.toggle('on')">${esc(p)}</div>`).join('');
+  const attHtml=attendeeList().map(t=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" class="rv-ta" value="${qattr(t)}" ${REVIEW.teamAttendees.includes(t)?'checked':''} style="width:auto">${esc(t)}</label>`).join('');
+  const photoBlock = REVIEW.type==='Site Visit' ? `
+      <div class="field"><div class="lbl">Photos <span class="opt">add more if you missed any</span></div>
+        <input type="file" accept="image/*" multiple onchange="onReviewPhotos(this)"><div id="rv-ph" class="sub" style="margin-top:4px">${REVIEW.photoIds.length} photo(s) attached</div></div>` : '';
   document.getElementById('app').innerHTML=`
     <div class="card">
       <h1>Review &amp; edit before sharing</h1>
-      <div class="sub">Edit anything below, then generate the shareable PDF for <b>${esc(REVIEW.project)}</b>.</div>
-      <div class="field"><div class="lbl">${LOG_TYPE==='Site Visit'?'Key observations / issues':'Minutes of meeting'}</div>
-        <textarea id="rv-body" style="min-height:160px" onkeydown="numKey(event)" onfocus="numFocus(event)">${esc(REVIEW.body||'')}</textarea></div>
+      <div class="sub">Edit anything below — purpose, attendees${REVIEW.type==='Site Visit'?', photos':''}, notes and actions — then generate the PDF for <b>${esc(REVIEW.project)}</b>.</div>
+      <div class="field"><div class="lbl">Purpose</div><div class="chips" id="rv-purpose">${purposeHtml}</div></div>
+      <div class="field"><div class="lbl">IDS team present</div><div>${attHtml}</div></div>
+      <div class="field"><div class="lbl">Other attendees <span class="opt">clients etc.</span></div><input id="rv-clients" value="${qattr(REVIEW.clientAttendees)}"></div>
+      <div class="field"><div class="lbl">${REVIEW.type==='Site Visit'?'Key observations / issues':'Minutes of meeting'}</div>
+        <textarea id="rv-body" style="min-height:150px" onkeydown="numKey(event)" onfocus="numFocus(event)">${esc(REVIEW.body||'')}</textarea></div>
       ${itemsHtml?'<div class="lbl" style="margin:10px 0 2px">Action items</div>'+itemsHtml:''}
+      ${photoBlock}
       <button id="genbtn" onclick="finalizeLog()" style="background:#1F3A5F;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-size:14px;cursor:pointer;width:100%;margin-top:12px">Generate shareable PDF</button>
       <div id="msg" class="sub" style="margin-top:8px"></div>
     </div>`;
@@ -202,13 +213,26 @@ function renderReview(){
 function captureReview(){
   (REVIEW.items||[]).forEach(it=>{ const el=document.getElementById('rv-it-'+it.id); if(el) it.text=el.value; });
   const b=document.getElementById('rv-body'); if(b) REVIEW.body=b.value;
+  const pp=document.getElementById('rv-purpose'); if(pp) REVIEW.purpose=[...pp.querySelectorAll('.chip.on')].map(c=>c.dataset.v);
+  if(document.querySelector('.rv-ta')) REVIEW.teamAttendees=[...document.querySelectorAll('.rv-ta:checked')].map(c=>c.value);
+  const cl=document.getElementById('rv-clients'); if(cl) REVIEW.clientAttendees=cl.value;
+}
+async function onReviewPhotos(input){
+  const ph=document.getElementById('rv-ph');
+  for(const f of input.files){
+    if(ph) ph.textContent='Uploading…';
+    const dataUrl=await new Promise(r=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(f);});
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project:REVIEW.project,date:REVIEW.date,name:f.name,mime:f.type,dataUrl})}).then(x=>x.json());
+    if(r.fileId){ REVIEW.photoIds.push(r.fileId); REVIEW.folderId=r.folderId||REVIEW.folderId; }
+  }
+  input.value=''; if(ph) ph.textContent=REVIEW.photoIds.length+' photo(s) attached';
 }
 async function finalizeLog(){
   const gb=document.getElementById('genbtn'); gb.disabled=true; msg('Generating the report PDF…');
   captureReview();
   const items={}; (REVIEW.items||[]).forEach(it=>{ items[it.id]=it.text; });
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'finalizeMeetingLog',logId:REVIEW.logId,bodyPolished:REVIEW.body,items})}).then(x=>x.json());
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'finalizeMeetingLog',logId:REVIEW.logId,bodyPolished:REVIEW.body,items,teamAttendees:REVIEW.teamAttendees,clientAttendees:REVIEW.clientAttendees,purpose:REVIEW.purpose,photoIds:REVIEW.photoIds})}).then(x=>x.json());
     if(res.status==='ok'){
       const link=res.pdfUrl?`<a href="${res.pdfUrl}" target="_blank" style="color:#1F3A5F;font-weight:600">Open / share the PDF ↗</a>`:'PDF generated.';
       document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#2E7D32">✓ Report ready</h1>
