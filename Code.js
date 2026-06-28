@@ -4132,6 +4132,11 @@ function getWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
+  // Completed/approved work counts through TODAY when the week has already ended,
+  // so tasks done in the week but approved a day or two later (after Saturday)
+  // are still included. Punctuality/hours stay on the Mon–Sat window.
+  var today = dateStr();
+  var doneUpper = (today > sat) ? today : sat;
 
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
@@ -4183,7 +4188,7 @@ function getWeeklyStats(weekStart) {
       if (String(r[3]||'').trim() === name &&
           String(r[13]||'').trim() === 'Done' &&
           isApproved &&
-          doneDate >= mon && doneDate <= sat) {
+          doneDate >= mon && doneDate <= doneUpper) {
         var deadline = cellDate(r[COL_DEADLINE]);
         var onTime   = deadline && doneDate <= deadline;
         if (onTime) completedOnTime++; else completedLate++;
@@ -4219,7 +4224,7 @@ function getWeeklyStats(weekStart) {
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       if (String(r[3]||'').trim() === name &&
           String(r[COL_LEADAPPR]||'').trim() === 'Yes' &&
-          doneDate >= mon && doneDate <= sat)
+          doneDate >= mon && doneDate <= doneUpper)
         approvedPts += parseFloat(r[8]) || 0;
     });
 
@@ -5553,7 +5558,7 @@ function getDeepakWeeklyStats(weekStart) {
       tasksAssignedThisWeek++;
 
       // Completed within the same week
-      if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= sat) {
+      if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= (dateStr() > sat ? dateStr() : sat)) {
         tasksCompletedThisWeek++;
         taskDetails.push({
           project   : String(ar[2] || '').trim(),
