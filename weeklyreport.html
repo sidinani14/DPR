@@ -361,7 +361,7 @@ function buildIndividualPage(m, taskData){
       <td class="t-date">${t.doneDate}</td>
       <td class="t-date">${t.deadline||'—'}</td>
       <td>${otLabel}</td>
-      <td class="t-pts" style="color:${sc(t.pts,5)}">${t.pts}</td>
+      <td class="t-pts">${t.pts}</td>
     </tr>`;
   }).join('') +
   `<tr style="border-top:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.03)">
