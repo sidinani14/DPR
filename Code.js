@@ -59,7 +59,7 @@ function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase
 // with the dashboard) — callable by managers only.
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
-  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1 };
+  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -301,6 +301,7 @@ function doGet(e) {
   if (action === 'getMeetingTimeline')       return safeRespond(function(){ return getMeetingTimeline(p.project||''); });
   if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
+  if (action === 'getWeeklyProjectDigest')   return safeRespond(function(){ return getWeeklyProjectDigest(p.weekStart||''); });
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
   if (action === 'getWeeklyDiag')            return safeRespond(function(){ return getWeeklyDiag(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
@@ -334,6 +335,7 @@ function doPost(e) {
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
     if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
+    if (data.action === 'getWeeklyProjectDigest') return respond(getWeeklyProjectDigest(data.weekStart||''));
     if (data.action === 'getProjectDetail')       return respond(getProjectDetail(data.project||''));
     if (data.action === 'disposeBlock')           return respond(disposeBlock(data));
     if (data.action === 'parkTask')               return respond(parkTask(data, authEmail));
@@ -5140,6 +5142,73 @@ function getProjectDetail(project){
     out.billables.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   }
   return out;
+}
+
+// ════════════════════════════════════════════════════════════════
+// getWeeklyProjectDigest — per-project weekly summary (managers only).
+// Buckets every source by project for the Mon–Sat week. "Active" = at least
+// one item this week (its own page); the rest are listed name/stage/last-seen.
+// NO money amounts — billing shows events only.
+// ════════════════════════════════════════════════════════════════
+function getWeeklyProjectDigest(weekStart){
+  var s=db();
+  var mon=weekStart||dateStr(mondayOf(new Date())), sat=addDaysToStr(mon,5);
+  function inWk(d){ return d && d>=mon && d<=sat; }
+  var P={}, order=[];
+  var pSheet=s.getSheetByName(PROJECTS_TAB);
+  if(pSheet){ var pr=pSheet.getDataRange().getValues();
+    for(var i=1;i<pr.length;i++){ var nm=String(pr[i][1]||'').trim(); if(!nm) continue; var k=nm.toLowerCase();
+      if(!P[k]){ P[k]={name:nm, stage:String(pr[i][2]||'').trim(), lastActivity:'',
+        meetings:[], tasksDone:[], connections:[], others:[], billing:[], visits:[], actions:[], issues:[]}; order.push(k); } }
+  }
+  function touch(k,d){ if(P[k]&&d&&(!P[k].lastActivity||d>P[k].lastActivity)) P[k].lastActivity=d; }
+
+  var ml=s.getSheetByName(MEETING_LOG_TAB);
+  if(ml){ var mr=ml.getDataRange().getValues();
+    for(var i=1;i<mr.length;i++){ if(String(mr[i][15]||'').trim()==='Deleted')continue;
+      var k=String(mr[i][4]||'').trim().toLowerCase(); if(!P[k])continue; var d=cellDate(mr[i][1]); touch(k,d);
+      if(inWk(d)) P[k].meetings.push({date:d, type:String(mr[i][3]||''), who:[String(mr[i][6]||''),String(mr[i][7]||'')].filter(Boolean).join(', ')}); } }
+  var a=s.getSheetByName(ASSIGN_TAB);
+  if(a){ var ar=a.getDataRange().getValues();
+    for(var i=1;i<ar.length;i++){ var k=String(ar[i][2]||'').trim().toLowerCase(); if(!P[k])continue;
+      var ss=String(ar[i][13]||'').trim(), sd=cellDate(ar[i][14]); touch(k,sd);
+      if(ss==='Done'&&inWk(sd)) P[k].tasksDone.push({date:sd, who:String(ar[i][3]||''), task:String(ar[i][4]||'')}); } }
+  var c=s.getSheetByName(CRM_LOG_TAB);
+  if(c){ var cr=c.getDataRange().getValues();
+    for(var i=1;i<cr.length;i++){ var k=String(cr[i][6]||'').trim().toLowerCase(); if(!P[k])continue;
+      var d=cellDate(cr[i][2]); touch(k,d); if(!inWk(d))continue; var rec={date:d, by:String(cr[i][3]||''), type:String(cr[i][5]||''), notes:String(cr[i][7]||'')};
+      if(String(cr[i][4]||'').trim()==='Client Connection') P[k].connections.push(rec); else P[k].others.push(rec); } }
+  var b=s.getSheetByName(BILLING_TAB);
+  if(b){ var br=b.getDataRange().getValues();
+    for(var i=1;i<br.length;i++){ var k=String(br[i][2]||'').trim().toLowerCase(); if(!P[k])continue;
+      var bd=cellDate(br[i][3]), rd=cellDate(br[i][6]); touch(k,bd); touch(k,rd);
+      if(inWk(bd)) P[k].billing.push({date:bd, event:'Bill raised'});
+      if(inWk(rd)) P[k].billing.push({date:rd, event:'Payment received'}); } }
+  var brq=s.getSheetByName(BILL_REQ_TAB);
+  if(brq){ var qr=brq.getDataRange().getValues();
+    for(var i=1;i<qr.length;i++){ var k=String(qr[i][3]||'').trim().toLowerCase(); if(!P[k])continue;
+      var d=cellDate(qr[i][1]); touch(k,d); if(inWk(d)) P[k].billing.push({date:d, event:'Billable reached — '+String(qr[i][4]||'')+' · '+String(qr[i][5]||'')}); } }
+  var e=s.getSheetByName(SITE_EXEC_TAB);
+  if(e){ var er=e.getDataRange().getValues();
+    for(var i=1;i<er.length;i++){ var k=String(er[i][3]||'').trim().toLowerCase(); if(!P[k])continue;
+      var d=cellDate(er[i][1]); touch(k,d); if(inWk(d)) P[k].visits.push({date:d, who:String(er[i][4]||'')}); } }
+  var dl=s.getSheetByName(DECISION_LOG_TAB);
+  if(dl){ var dr=dl.getDataRange().getValues();
+    for(var i=1;i<dr.length;i++){ if(String(dr[i][8]||'').trim()==='Deleted')continue;
+      var k=String(dr[i][2]||'').trim().toLowerCase(); if(!P[k])continue; var d=cellDate(dr[i][3]); touch(k,d);
+      if(inWk(d)) P[k].actions.push({date:d, cat:String(dr[i][4]||''), owner:String(dr[i][5]||''), text:String(dr[i][6]||'')}); } }
+  var iss=s.getSheetByName(SITE_ISSUES_TAB);
+  if(iss){ var ir=iss.getDataRange().getValues();
+    for(var i=1;i<ir.length;i++){ var k=String(ir[i][3]||'').trim().toLowerCase(); if(!P[k])continue;
+      var d=cellDate(ir[i][2]); touch(k,d); if(inWk(d)) P[k].issues.push({date:d, desc:String(ir[i][6]||''), status:String(ir[i][10]||'')}); } }
+
+  function cnt(p){ return p.meetings.length+p.tasksDone.length+p.connections.length+p.others.length+p.billing.length+p.visits.length+p.actions.length+p.issues.length; }
+  var active=[], inactive=[];
+  order.forEach(function(k){ var p=P[k]; if(p.stage==='Dead') return;
+    if(cnt(p)>0) active.push(p); else inactive.push({name:p.name, stage:p.stage||'—', lastActivity:p.lastActivity||''}); });
+  active.sort(function(x,y){ return cnt(y)-cnt(x); });
+  inactive.sort(function(x,y){ return (x.lastActivity||'').localeCompare(y.lastActivity||''); });
+  return {weekStart:mon, weekEnd:sat, active:active, inactive:inactive, counts:{active:active.length, inactive:inactive.length}};
 }
 
 // ── getSiteExecutionSummary — per project ──────────────────

@@ -1,0 +1,98 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Weekly Project Digest</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#2A2A2A;--ink2:#6E6E70;--ink3:#9E9B94;--char:#4D4D4F;--orange:#F2A03D;--orange2:#E08A1E;--line:#E7E3DA;--bg:#FBFAF7}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#EEEBE4;color:var(--ink)}
+.bar{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar input{font:inherit;font-size:13px;padding:6px 9px;border:1px solid var(--line);border-radius:7px}
+.bar button{font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border:none;border-radius:7px;background:var(--char);color:#fff;cursor:pointer}
+.bar .sp{margin-left:auto;font-size:12px;color:var(--ink3)}
+.page{width:210mm;min-height:296mm;margin:14px auto;background:var(--bg);padding:18mm 16mm;box-shadow:0 1px 6px rgba(0,0,0,.12)}
+.cover{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:250mm;justify-content:center}
+.logo{height:40px;margin-bottom:6px}
+.logotext{font-size:30px;letter-spacing:8px;font-weight:700}.logotext .a{color:var(--char)}.logotext .b{color:var(--orange)}
+.cv-sub{font-size:11px;letter-spacing:5px;color:var(--ink3);margin-top:4px}
+.rule{height:2px;width:62px;background:var(--orange);margin:26px auto}
+.cv-title{font-size:26px;color:var(--char);margin-top:8px}
+.cv-week{font-size:16px;color:var(--orange2);font-style:italic;margin-top:10px}
+.cv-sum{font-size:13px;color:var(--ink2);margin-top:22px}
+.proj{page-break-before:always}
+.ph{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid var(--char);padding-bottom:5px;margin-bottom:8px}
+.pn{font-size:17px;font-weight:700;color:var(--char)}
+.pstage{font-size:11px;color:#fff;background:var(--char);padding:2px 9px;border-radius:9px}
+.sec{margin:9px 0}
+.st{font-size:10px;font-weight:700;color:var(--orange2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.li{font-size:12px;line-height:1.55;color:var(--ink);padding-left:2px}
+.li .d{color:var(--ink3);font-family:'DM Mono',monospace;font-size:10.5px}
+.idx h2{font-size:18px;color:var(--char);border-bottom:2px solid var(--orange);padding-bottom:5px;margin-bottom:8px}
+table.idle{width:100%;border-collapse:collapse;font-size:12px}
+table.idle th{background:var(--char);color:#fff;text-align:left;padding:6px 9px;font-weight:500;font-size:10.5px}
+table.idle td{border-bottom:1px solid var(--line);padding:6px 9px}
+.foot{margin-top:18px;border-top:1px solid var(--line);padding-top:7px;font-size:9px;color:var(--ink3);text-align:center}
+@media print{.bar{display:none}.page{margin:0;box-shadow:none;width:auto;min-height:auto}@page{size:A4;margin:0}}
+</style></head><body>
+<div class="bar">
+  <label style="font-size:12px;color:#6E6E70">Week of (Mon):</label>
+  <input type="date" id="wk">
+  <button onclick="reload()">Load</button>
+  <button onclick="window.print()" style="background:var(--orange);color:#1A1A1A">Print / Save PDF</button>
+  <span class="sp" id="status">Sign in…</span>
+</div>
+<div id="out"></div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+const MANAGERS=['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'];
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function shortD(d){if(!d)return'';const p=String(d).split('-');return p.length===3?p[2]+'/'+p[1]:d}
+function mondayOf(dt){const d=new Date(dt);const day=d.getDay();d.setDate(d.getDate()+(day===0?-6:1-day));return d.toISOString().slice(0,10)}
+function reload(){ const w=document.getElementById('wk').value; if(w) load(w); }
+window.idsOnAuth=function(u){
+  const email=String((u&&u.email)||'').toLowerCase();
+  if(MANAGERS.indexOf(email)===-1){ document.body.innerHTML='<div style="max-width:430px;margin:16vh auto;text-align:center;font-family:system-ui,sans-serif;color:#444;padding:20px"><div style="font-size:42px">🔒</div><h2 style="color:#C0392B;margin:12px 0 6px">Access restricted</h2><p style="color:#666;font-size:14px">The weekly project digest is available to <b>Siddharth &amp; Astha</b> only.</p><a href="index.html" style="color:#4D4D4F;font-size:13px;text-decoration:none">← Back to workspace</a></div>'; return; }
+  document.getElementById('wk').value=mondayOf(new Date());
+  load(document.getElementById('wk').value);
+};
+async function load(weekStart){
+  document.getElementById('status').textContent='Loading…';
+  try{
+    const d=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getWeeklyProjectDigest',weekStart})}).then(r=>r.json());
+    if(d.code==='forbidden'){ document.getElementById('status').textContent='Restricted'; return; }
+    render(d);
+    document.getElementById('status').textContent=(d.counts.active)+' active · '+(d.counts.inactive)+' idle';
+  }catch(e){ document.getElementById('status').textContent='Error: '+e.message; }
+}
+function logoHtml(){ return '<img class="logo" src="ideaform-logo.png" alt="Ideaform" onerror="this.outerHTML=\'<div class=&quot;logotext&quot;><span class=&quot;a&quot;>IDEA</span><span class=&quot;b&quot;>FORM</span></div>\'">'; }
+function block(title, arr, fmt){ if(!arr||!arr.length) return ''; return '<div class="sec"><div class="st">'+title+' ('+arr.length+')</div>'+arr.map(fmt).join('')+'</div>'; }
+function render(d){
+  const wk=esc(d.weekStart)+' – '+esc(d.weekEnd);
+  let html='<div class="page"><div class="cover">'+logoHtml()
+    +'<div class="cv-sub">IDEAFORM DESIGN STUDIO</div><div class="rule"></div>'
+    +'<div class="cv-title">Weekly Project Digest</div>'
+    +'<div class="cv-week">'+wk+'</div>'
+    +'<div class="cv-sum"><b>'+d.counts.active+'</b> projects active this week · <b>'+d.counts.inactive+'</b> with no movement</div></div></div>';
+  (d.active||[]).forEach(function(p){
+    html+='<div class="page proj"><div class="ph"><span class="pn">'+esc(p.name)+'</span><span class="pstage">'+esc(p.stage||'—')+'</span></div>';
+    html+=block('Meetings &amp; site visits', mergeMV(p), m=>'<div class="li"><span class="d">'+shortD(m.date)+'</span> · '+esc(m.type)+(m.who?' · '+esc(m.who):'')+'</div>');
+    html+=block('Tasks completed', p.tasksDone, t=>'<div class="li"><span class="d">'+shortD(t.date)+'</span> · '+esc(t.who)+' — '+esc(t.task)+'</div>');
+    html+=block('Connections', p.connections, c=>'<div class="li"><span class="d">'+shortD(c.date)+'</span> · '+esc(c.type)+' · '+esc(c.by)+(c.notes?' — '+esc(c.notes):'')+'</div>');
+    html+=block('Other activities', p.others, c=>'<div class="li"><span class="d">'+shortD(c.date)+'</span> · '+esc(c.type)+' · '+esc(c.by)+'</div>');
+    html+=block('Billing', p.billing, b=>'<div class="li"><span class="d">'+shortD(b.date)+'</span> · '+esc(b.event)+'</div>');
+    html+=block('Action items raised', p.actions, a=>'<div class="li"><span class="d">'+shortD(a.date)+'</span> · <b>'+esc(a.cat)+'</b>'+(a.owner?' ('+esc(a.owner)+')':'')+' — '+esc(a.text)+'</div>');
+    html+=block('Issues', p.issues, i=>'<div class="li"><span class="d">'+shortD(i.date)+'</span> · '+esc(i.desc)+' ['+esc(i.status)+']</div>');
+    html+='<div class="foot">© Ideaform Design Studio · Weekly Project Digest · '+wk+' · Confidential</div></div>';
+  });
+  // idle projects
+  let rows=(d.inactive||[]).map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.stage)+'</td><td>'+(p.lastActivity?esc(p.lastActivity):'—')+'</td></tr>').join('');
+  html+='<div class="page proj idx"><h2>Projects with no movement this week ('+(d.inactive||[]).length+')</h2>'
+    +'<table class="idle"><tr><th>Project</th><th>Stage</th><th>Last activity</th></tr>'+(rows||'<tr><td colspan="3">—</td></tr>')+'</table>'
+    +'<div class="foot">© Ideaform Design Studio · '+wk+' · Confidential</div></div>';
+  document.getElementById('out').innerHTML=html;
+}
+function mergeMV(p){ return (p.meetings||[]).concat((p.visits||[]).map(v=>({date:v.date,type:'Site visit',who:v.who}))).sort((a,b)=>(b.date||'').localeCompare(a.date||'')); }
+</script>
+</body></html>
