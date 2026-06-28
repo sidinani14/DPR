@@ -59,7 +59,7 @@ function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase
 // with the dashboard) — callable by managers only.
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
-  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1 };
+  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -302,6 +302,7 @@ function doGet(e) {
   if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
   if (action === 'getWeeklyProjectDigest')   return safeRespond(function(){ return getWeeklyProjectDigest(p.weekStart||''); });
+  if (action === 'getAllMeetingLogs')        return safeRespond(getAllMeetingLogs);
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
   if (action === 'getWeeklyDiag')            return safeRespond(function(){ return getWeeklyDiag(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
@@ -336,6 +337,7 @@ function doPost(e) {
     if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
     if (data.action === 'getWeeklyProjectDigest') return respond(getWeeklyProjectDigest(data.weekStart||''));
+    if (data.action === 'getAllMeetingLogs')      return respond(getAllMeetingLogs());
     if (data.action === 'getProjectDetail')       return respond(getProjectDetail(data.project||''));
     if (data.action === 'disposeBlock')           return respond(disposeBlock(data));
     if (data.action === 'parkTask')               return respond(parkTask(data, authEmail));
@@ -1801,8 +1803,25 @@ function deleteMeetingLog(data, authEmail){
   var dec=s.getSheetByName(DECISION_LOG_TAB);
   if(dec && dec.getLastRow()>1){ var dr=dec.getDataRange().getValues();
     for(var j=1;j<dr.length;j++){ if(String(dr[j][1]||'')===logId) dec.getRange(j+1,9).setValue('Deleted'); } }
+  // remove this log's auto-created CRM connection (Submission ID = the logId)
+  var crm=s.getSheetByName(CRM_LOG_TAB);
+  if(crm && crm.getLastRow()>1){ var cr=crm.getDataRange().getValues();
+    for(var k=cr.length-1;k>=1;k--){ if(String(cr[k][1]||'').trim()===logId) crm.deleteRow(k+1); } }
   var pdf=generateProjectReportPDF(project);
   return {status:'ok', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
+}
+
+// All non-deleted meeting/site-visit logs (managers only) — for the Logs Manager.
+function getAllMeetingLogs(){
+  var sheet=db().getSheetByName(MEETING_LOG_TAB);
+  if(!sheet || sheet.getLastRow()<2) return {logs:[]};
+  var rows=sheet.getDataRange().getValues(), out=[];
+  for(var i=1;i<rows.length;i++){ if(String(rows[i][15]||'').trim()==='Deleted') continue;
+    out.push({ logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
+      project:String(rows[i][4]||''), loggedBy:String(rows[i][5]||''), clients:String(rows[i][7]||''),
+      status:String(rows[i][15]||''), pdfId:String(rows[i][19]||'') }); }
+  out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return {logs:out};
 }
 
 // ONE-TIME cleanup — run from the Apps Script editor (select purgeMockLogsNow → Run).

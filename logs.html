@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Logs Manager</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F5F3EE;--surface:#FFFFFF;--ink:#1A1917;--ink2:#6B6860;--ink3:#9E9B94;--border:#E2DFD8;--navy:#1F3A5F;--red:#C0392B;--amber:#C8863A}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);padding:22px 18px 60px}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:19px;color:var(--navy)}
+.sub{font-size:12px;color:var(--ink2);margin:3px 0 16px}
+.tools{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.tools input{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;flex:1;min-width:160px}
+.tools button{font:inherit;font-size:12px;font-weight:600;padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:#fff;cursor:pointer}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12.5px}
+th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;font-weight:500;font-size:11px}
+td{border-bottom:1px solid var(--border);padding:8px 10px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.dup{background:#FBEEDA}
+.tag{font-size:9px;font-weight:700;color:var(--amber);background:#FBEEDA;border:1px solid #E9C98A;border-radius:5px;padding:1px 6px;margin-left:5px}
+.del{font-size:11px;font-weight:600;color:var(--red);background:#fff;border:1px solid var(--border);border-radius:5px;padding:5px 10px;cursor:pointer}
+.pdf{font-size:11px;color:var(--navy)}
+.empty{padding:24px;text-align:center;color:var(--ink3);font-size:13px}
+</style></head><body>
+<div class="wrap">
+  <h1>Logs Manager</h1>
+  <div class="sub">All meeting &amp; site-visit logs. Delete incorrect, stale, or repeat entries — deleting removes the log, its action items and its connection, and rebuilds that project's PDF. <b>Cannot be undone.</b></div>
+  <div class="tools">
+    <input id="q" placeholder="Filter by project, person, type…" oninput="render()">
+    <button onclick="load()">↻ Refresh</button>
+    <span id="status" style="font-size:12px;color:var(--ink3)"></span>
+  </div>
+  <div id="out"><div class="empty">Sign in…</div></div>
+</div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+const MANAGERS=['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'];
+let LOGS=[];
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+function shortD(d){if(!d)return'';const p=String(d).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0].slice(2):d}
+window.idsOnAuth=function(u){
+  const email=String((u&&u.email)||'').toLowerCase();
+  if(MANAGERS.indexOf(email)===-1){ document.body.innerHTML='<div style="max-width:430px;margin:16vh auto;text-align:center;font-family:system-ui,sans-serif;color:#444;padding:20px"><div style="font-size:42px">🔒</div><h2 style="color:#C0392B;margin:12px 0 6px">Access restricted</h2><p style="color:#666;font-size:14px">The logs manager is available to <b>Siddharth &amp; Astha</b> only.</p><a href="index.html" style="color:#1F3A5F;font-size:13px;text-decoration:none">← Back to workspace</a></div>'; return; }
+  load();
+};
+async function load(){
+  document.getElementById('status').textContent='Loading…';
+  try{
+    const d=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getAllMeetingLogs'})}).then(r=>r.json());
+    LOGS=(d&&d.logs)||[];
+    // flag duplicates: same project + date + type appearing more than once
+    const seen={}; LOGS.forEach(l=>{const k=(l.project+'|'+l.date+'|'+l.type).toLowerCase(); seen[k]=(seen[k]||0)+1;});
+    LOGS.forEach(l=>{ l._dup=seen[(l.project+'|'+l.date+'|'+l.type).toLowerCase()]>1; });
+    render();
+    document.getElementById('status').textContent=LOGS.length+' logs';
+  }catch(e){ document.getElementById('status').textContent='Error: '+e.message; }
+}
+function render(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const rows=LOGS.filter(l=>!q||[l.project,l.loggedBy,l.type,l.clients].join(' ').toLowerCase().includes(q));
+  if(!rows.length){ document.getElementById('out').innerHTML='<div class="empty">No logs.</div>'; return; }
+  document.getElementById('out').innerHTML='<table><tr><th>Date</th><th>Project</th><th>Type</th><th>Logged by</th><th>Clients</th><th>PDF</th><th></th></tr>'+
+    rows.map(l=>`<tr class="${l._dup?'dup':''}">
+      <td>${shortD(l.date)}</td>
+      <td><b>${esc(l.project)}</b>${l._dup?'<span class="tag">possible repeat</span>':''}</td>
+      <td>${esc(l.type)}</td>
+      <td>${esc(l.loggedBy)}</td>
+      <td>${esc(l.clients||'—')}</td>
+      <td>${l.pdfId?`<a class="pdf" href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank">open</a>`:'—'}</td>
+      <td><button class="del" onclick="del('${l.logId}','${esc(l.project)}')">Delete</button></td>
+    </tr>`).join('')+'</table>';
+}
+async function del(logId, project){
+  if(!confirm('Delete this log for '+project+'? It will be removed from the report and cannot be undone.')) return;
+  document.getElementById('status').textContent='Deleting…';
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteMeetingLog',logId})}).then(x=>x.json());
+    if(r.status==='ok') load(); else { alert('Could not delete: '+(r.message||'failed')); document.getElementById('status').textContent=''; }
+  }catch(e){ alert('Network error'); }
+}
+</script>
+</body></html>
