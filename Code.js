@@ -1805,6 +1805,32 @@ function deleteMeetingLog(data, authEmail){
   return {status:'ok', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
 
+// ONE-TIME cleanup — run from the Apps Script editor (select purgeMockLogsNow → Run).
+// Removes ALL meeting/site-visit logs + their derived data (they were mock):
+//   • MEETING_LOG + DECISION_LOG rows (and trashes their report PDFs in Drive)
+//   • MoM-Action tasks in TASK_ASSIGNMENTS
+//   • meeting-derived CRM_LOG connections (Submission ID begins "ML-")
+// Does NOT touch SITE_EXECUTION (real DPER site reports) or normal DPR connections.
+function purgeMockLogsNow(){
+  var s=db(), out={meetingRows:0, decisionRows:0, momTasks:0, connections:0, pdfsTrashed:0};
+  var ml=s.getSheetByName(MEETING_LOG_TAB);
+  if(ml && ml.getLastRow()>1){
+    var mr=ml.getDataRange().getValues();
+    for(var i=1;i<mr.length;i++){ var pid=String(mr[i][19]||'').trim(); if(pid){ try{ DriveApp.getFileById(pid).setTrashed(true); out.pdfsTrashed++; }catch(e){} } }
+    out.meetingRows=ml.getLastRow()-1; ml.deleteRows(2, ml.getLastRow()-1);
+  }
+  var dl=s.getSheetByName(DECISION_LOG_TAB);
+  if(dl && dl.getLastRow()>1){ out.decisionRows=dl.getLastRow()-1; dl.deleteRows(2, dl.getLastRow()-1); }
+  var a=s.getSheetByName(ASSIGN_TAB);
+  if(a && a.getLastRow()>1){ var ar=a.getDataRange().getValues();
+    for(var i=ar.length-1;i>=1;i--){ if(String(ar[i][4]||'').trim()==='MoM Action'){ a.deleteRow(i+1); out.momTasks++; } } }
+  var c=s.getSheetByName(CRM_LOG_TAB);
+  if(c && c.getLastRow()>1){ var cr=c.getDataRange().getValues();
+    for(var i=cr.length-1;i>=1;i--){ if(String(cr[i][1]||'').trim().indexOf('ML-')===0){ c.deleteRow(i+1); out.connections++; } } }
+  Logger.log('purgeMockLogsNow done: '+JSON.stringify(out));
+  return out;
+}
+
 // ════════════════════════════════════════════════════════════════
 // SUBMIT APPROVALS
 // TASK_LOG: LeadApproved=K(11) ApprovedBy=L(12) ReviewedOn=M(13) Notes=N(14)
