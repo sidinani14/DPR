@@ -7297,6 +7297,71 @@ function addOngoingStage() {
   return 'Stage list now: ' + vals.join(', ');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// cleanupGhostDelayed  (one-time editor function — run once, then done)
+//
+// Problem: the old createDoneTask always appended a NEW row when a DPR was
+// submitted. This left the original assigned task stuck at Not-Started → it
+// aged past its deadline → showed as Delayed. The dashboard accumulated 395
+// Delayed tasks, all of which have a corresponding Done/Approval-Pending row.
+//
+// Fix: for every Not-Started / In-Progress / Blocked task whose deadline has
+// passed, find the newest matching Done row (same member + project + taskType).
+// If one exists, copy its completion date onto the delayed row and mark it Done.
+// Rows that have no matching Done record are left untouched (genuinely overdue).
+// ─────────────────────────────────────────────────────────────────────────────
+function cleanupGhostDelayed() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows  = sheet.getDataRange().getValues();
+  var today = dateStr();
+
+  // Build map: "member|project|taskType" → most-recent completion date from Done rows
+  var doneMap = {};   // key → { date, row }
+  for (var i = 1; i < rows.length; i++) {
+    var st = String(rows[i][13] || '').trim(); // N SelfStatus
+    if (st !== 'Done') continue;
+    var key = [
+      String(rows[i][3]||'').trim(),   // D member
+      String(rows[i][2]||'').trim(),   // C project
+      String(rows[i][4]||'').trim()    // E taskType
+    ].join('|');
+    var doneDate = String(rows[i][15]||rows[i][14]||'').trim(); // P actual || O status
+    if (!doneMap[key] || doneDate > doneMap[key].date) {
+      doneMap[key] = { date: doneDate || today, row: i + 1 };
+    }
+  }
+
+  var fixed = 0, skipped = 0;
+  for (var i = 1; i < rows.length; i++) {
+    var st       = String(rows[i][13] || '').trim(); // N SelfStatus
+    var deadline = cellDate(rows[i][10]);              // K Deadline
+    // Only touch unresolved tasks past their deadline
+    if (st === 'Done' || st === 'Parked' || st === 'Reassigned' || st === 'Work Not Done') continue;
+    if (!deadline || deadline >= today) continue;
+
+    var key = [
+      String(rows[i][3]||'').trim(),
+      String(rows[i][2]||'').trim(),
+      String(rows[i][4]||'').trim()
+    ].join('|');
+    var match = doneMap[key];
+    if (!match) { skipped++; continue; }
+
+    // Found a matching Done row — update the delayed row in place
+    var doneDate = match.date || today;
+    sheet.getRange(i+1, 14).setValue('Done');     // N SelfStatus
+    sheet.getRange(i+1, 15).setValue(doneDate);   // O SelfStatusDate
+    sheet.getRange(i+1, 16).setValue(doneDate);   // P ActualCompletionDate
+    sheet.getRange(i+1, 17).setValue('Pending');  // Q LeadApproved (queue for approval)
+    fixed++;
+    Logger.log('Ghost fixed row '+(i+1)+': '+key+' → Done on '+doneDate);
+  }
+  var msg = 'cleanupGhostDelayed: fixed='+fixed+', genuinely-overdue-skipped='+skipped;
+  Logger.log(msg);
+  return msg;
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
