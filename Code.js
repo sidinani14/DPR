@@ -7187,6 +7187,38 @@ function dedupeProjectsNow() {
   return msg + (summary.length ? '\n' + summary.join('\n') : '');
 }
 
+// ── ONE-TIME (run from the editor) ────────────────────────────────
+// Adds "Ongoing" to the PROJECTS Stage-column (C) dropdown / validation
+// list, reading the existing list so the other stages are preserved.
+// Applies down the whole column so future rows accept it too.
+function addOngoingStage() {
+  var sh = db().getSheetByName(PROJECTS_TAB);
+  if (!sh) return 'No PROJECTS tab found.';
+  var col = 3, maxRow = sh.getMaxRows();
+  var rng = sh.getRange(2, col, maxRow - 1, 1);
+
+  // read the current list from the first cell that has a VALUE_IN_LIST rule
+  var vals = null, rules = rng.getDataValidations();
+  for (var i = 0; i < rules.length && !vals; i++) {
+    var rule = rules[i][0];
+    if (rule && rule.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
+      vals = rule.getCriteriaValues()[0].slice();
+    }
+  }
+  if (!vals) vals = ['Briefing','Arch Design','Arch WDs','Civil Execution','Interior Design',
+                     'Interior WDs','Interiors Execution','Finishing/ Handover','On hold',
+                     'New Lead','Completed','Dead'];
+
+  if (vals.map(function(s){return String(s).toLowerCase().trim();}).indexOf('ongoing') === -1) {
+    vals.splice(1, 0, 'Ongoing'); // slot it right after Briefing
+  }
+  var newRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(vals, true).setAllowInvalid(false).build();
+  rng.setDataValidation(newRule);
+  Logger.log('Stage list now: ' + vals.join(', '));
+  return 'Stage list now: ' + vals.join(', ');
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
