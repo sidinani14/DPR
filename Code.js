@@ -7599,6 +7599,34 @@ function fixGhostDelayedStatus() {
   return msg;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// diagnoseTasks  — read-only, no writes. Run from editor to see the actual
+// status distribution of all rows with a past deadline.
+// ─────────────────────────────────────────────────────────────────────────────
+function diagnoseTasks() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows  = sheet.getDataRange().getValues();
+  var today = dateStr();
+  var counts = {}, approvalCounts = {}, total = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var deadline = cellDate(rows[i][10]);  // K
+    if (!deadline || deadline >= today) continue;
+    var st   = String(rows[i][13] || '').trim() || '(blank)';
+    var appr = String(rows[i][16] || '').trim() || '(blank)';
+    counts[st] = (counts[st] || 0) + 1;
+    if (st === 'Done') approvalCounts[appr] = (approvalCounts[appr] || 0) + 1;
+    total++;
+  }
+
+  Logger.log('Tasks with past deadline: ' + total);
+  Object.keys(counts).forEach(function(k){ Logger.log('  SelfStatus="'+k+'": '+counts[k]); });
+  Logger.log('  Of the Done tasks, LeadApproved breakdown:');
+  Object.keys(approvalCounts).forEach(function(k){ Logger.log('    LeadApproved="'+k+'": '+approvalCounts[k]); });
+  return counts;
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
