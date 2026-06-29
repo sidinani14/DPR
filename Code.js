@@ -7362,6 +7362,73 @@ function cleanupGhostDelayed() {
   return msg;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// reconcileDelayedTasks  (one-time editor function — run once from editor)
+//
+// Reads the ACTUAL data already in each delayed row and fixes status:
+//   • LeadApproved = 'Yes'         → SelfStatus = 'Done'  (keep approval, use deadline as done date if blank)
+//   • SelfStatusDate or ActualCompletionDate filled → SelfStatus = 'Done', LeadApproved = 'Pending'
+//   • Nothing filled at all         → SelfStatus = 'Parked' (clears from workload, keep as record)
+// Logs a summary line per row and prints totals at the end.
+// ─────────────────────────────────────────────────────────────────────────────
+function reconcileDelayedTasks() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows  = sheet.getDataRange().getValues();
+  var today = dateStr();
+  var approved = 0, markedDone = 0, parked = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var r            = rows[i];
+    var selfStatus   = String(r[13] || '').trim();  // N SelfStatus
+    var statusDate   = String(r[14] || '').trim();  // O SelfStatusDate
+    var actualDate   = String(r[15] || '').trim();  // P ActualCompletionDate
+    var leadApproved = String(r[16] || '').trim();  // Q LeadApproved
+    var deadline     = cellDate(r[10]);              // K Deadline
+
+    // Only touch rows that are currently in "Delayed" state
+    if (selfStatus === 'Done' || selfStatus === 'Parked' ||
+        selfStatus === 'Reassigned' || selfStatus === 'Work Not Done' ||
+        selfStatus === 'Blocked' || selfStatus === 'In Progress') continue;
+    if (!deadline || deadline >= today) continue;  // not delayed
+
+    var taskId = String(r[0]||'row '+(i+1));
+    var member = String(r[3]||'');
+    var task   = String(r[4]||'');
+
+    if (leadApproved === 'Yes') {
+      // Already approved — just the SelfStatus field was never set to Done
+      var doneDate = actualDate || statusDate || deadline;
+      sheet.getRange(i+1, 14).setValue('Done');
+      if (!statusDate) sheet.getRange(i+1, 15).setValue(doneDate);
+      if (!actualDate) sheet.getRange(i+1, 16).setValue(doneDate);
+      approved++;
+      Logger.log('APPROVED fix  | '+taskId+' | '+member+' | '+task+' → Done ('+doneDate+')');
+
+    } else if (statusDate || actualDate) {
+      // Has a completion date recorded — mark Done, queue for approval
+      var doneDate = actualDate || statusDate;
+      sheet.getRange(i+1, 14).setValue('Done');
+      sheet.getRange(i+1, 15).setValue(doneDate);
+      if (!actualDate) sheet.getRange(i+1, 16).setValue(doneDate);
+      sheet.getRange(i+1, 17).setValue('Pending');
+      markedDone++;
+      Logger.log('DONE queued   | '+taskId+' | '+member+' | '+task+' → Done+Pending ('+doneDate+')');
+
+    } else {
+      // No completion data at all — park it to clear the workload view
+      sheet.getRange(i+1, 14).setValue('Parked');
+      sheet.getRange(i+1, 26).setValue('Parked - no completion record (reconcileDelayedTasks)');
+      parked++;
+      Logger.log('PARKED        | '+taskId+' | '+member+' | '+task);
+    }
+  }
+
+  var summary = 'reconcileDelayedTasks done — approved='+approved+', markedDone='+markedDone+', parked='+parked;
+  Logger.log(summary);
+  return summary;
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
