@@ -583,11 +583,16 @@ async function submitTasks() {
   try {
     if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       for (let pi=0; pi<allPayloads.length; pi++) {
-        await fetch(APPS_SCRIPT_URL, {
+        const res = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
           headers: {'Content-Type': 'text/plain'},
           body: JSON.stringify(allPayloads[pi]),
-        });
+        }).then(r=>r.json()).catch(()=>({status:'error',message:'No response'}));
+        if (res.status !== 'ok') {
+          document.getElementById('sending').classList.remove('show');
+          toast('Error saving tasks: ' + (res.message || res.code || JSON.stringify(res)));
+          return;
+        }
       }
     }
     document.getElementById('sending').classList.remove('show');
@@ -598,7 +603,7 @@ async function submitTasks() {
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
-    toast('Submission failed — check connection');
+    toast('Submission failed: ' + err.message);
   }
 }
 
