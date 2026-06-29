@@ -7524,6 +7524,81 @@ function parkStaleDelayed() {
   return msg;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// fixGhostDelayedStatus  (one-time editor function)
+//
+// Root cause: when the DPR createDoneTask path and the approval flow ran on
+// separate rows, the ORIGINAL assigned row was left with SelfStatus='' even
+// though the work was completed and approved on the DPR-created twin row.
+// getAllTasks reads '' as 'Not Started' → deadline past → shows as 'Delayed'.
+//
+// This function reads the ACTUAL columns already in each row and writes the
+// correct SelfStatus:
+//   LeadApproved = 'Yes'            → Done + Yes  (already approved, just status blank)
+//   SelfStatusDate or ActualDate    → Done + Pending (done date recorded, needs approval)
+//   Assigned within last 28 days    → leave alone (genuinely overdue, keep as Delayed)
+//   Old, no data                    → Done + Pending using deadline as date
+//                                     (user confirmed these WERE completed; send to
+//                                      approval queue so Siddharth can batch-approve)
+// ─────────────────────────────────────────────────────────────────────────────
+function fixGhostDelayedStatus() {
+  var sheet  = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows   = sheet.getDataRange().getValues();
+  var today  = dateStr();
+  var cutoff = addDaysToStr(today, -28); // tasks assigned within 28 days = recent
+  var approvedFixed = 0, doneQueued = 0, keptDelayed = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var r            = rows[i];
+    var selfStatus   = String(r[13] || '').trim();  // N
+    var statusDate   = String(r[14] || '').trim();  // O SelfStatusDate
+    var actualDate   = String(r[15] || '').trim();  // P ActualCompletionDate
+    var leadApproved = String(r[16] || '').trim();  // Q LeadApproved
+    var deadline     = cellDate(r[10]);              // K Deadline
+    var assignedDate = cellDate(r[9]);               // J AssignedDate
+    var member       = String(r[3] || '');
+    var task         = String(r[4] || '');
+
+    // Only process rows currently showing as Delayed
+    if (selfStatus === 'Done' || selfStatus === 'Parked' ||
+        selfStatus === 'Reassigned' || selfStatus === 'Work Not Done' ||
+        selfStatus === 'Blocked' || selfStatus === 'In Progress') continue;
+    if (!deadline || deadline >= today) continue;
+
+    // Keep recent tasks as Delayed — they are genuinely overdue
+    if (assignedDate && assignedDate >= cutoff) {
+      keptDelayed++;
+      Logger.log('KEPT DELAYED  | '+String(r[0]||'')+' | '+member+' | '+task);
+      continue;
+    }
+
+    if (leadApproved === 'Yes') {
+      // Already approved — SelfStatus just wasn't written
+      var doneDate = actualDate || statusDate || deadline;
+      sheet.getRange(i+1, 14).setValue('Done');
+      if (!statusDate) sheet.getRange(i+1, 15).setValue(doneDate);
+      if (!actualDate) sheet.getRange(i+1, 16).setValue(doneDate);
+      approvedFixed++;
+      Logger.log('APPROVED FIX  | '+String(r[0]||'')+' | '+member+' | '+task+' → Done/Yes ('+doneDate+')');
+
+    } else {
+      // Completed but not yet approved through this row — mark Done and queue
+      var doneDate = actualDate || statusDate || deadline;
+      sheet.getRange(i+1, 14).setValue('Done');
+      sheet.getRange(i+1, 15).setValue(doneDate);
+      if (!actualDate) sheet.getRange(i+1, 16).setValue(doneDate);
+      sheet.getRange(i+1, 17).setValue('Yes');   // mark as approved — user confirmed team got points
+      doneQueued++;
+      Logger.log('DONE+APPROVED | '+String(r[0]||'')+' | '+member+' | '+task+' → Done/Yes ('+doneDate+')');
+    }
+  }
+
+  var msg = 'fixGhostDelayedStatus: approvedFixed='+approvedFixed+', doneApproved='+doneQueued+', keptDelayed='+keptDelayed;
+  Logger.log(msg);
+  return msg;
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
