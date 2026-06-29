@@ -11,13 +11,16 @@
 (function () {
   var CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
   var API_HOST = 'script.google.com/macros';
-  // The backend decides who's allowed (driven by the TEAM tab + directors).
-  // The gate asks it via checkAccess — no hardcoded list to keep in sync.
   var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+  var STORE_KEY = 'ids_token';
+
+  // ── Storage helpers — localStorage so sign-in persists across all tabs ──
+  // Falls back to sessionStorage if localStorage is blocked (private browsing).
+  function storeGet(k)    { try { return localStorage.getItem(k); }    catch(e){ try { return sessionStorage.getItem(k); }    catch(_){} } return null; }
+  function storeSet(k, v) { try { localStorage.setItem(k, v); }         catch(e){ try { sessionStorage.setItem(k, v); }         catch(_){} } }
+  function storeDel(k)    { try { localStorage.removeItem(k); }          catch(e){ try { sessionStorage.removeItem(k); }          catch(_){} } }
 
   // ── 1. Cover the page with an opaque overlay until auth ──
-  // (NOT visibility:hidden — Google's sign-in button won't render inside a
-  //  hidden page, which blocks sign-in. The opaque #ids-gate hides content.)
   try {
     var st = document.createElement('style');
     st.id = 'ids-lock-style';
@@ -26,8 +29,7 @@
   } catch (e) {}
 
   // ── 2. Patch fetch so every backend call carries the ID token, and so an
-  //       "unauthorized" reply surfaces as a clear access-denied screen
-  //       (instead of forms silently showing empty data). ──
+  //       "unauthorized" reply surfaces as a clear access-denied screen ──
   var _fetch = window.fetch;
   window.fetch = function (url, opts) {
     opts = opts || {};
@@ -48,7 +50,7 @@
             if (j && j.code === 'unauthorized') {
               window.__idsDenied = true;
               window.IDS_TOKEN = null;
-              try { sessionStorage.removeItem('ids_token'); google.accounts.id.disableAutoSelect(); } catch (e) {}
+              try { storeDel(STORE_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
               buildGate('denied',
                 'Your account isn’t authorized for this system. Ask your admin to add your exact Google email to the TEAM tab (and mark it active).',
                 (window.IDS_USER && window.IDS_USER.email) || '');
@@ -97,7 +99,7 @@
     if (state === 'denied') {
       var rb = document.getElementById('ids-retry');
       if (rb) rb.onclick = function () {
-        try { sessionStorage.removeItem('ids_token'); google.accounts.id.disableAutoSelect(); } catch (e) {}
+        try { storeDel(STORE_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
         buildGate('signin');
       };
     }
@@ -113,16 +115,13 @@
     var token = resp && resp.credential;
     var p = token ? parseJwt(token) : null;
     if (!p) { buildGate('denied', 'Sign-in failed. Please try again.'); return; }
-    // Reveal the app for any successful Google sign-in. The backend is the real
-    // gate — it independently checks the token against the TEAM tab on every
-    // data request, so non-team accounts see only empty screens with no data.
     grant(token, p);
   }
 
   function grant(token, p) {
     window.IDS_TOKEN = token;
     window.IDS_USER = { email: String(p.email || '').toLowerCase(), name: p.name || p.email || '', picture: p.picture || '' };
-    try { sessionStorage.setItem('ids_token', token); } catch (e) {}
+    storeSet(STORE_KEY, token);
     // reveal page
     var s = document.getElementById('ids-lock-style'); if (s) s.remove();
     var g = document.getElementById('ids-gate'); if (g) g.remove();
@@ -132,27 +131,39 @@
 
   // ── 4. Boot ──
   function boot() {
-    // Reuse a still-valid token from this browser session (smooth page-to-page nav)
+    // Reuse a stored token — localStorage means it's shared across all open tabs.
+    // Only use it if not expired (keep 60s margin) AND issued today (end-of-day reset).
     try {
-      var saved = sessionStorage.getItem('ids_token');
+      var saved = storeGet(STORE_KEY);
       if (saved) {
         var sp = parseJwt(saved);
-        // A saved token already passed the backend check this session — trust until expiry.
-        if (sp && sp.exp && sp.exp * 1000 > Date.now() + 60000) {
+        var nowMs = Date.now();
+        // Midnight tonight (local time) — token is cleared after working day ends
+        var midnight = new Date(); midnight.setHours(24,0,0,0);
+        if (sp && sp.exp && sp.exp * 1000 > nowMs + 60000 && nowMs < midnight.getTime()) {
           grant(saved, sp);
           return;
         }
-        sessionStorage.removeItem('ids_token');
+        storeDel(STORE_KEY);
       }
     } catch (e) {}
 
+    // No valid stored token — try silent FedCM re-auth first, then show sign-in UI
     buildGate('checking');
     loadGis(function () {
       try {
-        google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: true, use_fedcm_for_prompt: true });
+        google.accounts.id.initialize({
+          client_id: CLIENT_ID,
+          callback: onCredential,
+          auto_select: true,
+          use_fedcm_for_prompt: true,
+        });
       } catch (e) {}
-      buildGate('signin');
-      try { google.accounts.id.prompt(); } catch (e) {}
+      // prompt() will silently call onCredential if the browser can auto-sign in.
+      // If it can't (token fully expired, multiple accounts, etc.), it does nothing
+      // and we fall through to show the sign-in button.
+      try { google.accounts.id.prompt(function(n){ if(n.isNotDisplayed()||n.isSkippedMoment()) buildGate('signin'); }); }
+      catch(e) { buildGate('signin'); }
     });
   }
 
@@ -165,6 +176,14 @@
     s.async = true; s.defer = true; s.onload = cb;
     document.head.appendChild(s);
   }
+
+  // Expose sign-out so pages can wire it to a button
+  window.IDS_SIGNOUT = function () {
+    storeDel(STORE_KEY);
+    window.IDS_TOKEN = null;
+    try { google.accounts.id.disableAutoSelect(); } catch (e) {}
+    location.href = 'index.html';
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

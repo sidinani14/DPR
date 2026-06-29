@@ -59,7 +59,7 @@ const TOOLS=[
 ];
 function esc(s){return String(s==null?'':s).replace(/</g,'&lt;')}
 function tileHtml(x){return `<a class="tile" href="${x.u}"><div class="tile-ic">${x.i}</div><div><div class="tile-t">${esc(x.t)}</div><div class="tile-d">${esc(x.d)}</div></div></a>`}
-function switchAccount(){ try{sessionStorage.removeItem('ids_token'); google.accounts.id.disableAutoSelect();}catch(e){} location.reload(); }
+function switchAccount(){ if(window.IDS_SIGNOUT) window.IDS_SIGNOUT(); else { try{localStorage.removeItem('ids_token');google.accounts.id.disableAutoSelect();}catch(e){} location.reload(); } }
 window.idsOnAuth = function(user){
   const email=String((user&&user.email)||'').toLowerCase();
   const first=String((user&&user.name)||'').split(' ')[0]||'there';
