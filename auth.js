@@ -13,6 +13,8 @@
   var API_HOST = 'script.google.com/macros';
   var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
   var STORE_KEY = 'ids_token';
+  var EXP_KEY   = 'ids_session_exp';
+  var SESSION_MS = 12 * 60 * 60 * 1000;  // 12 hours
 
   // ── Storage helpers — localStorage so sign-in persists across all tabs ──
   // Falls back to sessionStorage if localStorage is blocked (private browsing).
@@ -122,6 +124,7 @@
     window.IDS_TOKEN = token;
     window.IDS_USER = { email: String(p.email || '').toLowerCase(), name: p.name || p.email || '', picture: p.picture || '' };
     storeSet(STORE_KEY, token);
+    storeSet(EXP_KEY, String(Date.now() + SESSION_MS));
     // reveal page
     var s = document.getElementById('ids-lock-style'); if (s) s.remove();
     var g = document.getElementById('ids-gate'); if (g) g.remove();
@@ -138,13 +141,13 @@
       if (saved) {
         var sp = parseJwt(saved);
         var nowMs = Date.now();
-        // Midnight tonight (local time) — token is cleared after working day ends
-        var midnight = new Date(); midnight.setHours(24,0,0,0);
-        if (sp && sp.exp && sp.exp * 1000 > nowMs + 60000 && nowMs < midnight.getTime()) {
+        var sessionExp = parseInt(storeGet(EXP_KEY) || '0');
+        // Valid if: Google token not expired AND within 12-hour session window
+        if (sp && sp.exp && sp.exp * 1000 > nowMs + 60000 && nowMs < sessionExp) {
           grant(saved, sp);
           return;
         }
-        storeDel(STORE_KEY);
+        storeDel(STORE_KEY); storeDel(EXP_KEY);
       }
     } catch (e) {}
 
@@ -179,7 +182,7 @@
 
   // Expose sign-out so pages can wire it to a button
   window.IDS_SIGNOUT = function () {
-    storeDel(STORE_KEY);
+    storeDel(STORE_KEY); storeDel(EXP_KEY);
     window.IDS_TOKEN = null;
     try { google.accounts.id.disableAutoSelect(); } catch (e) {}
     location.href = 'index.html';

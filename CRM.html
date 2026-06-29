@@ -339,7 +339,7 @@ textarea{min-height:62px;resize:vertical;}
           <div class="field"><span class="lbl" style="font-size:10px">Client <span class="opt">groups projects</span></span><input type="text" id="np-client" placeholder="Client name…"></div>
         </div>
         <div class="field-row">
-          <div class="field"><span class="lbl" style="font-size:10px">Discipline / Type</span><select id="np-type"><option value="">Select…</option></select></div>
+          <div class="field"><span class="lbl" style="font-size:10px">Discipline / Type</span><select id="np-type" onchange="npTypeChanged()"><option value="">Select…</option></select></div>
           <div class="field"><span class="lbl" style="font-size:10px">Stage</span><select id="np-stage">
             <option value="Ongoing">Ongoing</option>
             <option value="Briefing">Briefing</option>
@@ -358,7 +358,7 @@ textarea{min-height:62px;resize:vertical;}
         </div>
         <div class="field-row">
           <div class="field"><span class="lbl" style="font-size:10px">Project Lead</span><select id="np-lead"><option value="">Select…</option></select></div>
-          <div class="field"><span class="lbl" style="font-size:10px">Multiplier <span class="opt">task point weight</span></span><input type="number" id="np-mult" value="1" min="0.5" max="5" step="0.5" style="width:80px"></div>
+          <div class="field"><span class="lbl" style="font-size:10px">Multiplier <span class="opt">auto from discipline</span></span><div id="np-mult-display" style="font-size:13px;font-weight:600;color:var(--navy);padding:6px 0">—</div></div>
         </div>
         <button type="button" class="add-btn green" onclick="addNewProject()">✓ Add to Projects</button>
         <div id="np-added" style="font-size:11px;color:var(--green);margin-top:7px"></div>
@@ -647,7 +647,7 @@ async function loadProjects() {
     const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
     projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
     teamMembers = d.team || [];
-    try { const cfg = await cr.json(); disciplines = (cfg.disciplines||[]).map(x=>x.label).filter(Boolean); } catch(e){}
+    try { const cfg = await cr.json(); disciplines = (cfg.disciplines||[]).filter(d=>d&&d.label); } catch(e){}
     populateTypeDropdown();
     populateLeadDropdown();
     refreshProjectDropdowns();
@@ -657,8 +657,14 @@ async function loadProjects() {
 
 function populateTypeDropdown(){
   const sel=document.getElementById('np-type'); if(!sel) return;
-  const opts = disciplines.length ? disciplines : ['Architecture','Interior','Architecture + Interior','PMC','Consultation'];
-  sel.innerHTML = '<option value="">Select…</option>'+opts.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  const opts = disciplines.length ? disciplines : [{label:'Architecture',multiplier:1},{label:'Interior',multiplier:1},{label:'Architecture + Interior',multiplier:1},{label:'PMC',multiplier:1},{label:'Consultation',multiplier:1}];
+  sel.innerHTML = '<option value="">Select…</option>'+opts.map(d=>`<option value="${esc(d.label)}">${esc(d.label)}</option>`).join('');
+}
+function npTypeChanged(){
+  const val = document.getElementById('np-type').value;
+  const d = disciplines.find(x=>x.label===val);
+  const mult = d ? d.multiplier : null;
+  document.getElementById('np-mult-display').textContent = mult ? mult+'x' : '—';
 }
 
 function toggleNewProj(){ document.getElementById('np-form').classList.toggle('hidden'); }
@@ -672,18 +678,20 @@ function addNewProject(){
   const name=(document.getElementById('np-name').value||'').trim();
   if(!name){ toast('Enter a project name'); return; }
   if(projects.some(p=>p.name.toLowerCase()===name.toLowerCase())){ toast('Project already exists'); return; }
+  const type = document.getElementById('np-type').value||'';
+  const discObj = disciplines.find(d=>d.label===type);
   const np={ name,
     client:(document.getElementById('np-client').value||'').trim(),
-    type:document.getElementById('np-type').value||'',
+    type,
     stage:document.getElementById('np-stage').value||'Ongoing',
     lead:document.getElementById('np-lead').value||'',
-    multiplier:parseFloat(document.getElementById('np-mult').value)||1 };
+    multiplier: discObj ? discObj.multiplier : 1 };
   newProjects.push(np);
-  projects.push({name:name, status:np.stage, discipline:np.type, lead:np.lead});
+  projects.push({name:name, status:np.stage, discipline:np.type, lead:np.lead, multiplier:np.multiplier});
   refreshProjectDropdowns(); buildMsels();
   document.getElementById('np-added').innerHTML = `✓ Added: ${newProjects.map(p=>esc(p.name)).join(', ')} — now selectable below`;
   ['np-name','np-client'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('np-mult').value='1';
+  document.getElementById('np-type').value=''; document.getElementById('np-mult-display').textContent='—';
 }
 
 function projOptionsHtml(){

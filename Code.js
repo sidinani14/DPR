@@ -7109,6 +7109,9 @@ function createCrmProjects(list) {
   if (!list || !list.length) return;
   var projSheet = db().getSheetByName(PROJECTS_TAB);
   if (!projSheet) return;
+  // Build discipline → multiplier map from CONFIG (authoritative source)
+  var discMult = {};
+  try { (readConfig().disciplines||[]).forEach(function(d){ if(d.label) discMult[d.label.toLowerCase()]=d.multiplier||1; }); } catch(e){}
   var rows = projSheet.getDataRange().getValues();
   // Ensure a "Client" header exists in col G
   if (rows.length && String(rows[0][6]||'').trim() === '') projSheet.getRange(1,7).setValue('Client');
@@ -7124,7 +7127,7 @@ function createCrmProjects(list) {
     var n = normName(nm), c = normName(np.client);
     if (existing[n] || (c && existing[c])) { Logger.log('CRM project skipped (duplicate): ' + nm); return; }
     var pid = nextId(projSheet, 'CP-');
-    var mult = parseFloat(np.multiplier) || 1;
+    var mult = discMult[(np.type||'').toLowerCase()] || parseFloat(np.multiplier) || 1;
     projSheet.insertRowAfter(insertAt);
     projSheet.getRange(insertAt + 1, 1, 1, 7).setValues(
       [[ pid, nm, np.stage || 'Ongoing', np.type || '', mult, np.lead || '', np.client || '' ]]);
