@@ -7463,6 +7463,67 @@ function restoreDelayedTasks() {
   return msg;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// parkStaleDelayed  (one-time editor function — replaces reconcileDelayedTasks)
+//
+// Separates REAL delayed tasks from stale ghost tasks:
+//   • Stale  = assigned more than 28 days ago, no completion data → Parked
+//   • Recent = assigned within last 28 days, still unfinished → stays Delayed
+//     (these are genuine overdue tasks and should stay visible on the dashboard)
+//
+// Also fixes the "approved but SelfStatus blank" inconsistency for both old
+// and new tasks: if LeadApproved = 'Yes', set SelfStatus = 'Done'.
+// ─────────────────────────────────────────────────────────────────────────────
+function parkStaleDelayed() {
+  var sheet  = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows   = sheet.getDataRange().getValues();
+  var today  = dateStr();
+  var cutoff = addDaysToStr(today, -28); // tasks assigned >28 days ago = stale
+  var parked = 0, approvedFixed = 0, skippedRecent = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var r            = rows[i];
+    var selfStatus   = String(r[13] || '').trim();  // N SelfStatus
+    var statusDate   = String(r[14] || '').trim();  // O SelfStatusDate
+    var actualDate   = String(r[15] || '').trim();  // P ActualCompletionDate
+    var leadApproved = String(r[16] || '').trim();  // Q LeadApproved
+    var deadline     = cellDate(r[10]);              // K Deadline
+    var assignedDate = cellDate(r[9]);               // J AssignedDate
+
+    // Only touch unresolved tasks with a past deadline
+    if (selfStatus === 'Done' || selfStatus === 'Parked' ||
+        selfStatus === 'Reassigned' || selfStatus === 'Work Not Done' ||
+        selfStatus === 'Blocked' || selfStatus === 'In Progress') continue;
+    if (!deadline || deadline >= today) continue;
+
+    // Fix: already approved but SelfStatus never set → mark Done regardless of age
+    if (leadApproved === 'Yes') {
+      var doneDate = actualDate || statusDate || deadline;
+      sheet.getRange(i+1, 14).setValue('Done');
+      if (!statusDate) sheet.getRange(i+1, 15).setValue(doneDate);
+      if (!actualDate) sheet.getRange(i+1, 16).setValue(doneDate);
+      approvedFixed++;
+      continue;
+    }
+
+    // Recent tasks (assigned within last 28 days): genuine overdue — leave as Delayed
+    if (assignedDate && assignedDate >= cutoff) {
+      skippedRecent++;
+      continue;
+    }
+
+    // Stale task (old assignment, no completion evidence) → park it
+    sheet.getRange(i+1, 14).setValue('Parked');
+    sheet.getRange(i+1, 26).setValue('Parked - stale unfinished task (parkStaleDelayed)');
+    parked++;
+  }
+
+  var msg = 'parkStaleDelayed: parked='+parked+', approvedFixed='+approvedFixed+', recentKept='+skippedRecent;
+  Logger.log(msg);
+  return msg;
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
