@@ -117,6 +117,23 @@
     var token = resp && resp.credential;
     var p = token ? parseJwt(token) : null;
     if (!p) { buildGate('denied', 'Sign-in failed. Please try again.'); return; }
+
+    // Guard against Chrome auto-selecting the wrong Google account.
+    // When multiple profiles exist in one browser, GIS may silently fire this
+    // callback with a personal/non-authorised token and overwrite the valid session.
+    // Rule: if a valid session already exists for a DIFFERENT email, drop this token.
+    try {
+      var existing = storeGet(STORE_KEY);
+      if (existing) {
+        var ep  = parseJwt(existing);
+        var exp = parseInt(storeGet(EXP_KEY) || '0');
+        var stillValid = ep && ep.exp && ep.exp * 1000 > Date.now() + 60000 && Date.now() < exp;
+        if (stillValid && String(ep.email||'').toLowerCase() !== String(p.email||'').toLowerCase()) {
+          return; // wrong account — keep existing session, discard this token
+        }
+      }
+    } catch(e) {}
+
     grant(token, p);
   }
 
@@ -151,16 +168,18 @@
       }
     } catch (e) {}
 
-    // No valid stored token — try silent FedCM re-auth first, then show sign-in UI
+    // No valid stored token — try silent FedCM re-auth first, then show sign-in UI.
+    // Extract stored email (if any) to pass as login_hint so Chrome picks the right
+    // account when multiple Google profiles exist in the same browser.
+    var loginHint = '';
+    try { var lh = storeGet(STORE_KEY); if (lh) { var lp = parseJwt(lh); if (lp) loginHint = lp.email || ''; } } catch(e) {}
+
     buildGate('checking');
     loadGis(function () {
       try {
-        google.accounts.id.initialize({
-          client_id: CLIENT_ID,
-          callback: onCredential,
-          auto_select: true,
-          use_fedcm_for_prompt: true,
-        });
+        var initOpts = { client_id: CLIENT_ID, callback: onCredential, auto_select: true, use_fedcm_for_prompt: true };
+        if (loginHint) initOpts.login_hint = loginHint;
+        google.accounts.id.initialize(initOpts);
       } catch (e) {}
       // prompt() will silently call onCredential if the browser can auto-sign in.
       // If it can't (token fully expired, multiple accounts, etc.), it does nothing
