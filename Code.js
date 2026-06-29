@@ -77,6 +77,8 @@ function prependRow(sheet, values){
   sheet.getRange(2, 1, 1, values.length).setValues([values]);
   return 2;
 }
+// Normalise a name/client for de-dup: lowercase, punctuation→space, collapse spaces.
+function normName(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' '); }
 function writeBlockLogHeaders(sheet){
   var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
          'Reason','Prior Status','Original Deadline','Disposition','Reviewed By','Review Date','Note'];
@@ -7079,14 +7081,20 @@ function createCrmProjects(list) {
   var rows = projSheet.getDataRange().getValues();
   // Ensure a "Client" header exists in col G
   if (rows.length && String(rows[0][6]||'').trim() === '') projSheet.getRange(1,7).setValue('Client');
+  // Index existing projects by normalised NAME and normalised CLIENT, so a project
+  // re-entered under a slightly different name (or just the client's name) is caught.
   var existing = {};
-  for (var i = 1; i < rows.length; i++) existing[String(rows[i][1]||'').trim().toLowerCase()] = true;
+  for (var i = 1; i < rows.length; i++) {
+    var en = normName(rows[i][1]); if (en) existing[en] = true;
+    var ec = normName(rows[i][6]); if (ec) existing[ec] = true;
+  }
   list.forEach(function(np){
-    var nm = String(np.name||'').trim();
-    if (!nm || existing[nm.toLowerCase()]) return;
+    var nm = String(np.name||'').trim(); if (!nm) return;
+    var n = normName(nm), c = normName(np.client);
+    if (existing[n] || (c && existing[c])) { Logger.log('CRM project skipped (duplicate): ' + nm); return; }
     var pid = nextId(projSheet, 'CP-');
     projSheet.appendRow([ pid, nm, np.stage || 'Ongoing', np.type || '', '', '', np.client || '' ]);
-    existing[nm.toLowerCase()] = true;
+    existing[n] = true; if (c) existing[c] = true;
     Logger.log('CRM added project: ' + nm + ' (' + pid + ')');
   });
 }
@@ -7097,9 +7105,10 @@ function promoteLeadToProject(clientName, member) {
   var projSheet = db().getSheetByName(PROJECTS_TAB);
   if (!projSheet) return false;
   var rows = projSheet.getDataRange().getValues();
-  var key  = nm.toLowerCase();
+  var key  = normName(nm);
   for (var i = 1; i < rows.length; i++) {
-    if (String(rows[i][1]||'').trim().toLowerCase() === key) return false; // already in PROJECTS
+    // already a project — match by normalised name OR by the client column
+    if (normName(rows[i][1]) === key || normName(rows[i][6]) === key) return false;
   }
   var pid = nextId(projSheet, 'NL-');
   projSheet.appendRow([ pid, nm, 'New Lead', '', '', '' ]);
