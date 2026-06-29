@@ -4003,8 +4003,45 @@ function createDoneTask(data) {
     weightedPts = Math.round(basePts * mult * units * 10) / 10;
   }
 
-  var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
   var member = data.member || '';
+
+  // Before creating a new row, check if there's an existing pre-assigned task
+  // for this member + project + taskType that hasn't been done yet.
+  // If found, update it in place instead of creating a duplicate "ghost" row
+  // (the old ghost pattern left assigned tasks stuck at Not Started → Delayed).
+  var rows = sheet.getDataRange().getValues();
+  var matchRow = -1;
+  for (var j = 1; j < rows.length; j++) {
+    var rM  = String(rows[j][3]  || '').trim();  // D AssignedTo
+    var rP  = String(rows[j][2]  || '').trim();  // C ProjectName
+    var rT  = String(rows[j][4]  || '').trim();  // E Stage/TaskType
+    var rS  = String(rows[j][13] || '').trim();  // N SelfStatus
+    var rA  = String(rows[j][11] || '').trim();  // L Area
+    var rD  = String(rows[j][12] || '').trim();  // M Drawing
+    if (rM !== member || rP !== (data.project||'') || rT !== (data.taskType||'')) continue;
+    if (rS === 'Done' || rS === 'Parked' || rS === 'Reassigned') continue; // already resolved
+    // Area/drawing: only require match if BOTH sides have a value
+    if (data.area    && rA && rA !== data.area)    continue;
+    if (data.drawing && rD && rD !== data.drawing) continue;
+    matchRow = j + 1; // 1-indexed sheet row
+    break;
+  }
+
+  if (matchRow > -1) {
+    // Update the existing assigned task row in place
+    var actualDate = data.actualCompletionDate || today;
+    sheet.getRange(matchRow, 9 ).setValue(weightedPts); // I WeightedPts (recalc with current mult)
+    sheet.getRange(matchRow, 14).setValue('Done');       // N SelfStatus
+    sheet.getRange(matchRow, 15).setValue(today);        // O SelfStatusDate
+    sheet.getRange(matchRow, 16).setValue(actualDate);   // P ActualCompletionDate
+    sheet.getRange(matchRow, 17).setValue('Pending');    // Q LeadApproved (reset for re-approval)
+    var existingId = String(rows[matchRow-1][0]||'');
+    Logger.log('Done task updated existing: '+member+' / '+data.taskType+' row '+matchRow+' ('+existingId+')');
+    return {status:'ok', taskId:existingId, updated:true};
+  }
+
+  // No matching pre-assigned task — create a new self-logged row
+  var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
 
   sheet.appendRow([
     newId,
@@ -4032,7 +4069,7 @@ function createDoneTask(data) {
     'Medium',                  // W Priority
   ]);
 
-  Logger.log('Done task created: '+member+' / '+data.taskType+' = '+weightedPts+'pts → '+newId);
+  Logger.log('Done task created (new): '+member+' / '+data.taskType+' = '+weightedPts+'pts → '+newId);
   return {status:'ok', taskId:newId};
 }
 
