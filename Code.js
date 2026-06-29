@@ -79,6 +79,20 @@ function prependRow(sheet, values){
 }
 // Normalise a name/client for de-dup: lowercase, punctuation→space, collapse spaces.
 function normName(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' '); }
+
+// True if writing `value` into `cell` won't violate its data-validation rule.
+// Only VALUE_IN_LIST rules are checked (the kind used on Stage/Client columns);
+// other criteria types (or no rule) are allowed through.
+function cellAccepts(cell, value){
+  var dv = cell.getDataValidation();
+  if (!dv) return true;
+  if (dv.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST){
+    var list = dv.getCriteriaValues()[0] || [];
+    var v = String(value).toLowerCase().trim();
+    return list.map(function(s){ return String(s).toLowerCase().trim(); }).indexOf(v) !== -1;
+  }
+  return true;
+}
 function writeBlockLogHeaders(sheet){
   var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
          'Reason','Prior Status','Original Deadline','Disposition','Reviewed By','Review Date','Note'];
@@ -7160,14 +7174,16 @@ function dedupeProjectsNow() {
          (realStage(m) === realStage(keep) && filled(m) > filled(keep)) ||
          (realStage(m) === realStage(keep) && filled(m) === filled(keep) && m < keep)) keep = m;
     });
-    // back-fill keeper's blank cells from the dups (per-cell, guarded so a
-    // data-validation rule on any one cell can't abort the whole run)
+    // back-fill keeper's blank cells from the dups. Sheets enforces data
+    // validation on flush (not on setValue), so a bad value can't be caught
+    // with try/catch — instead we pre-check each cell's list and skip values
+    // the rule would reject.
     members.forEach(function(m){ if (m===keep) return;
       for (var k=0;k<cols;k++){
         if (String(rows[keep][k]||'').trim()==='' && String(rows[m][k]||'').trim()!==''){
-          rows[keep][k]=rows[m][k];
-          try { sh.getRange(keep+1, k+1).setValue(rows[m][k]); }
-          catch(e){ Logger.log('  (skipped back-fill of col '+(k+1)+' on row '+(keep+1)+': '+e.message+')'); }
+          var cell = sh.getRange(keep+1, k+1);
+          if (cellAccepts(cell, rows[m][k])){ cell.setValue(rows[m][k]); rows[keep][k]=rows[m][k]; }
+          else Logger.log('  (skipped back-fill of col '+(k+1)+' on row '+(keep+1)+': value "'+rows[m][k]+'" not in validation list)');
         }
       }
       toDelete.push(m);
