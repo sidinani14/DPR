@@ -7160,14 +7160,18 @@ function dedupeProjectsNow() {
          (realStage(m) === realStage(keep) && filled(m) > filled(keep)) ||
          (realStage(m) === realStage(keep) && filled(m) === filled(keep) && m < keep)) keep = m;
     });
-    // back-fill keeper's blank cells from the dups
+    // back-fill keeper's blank cells from the dups (per-cell, guarded so a
+    // data-validation rule on any one cell can't abort the whole run)
     members.forEach(function(m){ if (m===keep) return;
       for (var k=0;k<cols;k++){
-        if (String(rows[keep][k]||'').trim()==='' && String(rows[m][k]||'').trim()!=='') rows[keep][k]=rows[m][k];
+        if (String(rows[keep][k]||'').trim()==='' && String(rows[m][k]||'').trim()!==''){
+          rows[keep][k]=rows[m][k];
+          try { sh.getRange(keep+1, k+1).setValue(rows[m][k]); }
+          catch(e){ Logger.log('  (skipped back-fill of col '+(k+1)+' on row '+(keep+1)+': '+e.message+')'); }
+        }
       }
       toDelete.push(m);
     });
-    sh.getRange(keep+1, 1, 1, cols).setValues([rows[keep]]);  // write back-filled keeper
     summary.push('KEEP "' + rows[keep][1] + '" (' + rows[keep][0] + '), removed ' +
       members.filter(function(m){return m!==keep;}).map(function(m){return rows[m][0]+' "'+rows[m][1]+'"';}).join(', '));
   });
