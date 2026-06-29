@@ -339,11 +339,26 @@ textarea{min-height:62px;resize:vertical;}
           <div class="field"><span class="lbl" style="font-size:10px">Client <span class="opt">groups projects</span></span><input type="text" id="np-client" placeholder="Client name…"></div>
         </div>
         <div class="field-row">
-          <div class="field"><span class="lbl" style="font-size:10px">Type</span><select id="np-type"><option value="">Select…</option></select></div>
+          <div class="field"><span class="lbl" style="font-size:10px">Discipline / Type</span><select id="np-type"><option value="">Select…</option></select></div>
           <div class="field"><span class="lbl" style="font-size:10px">Stage</span><select id="np-stage">
-            <option value="Ongoing">Ongoing</option><option value="New Lead">New Lead</option>
-            <option value="Proposal">Proposal</option><option value="On Hold">On Hold</option>
+            <option value="Ongoing">Ongoing</option>
+            <option value="Briefing">Briefing</option>
+            <option value="Arch Design">Arch Design</option>
+            <option value="Arch WDs">Arch WDs</option>
+            <option value="Civil Execution">Civil Execution</option>
+            <option value="Interior Design">Interior Design</option>
+            <option value="Interior WDs">Interior WDs</option>
+            <option value="Interiors Execution">Interiors Execution</option>
+            <option value="Finishing/ Handover">Finishing/ Handover</option>
+            <option value="On hold">On hold</option>
+            <option value="New Lead">New Lead</option>
+            <option value="Completed">Completed</option>
+            <option value="Dead">Dead</option>
           </select></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><span class="lbl" style="font-size:10px">Project Lead</span><select id="np-lead"><option value="">Select…</option></select></div>
+          <div class="field"><span class="lbl" style="font-size:10px">Multiplier <span class="opt">task point weight</span></span><input type="number" id="np-mult" value="1" min="0.5" max="5" step="0.5" style="width:80px"></div>
         </div>
         <button type="button" class="add-btn green" onclick="addNewProject()">✓ Add to Projects</button>
         <div id="np-added" style="font-size:11px;color:var(--green);margin-top:7px"></div>
@@ -596,6 +611,7 @@ let issueActions= {};
 let openLeads   = [];
 let newProjects = [];
 let disciplines = [];
+let teamMembers = [];
 
 // ════════════════════════════════════════
 // AUTH
@@ -630,8 +646,10 @@ async function loadProjects() {
     const d = await lr.json();
     const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
     projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
+    teamMembers = d.team || [];
     try { const cfg = await cr.json(); disciplines = (cfg.disciplines||[]).map(x=>x.label).filter(Boolean); } catch(e){}
     populateTypeDropdown();
+    populateLeadDropdown();
     refreshProjectDropdowns();
     buildMsels();
   } catch(e){ toast('Could not load projects'); }
@@ -645,17 +663,27 @@ function populateTypeDropdown(){
 
 function toggleNewProj(){ document.getElementById('np-form').classList.toggle('hidden'); }
 
+function populateLeadDropdown(){
+  const sel=document.getElementById('np-lead'); if(!sel) return;
+  sel.innerHTML='<option value="">Select…</option>'+teamMembers.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+}
+
 function addNewProject(){
   const name=(document.getElementById('np-name').value||'').trim();
   if(!name){ toast('Enter a project name'); return; }
   if(projects.some(p=>p.name.toLowerCase()===name.toLowerCase())){ toast('Project already exists'); return; }
-  const np={ name, client:(document.getElementById('np-client').value||'').trim(),
-             type:document.getElementById('np-type').value||'', stage:document.getElementById('np-stage').value||'Ongoing' };
+  const np={ name,
+    client:(document.getElementById('np-client').value||'').trim(),
+    type:document.getElementById('np-type').value||'',
+    stage:document.getElementById('np-stage').value||'Ongoing',
+    lead:document.getElementById('np-lead').value||'',
+    multiplier:parseFloat(document.getElementById('np-mult').value)||1 };
   newProjects.push(np);
-  projects.push({name:name, status:np.stage, discipline:np.type});   // usable immediately
+  projects.push({name:name, status:np.stage, discipline:np.type, lead:np.lead});
   refreshProjectDropdowns(); buildMsels();
   document.getElementById('np-added').innerHTML = `✓ Added: ${newProjects.map(p=>esc(p.name)).join(', ')} — now selectable below`;
   ['np-name','np-client'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('np-mult').value='1';
 }
 
 function projOptionsHtml(){

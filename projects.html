@@ -167,8 +167,8 @@ function cardHtml(p){
     <div class="card-top"><span class="dot ${p.rag}"></span><span class="pname">${p.name}</span><span class="stage">${p.stage}</span></div>
     <div class="crow">
       <span>Last connect: <b>${ago(p.lastActivity||p.lastConn)}</b></span>
-      <span>This wk: <b>${p.tasksThisWeek}</b></span>
-      <span>Open tasks: <b>${p.openTasks}</b></span>
+      <span>Open: <b>${p.openTasks}</b></span>
+      <span>Delayed: <b style="${p.delayedTasks?'color:#C0392B':''}">${p.delayedTasks||0}</b></span>
     </div>
     <div class="crow">
       <span>Bill: <b>${bill}</b></span>

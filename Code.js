@@ -7098,6 +7098,13 @@ function leadReachedProposal(status){ return LEAD_PROPOSAL_STAGES.indexOf(String
 // CRM adds projects not yet in the PROJECTS tab (name + type + stage + client).
 // Persists them so Aman can raise issues/deliverables without Siddharth's help.
 //   PROJECTS cols: A ID, B Name, C Status(stage), D Discipline(type), E Mult, F Lead, G Client
+// Returns the 1-based sheet row of the last row that has a project ID in col A.
+function lastProjRowNum(rows) {
+  var last = 1;
+  for (var i = 1; i < rows.length; i++) { if (String(rows[i][0]||'').trim()) last = i + 1; }
+  return last;
+}
+
 function createCrmProjects(list) {
   if (!list || !list.length) return;
   var projSheet = db().getSheetByName(PROJECTS_TAB);
@@ -7105,19 +7112,23 @@ function createCrmProjects(list) {
   var rows = projSheet.getDataRange().getValues();
   // Ensure a "Client" header exists in col G
   if (rows.length && String(rows[0][6]||'').trim() === '') projSheet.getRange(1,7).setValue('Client');
-  // Index existing projects by normalised NAME and normalised CLIENT, so a project
-  // re-entered under a slightly different name (or just the client's name) is caught.
+  // Index existing projects by normalised NAME and normalised CLIENT.
   var existing = {};
   for (var i = 1; i < rows.length; i++) {
     var en = normName(rows[i][1]); if (en) existing[en] = true;
     var ec = normName(rows[i][6]); if (ec) existing[ec] = true;
   }
+  var insertAt = lastProjRowNum(rows); // 1-based row of last project; new row goes after it
   list.forEach(function(np){
     var nm = String(np.name||'').trim(); if (!nm) return;
     var n = normName(nm), c = normName(np.client);
     if (existing[n] || (c && existing[c])) { Logger.log('CRM project skipped (duplicate): ' + nm); return; }
     var pid = nextId(projSheet, 'CP-');
-    projSheet.appendRow([ pid, nm, np.stage || 'Ongoing', np.type || '', '', '', np.client || '' ]);
+    var mult = parseFloat(np.multiplier) || 1;
+    projSheet.insertRowAfter(insertAt);
+    projSheet.getRange(insertAt + 1, 1, 1, 7).setValues(
+      [[ pid, nm, np.stage || 'Ongoing', np.type || '', mult, np.lead || '', np.client || '' ]]);
+    insertAt++;
     existing[n] = true; if (c) existing[c] = true;
     Logger.log('CRM added project: ' + nm + ' (' + pid + ')');
   });
@@ -7131,11 +7142,12 @@ function promoteLeadToProject(clientName, member) {
   var rows = projSheet.getDataRange().getValues();
   var key  = normName(nm);
   for (var i = 1; i < rows.length; i++) {
-    // already a project — match by normalised name OR by the client column
     if (normName(rows[i][1]) === key || normName(rows[i][6]) === key) return false;
   }
   var pid = nextId(projSheet, 'NL-');
-  projSheet.appendRow([ pid, nm, 'New Lead', '', '', '' ]);
+  var insertAt = lastProjRowNum(rows);
+  projSheet.insertRowAfter(insertAt);
+  projSheet.getRange(insertAt + 1, 1, 1, 7).setValues([[ pid, nm, 'New Lead', '', 1, '', '' ]]);
   Logger.log('Lead promoted to PROJECTS: ' + nm + ' (' + pid + ')');
   return true;
 }
