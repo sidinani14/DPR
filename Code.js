@@ -7429,6 +7429,40 @@ function reconcileDelayedTasks() {
   return summary;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// restoreDelayedTasks  (one-time editor function — run once to undo the
+//                       reconcileDelayedTasks script)
+//
+// reconcileDelayedTasks parked tasks that had no completion data; this removed
+// them from the "This Week" and "Today" heatmap views on the dashboard.
+// This function identifies those rows by the note left in col AA and restores
+// them to empty SelfStatus so they appear as Delayed (red) on the dashboard
+// exactly as they did before the reconcile script ran.
+// ─────────────────────────────────────────────────────────────────────────────
+function restoreDelayedTasks() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows = sheet.getDataRange().getValues();
+  var restored = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var selfStatus = String(rows[i][13] || '').trim(); // N SelfStatus
+    var parkNote   = String(rows[i][25] || '').trim(); // AA (col 26, 0-idx 25) park reason
+
+    if (selfStatus !== 'Parked') continue;
+    if (parkNote.indexOf('reconcileDelayedTasks') === -1) continue;
+
+    sheet.getRange(i+1, 14).setValue('');  // N — clear SelfStatus (→ Not Started → Delayed)
+    sheet.getRange(i+1, 26).setValue('');  // AA — clear the park note
+    restored++;
+    Logger.log('Restored | row '+(i+1)+' | '+String(rows[i][3]||'')+' | '+String(rows[i][4]||''));
+  }
+
+  var msg = 'restoreDelayedTasks: restored '+restored+' tasks back to Delayed state';
+  Logger.log(msg);
+  return msg;
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
