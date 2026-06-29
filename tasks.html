@@ -593,6 +593,12 @@ async function submitTasks() {
           toast('Error saving tasks: ' + (res.message || res.code || JSON.stringify(res)));
           return;
         }
+        if ((res.written||0) === 0) {
+          document.getElementById('sending').classList.remove('show');
+          toast('Backend reported 0 tasks written — payload may be malformed. Check console.');
+          console.warn('assignTasks response:', res, 'payload:', allPayloads[pi]);
+          return;
+        }
       }
     }
     document.getElementById('sending').classList.remove('show');
