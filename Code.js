@@ -7116,6 +7116,73 @@ function promoteLeadToProject(clientName, member) {
   return true;
 }
 
+// ── ONE-TIME cleanup (run from the editor) ────────────────────────
+// Collapses existing duplicate PROJECTS rows that share a normalised
+// name OR client. Keeps the most-complete row per group, back-fills its
+// blank cells from the dups, then deletes the extras. Logs everything.
+function dedupeProjectsNow() {
+  var sh = db().getSheetByName(PROJECTS_TAB);
+  if (!sh) return 'No PROJECTS tab found.';
+  var rows = sh.getDataRange().getValues();
+  var n = rows.length, cols = sh.getLastColumn();
+  if (n < 3) return 'Nothing to dedupe (' + (n - 1) + ' data rows).';
+
+  // union-find over data rows (1..n-1)
+  var parent = []; for (var i = 0; i < n; i++) parent[i] = i;
+  function find(x){ while (parent[x] !== x){ parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function uni(a,b){ var ra=find(a), rb=find(b); if (ra!==rb) parent[ra]=rb; }
+
+  // any row whose normalised NAME or CLIENT matches a key already seen
+  // joins that key's group (cross-matching name↔client both ways).
+  var seen = {}; // normalised token -> first row index that used it
+  for (var i = 1; i < n; i++) {
+    var toks = [];
+    var nk = normName(rows[i][1]); if (nk) toks.push(nk);
+    var ck = normName(rows[i][6]); if (ck && ck !== nk) toks.push(ck);
+    toks.forEach(function(t){ if (seen[t] != null) uni(i, seen[t]); else seen[t] = i; });
+  }
+
+  // gather groups
+  var groups = {};
+  for (var i = 1; i < n; i++){ var r = find(i); (groups[r] = groups[r] || []).push(i); }
+
+  function filled(idx){ var c=0; for (var k=0;k<cols;k++) if (String(rows[idx][k]||'').trim()!=='') c++; return c; }
+  function realStage(idx){ var s=String(rows[idx][2]||'').trim().toLowerCase(); return (s && s!=='new lead') ? 1 : 0; }
+
+  var toDelete = [], summary = [];
+  Object.keys(groups).forEach(function(g){
+    var members = groups[g];
+    if (members.length < 2) return;
+    // keeper = most real stage, then most filled, then topmost row
+    var keep = members[0];
+    members.forEach(function(m){
+      if (realStage(m) > realStage(keep) ||
+         (realStage(m) === realStage(keep) && filled(m) > filled(keep)) ||
+         (realStage(m) === realStage(keep) && filled(m) === filled(keep) && m < keep)) keep = m;
+    });
+    // back-fill keeper's blank cells from the dups
+    members.forEach(function(m){ if (m===keep) return;
+      for (var k=0;k<cols;k++){
+        if (String(rows[keep][k]||'').trim()==='' && String(rows[m][k]||'').trim()!=='') rows[keep][k]=rows[m][k];
+      }
+      toDelete.push(m);
+    });
+    sh.getRange(keep+1, 1, 1, cols).setValues([rows[keep]]);  // write back-filled keeper
+    summary.push('KEEP "' + rows[keep][1] + '" (' + rows[keep][0] + '), removed ' +
+      members.filter(function(m){return m!==keep;}).map(function(m){return rows[m][0]+' "'+rows[m][1]+'"';}).join(', '));
+  });
+
+  // delete from the bottom up so row indices stay valid
+  toDelete.sort(function(a,b){ return b-a; }).forEach(function(idx){ sh.deleteRow(idx+1); });
+
+  var msg = (toDelete.length
+    ? 'Removed ' + toDelete.length + ' duplicate row(s) across ' + summary.length + ' group(s).'
+    : 'No duplicates found.');
+  Logger.log(msg);
+  summary.forEach(function(s){ Logger.log('  ' + s); });
+  return msg + (summary.length ? '\n' + summary.join('\n') : '');
+}
+
 // ════════════════════════════════════════════════════════════════
 // writeBilling — BILLING tab. Payments match a bill by INVOICE NO. first,
 // else fall back to the oldest unpaid bill of the same project. Follow-up
