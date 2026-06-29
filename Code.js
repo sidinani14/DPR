@@ -65,6 +65,18 @@ var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
 var LOGS_ROOT_FOLDER = 'IDS Logs';      // Drive root for per-project report folders
 function ensureCols(sheet, n){ var m=sheet.getMaxColumns(); if (m < n) sheet.insertColumnsAfter(m, n-m); }
+// Insert a new data row at the TOP (row 2, just under the header) so the latest
+// entries are visible without scrolling. Use for human-reviewed log tabs only —
+// NOT for tabs whose automation reads the just-written row via getLastRow().
+function prependRow(sheet, values){
+  ensureCols(sheet, values.length);
+  sheet.insertRowBefore(2);
+  var rng = sheet.getRange(2, 1, 1, sheet.getMaxColumns());
+  // a freshly-inserted row inherits the header row's formatting — reset to plain
+  rng.setBackground('#FFFFFF').setFontColor('#000000').setFontWeight('normal').setFontStyle('normal');
+  sheet.getRange(2, 1, 1, values.length).setValues([values]);
+  return 2;
+}
 function writeBlockLogHeaders(sheet){
   var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
          'Reason','Prior Status','Original Deadline','Disposition','Reviewed By','Review Date','Note'];
@@ -590,7 +602,7 @@ function writeDailySummary(data) {
   var hh    = String(ts.getHours()).padStart(2,'0');
   var mm    = String(ts.getMinutes()).padStart(2,'0');
   var timeStr = hh + ':' + mm;
-  sheet.appendRow([
+  prependRow(sheet, [
     dateStr(data['Timestamp']),  // A Date
     timeStr,                      // B Time (HH:MM 24h)
     data['Member']            || '',  // C Member
@@ -1301,7 +1313,7 @@ function appendConnections(member, day, connections, subId){
   var n = 0;
   connections.forEach(function(c){
     if (!c || (!c.project && !c.type && !c.notes)) return;
-    logSheet.appendRow([ nextId(logSheet,'LOG-'), subId||'', day, member,
+    prependRow(logSheet, [ nextId(logSheet,'LOG-'), subId||'', day, member,
       'Client Connection', c.type||'', c.project||'', c.notes||'' ]);
     n++;
   });
@@ -1491,7 +1503,7 @@ function submitMeetingLog(data, authEmail){
   var folderId = data.folderId || '';
   var videoLinks = (data.videoLinks||[]).join(' | ');
 
-  logSheet.appendRow([ logId, day, String(data.time||''), type, project, loggedBy,
+  prependRow(logSheet, [ logId, day, String(data.time||''), type, project, loggedBy,
     (data.teamAttendees||[]).join(', '), String(data.clientAttendees||''),
     (data.purpose||[]).join(', '), bodyRaw, bodyPolished, String(data.duration||''),
     folderId, photoIds, videoLinks, 'Draft', '', '', whatChanged, '', '', '' ]);
@@ -4715,7 +4727,7 @@ function writeSiteExecution(data) {
   var today = dateStr();
   var now   = new Date().toTimeString().substring(0,5);
 
-  sheet.appendRow([
+  prependRow(sheet, [
     subId,
     data.date         || today,
     data.time         || now,
@@ -4760,7 +4772,7 @@ function writeSiteIssues(subId, date, project, issues, onTrack, reportedBy) {
       taskId = createIssueTask(iss, issProject, date, onTrack);
     }
 
-    sheet.appendRow([
+    prependRow(sheet, [
       issId,
       subId,
       date,
@@ -6786,7 +6798,7 @@ function submitAmanCRM(data) {
     // ── 1. Write AMAN_DAILY index row (summary only) ──────────
     var dailySheet = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
     var subId      = nextId(dailySheet, 'CRM-');
-    dailySheet.appendRow([
+    prependRow(dailySheet, [
       subId, today, now, member,
       vendor.on || 'No', siteIss.on || 'No', tncp.on || 'No', bni.on || 'No',
     ]);
@@ -6804,13 +6816,13 @@ function submitAmanCRM(data) {
     function writeActRows(label, act) {
       (act.entries || []).forEach(function(e) {
         if (!e.project && !e.notes) return;
-        logSheet.appendRow([ nextId(logSheet, 'LOG-'), subId, today, member, 'Other Activity', label, e.project || '', e.notes || '' ]);
+        prependRow(logSheet, [ nextId(logSheet, 'LOG-'), subId, today, member, 'Other Activity', label, e.project || '', e.notes || '' ]);
       });
     }
     if (vendor.on  === 'Yes') writeActRows('Vendor Coordination', vendor);
     if (siteIss.on === 'Yes') writeActRows('Site Issues Addressed', siteIss);
     if (tncp.on    === 'Yes') writeActRows('TnCP Coordination', tncp);
-    if (bni.on     === 'Yes') logSheet.appendRow([ nextId(logSheet, 'LOG-'), subId, today, member, 'Other Activity', 'BNI Activity', '', '' ]);
+    if (bni.on     === 'Yes') prependRow(logSheet, [ nextId(logSheet, 'LOG-'), subId, today, member, 'Other Activity', 'BNI Activity', '', '' ]);
 
     // ── 2. Write new leads to LEADS sheet ─────────────────────
     var leadsSheet = getOrCreate(LEADS_TAB, writeLeadsHeaders);
@@ -6819,7 +6831,7 @@ function submitAmanCRM(data) {
       if (!lead.clientName) return;
       var leadId = nextId(leadsSheet, 'LEAD-');
       var st = lead.leadStatus || 'Not Contacted';
-      leadsSheet.appendRow([
+      prependRow(leadsSheet, [
         leadId,
         lead.clientName  || '',
         lead.contactNo   || '',
@@ -7117,7 +7129,7 @@ function writeBilling(subId, today, finance) {
   bills.forEach(function(b) {
     if (!b.project && !b.amount && !b.invoice) return;
     var billId = nextId(sheet, 'BILL-');
-    sheet.appendRow([
+    prependRow(sheet, [
       billId, b.invoice || '', b.project || '', today, parseFloat(b.amount) || 0,
       '', '', '', 'Pending', subId,
     ]);
@@ -7158,7 +7170,7 @@ function writeBilling(subId, today, finance) {
     } else {
       // Payment with no matching bill — record as its own row
       var pid = nextId(sheet, 'BILL-');
-      sheet.appendRow([ pid, p.invoice || '', p.project || '', '', '', amt, today, '', 'Payment (no bill)', subId ]);
+      prependRow(sheet, [ pid, p.invoice || '', p.project || '', '', '', amt, today, '', 'Payment (no bill)', subId ]);
     }
   });
 

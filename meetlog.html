@@ -54,7 +54,9 @@ function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
 function projOpts(){return '<option value="">Select project…</option>'+PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');}
 function teamOpts(){const me=(window.IDS_USER&&window.IDS_USER.name)||'';return TEAM.map(t=>`<option ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
 function attendeeList(){const seen={};return TEAM.concat(EXTRA_ATTENDEES).filter(t=>{const k=t.toLowerCase();if(seen[k])return false;seen[k]=1;return !!t;});}
-function teamChecks(){return attendeeList().map(t=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}">${esc(t)}</label>`).join('');}
+// When Aman is logging (he records Siddharth's meetings), pre-tick Siddharth.
+function isAmanUser(){ return String((window.IDS_USER&&window.IDS_USER.email)||'').toLowerCase()==='aman.raghuwanshi@ideaform.in'; }
+function teamChecks(){return attendeeList().map(t=>{const pre=(isAmanUser()&&t==='Siddharth Inani')?' checked':'';return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}"${pre}>${esc(t)}</label>`;}).join('');}
 
 function render(){
   const today=new Date().toISOString().substring(0,10);
