@@ -81,17 +81,27 @@ function prependRow(sheet, values){
 function normName(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' '); }
 
 // True if writing `value` into `cell` won't violate its data-validation rule.
-// Only VALUE_IN_LIST rules are checked (the kind used on Stage/Client columns);
-// other criteria types (or no rule) are allowed through.
+// Handles inline lists (VALUE_IN_LIST) and list-from-range (VALUE_IN_RANGE).
+// No rule → allowed. Any rule type we can't positively verify → skip (return
+// false), so a write can never reach flush with an unverified value.
 function cellAccepts(cell, value){
   var dv = cell.getDataValidation();
   if (!dv) return true;
-  if (dv.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST){
+  var t = dv.getCriteriaType(), v = String(value).toLowerCase().trim();
+  if (t === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST){
     var list = dv.getCriteriaValues()[0] || [];
-    var v = String(value).toLowerCase().trim();
     return list.map(function(s){ return String(s).toLowerCase().trim(); }).indexOf(v) !== -1;
   }
-  return true;
+  if (t === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE){
+    var rng = dv.getCriteriaValues()[0];
+    if (!rng || !rng.getValues) return false;
+    var flat = [];
+    rng.getValues().forEach(function(row){ row.forEach(function(c){
+      var s = String(c).toLowerCase().trim(); if (s) flat.push(s);
+    }); });
+    return flat.indexOf(v) !== -1;
+  }
+  return false;
 }
 function writeBlockLogHeaders(sheet){
   var h=['Block ID','Task ID','Assign Row','Member','Project','Task Type','Raised Date',
