@@ -14,6 +14,7 @@
   var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
   var STORE_KEY = 'ids_token';
   var EXP_KEY   = 'ids_session_exp';
+  var HINT_KEY  = 'ids_email_hint'; // persistent — never deleted, survives expiry
   var SESSION_MS = 12 * 60 * 60 * 1000;  // 12 hours
 
   // ── Storage helpers — localStorage so sign-in persists across all tabs ──
@@ -52,10 +53,12 @@
             if (j && j.code === 'unauthorized') {
               window.__idsDenied = true;
               window.IDS_TOKEN = null;
-              try { storeDel(STORE_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
+              var who = (window.IDS_USER && window.IDS_USER.email) || '';
+              try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
               buildGate('denied',
-                'Your account isn’t authorized for this system. Ask your admin to add your exact Google email to the TEAM tab (and mark it active).',
-                (window.IDS_USER && window.IDS_USER.email) || '');
+                'The signed-in account (' + (who || 'unknown') + ') is not on the authorised team list.' +
+                ' If you have multiple Google accounts in this browser, tap "Try another account" to switch.',
+                who);
             }
           }).catch(function () {});
         } catch (e) {}
@@ -79,18 +82,22 @@
         'display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,sans-serif';
       document.body.appendChild(g);
     }
-    var inner = '<div style="text-align:center;max-width:340px;padding:28px">' +
+    var inner = '<div style="text-align:center;max-width:360px;padding:28px">' +
       '<div style="font-family:Syne,system-ui,sans-serif;font-weight:700;font-size:18px;color:#C8A96E;letter-spacing:.5px">IDEAFORM DESIGN STUDIO</div>' +
       '<div style="font-size:12px;color:#5A5652;margin-top:4px;font-family:DM Mono,monospace">Internal · authorized team access only</div>';
     if (state === 'signin') {
+      // Show hint email if we know their account
+      var hint = storeGet(HINT_KEY);
+      var hintHtml = hint
+        ? '<div style="margin-top:10px;font-size:11px;color:#5A5652">Signing in as <span style="color:#C8A96E;font-family:DM Mono,monospace">' + hint + '</span></div>'
+        : '<div style="margin-top:10px;font-size:11px;color:#5A5652">Only emails on the team list can enter.</div>';
       inner += '<div style="margin-top:26px;font-size:13px;color:#9A9690">Sign in with your Ideaform Google account</div>' +
         '<div id="ids-btn" style="margin-top:16px;display:flex;justify-content:center"></div>' +
-        '<div style="margin-top:14px;font-size:11px;color:#5A5652">Only emails on the team list can enter.</div>';
+        hintHtml;
     } else if (state === 'denied') {
       inner += '<div style="margin-top:26px;font-size:34px">🔒</div>' +
         '<div style="margin-top:10px;font-size:14px;color:#C05050;font-weight:600">Access denied</div>' +
-        '<div style="margin-top:8px;font-size:12px;color:#9A9690">' + (msg || '') +
-        (who ? '<br><span style="color:#5A5652;font-family:DM Mono,monospace">' + who + '</span>' : '') + '</div>' +
+        '<div style="margin-top:8px;font-size:12px;color:#9A9690;line-height:1.5">' + (msg || '') + '</div>' +
         '<button id="ids-retry" style="margin-top:18px;padding:8px 16px;font-size:12px;color:#C8A96E;background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.3);border-radius:6px;cursor:pointer">Try another account</button>';
     } else {
       inner += '<div style="margin-top:26px;font-size:13px;color:#9A9690">Checking access…</div>';
@@ -101,8 +108,14 @@
     if (state === 'denied') {
       var rb = document.getElementById('ids-retry');
       if (rb) rb.onclick = function () {
-        try { storeDel(STORE_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
+        window.__idsDenied = false;
+        try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
         buildGate('signin');
+        // Re-initialize GIS without auto_select so user sees the account picker
+        try {
+          google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false, use_fedcm_for_prompt: true });
+          google.accounts.id.prompt(function(n){ if(n.isNotDisplayed()||n.isSkippedMoment()) renderButton(); });
+        } catch(e) { renderButton(); }
       };
     }
   }
@@ -118,17 +131,17 @@
     var p = token ? parseJwt(token) : null;
     if (!p) { buildGate('denied', 'Sign-in failed. Please try again.'); return; }
 
-    // Guard against Chrome auto-selecting the wrong Google account.
-    // When multiple profiles exist in one browser, GIS may silently fire this
-    // callback with a personal/non-authorised token and overwrite the valid session.
-    // Rule: if a valid session already exists for a DIFFERENT email, drop this token.
+    // Guard: if a valid session exists within the 12-hour window for a DIFFERENT email,
+    // discard this token — Chrome may have auto-selected a wrong secondary account.
+    // We protect for the full 12h session window (not just while Google JWT is fresh),
+    // so a token refresh mid-session can't sneak in the wrong account.
     try {
       var existing = storeGet(STORE_KEY);
       if (existing) {
         var ep  = parseJwt(existing);
         var exp = parseInt(storeGet(EXP_KEY) || '0');
-        var stillValid = ep && ep.exp && ep.exp * 1000 > Date.now() + 60000 && Date.now() < exp;
-        if (stillValid && String(ep.email||'').toLowerCase() !== String(p.email||'').toLowerCase()) {
+        var withinSession = ep && Date.now() < exp; // within 12h window
+        if (withinSession && String(ep.email||'').toLowerCase() !== String(p.email||'').toLowerCase()) {
           return; // wrong account — keep existing session, discard this token
         }
       }
@@ -142,6 +155,8 @@
     window.IDS_USER = { email: String(p.email || '').toLowerCase(), name: p.name || p.email || '', picture: p.picture || '' };
     storeSet(STORE_KEY, token);
     storeSet(EXP_KEY, String(Date.now() + SESSION_MS));
+    storeSet(HINT_KEY, String(p.email || '').toLowerCase()); // persist email — never deleted
+    window.__idsDenied = false;
     // reveal page
     var s = document.getElementById('ids-lock-style'); if (s) s.remove();
     var g = document.getElementById('ids-gate'); if (g) g.remove();
@@ -152,7 +167,7 @@
   // ── 4. Boot ──
   function boot() {
     // Reuse a stored token — localStorage means it's shared across all open tabs.
-    // Only use it if not expired (keep 60s margin) AND issued today (end-of-day reset).
+    // Only use it if not expired (keep 60s margin) AND within 12-hour session window.
     try {
       var saved = storeGet(STORE_KEY);
       if (saved) {
@@ -164,15 +179,16 @@
           grant(saved, sp);
           return;
         }
+        // Token expired — save email hint before deleting (fixes loginHint bug)
+        if (sp && sp.email) storeSet(HINT_KEY, String(sp.email).toLowerCase());
         storeDel(STORE_KEY); storeDel(EXP_KEY);
       }
     } catch (e) {}
 
     // No valid stored token — try silent FedCM re-auth first, then show sign-in UI.
-    // Extract stored email (if any) to pass as login_hint so Chrome picks the right
-    // account when multiple Google profiles exist in the same browser.
-    var loginHint = '';
-    try { var lh = storeGet(STORE_KEY); if (lh) { var lp = parseJwt(lh); if (lp) loginHint = lp.email || ''; } } catch(e) {}
+    // Read the persistent HINT_KEY (not the deleted STORE_KEY) so Chrome picks the
+    // right account even after session expiry.
+    var loginHint = storeGet(HINT_KEY) || '';
 
     buildGate('checking');
     loadGis(function () {
@@ -202,6 +218,7 @@
   // Expose sign-out so pages can wire it to a button
   window.IDS_SIGNOUT = function () {
     storeDel(STORE_KEY); storeDel(EXP_KEY);
+    // NOTE: HINT_KEY intentionally kept — helps pick right account on next sign-in
     window.IDS_TOKEN = null;
     try { google.accounts.id.disableAutoSelect(); } catch (e) {}
     location.href = 'index.html';

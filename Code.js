@@ -772,6 +772,11 @@ function getAllTasks() {
 
     var status = 'Upcoming';
     var blockDispo = String(r[COL_BLK_DISPO-1] || '').trim();   // Z disposition
+    // Fallback: if SelfStatus column reads blank but the disposition column says Parked,
+    // the sheet columns M/N may be swapped — treat as Parked to avoid showing in Upcoming
+    if ((selfStatus === 'Not Started' || selfStatus === '') && blockDispo === 'Parked') {
+      selfStatus = 'Parked';
+    }
     if (selfStatus === 'Work Not Done') {
       status = 'Work Not Done';  // lead closed it off the assignee (reassigned) — penalty applies
     }
@@ -7381,8 +7386,8 @@ function reconcileDelayedTasks() {
   for (var i = 1; i < rows.length; i++) {
     var r            = rows[i];
     var selfStatus   = String(r[13] || '').trim();  // N SelfStatus
-    var statusDate   = String(r[14] || '').trim();  // O SelfStatusDate
-    var actualDate   = String(r[15] || '').trim();  // P ActualCompletionDate
+    var statusDate   = cellDate(r[14]);              // O SelfStatusDate
+    var actualDate   = cellDate(r[15]);              // P ActualCompletionDate
     var leadApproved = String(r[16] || '').trim();  // Q LeadApproved
     var deadline     = cellDate(r[10]);              // K Deadline
 
@@ -7485,8 +7490,8 @@ function parkStaleDelayed() {
   for (var i = 1; i < rows.length; i++) {
     var r            = rows[i];
     var selfStatus   = String(r[13] || '').trim();  // N SelfStatus
-    var statusDate   = String(r[14] || '').trim();  // O SelfStatusDate
-    var actualDate   = String(r[15] || '').trim();  // P ActualCompletionDate
+    var statusDate   = cellDate(r[14]);              // O SelfStatusDate
+    var actualDate   = cellDate(r[15]);              // P ActualCompletionDate
     var leadApproved = String(r[16] || '').trim();  // Q LeadApproved
     var deadline     = cellDate(r[10]);              // K Deadline
     var assignedDate = cellDate(r[9]);               // J AssignedDate
@@ -7520,6 +7525,135 @@ function parkStaleDelayed() {
   }
 
   var msg = 'parkStaleDelayed: parked='+parked+', approvedFixed='+approvedFixed+', recentKept='+skippedRecent;
+  Logger.log(msg);
+  return msg;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// unparkScriptParked  (one-time editor function)
+//
+// Reverses the parking done by parkStaleDelayed today. Those tasks should
+// show as Delayed (Not Started + deadline past) per user rules, not hidden.
+// Checks col Z (COL_BLK_DISPO) for the 'parkStaleDelayed' signature.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// diagnoseLMNColumns  (run from editor to confirm L/M/N column order)
+// ─────────────────────────────────────────────────────────────────────────────
+function diagnoseLMNColumns() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return 'No sheet';
+  var lastRow = sheet.getLastRow();
+  // Read cols K–P (1-indexed 11–16), rows 1–5
+  var data = sheet.getRange(1, 11, Math.min(5, lastRow), 6).getValues();
+  var cols = ['K','L','M','N','O','P'];
+  var lines = ['Column headers + first 4 data rows (K→P):'];
+  for (var c = 0; c < cols.length; c++) {
+    var header = String(data[0][c] || '');
+    var samples = data.slice(1).map(function(r){ return String(r[c]||''); }).join(' | ');
+    lines.push('  ' + cols[c] + ': "' + header + '"  →  ' + samples);
+  }
+  var hL = String(data[0][1]).trim(); // L (index 1 in 6-col range starting at K)
+  var hM = String(data[0][2]).trim(); // M
+  var hN = String(data[0][3]).trim(); // N
+  if (hL === 'Area' && hM === 'Drawing Name' && hN === 'Self Status') {
+    lines.push('\nSTATUS: CORRECT — L=Area, M=Drawing Name, N=Self Status. No fix needed.');
+  } else if (hL === 'Self Status' && hM === 'Area' && hN === 'Drawing Name') {
+    lines.push('\nSTATUS: 3-WAY ROTATION NEEDED. Run fixColumnOrder() to restore L=Area, M=Drawing Name, N=Self Status.');
+  } else {
+    lines.push('\nSTATUS: Unexpected order — L="'+hL+'" M="'+hM+'" N="'+hN+'". Inspect manually.');
+  }
+  var msg = lines.join('\n');
+  Logger.log(msg);
+  return msg;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fixColumnOrder  (one-time fix for 3-way column rotation)
+// Current sheet: L=Self Status, M=Area, N=Drawing Name
+// Target:        L=Area,        M=Drawing Name, N=Self Status
+// Run diagnoseLMNColumns() first to confirm this is the problem.
+// ─────────────────────────────────────────────────────────────────────────────
+function fixColumnOrder() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return 'No sheet';
+  // 1-indexed column numbers: L=12, M=13, N=14
+  var hL = String(sheet.getRange(1, 12).getValue()).trim();
+  var hM = String(sheet.getRange(1, 13).getValue()).trim();
+  var hN = String(sheet.getRange(1, 14).getValue()).trim();
+
+  if (hL === 'Area' && hM === 'Drawing Name' && hN === 'Self Status') {
+    return 'ALREADY CORRECT — L=Area, M=Drawing Name, N=Self Status. Nothing changed.';
+  }
+  if (hL !== 'Self Status' || hM !== 'Area' || hN !== 'Drawing Name') {
+    return 'UNEXPECTED — L="'+hL+'" M="'+hM+'" N="'+hN+'". Expected L=Self Status, M=Area, N=Drawing Name. Check manually.';
+  }
+
+  var lastRow = sheet.getLastRow();
+  var colL = sheet.getRange(1, 12, lastRow, 1).getValues(); // Self Status data
+  var colM = sheet.getRange(1, 13, lastRow, 1).getValues(); // Area data
+  var colN = sheet.getRange(1, 14, lastRow, 1).getValues(); // Drawing Name data
+
+  // 3-way rotation: M→L, N→M, L→N
+  sheet.getRange(1, 12, lastRow, 1).setValues(colM); // L ← Area (was M)
+  sheet.getRange(1, 13, lastRow, 1).setValues(colN); // M ← Drawing Name (was N)
+  sheet.getRange(1, 14, lastRow, 1).setValues(colL); // N ← Self Status (was L)
+
+  var msg = 'FIXED: 3-way rotation applied for ' + lastRow + ' rows. Now L=Area, M=Drawing Name, N=Self Status.';
+  Logger.log(msg);
+  return msg;
+}
+
+// Repairs cells in columns O (SelfStatusDate) and P (ActualCompletionDate) that
+// were written as Date.toString() strings ("Sat Jun 27 2026 05:30:00 GMT+0530...")
+// by reconcileDelayedTasks/parkStaleDelayed before the cellDate() fix.
+function fixDateFormats() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return 'No sheet found';
+  var rows = sheet.getDataRange().getValues();
+  var fixed = 0;
+  // 0-indexed: O=14, P=15, S=18
+  var dateCols0 = [14, 15, 18];
+
+  for (var i = 1; i < rows.length; i++) {
+    for (var ci = 0; ci < dateCols0.length; ci++) {
+      var col0 = dateCols0[ci];
+      var val  = rows[i][col0];
+      if (!val) continue;
+      var str  = String(val);
+      // Detect the ugly Date.toString() format — always contains 'GMT'
+      if (str.indexOf('GMT') === -1) continue;
+      // Parse back to a proper YYYY-MM-DD string
+      var parsed = cellDate(new Date(str));
+      if (!parsed) continue;
+      sheet.getRange(i + 1, col0 + 1).setValue(parsed); // col0+1 = 1-indexed
+      fixed++;
+    }
+  }
+
+  var msg = 'fixDateFormats: fixed ' + fixed + ' cells in O/P/S columns';
+  Logger.log(msg);
+  return msg;
+}
+
+function unparkScriptParked() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return 'No sheet found';
+  var rows = sheet.getDataRange().getValues();
+  var unparked = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var st   = String(rows[i][13] || '').trim(); // N SelfStatus
+    var note = String(rows[i][25] || '').trim(); // Z COL_BLK_DISPO (col 26 1-idx)
+    if (st !== 'Parked') continue;
+    if (note.indexOf('parkStaleDelayed') === -1 && note.indexOf('reconcileDelayedTasks') === -1) continue;
+    // Restore to blank (Not Started) — deadline stays in col K, so getAllTasks
+    // computes target < today → status = 'Delayed'
+    sheet.getRange(i+1, 14).setValue(''); // N SelfStatus → Not Started
+    sheet.getRange(i+1, 26).setValue(''); // Z COL_BLK_DISPO → clear
+    unparked++;
+  }
+
+  var msg = 'unparkScriptParked: unparked=' + unparked;
   Logger.log(msg);
   return msg;
 }
@@ -7625,6 +7759,36 @@ function diagnoseTasks() {
   Logger.log('  Of the Done tasks, LeadApproved breakdown:');
   Object.keys(approvalCounts).forEach(function(k){ Logger.log('    LeadApproved="'+k+'": '+approvalCounts[k]); });
   return counts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// approveGhostPending — one-time editor function
+// Approves the small number of Done+Pending ghost tasks that still have
+// LeadApproved='Pending' with a past deadline. User confirmed all were
+// completed and the team received their points.
+// ─────────────────────────────────────────────────────────────────────────────
+function approveGhostPending() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) { Logger.log('ASSIGN_TAB not found'); return; }
+  var rows  = sheet.getDataRange().getValues();
+  var today = dateStr();
+  var fixed = 0;
+
+  for (var i = 1; i < rows.length; i++) {
+    var selfStatus   = String(rows[i][13] || '').trim();  // N
+    var leadApproved = String(rows[i][16] || '').trim();  // Q
+    var deadline     = cellDate(rows[i][10]);              // K
+    if (selfStatus !== 'Done')    continue;
+    if (leadApproved !== 'Pending') continue;
+    if (!deadline || deadline >= today) continue;         // only past-deadline ghost tasks
+    sheet.getRange(i+1, 17).setValue('Yes');              // Q LeadApproved
+    fixed++;
+    Logger.log('Approved | '+String(rows[i][0]||'')+' | '+String(rows[i][3]||'')+' | '+String(rows[i][4]||''));
+  }
+
+  var msg = 'approveGhostPending: approved ' + fixed + ' tasks';
+  Logger.log(msg);
+  return msg;
 }
 
 // ════════════════════════════════════════════════════════════════
