@@ -113,7 +113,7 @@
         buildGate('signin');
         // Re-initialize GIS without auto_select so user sees the account picker
         try {
-          google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false, use_fedcm_for_prompt: true });
+          google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false });
           google.accounts.id.prompt(function(n){ if(n.isNotDisplayed()||n.isSkippedMoment()) renderButton(); });
         } catch(e) { renderButton(); }
       };
@@ -191,17 +191,23 @@
     var loginHint = storeGet(HINT_KEY) || '';
 
     buildGate('checking');
+    // Safety net: if GIS prompt doesn't call back within 4 s, show the button anyway.
+    var _signinShown = false;
+    function showSignin(){ if(!_signinShown){ _signinShown=true; buildGate('signin'); } }
+    var _signinTimer = setTimeout(showSignin, 4000);
     loadGis(function () {
       try {
-        var initOpts = { client_id: CLIENT_ID, callback: onCredential, auto_select: true, use_fedcm_for_prompt: true };
+        // Note: use_fedcm_for_prompt intentionally omitted — FedCM can silently swallow
+        // the prompt callback, leaving the page stuck on "Checking access…" forever.
+        var initOpts = { client_id: CLIENT_ID, callback: onCredential, auto_select: true };
         if (loginHint) initOpts.login_hint = loginHint;
         google.accounts.id.initialize(initOpts);
-      } catch (e) {}
-      // prompt() will silently call onCredential if the browser can auto-sign in.
-      // If it can't (token fully expired, multiple accounts, etc.), it does nothing
-      // and we fall through to show the sign-in button.
-      try { google.accounts.id.prompt(function(n){ if(n.isNotDisplayed()||n.isSkippedMoment()) buildGate('signin'); }); }
-      catch(e) { buildGate('signin'); }
+      } catch (e) { clearTimeout(_signinTimer); showSignin(); return; }
+      try {
+        google.accounts.id.prompt(function(n){
+          if(n.isNotDisplayed()||n.isSkippedMoment()){ clearTimeout(_signinTimer); showSignin(); }
+        });
+      } catch(e) { clearTimeout(_signinTimer); showSignin(); }
     });
   }
 
