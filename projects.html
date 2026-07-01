@@ -108,7 +108,7 @@ table.leads tr:hover td{background:var(--surface2)}
 <div class="drawer" id="drawer"></div>
 
 <script>
-const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
 let DATA={projects:[],newLeads:[],counts:{}};
 
 function api(action, extra){ return fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra||{}))}).then(r=>r.json()); }

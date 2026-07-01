@@ -11,7 +11,7 @@
 (function () {
   var CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
   var API_HOST = 'script.google.com/macros';
-  var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+  var ACCESS_CHECK_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
   var STORE_KEY = 'ids_token';
   var EXP_KEY   = 'ids_session_exp';
   var HINT_KEY  = 'ids_email_hint'; // persistent — never deleted, survives expiry

@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#0F0F0F;color:#F0EDE8;width:1200px;padding:34px 40px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.title{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;letter-spacing:-.5px}
+.title span{color:#C8A96E}
+.sub{font-size:13px;color:#8A8680;margin-top:4px;font-family:'DM Mono',monospace}
+.weekpill{font-size:12px;color:#C8A96E;background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.3);padding:7px 14px;border-radius:20px;font-weight:600}
+.top{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:14px;margin-bottom:20px}
+.card{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:12px;padding:16px 18px}
+.card.gold{background:linear-gradient(135deg,rgba(200,169,110,.14),rgba(200,169,110,.04));border-color:rgba(200,169,110,.35)}
+.k-lbl{font-size:11px;color:#7A766F;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.k-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin-top:6px}
+.k-score{font-family:'DM Mono',monospace;font-size:34px;font-weight:500;color:#C8A96E;margin-top:2px}
+.k-score small{font-size:15px;color:#7A766F}
+.k-tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;margin-top:8px}
+.tag-top{background:rgba(74,155,111,.18);color:#5FB584}
+.tag-watch{background:rgba(192,80,80,.18);color:#D06E6E}
+.k-meta{font-size:12px;color:#9A9690;margin-top:8px;line-height:1.5}
+table{width:100%;border-collapse:collapse}
+th{font-size:10.5px;color:#7A766F;text-transform:uppercase;letter-spacing:.6px;text-align:center;padding:0 8px 12px;font-weight:600}
+th.l,td.l{text-align:left}
+td{padding:11px 8px;text-align:center;border-top:1px solid #232323;font-family:'DM Mono',monospace;font-size:14px}
+tr.rowtop td{background:rgba(200,169,110,.05)}
+.rank{color:#7A766F;font-size:13px}
+.member{font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;color:#F0EDE8;text-align:left}
+.total{font-weight:700;font-size:17px}
+.bar{height:7px;border-radius:4px;background:#232323;overflow:hidden;width:120px;display:inline-block;vertical-align:middle}
+.fill{height:100%;border-radius:4px;display:block}
+.g{color:#5FB584}.a{color:#D9A23B}.r{color:#D06E6E}
+.legend{margin-top:16px;font-size:11.5px;color:#7A766F;display:flex;gap:18px;font-family:'DM Mono',monospace}
+.legend b{color:#C8A96E;font-weight:500}
+</style></head><body>
+<div class="head">
+  <div>
+    <div class="title">IDEAFORM · <span>Weekly Performance Scorecard</span></div>
+    <div class="sub">Automated from daily reports + attendance · scored out of 100</div>
+  </div>
+  <div class="weekpill">Week of 8 – 13 June 2026</div>
+</div>
+
+<div class="top">
+  <div class="card gold">
+    <div class="k-lbl">🏆 Top Performer</div>
+    <div class="k-name">Rahul Sharma</div>
+    <div class="k-score">94<small>/100</small></div>
+    <div class="k-tag tag-top">Commendation</div>
+    <div class="k-meta">28.5 output pts · 6/6 DPRs filed · 0 late tasks</div>
+  </div>
+  <div class="card">
+    <div class="k-lbl">Team Average</div>
+    <div class="k-name" style="color:#C8A96E">73.6</div>
+    <div class="k-meta" style="margin-top:14px">Up from 68.2 last week<br>7 members scored</div>
+  </div>
+  <div class="card">
+    <div class="k-lbl">Needs Attention</div>
+    <div class="k-name">Sameer Patel</div>
+    <div class="k-score" style="color:#D06E6E">47<small>/100</small></div>
+    <div class="k-tag tag-watch">2 tasks reassigned</div>
+  </div>
+</div>
+
+<table>
+  <thead><tr>
+    <th class="l" style="width:38px">#</th><th class="l">Team Member</th>
+    <th>Output /50</th><th>DPR /15</th><th>Punctuality /15</th><th>Hours /10</th><th>Reliability /10</th>
+    <th>Total /100</th><th></th>
+  </tr></thead>
+  <tbody>
+    <tr class="rowtop"><td class="rank">1</td><td class="member">Rahul Sharma 🏆</td><td>28.5</td><td>15</td><td>14.2</td><td>9.5</td><td>10</td><td class="total g">94</td><td><span class="bar"><span class="fill g" style="width:94%;background:#5FB584"></span></span></td></tr>
+    <tr><td class="rank">2</td><td class="member">Priya Menon</td><td>26.0</td><td>15</td><td>13.5</td><td>9.0</td><td>9</td><td class="total g">88</td><td><span class="bar"><span class="fill" style="width:88%;background:#5FB584"></span></span></td></tr>
+    <tr><td class="rank">3</td><td class="member">Arjun Kapoor</td><td>23.5</td><td>13</td><td>12.0</td><td>8.5</td><td>9</td><td class="total g">81</td><td><span class="bar"><span class="fill" style="width:81%;background:#7FB58A"></span></span></td></tr>
+    <tr><td class="rank">4</td><td class="member">Neha Rao</td><td>21.0</td><td>13</td><td>11.5</td><td>8.0</td><td>8</td><td class="total a">76</td><td><span class="bar"><span class="fill" style="width:76%;background:#D9A23B"></span></span></td></tr>
+    <tr><td class="rank">5</td><td class="member">Vikram Iyer</td><td>18.5</td><td>11</td><td>10.0</td><td>7.5</td><td>7</td><td class="total a">68</td><td><span class="bar"><span class="fill" style="width:68%;background:#D9A23B"></span></span></td></tr>
+    <tr><td class="rank">6</td><td class="member">Anjali Desai</td><td>16.0</td><td>11</td><td>9.5</td><td>7.0</td><td>6</td><td class="total a">61</td><td><span class="bar"><span class="fill" style="width:61%;background:#D9A23B"></span></span></td></tr>
+    <tr><td class="rank">7</td><td class="member">Sameer Patel</td><td>12.5</td><td>9</td><td>8.0</td><td>6.5</td><td>4</td><td class="total r">47</td><td><span class="bar"><span class="fill" style="width:47%;background:#D06E6E"></span></span></td></tr>
+  </tbody>
+</table>
+<div class="legend">
+  <span><b>Output</b> = drawings & tasks delivered</span>
+  <span><b>DPR</b> = daily reports filed</span>
+  <span><b>Punctuality + Hours</b> = biometric attendance</span>
+  <span><b>Reliability</b> = deadlines kept</span>
+</div>
+</body></html>

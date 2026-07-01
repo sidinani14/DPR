@@ -151,7 +151,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 </div>
 
 <script>
-const API = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+const API = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
 function api(action, extra){ return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra||{}))}).then(r=>r.json()); }
 
 let _3mData = null;

@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDS Weekly Productivity Report - June 1-6, 2026</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .header-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .header-info div {
+            background: rgba(255,255,255,0.1);
+            padding: 12px;
+            border-radius: 4px;
+        }
+
+        .header-info strong {
+            display: block;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            color: #333;
+            margin: 30px 0 20px 0;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .scorecard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .score-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f9f9f9;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .score-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .score-card.excellent {
+            border-left: 4px solid #4caf50;
+            background: #f1f8f4;
+        }
+
+        .score-card.good {
+            border-left: 4px solid #2196f3;
+            background: #f1f5fb;
+        }
+
+        .score-card.average {
+            border-left: 4px solid #ff9800;
+            background: #fef5f0;
+        }
+
+        .score-card.poor {
+            border-left: 4px solid #f44336;
+            background: #fef0f0;
+        }
+
+        .card-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .card-role {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .card-target {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #666;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .total-score {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .score-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: #667eea;
+            border-radius: 3px;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .summary-table th {
+            background: #f5f5f5;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .summary-table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #667eea;
+            width: 40px;
+        }
+
+        .score {
+            font-weight: bold;
+        }
+
+        .score-100 {
+            color: #4caf50;
+        }
+
+        .score-75 {
+            color: #2196f3;
+        }
+
+        .score-50 {
+            color: #ff9800;
+        }
+
+        .score-0 {
+            color: #f44336;
+        }
+
+        .insights {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .insights h3 {
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .insights ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .insights li {
+            padding: 8px 0;
+            padding-left: 20px;
+            position: relative;
+            color: #666;
+        }
+
+        .insights li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .insights li.warning:before {
+            content: "⚠";
+            color: #ff9800;
+        }
+
+        .insights li.critical:before {
+            content: "🔴";
+            color: #f44336;
+        }
+
+        .footer {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 0 0 8px 8px;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .scorecard {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Weekly Productivity Report</h1>
+            <p>Ideaform Design Studio - Week 1</p>
+            <div class="header-info">
+                <div>
+                    <strong>Week Period</strong>
+                    June 1 - 6, 2026
+                </div>
+                <div>
+                    <strong>Report Generated</strong>
+                    June 8, 2026
+                </div>
+                <div>
+                    <strong>Team Members</strong>
+                    6 Core Contributors
+                </div>
+                <div>
+                    <strong>Average Score</strong>
+                    61.8/100
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Summary Table -->
+            <h2 class="section-title">📈 Team Rankings - Week 1</h2>
+
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px">#</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Target</th>
+                        <th>Output (/50)</th>
+                        <th>DPR (/15)</th>
+                        <th>Punctuality (/20)</th>
+                        <th>Hours (/15)</th>
+                        <th style="width: 100px">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: #f1f8f4;">
+                        <td class="rank">🥇</td>
+                        <td><strong>Poorvi Goyal</strong></td>
+                        <td>Junior Architect</td>
+                        <td>48</td>
+                        <td>41.98</td>
+                        <td>15.00</td>
+                        <td>20.00</td>
+                        <td>15.00</td>
+                        <td class="score score-100"><strong>91.98</strong></td>
+                    </tr>
+                    <tr style="background: #f1f5fb;">
+                        <td class="rank">🥈</td>
+                        <td><strong>Aaditya Koshti</strong></td>
+                        <td>Junior Architect</td>
+                        <td>48</td>
+                        <td>14.06</td>
+                        <td>12.50</td>
+                        <td>20.00</td>
+                        <td>14.00</td>
+                        <td class="score score-75"><strong>60.56</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="rank">🥉</td>
+                        <td><strong>Himanshu Malviya</strong></td>
+                        <td>Technical Lead</td>
+                        <td>72</td>
+                        <td>10.00</td>
+                        <td>15.00</td>
+                        <td>20.00</td>
+                        <td>12.00</td>
+                        <td class="score score-75"><strong>57.00</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="rank">4️⃣</td>
+                        <td><strong>Achal Rathore</strong></td>
+                        <td>Technical Lead</td>
+                        <td>72</td>
+                        <td>12.29</td>
+                        <td>12.50</td>
+                        <td>18.00</td>
+                        <td>12.00</td>
+                        <td class="score score-75"><strong>54.79</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="rank">5️⃣</td>
+                        <td><strong>Bhavesh Bhagwat</strong></td>
+                        <td>Junior Architect</td>
+                        <td>60</td>
+                        <td>11.00</td>
+                        <td>10.00</td>
+                        <td>18.00</td>
+                        <td>12.00</td>
+                        <td class="score score-50"><strong>51.00</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="rank">6️⃣</td>
+                        <td><strong>Sahil Maurya</strong></td>
+                        <td>Junior ID</td>
+                        <td>48</td>
+                        <td>12.92</td>
+                        <td>5.00</td>
+                        <td>16.00</td>
+                        <td>12.00</td>
+                        <td class="score score-0"><strong>45.92</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Insights -->
+            <div class="insights">
+                <h3>🎯 Key Insights</h3>
+                <ul>
+                    <li><strong>Poorvi Goyal</strong> leads with 91.98/100 - exceptional performance across all dimensions. Perfect attendance and DPR consistency.</li>
+                    <li><strong>Aaditya Koshti & Himanshu Malviya</strong> show good attendance discipline but need to improve task delivery (28% and 20% of targets respectively).</li>
+                    <li><strong>Achal Rathore</strong> had one absent day which impacted punctuality score but completed 14 tasks with high on-time rate.</li>
+                    <li class="warning"><strong>Bhavesh Bhagwat</strong> shows one absent day and lower DPR consistency (4/6 days) - needs improvement in documentation.</li>
+                    <li class="critical"><strong>Sahil Maurya</strong> CRITICAL: Only 33% DPR consistency (2/6 days submitted) - immediate intervention required.</li>
+                </ul>
+            </div>
+
+            <!-- Detailed Scorecard -->
+            <h2 class="section-title">👤 Individual Performance Cards</h2>
+
+            <div class="scorecard">
+                <!-- Poorvi Goyal -->
+                <div class="score-card excellent">
+                    <div class="card-name">Poorvi Goyal 🌟</div>
+                    <div class="card-role">Junior Architect</div>
+                    <div class="card-target">Target: 48 pts/week</div>
+                    <div class="metric">
+                        <span class="metric-label">Output</span>
+                        <span class="metric-value">41.98/50</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Consistency</span>
+                        <span class="metric-value">15/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Punctuality</span>
+                        <span class="metric-value">20/20</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Hours Worked</span>
+                        <span class="metric-value">15/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Tasks Completed</span>
+                        <span class="metric-value">15/15</span>
+                    </div>
+                    <div class="total-score">91.98</div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: 92%; background: #4caf50;"></div>
+                    </div>
+                </div>
+
+                <!-- Aaditya Koshti -->
+                <div class="score-card good">
+                    <div class="card-name">Aaditya Koshti</div>
+                    <div class="card-role">Junior Architect</div>
+                    <div class="card-target">Target: 48 pts/week</div>
+                    <div class="metric">
+                        <span class="metric-label">Output</span>
+                        <span class="metric-value">14.06/50</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Consistency</span>
+                        <span class="metric-value">12.5/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Punctuality</span>
+                        <span class="metric-value">20/20</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Hours Worked</span>
+                        <span class="metric-value">14/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Tasks Completed</span>
+                        <span class="metric-value">5 late</span>
+                    </div>
+                    <div class="total-score">60.56</div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: 61%;"></div>
+                    </div>
+                </div>
+
+                <!-- Himanshu Malviya -->
+                <div class="score-card good">
+                    <div class="card-name">Himanshu Malviya</div>
+                    <div class="card-role">Technical Lead</div>
+                    <div class="card-target">Target: 72 pts/week</div>
+                    <div class="metric">
+                        <span class="metric-label">Output</span>
+                        <span class="metric-value">10/50</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Consistency</span>
+                        <span class="metric-value">15/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Punctuality</span>
+                        <span class="metric-value">20/20</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Hours Worked</span>
+                        <span class="metric-value">12/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Delivery Rate</span>
+                        <span class="metric-value">20% of target</span>
+                    </div>
+                    <div class="total-score">57.00</div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: 57%;"></div>
+                    </div>
+                </div>
+
+                <!-- Achal Rathore -->
+                <div class="score-card good">
+                    <div class="card-name">Achal Rathore</div>
+                    <div class="card-role">Technical Lead</div>
+                    <div class="card-target">Target: 72 pts/week</div>
+                    <div class="metric">
+                        <span class="metric-label">Output</span>
+                        <span class="metric-value">12.29/50</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Consistency</span>
+                        <span class="metric-value">12.5/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Punctuality</span>
+                        <span class="metric-value">18/20</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Hours Worked</span>
+                        <span class="metric-value">12/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">1 Absent Day</span>
+                        <span class="metric-value">-2.0 pts impact</span>
+                    </div>
+                    <div class="total-score">54.79</div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: 55%;"></div>
+                    </div>
+                </div>
+
+                <!-- Bhavesh Bhagwat -->
+                <div class="score-card average">
+                    <div class="card-name">Bhavesh Bhagwat</div>
+                    <div class="card-role">Junior Architect</div>
+                    <div class="card-target">Target: 60 pts/week</div>
+                    <div class="metric">
+                        <span class="metric-label">Output</span>
+                        <span class="metric-value">11/50</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Consistency</span>
+                        <span class="metric-value">10/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Punctuality</span>
+                        <span class="metric-value">18/20</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Hours Worked</span>
+                        <span class="metric-value">12/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Days</span>
+                        <span class="metric-value">4/6 (67%)</span>
+                    </div>
+                    <div class="total-score">51.00</div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: 51%;"></div>
+                    </div>
+                </div>
+
+                <!-- Sahil Maurya -->
+                <div class="score-card poor">
+                    <div class="card-name">Sahil Maurya ⚠️</div>
+                    <div class="card-role">Junior ID</div>
+                    <div class="card-target">Target: 48 pts/week</div>
+                    <div class="metric">
+                        <span class="metric-label">Output</span>
+                        <span class="metric-value">12.92/50</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Consistency</span>
+                        <span class="metric-value">5/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Punctuality</span>
+                        <span class="metric-value">16/20</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Hours Worked</span>
+                        <span class="metric-value">12/15</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">DPR Days</span>
+                        <span class="metric-value">2/6 (33%)</span>
+                    </div>
+                    <div class="total-score">45.92</div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: 46%; background: #f44336;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Critical Actions -->
+            <h2 class="section-title">⚡ Critical Actions Required</h2>
+
+            <div class="insights">
+                <h3>🔴 Immediate (Within 2 Days)</h3>
+                <ul class="critical">
+                    <li><strong>Sahil Maurya DPR Crisis:</strong> Only 2/6 days submitted (33%). Schedule 1-on-1 meeting to identify blocker. Implement daily 5 PM reminder.</li>
+                </ul>
+
+                <h3>🟡 High Priority (This Week)</h3>
+                <ul class="warning">
+                    <li><strong>Task Delivery Audit:</strong> Himanshu (20%), Achal (25%), Bhavesh (22%), Aaditya (28%) all below targets. Review assignment capacity and project blockers.</li>
+                    <li><strong>Attendance Follow-up:</strong> Check reasons for absent days (Achal, Bhavesh)</li>
+                    <li><strong>Bhavesh DPR:</strong> Only 4/6 submissions. Add to automated reminder system.</li>
+                </ul>
+
+                <h3>🟢 Medium Priority (Next Week)</h3>
+                <ul>
+                    <li><strong>Late Task Pattern:</strong> Aaditya and Bhavesh show all completions as late. Review deadline expectations.</li>
+                    <li><strong>Mentoring:</strong> Consider pairing Poorvi Goyal with lower performers on DPR consistency best practices.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Generated: June 8, 2026 | Ideaform Design Studio Productivity System</p>
+            <p>Report covers: 6 core team members | Period: June 1-6, 2026</p>
+            <p>Data sources: Task completion (TASK_ASSIGNMENTS), DPR submissions (DAILY_SUMMARY), Attendance (Biometric)</p>
+        </div>
+    </div>
+</body>
+</html>
