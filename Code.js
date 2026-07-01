@@ -705,8 +705,8 @@ function assignTasks(data) {
       tWeighted,                      // I Weighted Pts = F × G × H
       data.dateAssigned || today,     // J
       t.targetDate      || '',        // K
-      t.area            || '',        // L
-      t.drawing         || '',        // M
+      t.description || t.area || '', // L Description (was Area)
+      t.drawing         || '',        // M Drawing Name (legacy; new tasks leave blank)
       'Not Started',                  // N SelfStatus
       '',                             // O SelfStatusDate
       '',                             // P ActualCompletionDate
@@ -745,7 +745,7 @@ function bulkAssignTasks(data, authEmail) {
 function writeAssignHeaders(s) {
   var h = ['Task ID','Project ID','Project Name','Assigned To','Stage','Disc. Multiplier',
            'Stage Base Pts','Units','Weighted Points','Assigned Date','Deadline',
-           'Area','Drawing Name','Self Status','Self Done Date','Actual Completion Date',
+           'Description','Drawing Name','Self Status','Self Done Date','Actual Completion Date',
            'Lead Approved','Approved By','Approval Date','Revision Tag','Notes','Assigned by','Priority'];
   var r = s.getRange(1, 1, 1, h.length);
   r.setValues([h]);
@@ -1586,8 +1586,11 @@ function submitMeetingLog(data, authEmail){
       var assignee = resolveAssignee(f.owner, project) || f.owner;
       var taskId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
       aSheet.appendRow([ taskId, '', project, assignee, 'MoM Action', 1, 1, 1, 1, day,
-        f.deadline || addDaysToStr(day,3), '', '', 'Not Started', '', '', 'Pending', '', '', '',
-        (f.textPolished||f.text)+' [From '+type+' '+day+']', loggedBy+' (MoM)', 'Medium' ]);
+        f.deadline || addDaysToStr(day,3),
+        f.textPolished||f.text,                    // L Description (action item text)
+        '', 'Not Started', '', '', 'Pending', '', '', '',
+        '[From '+type+' '+day+']',                 // U Notes (source metadata)
+        loggedBy+' (MoM)', 'Medium' ]);
       parkRowIfStalled(aSheet, project);
     }
   });
@@ -1891,18 +1894,21 @@ function get3MData(project, weekStart) {
       var dl   = cellDate(ar[j][10]);
       var tt   = String(ar[j][4]||'');
       var who  = String(ar[j][3]||'');
-      var draw = String(ar[j][12]||'') || String(ar[j][11]||'');
+      var area  = String(ar[j][11]||'');
+      var draw  = String(ar[j][12]||'');
+      var desc  = area ? (draw ? area + ' — ' + draw : area) : draw;
+      var tnotes = String(ar[j][20]||'');
       var dsp  = String(ar[j][COL_BLK_DISPO-1]||'').trim();
       if (dsp === 'Parked' || dsp === 'Parked (Stalled)') continue;
       if (ss === 'Reassigned') continue;
 
       if (ss === 'Done' && ssd >= lastMon && ssd <= lastSat) {
-        out.lastWeekDone.push({ task: tt + (draw ? ' — '+draw : ''), who: who });
+        out.lastWeekDone.push({ taskType: tt, description: desc, notes: tnotes, who: who });
       } else if (ss !== 'Done' && dl >= mon && dl <= sat) {
         if (isVisitTask(tt)) {
           out.siteActivities.push({ day: dowName(dl), date: dl, task: tt, who: who });
         } else {
-          out.deliverables.push({ day: dowName(dl), date: dl, task: tt + (draw ? ' — '+draw : ''), who: who });
+          out.deliverables.push({ day: dowName(dl), date: dl, taskType: tt, description: desc, notes: tnotes, who: who });
         }
       }
     }
@@ -1958,7 +1964,10 @@ function generate3MMessage(data, authEmail) {
   lines.push('');
   if (report.lastWeekDone.length) {
     lines.push('Last Week Completed');
-    report.lastWeekDone.forEach(function(t){ lines.push('* ' + t.task); });
+    report.lastWeekDone.forEach(function(t){
+      lines.push('* ' + t.taskType + (t.description ? ' — ' + t.description : ''));
+      if (t.notes) lines.push('  ↳ ' + t.notes);
+    });
   } else {
     lines.push('No completed items recorded for last week.');
   }
@@ -1967,8 +1976,9 @@ function generate3MMessage(data, authEmail) {
     lines.push(''); lines.push(SEP);
     lines.push('🏛 IDS Deliverables');
     report.deliverables.forEach(function(d){
-      lines.push(''); lines.push('* ' + d.task);
+      lines.push(''); lines.push('* ' + d.taskType + (d.description ? ' — ' + d.description : ''));
       lines.push('  (' + d.day + ')');
+      if (d.notes) lines.push('  ↳ ' + d.notes);
     });
   }
 
@@ -5080,7 +5090,8 @@ function createIssueTask(iss, project, date, onTrack) {
 
   var srcLabel = (iss.reportedBy === 'Aman Raghuwanshi') ? 'CRM' : 'DPER';
   var taskType = (iss.kind === 'Deliverable') ? 'Design Deliverable — CRM' : 'Site Issue — Design';
-  var notes    = iss.description + ' [From ' + srcLabel + ': ' + project + ', ' + date + ']';
+  var description = iss.description || '';
+  var metaNotes   = '[' + srcLabel + ': ' + project + ', ' + date + ']';
 
   sheet.appendRow([
     newId,                    // A TaskID
@@ -5094,8 +5105,8 @@ function createIssueTask(iss, project, date, onTrack) {
     1,                        // I Weighted Pts = 1 × 1 × 1
     today,                    // J AssignedDate
     iss.targetDate || addDaysToStr(today,2), // K Deadline
-    '',                       // L Area
-    '',                       // M Drawing
+    description,              // L Description (was Area)
+    '',                       // M Drawing (unused for auto-tasks)
     'Not Started',            // N SelfStatus
     '',                       // O SelfStatusDate
     '',                       // P ActualCompletionDate
@@ -5103,7 +5114,7 @@ function createIssueTask(iss, project, date, onTrack) {
     '',                       // R ApprovedBy
     '',                       // S ApprovalDate
     '',                       // T RevisionTag
-    notes,                    // U Notes
+    metaNotes,                // U Notes (source metadata only)
     srcLabel + ' — ' + (iss.reportedBy||'Execution Lead'), // V AssignedBy
     priority,                 // W Priority
   ]);
@@ -5476,13 +5487,15 @@ function getProjectWeeklyReport(project, weekStart) {
       var dl   = cellDate(ar[j][10]);
       var tt   = String(ar[j][4]||'');
       var who  = String(ar[j][3]||'');
-      var area = String(ar[j][11]||'');
-      var draw = String(ar[j][12]||'');
+      var area  = String(ar[j][11]||'');
+      var draw  = String(ar[j][12]||'');
+      var notes = String(ar[j][20]||'');
+      var description = area ? (draw ? area + ' — ' + draw : area) : draw;
       var dsp  = String(ar[j][COL_BLK_DISPO-1]||'').trim();
       if (dsp === 'Parked' || dsp === 'Parked (Stalled)') continue;
       if (ss === 'Reassigned') continue;
 
-      var task = { taskType:tt, assignedTo:who, area:area, drawing:draw, deadline:dl, selfStatus:ss };
+      var task = { taskType:tt, assignedTo:who, description:description, notes:notes, deadline:dl, selfStatus:ss };
 
       if (ss === 'Done') {
         if (ssd >= lastMon && ssd <= lastSat) out.lastWeekDone.push(task);
@@ -7029,10 +7042,10 @@ function createMeetingTasks(agendas, member, today) {
     attendees.forEach(function(person) {
       if (!person) return;
       var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
-      var notes = (type + ' — ' + (ag.project||'') +
-                   (ag.time ? ' @ ' + ag.time : '') +
-                   (ag.agenda ? '. Agenda: ' + ag.agenda : '') +
-                   ' [CRM auto; points = hours logged in DPR — Site Visit ×2/hr, Meeting ×1/hr]');
+      var description = (ag.agenda || ag.purpose || type) +
+                        (ag.time ? ' @ ' + ag.time : '') +
+                        (ag.project ? ' — ' + ag.project : '');
+      var metaNotes = '[Auto: pts = hours logged in DPR — Site Visit ×2/hr, Meeting ×1/hr]';
       sheet.appendRow([
         newId,                        // A TaskID
         '',                           // B ProjectID
@@ -7045,12 +7058,13 @@ function createMeetingTasks(agendas, member, today) {
         0,                            // I Weighted Pts (0 until Done w/ hours → hours × rate)
         today,                        // J AssignedDate
         ag.date || today,             // K Deadline (meeting/visit date)
-        '', '',                       // L Area, M Drawing
+        description,                  // L Description (agenda/purpose)
+        '',                           // M Drawing (unused)
         'Not Started',                // N SelfStatus
         '', '',                       // O SelfStatusDate, P ActualCompletion
         'Pending',                    // Q LeadApproved
         '', '', '',                   // R ApprovedBy, S ApprovalDate, T RevisionTag
-        notes,                        // U Notes
+        metaNotes,                    // U Notes (auto-pts metadata)
         'CRM — ' + member,            // V AssignedBy
         'Medium',                     // W Priority
       ]);

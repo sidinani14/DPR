@@ -724,8 +724,7 @@ function renderTaskList(tasks) {
       </div>
       <div class="task-body">
         <div class="task-type">${t.taskType}</div>
-        ${t.area?`<div class="task-area">${t.area}</div>`:''}
-        ${t.drawing?`<div class="task-drawing">Drawing: ${t.drawing}</div>`:''}
+        ${(t.area||t.drawing)?`<div class="task-area">${t.area&&t.drawing?t.area+' — '+t.drawing:t.area||t.drawing}</div>`:''}
         ${t.revisionTag?`<div class="revision-badge">🔴 ${t.revisionTag}${t.revisionType?' — '+t.revisionType:''}</div>`:''}
         <div class="task-meta">
           <div class="tm">Units: <span>${t.units}</span></div>

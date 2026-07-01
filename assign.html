@@ -104,13 +104,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <div class="field"><label>Assigned To</label>
         <select id="s-member"><option value="">Select member…</option></select></div>
     </div>
-    <div class="grid3">
+    <div class="grid2">
       <div class="field"><label>Stage / Task Type</label>
         <select id="s-stage" onchange="onSingleStage()"><option value="">Select stage…</option></select></div>
-      <div class="field"><label>Area</label>
-        <input type="text" id="s-area" placeholder="e.g. Kitchen, Bedroom 2"></div>
-      <div class="field"><label>Drawing Name</label>
-        <input type="text" id="s-drawing" placeholder="e.g. Floor Plan, Elevation"></div>
+      <div class="field"><label>Description <span style="font-size:10px;font-weight:400;color:var(--text3)">(area · drawing name)</span></label>
+        <input type="text" id="s-description" placeholder="e.g. Kitchen — Floor Plan, Bedroom 2 — Elevation"></div>
     </div>
     <div class="grid3">
       <div class="field"><label>Units <span id="s-pts-info" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
@@ -120,8 +118,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <div class="field"><label>Priority</label>
         <select id="s-priority"><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></div>
     </div>
-    <div class="field"><label>Notes</label>
-      <input type="text" id="s-notes" placeholder="Optional notes"></div>
+    <div class="field"><label>Notes <span style="font-size:10px;font-weight:400;color:var(--text3)">(optional)</span></label>
+      <input type="text" id="s-notes" placeholder="e.g. Client requirement, revision context…"></div>
     <div style="font-size:12px;color:var(--text3);margin-top:6px" id="s-pts-preview"></div>
   </div>
 
@@ -151,25 +149,29 @@ let MODE = 'single';
 let blockCount = 0;
 
 window.idsOnAuth = async function(user){
-  const [lists, cfg] = await Promise.all([api('getLists'), api('getConfig')]);
-  CFG.allMembers = lists.allMembers || [];
-  CFG.projects   = (lists.projects || []).filter(p => p.status !== 'Closed' && p.status !== 'Completed');
-  CFG.stages     = (cfg.stages || []).filter(s => s.label && !isVisitType(s.label));
+  try {
+    const [lists, cfg] = await Promise.all([api('getLists'), api('getConfig')]);
+    CFG.allMembers = (lists && lists.allMembers) ? lists.allMembers : [];
+    CFG.projects   = ((lists && lists.projects) ? lists.projects : []).filter(p => p.status !== 'Closed' && p.status !== 'Completed');
+    CFG.stages     = ((cfg && cfg.stages) ? cfg.stages : []).filter(s => s.label && !isVisitType(s.label));
 
-  // Assign-by default = current user's name
-  const byEl = document.getElementById('meta-by');
-  byEl.innerHTML = CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
-  const myName = CFG.allMembers.find(m => m.toLowerCase().includes(String(user.name||'').split(' ')[0].toLowerCase())) || CFG.allMembers[0] || '';
-  byEl.value = myName;
+    if (!CFG.allMembers.length || !CFG.projects.length) {
+      document.getElementById('submit-status').textContent = CFG.allMembers.length ? '' : '⚠ Could not load team list — check connection';
+    }
 
-  document.getElementById('meta-date').value = today();
+    const byEl = document.getElementById('meta-by');
+    byEl.innerHTML = CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+    const myName = CFG.allMembers.find(m => m.toLowerCase().includes(String(user.name||'').split(' ')[0].toLowerCase())) || CFG.allMembers[0] || '';
+    byEl.value = myName;
 
-  // Populate single-mode dropdowns
-  populateSingleDropdowns();
+    document.getElementById('meta-date').value = today();
+    populateSingleDropdowns();
 
-  // If project param in URL, pre-select it in bulk mode
-  const urlP = new URLSearchParams(location.search).get('project');
-  if (urlP) { setMode('bulk'); addBlock(urlP); }
+    const urlP = new URLSearchParams(location.search).get('project');
+    if (urlP) { setMode('bulk'); addBlock(urlP); }
+  } catch(e) {
+    document.getElementById('submit-status').textContent = '✗ Failed to load form data: ' + e.message;
+  }
 };
 
 function today(){ return new Date().toISOString().split('T')[0]; }
@@ -182,7 +184,7 @@ function populateSingleDropdowns(){
   const ms = document.getElementById('s-member');
   ms.innerHTML = '<option value="">Select member…</option>' + CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
   const ss = document.getElementById('s-stage');
-  ss.innerHTML = '<option value="">Select stage…</option>' + CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.basePts||0}">${s.label}</option>`).join('');
+  ss.innerHTML = '<option value="">Select stage…</option>' + CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.pts||0}">${s.label}</option>`).join('');
 }
 
 function onSingleProject(){ updateSinglePts(); }
@@ -239,7 +241,7 @@ function addBlock(preProject){
     <div class="block-body">
       <table class="task-table">
         <thead><tr>
-          <th>Stage / Task Type</th><th>Area</th><th>Drawing Name</th>
+          <th>Stage / Task Type</th><th>Description <span style="font-size:8px;font-weight:400;color:var(--text3)">(area · drawing)</span></th>
           <th style="width:60px">Units</th><th style="width:110px">Deadline</th>
           <th style="width:80px">Priority</th><th style="width:60px">Pts</th><th class="td-del"></th>
         </tr></thead>
@@ -266,12 +268,11 @@ function removeBlock(id){ document.getElementById(id).remove(); updateCount(); }
 
 function addRow(blockId){
   const block = document.getElementById(blockId);
-  const stageOpts = CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.basePts||0}">${s.label}</option>`).join('');
+  const stageOpts = CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.pts||0}">${s.label}</option>`).join('');
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td><select class="r-stage" onchange="onRowStage(this)">${stageOpts}</select></td>
-    <td><input type="text" class="r-area" placeholder="Area" oninput="updateCount()"></td>
-    <td><input type="text" class="r-draw" placeholder="Drawing name" oninput="updateCount()"></td>
+    <td><input type="text" class="r-desc" placeholder="e.g. Kitchen — Floor Plan" oninput="updateCount()"></td>
     <td><input type="number" class="r-units" value="1" min="1" style="width:54px" onchange="onRowStage(this)"></td>
     <td><input type="date" class="r-deadline" oninput="updateCount()"></td>
     <td><select class="r-priority"><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></td>
@@ -332,21 +333,19 @@ async function submit(){
         multiplier: parseFloat(projOpt.dataset.mult||1),
         assignedBy, dateAssigned,
         tasks:[{
-          taskType: stageOpt.value,
-          basePts:  parseFloat(stageOpt.dataset.pts||0),
-          units:    parseFloat(document.getElementById('s-units').value||1),
-          targetDate: document.getElementById('s-deadline').value,
-          area:     document.getElementById('s-area').value,
-          drawing:  document.getElementById('s-drawing').value,
-          priority: document.getElementById('s-priority').value,
-          notes:    document.getElementById('s-notes').value
+          taskType:    stageOpt.value,
+          basePts:     parseFloat(stageOpt.dataset.pts||0),
+          units:       parseFloat(document.getElementById('s-units').value||1),
+          targetDate:  document.getElementById('s-deadline').value,
+          description: document.getElementById('s-description').value,
+          priority:    document.getElementById('s-priority').value,
+          notes:       document.getElementById('s-notes').value
         }]
       };
       const r = await api('assignTasks', data);
       if (r.status !== 'ok') throw new Error(r.message||'Failed');
       status.textContent = '✓ Task created';
-      document.getElementById('s-area').value = '';
-      document.getElementById('s-drawing').value = '';
+      document.getElementById('s-description').value = '';
       document.getElementById('s-notes').value = '';
     } else {
       // Bulk mode
@@ -363,13 +362,12 @@ async function submit(){
           const stageOpt = tr.querySelector('.r-stage').selectedOptions[0];
           if (!stageOpt||!stageOpt.value) return;
           tasks.push({
-            taskType:   stageOpt.value,
-            basePts:    parseFloat(stageOpt.dataset.pts||0),
-            units:      parseFloat(tr.querySelector('.r-units').value||1),
-            targetDate: tr.querySelector('.r-deadline').value,
-            area:       tr.querySelector('.r-area').value,
-            drawing:    tr.querySelector('.r-draw').value,
-            priority:   tr.querySelector('.r-priority').value
+            taskType:    stageOpt.value,
+            basePts:     parseFloat(stageOpt.dataset.pts||0),
+            units:       parseFloat(tr.querySelector('.r-units').value||1),
+            targetDate:  tr.querySelector('.r-deadline').value,
+            description: tr.querySelector('.r-desc').value,
+            priority:    tr.querySelector('.r-priority').value
           });
         });
         if (!tasks.length){ errs.push('Block "'+projOpt.value+'" has no tasks'); valid=false; return; }
