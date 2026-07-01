@@ -69,6 +69,19 @@ table.leads tr:hover td{background:var(--surface2)}
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .status-line{max-width:1100px;margin:0 auto;padding:6px 20px 0;font-size:11px;color:var(--text3)}
 @media(max-width:560px){.strip{grid-template-columns:repeat(2,1fr)}}
+/* Weekly report drawer */
+.dtabs{display:flex;gap:2px;margin-bottom:14px;background:var(--surface2);border-radius:7px;padding:3px}
+.dtab{flex:1;font-size:11px;font-weight:600;padding:6px;text-align:center;border-radius:5px;cursor:pointer;color:var(--text3);border:none;background:none}
+.dtab.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.wr-section{margin-bottom:14px}
+.wr-head{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.wr-count{font-size:9px;background:rgba(200,169,110,.15);color:var(--accent);border-radius:8px;padding:1px 6px}
+.wr-item{font-size:12px;padding:6px 9px;background:var(--surface2);border-radius:6px;margin-bottom:4px;color:var(--text2)}
+.wr-item b{color:var(--text);font-weight:600}
+.wr-item .meta{font-size:10px;color:var(--text3);margin-top:2px}
+.wr-empty{font-size:11px;color:var(--text3);font-style:italic;padding:3px 0}
+.wr-visit{font-size:12px;background:var(--surface2);border-radius:6px;padding:8px 10px;color:var(--text2)}
+.wr-last{font-size:10px;color:var(--text3);margin-top:3px}
 </style>
 </head>
 <body>
@@ -180,37 +193,95 @@ function cardHtml(p){
   </div>`;
 }
 
-async function openDrawer(project){
+async function openDrawer(project, tab){
   const bg=document.getElementById('drawer-bg'), d=document.getElementById('drawer');
   bg.classList.add('open'); d.classList.add('open'); window._drawerProject=project;
-  d.innerHTML=`<div class="dh"><h3>${project}</h3><button class="dclose" onclick="closeDrawer()">×</button></div><div class="dsub">loading…</div>`;
+  tab = tab || 'health';
+  d.innerHTML=`<div class="dh"><h3>${project}</h3><button class="dclose" onclick="closeDrawer()">×</button></div>
+    <div class="dtabs">
+      <button class="dtab ${tab==='health'?'on':''}" onclick="openDrawer('${project.replace(/'/g,"\\'")}','health')">Project Health</button>
+      <button class="dtab ${tab==='report'?'on':''}" onclick="openDrawer('${project.replace(/'/g,"\\'")}','report')">Weekly Report</button>
+    </div>
+    <div id="drawer-body"><div class="dsub">loading…</div></div>`;
+  const db=document.getElementById('drawer-body');
   try{
-    const [x, mt]=await Promise.all([api('getProjectDetail',{project}), api('getMeetingTimeline',{project}).catch(()=>({meetings:[]}))]);
-    const iss=(x.openIssues||[]), tasks=(x.tasks||[]), visits=(x.siteVisits||[]), conns=(x.connections||[]);
-    const meets=(mt&&mt.meetings)||[];
-    const canDel=isSiddharth();
-    const mHtml = meets.length? meets.map(m=>`<div class="ditem"><b>${shortD(m.date)}</b> · ${m.type||''} · ${m.loggedBy||''} <span class="dpill ${m.status==='Final'?'di-esc':'di-open'}">${m.status||m.approved||'Draft'}</span>${m.pdfId?' <a href="https://drive.google.com/file/d/'+m.pdfId+'/view" target="_blank" style="font-size:11px">PDF</a>':''}${canDel&&m.logId?` <button onclick="doDeleteLog('${m.logId}')" style="font-size:10px;color:#C0392B;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;margin-left:4px">Delete</button>`:''}</div>`).join('') : '<div class="dempty">No meetings/visits logged</div>';
-    const bills=(x.billables||[]), others=(x.otherActivities||[]);
-    const billHtml = bills.length? bills.map(b=>`<div class="ditem"><b>${shortD(b.date)}</b> · ${b.discipline||''} · ${b.stage||''} <span class="dpill di-open">${b.status||''}</span> <span style="font-size:11px;color:var(--text3)">${b.raisedBy||''}</span></div>`).join('') : '<div class="dempty">No billables raised</div>';
-    const othHtml = others.length? others.slice(0,12).map(o=>`<div class="ditem"><b>${shortD(o.date)}</b> · ${o.type||''} · ${o.by||''}${o.notes?'<br><span style="font-size:11px">'+o.notes+'</span>':''}</div>`).join('') : '<div class="dempty">No other activities</div>';
-    const tord={Delayed:0,'In Progress':1,Ongoing:1,Done:3};
-    const issHtml = iss.length? iss.map(i=>`<div class="ditem"><b>${i.desc||i.type||'Issue'}</b><span class="dpill ${i.status==='Open'?'di-open':'di-esc'}">${i.status}</span><br><span style="font-size:11px">${i.assignedTo||'—'} · due ${shortD(i.targetDate)}</span></div>`).join('') : '<div class="dempty">No open issues 🎉</div>';
-    const acts=(x.actionItems||[]);
-    const actHtml = acts.length? acts.map(a=>`<div class="ditem"><b>${a.category||'—'}</b>${a.owner?' · '+a.owner:''} <span class="dpill ${a.status==='Open'?'di-open':'di-esc'}">${a.status||'Open'}</span><br><span style="font-size:11px">${a.text||''}</span> <span style="color:var(--text3);font-size:10px">${shortD(a.date)}</span></div>`).join('') : '<div class="dempty">No action items from logs</div>';
-    const tHtml = tasks.length? tasks.map(t=>`<div class="ditem"><b>${t.taskType}</b> · ${t.selfStatus||'—'}<br><span style="font-size:11px">${t.assignedTo} · due ${shortD(t.deadline)}</span></div>`).join('') : '<div class="dempty">No tasks this week</div>';
-    const vHtml = visits.length? visits.map(v=>`<div class="ditem"><b>${shortD(v.date)}</b> · ${v.who||'—'}${v.hours?' · '+v.hours+'h':''} <span style="color:var(--text3)">${v.type||''}</span></div>`).join('') : '<div class="dempty">No site visits logged</div>';
-    const cHtml = conns.length? conns.slice(0,12).map(co=>`<div class="ditem"><b>${shortD(co.date)}</b> · ${co.type||''} · ${co.by||''}${co.notes?'<br><span style="font-size:11px">'+co.notes+'</span>':''}</div>`).join('') : '<div class="dempty">No connections logged</div>';
-    d.innerHTML=`<div class="dh"><h3>${project}</h3><button class="dclose" onclick="closeDrawer()">×</button></div>
-      <div class="dsub">Last bill raised: ${shortD(x.lastBillRaised)} · Last payment cleared: ${shortD(x.lastPayCleared)}${x.dperPct?' · Progress: '+x.dperPct+'%':''}</div>
-      <div class="dsec">Open Issues (${iss.length})</div>${issHtml}
-      <div class="dsec">Action Items — from meeting/site logs (${acts.length})</div>${actHtml}
-      <div class="dsec">Tasks this week (${tasks.length})</div>${tHtml}
-      <div class="dsec">Site visits done (${visits.length})</div>${vHtml}
-      <div class="dsec">Meetings & Decisions (${meets.length})</div>${mHtml}
-      <div class="dsec">Connections (${conns.length})</div>${cHtml}
-      <div class="dsec">Billables (${bills.length})</div>${billHtml}
-      <div class="dsec">Other activities (${others.length})</div>${othHtml}`;
-  }catch(e){ d.querySelector('.dsub').textContent='Error: '+e.message; }
+    if(tab==='health'){
+      const [x, mt]=await Promise.all([api('getProjectDetail',{project}), api('getMeetingTimeline',{project}).catch(()=>({meetings:[]}))]);
+      const iss=(x.openIssues||[]), tasks=(x.tasks||[]), visits=(x.siteVisits||[]), conns=(x.connections||[]);
+      const meets=(mt&&mt.meetings)||[];
+      const canDel=isSiddharth();
+      const mHtml = meets.length? meets.map(m=>`<div class="ditem"><b>${shortD(m.date)}</b> · ${m.type||''} · ${m.loggedBy||''} <span class="dpill ${m.status==='Final'?'di-esc':'di-open'}">${m.status||m.approved||'Draft'}</span>${m.pdfId?' <a href="https://drive.google.com/file/d/'+m.pdfId+'/view" target="_blank" style="font-size:11px">PDF</a>':''}${canDel&&m.logId?` <button onclick="doDeleteLog('${m.logId}')" style="font-size:10px;color:#C0392B;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;margin-left:4px">Delete</button>`:''}</div>`).join('') : '<div class="dempty">No meetings/visits logged</div>';
+      const bills=(x.billables||[]), others=(x.otherActivities||[]);
+      const billHtml = bills.length? bills.map(b=>`<div class="ditem"><b>${shortD(b.date)}</b> · ${b.discipline||''} · ${b.stage||''} <span class="dpill di-open">${b.status||''}</span> <span style="font-size:11px;color:var(--text3)">${b.raisedBy||''}</span></div>`).join('') : '<div class="dempty">No billables raised</div>';
+      const othHtml = others.length? others.slice(0,12).map(o=>`<div class="ditem"><b>${shortD(o.date)}</b> · ${o.type||''} · ${o.by||''}${o.notes?'<br><span style="font-size:11px">'+o.notes+'</span>':''}</div>`).join('') : '<div class="dempty">No other activities</div>';
+      const issHtml = iss.length? iss.map(i=>`<div class="ditem"><b>${i.desc||i.type||'Issue'}</b><span class="dpill ${i.status==='Open'?'di-open':'di-esc'}">${i.status}</span><br><span style="font-size:11px">${i.assignedTo||'—'} · due ${shortD(i.targetDate)}</span></div>`).join('') : '<div class="dempty">No open issues 🎉</div>';
+      const acts=(x.actionItems||[]);
+      const actHtml = acts.length? acts.map(a=>`<div class="ditem"><b>${a.category||'—'}</b>${a.owner?' · '+a.owner:''} <span class="dpill ${a.status==='Open'?'di-open':'di-esc'}">${a.status||'Open'}</span><br><span style="font-size:11px">${a.text||''}</span> <span style="color:var(--text3);font-size:10px">${shortD(a.date)}</span></div>`).join('') : '<div class="dempty">No action items from logs</div>';
+      const tHtml = tasks.length? tasks.map(t=>`<div class="ditem"><b>${t.taskType}</b> · ${t.selfStatus||'—'}<br><span style="font-size:11px">${t.assignedTo} · due ${shortD(t.deadline)}</span></div>`).join('') : '<div class="dempty">No tasks this week</div>';
+      const vHtml = visits.length? visits.map(v=>`<div class="ditem"><b>${shortD(v.date)}</b> · ${v.who||'—'}${v.hours?' · '+v.hours+'h':''} <span style="color:var(--text3)">${v.type||''}</span></div>`).join('') : '<div class="dempty">No site visits logged</div>';
+      const cHtml = conns.length? conns.slice(0,12).map(co=>`<div class="ditem"><b>${shortD(co.date)}</b> · ${co.type||''} · ${co.by||''}${co.notes?'<br><span style="font-size:11px">'+co.notes+'</span>':''}</div>`).join('') : '<div class="dempty">No connections logged</div>';
+      db.innerHTML=`<div class="dsub">Last bill raised: ${shortD(x.lastBillRaised)} · Last payment cleared: ${shortD(x.lastPayCleared)}${x.dperPct?' · Progress: '+x.dperPct+'%':''}</div>
+        <div class="dsec">Open Issues (${iss.length})</div>${issHtml}
+        <div class="dsec">Action Items — from meeting/site logs (${acts.length})</div>${actHtml}
+        <div class="dsec">Tasks this week (${tasks.length})</div>${tHtml}
+        <div class="dsec">Site visits done (${visits.length})</div>${vHtml}
+        <div class="dsec">Meetings & Decisions (${meets.length})</div>${mHtml}
+        <div class="dsec">Connections (${conns.length})</div>${cHtml}
+        <div class="dsec">Billables (${bills.length})</div>${billHtml}
+        <div class="dsec">Other activities (${others.length})</div>${othHtml}`;
+    } else {
+      const r = await api('getProjectWeeklyReport',{project});
+      db.innerHTML = renderWeeklyReport(r, project);
+    }
+  }catch(e){ db.innerHTML=`<div class="dsub" style="color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+function renderWeeklyReport(r, project){
+  function taskRow(t){
+    const label = [t.taskType, t.area||t.drawing].filter(Boolean).join(' · ');
+    return `<div class="wr-item"><b>${label||'—'}</b><div class="meta">${t.assignedTo||'—'} · deadline ${shortD(t.deadline)}</div></div>`;
+  }
+  function issRow(i){
+    return `<div class="wr-item"><b>${i.desc||'—'}</b> <span style="font-size:10px;color:var(--red)">${i.status}</span><div class="meta">${i.assignedTo||'—'} · due ${shortD(i.targetDate)}</div></div>`;
+  }
+  const done  = (r.lastWeekDone||[]);
+  const delay = (r.delayed||[]);
+  const prog  = (r.inProgress||[]);
+  const next  = (r.nextWeekTasks||[]);
+  const iss   = (r.openIssues||[]);
+
+  const doneHtml  = done.length  ? done.map(taskRow).join('')  : '<div class="wr-empty">Nothing completed last week</div>';
+  const delayHtml = delay.length ? delay.map(taskRow).join('') : '<div class="wr-empty">No delayed tasks</div>';
+  const progHtml  = prog.length  ? prog.map(taskRow).join('')  : '<div class="wr-empty">No in-progress tasks</div>';
+  const nextHtml  = next.length  ? next.map(taskRow).join('')  : '<div class="wr-empty">No tasks assigned for this week yet</div>';
+  const issHtml   = iss.length   ? iss.map(issRow).join('')    : '<div class="wr-empty">No open issues</div>';
+  const visitHtml = r.lastVisitDate
+    ? `<div class="wr-visit">${shortD(r.lastVisitDate)}<div class="wr-last">by ${r.lastVisitBy||'—'}</div></div>`
+    : `<div class="wr-empty">No site visits recorded</div>`;
+
+  return `
+    <div class="dsub" style="margin-bottom:12px">
+      Last week: ${r.lastWeekRange||'—'} &nbsp;·&nbsp; This week: ${r.thisWeekRange||'—'}
+      &nbsp;·&nbsp; <a href="3m.html?project=${encodeURIComponent(project)}" style="color:var(--accent);font-size:11px">Generate 3M →</a>
+    </div>
+    <div class="wr-section">
+      <div class="wr-head">✅ Completed last week <span class="wr-count">${done.length}</span></div>${doneHtml}
+    </div>
+    <div class="wr-section">
+      <div class="wr-head">⏳ Delayed <span class="wr-count" style="background:rgba(224,85,107,.2);color:var(--red)">${delay.length}</span></div>${delayHtml}
+    </div>
+    <div class="wr-section">
+      <div class="wr-head">🔄 In Progress <span class="wr-count">${prog.length}</span></div>${progHtml}
+    </div>
+    <div class="wr-section">
+      <div class="wr-head">🏗 Last Site Visit</div>${visitHtml}
+    </div>
+    <div class="wr-section">
+      <div class="wr-head">⚠ Open Issues <span class="wr-count" style="background:rgba(224,85,107,.2);color:var(--red)">${iss.length}</span></div>${issHtml}
+    </div>
+    <div class="wr-section">
+      <div class="wr-head">📋 This Week's Tasks <span class="wr-count">${next.length}</span></div>${nextHtml}
+    </div>`;
 }
 function closeDrawer(){ document.getElementById('drawer-bg').classList.remove('open'); document.getElementById('drawer').classList.remove('open'); }
 const DIRECTOR_EMAILS=['sidinani14@gmail.com','siddharth@ideaform.in'];

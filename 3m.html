@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · 3M Message</title>
+<script src="auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#202020;--surface3:#2A2A2A;--border:#2E2E2E;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--green:#4A9B6F;--red:#E0556B;--radius:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:50}
+.header-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--accent)}
+.logo small{display:block;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);font-weight:400;margin-top:2px}
+.nav-links{display:flex;gap:8px}
+.nav-link{font-size:11px;color:var(--text3);text-decoration:none;padding:5px 10px;border:1px solid var(--border);border-radius:5px}
+.nav-link:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{max-width:900px;margin:0 auto;padding:18px 16px 80px;display:grid;grid-template-columns:320px 1fr;gap:18px}
+@media(max-width:700px){.layout{grid-template-columns:1fr}}
+
+/* LEFT PANEL — inputs */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.panel-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.field{margin-bottom:12px}
+label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;border-radius:6px;padding:8px 10px;outline:none;color-scheme:dark}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+
+.action-list{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.action-item{display:grid;grid-template-columns:1fr auto;gap:6px;background:var(--surface2);border-radius:7px;padding:8px}
+.action-item input{font-size:12px;padding:5px 8px}
+.action-item .del-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:2px 4px;align-self:center;border-radius:4px}
+.action-item .del-btn:hover{color:var(--red)}
+.action-sub{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px;grid-column:1/-1}
+.add-action-btn{font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px dashed rgba(200,169,110,.3);border-radius:5px;padding:6px;cursor:pointer;width:100%;text-align:center}
+.add-action-btn:hover{background:rgba(200,169,110,.15)}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+
+.gen-btn{width:100%;font-size:13px;font-weight:700;color:#000;background:var(--accent);border:none;border-radius:7px;padding:11px;cursor:pointer;margin-bottom:8px}
+.gen-btn:disabled{opacity:.5;cursor:not-allowed}
+.polish-btn{width:100%;font-size:12px;font-weight:600;color:var(--accent);background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.3);border-radius:7px;padding:9px;cursor:pointer}
+.polish-btn:disabled{opacity:.5;cursor:not-allowed}
+.gen-status{font-size:11px;color:var(--text3);text-align:center;margin-top:6px;min-height:16px}
+
+/* DATA PREVIEW chips */
+.data-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--text3)}
+.chip.has{border-color:rgba(74,155,111,.4);color:var(--green)}
+
+/* RIGHT PANEL — message preview */
+.msg-panel{display:flex;flex-direction:column;gap:10px}
+.msg-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.msg-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px}
+.msg-actions{display:flex;gap:7px}
+.copy-btn{font-size:12px;font-weight:700;color:#000;background:var(--accent);border:none;border-radius:6px;padding:8px 18px;cursor:pointer}
+.copy-btn:disabled{opacity:.4;cursor:not-allowed}
+.copy-btn.copied{background:var(--green);color:#fff}
+.edit-toggle{font-size:11px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:6px;padding:7px 12px;cursor:pointer}
+.edit-toggle:hover{border-color:var(--accent);color:var(--accent)}
+
+.msg-box{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.msg-display{padding:18px;font-size:13px;line-height:1.7;white-space:pre-wrap;font-family:'DM Mono',monospace;color:var(--text2);min-height:400px;word-break:break-word}
+.msg-edit{width:100%;min-height:520px;background:var(--surface2);border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;line-height:1.7;padding:18px;resize:vertical;display:none}
+.msg-edit:focus{outline:none}
+
+.msg-empty{padding:40px;text-align:center;color:var(--text3);font-size:13px}
+.msg-empty .arrow{font-size:24px;margin-bottom:8px;opacity:.4}
+
+.polished-badge{display:inline-block;font-size:10px;background:rgba(74,155,111,.15);color:var(--green);border:1px solid rgba(74,155,111,.3);border-radius:4px;padding:1px 8px;margin-left:8px;vertical-align:middle}
+
+/* Auto-data summary */
+.auto-summary{background:var(--surface2);border-radius:7px;padding:10px;margin-top:8px}
+.auto-row{font-size:11px;color:var(--text3);display:flex;gap:6px;margin-bottom:3px}
+.auto-row b{color:var(--text2)}
+</style>
+</head>
+<body>
+<div class="header"><div class="header-inner">
+  <div class="logo">IDEAFORM · 3M Message<small>monday morning message generator</small></div>
+  <div class="nav-links">
+    <a class="nav-link" href="dashboard.html">Tasks</a>
+    <a class="nav-link" href="projects.html">Projects</a>
+    <a class="nav-link" href="assign.html">Assign</a>
+  </div>
+</div></div>
+
+<div class="layout">
+  <!-- LEFT: inputs -->
+  <div>
+    <div class="panel">
+      <div class="panel-title">Project & Week</div>
+      <div class="field"><label>Project</label>
+        <select id="sel-project" onchange="onProjectChange()"><option value="">Select project…</option></select></div>
+      <div class="field"><label>Week Starting (Monday)</label>
+        <input type="date" id="sel-week" onchange="onProjectChange()"></div>
+
+      <div id="auto-summary" style="display:none" class="auto-summary">
+        <div class="auto-row"><b>Last week done:</b> <span id="sum-done">—</span></div>
+        <div class="auto-row"><b>Deliverables:</b> <span id="sum-deliv">—</span></div>
+        <div class="auto-row"><b>Site activities:</b> <span id="sum-site">—</span></div>
+        <div class="auto-row"><b>Meetings:</b> <span id="sum-meet">—</span></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-title">Manual Inputs</div>
+
+      <div class="field"><label>Current Stage</label>
+        <input type="text" id="inp-stage" placeholder="e.g. Interior Finishing"></div>
+      <div class="field"><label>Overall Progress %</label>
+        <input type="number" id="inp-pct" min="0" max="100" placeholder="e.g. 68"></div>
+
+      <div class="divider"></div>
+      <div class="panel-title">Client Actions & Procurement</div>
+      <div id="action-list" class="action-list"></div>
+      <button class="add-action-btn" onclick="addAction()">+ Add item</button>
+
+      <div class="divider"></div>
+      <div class="field"><label>Important Notes</label>
+        <textarea id="inp-notes" rows="2" placeholder="Any warnings, delays, or alerts for the client…"></textarea></div>
+
+      <div class="divider"></div>
+      <button class="gen-btn" id="gen-btn" onclick="generateMessage()">Generate Message</button>
+      <button class="polish-btn" id="polish-btn" onclick="polishMessage()" disabled>✨ Polish with AI</button>
+      <div class="gen-status" id="gen-status"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: message preview -->
+  <div class="msg-panel">
+    <div class="msg-header">
+      <div>
+        <span class="msg-label">Message Preview</span>
+        <span id="polished-badge" class="polished-badge" style="display:none">AI polished</span>
+      </div>
+      <div class="msg-actions">
+        <button class="edit-toggle" id="edit-toggle" onclick="toggleEdit()">Edit</button>
+        <button class="copy-btn" id="copy-btn" onclick="copyMessage()" disabled>Copy</button>
+      </div>
+    </div>
+    <div class="msg-box">
+      <div class="msg-display" id="msg-display">
+        <div class="msg-empty"><div class="arrow">←</div>Select a project and click "Generate Message"</div>
+      </div>
+      <textarea class="msg-edit" id="msg-edit" oninput="onMsgEdit()"></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+function api(action, extra){ return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra||{}))}).then(r=>r.json()); }
+
+let _3mData = null;
+let _editMode = false;
+
+function monday(){
+  const d = new Date(), day = d.getDay();
+  d.setDate(d.getDate() + (day===0?-6:1-day));
+  return d.toISOString().split('T')[0];
+}
+
+window.idsOnAuth = async function(){
+  const lists = await api('getLists');
+  const projects = (lists.projects||[]).filter(p=>p.status!=='Closed'&&p.status!=='Completed');
+  const sel = document.getElementById('sel-project');
+  sel.innerHTML = '<option value="">Select project…</option>' + projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  document.getElementById('sel-week').value = monday();
+
+  // Pre-select project from URL param
+  const urlP = new URLSearchParams(location.search).get('project');
+  if (urlP) { sel.value = urlP; onProjectChange(); }
+};
+
+async function onProjectChange(){
+  const project = document.getElementById('sel-project').value;
+  const week    = document.getElementById('sel-week').value;
+  if (!project || !week) { document.getElementById('auto-summary').style.display='none'; return; }
+
+  document.getElementById('gen-status').textContent = 'Loading project data…';
+  try {
+    _3mData = await api('get3MData', { project, weekStart: week });
+    // Show summary chips
+    document.getElementById('sum-done').textContent  = _3mData.lastWeekDone.length  + ' tasks';
+    document.getElementById('sum-deliv').textContent = _3mData.deliverables.length  + ' tasks';
+    document.getElementById('sum-site').textContent  = _3mData.siteActivities.length + ' activities';
+    document.getElementById('sum-meet').textContent  = _3mData.meetings.length       + ' meetings';
+    document.getElementById('auto-summary').style.display = '';
+    // Pre-fill stage if empty and backend returned one
+    if (_3mData.stage && !document.getElementById('inp-stage').value) {
+      document.getElementById('inp-stage').value = _3mData.stage;
+    }
+    document.getElementById('gen-status').textContent = 'Data loaded — ready to generate';
+  } catch(e) {
+    document.getElementById('gen-status').textContent = 'Could not load project data';
+  }
+}
+
+// ── CLIENT ACTIONS ──────────────────────────────────────
+let actionCount = 0;
+function addAction(text, deadline, note){
+  actionCount++;
+  const id = 'act-'+actionCount;
+  const div = document.createElement('div');
+  div.className = 'action-item'; div.id = id;
+  div.innerHTML = `
+    <input type="text" class="a-text" placeholder="Action / procurement item…" value="${esc(text||'')}">
+    <button class="del-btn" onclick="document.getElementById('${id}').remove()">×</button>
+    <div class="action-sub">
+      <input type="text" class="a-deadline" placeholder="Deadline (e.g. Before Tuesday)" value="${esc(deadline||'')}">
+      <input type="text" class="a-note"     placeholder="Note / dependency (optional)" value="${esc(note||'')}">
+    </div>`;
+  document.getElementById('action-list').appendChild(div);
+}
+
+function getActions(){
+  return Array.from(document.querySelectorAll('.action-item')).map(div=>({
+    text:     div.querySelector('.a-text').value.trim(),
+    deadline: div.querySelector('.a-deadline').value.trim(),
+    note:     div.querySelector('.a-note').value.trim()
+  })).filter(a=>a.text);
+}
+
+function esc(s){ return String(s||'').replace(/"/g,'&quot;'); }
+
+// ── GENERATE ───────────────────────────────────────────
+async function generateMessage(){
+  const project = document.getElementById('sel-project').value;
+  const week    = document.getElementById('sel-week').value;
+  if (!project) { setStatus('Select a project first'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true; setStatus('Building message…');
+
+  try {
+    const payload = {
+      project, weekStart: week,
+      stage:          document.getElementById('inp-stage').value.trim(),
+      progressPct:    document.getElementById('inp-pct').value.trim(),
+      clientActions:  getActions(),
+      importantNotes: document.getElementById('inp-notes').value.trim(),
+      aiPolish: false
+    };
+    const r = await api('generate3MMessage', payload);
+    if (!r.message) throw new Error('No message returned');
+    showMessage(r.message, false);
+    document.getElementById('polish-btn').disabled = false;
+    setStatus('Message generated — review and copy, or polish with AI');
+  } catch(e) {
+    setStatus('Error: '+e.message);
+  }
+  btn.disabled = false;
+}
+
+async function polishMessage(){
+  const project = document.getElementById('sel-project').value;
+  const week    = document.getElementById('sel-week').value;
+  const current = getCurrentMessage();
+  if (!current) { setStatus('Generate a message first'); return; }
+
+  const btn = document.getElementById('polish-btn');
+  btn.disabled = true; setStatus('Polishing with AI…');
+
+  try {
+    const payload = {
+      project, weekStart: week,
+      stage:          document.getElementById('inp-stage').value.trim(),
+      progressPct:    document.getElementById('inp-pct').value.trim(),
+      clientActions:  getActions(),
+      importantNotes: document.getElementById('inp-notes').value.trim(),
+      rawMessage:     current
+    };
+    const r = await api('generate3MMessage', payload);
+    if (!r.message) throw new Error('No response from AI');
+    showMessage(r.message, r.polished);
+    setStatus(r.polished ? '✨ AI polished — review before sending' : 'AI not configured — showing raw message');
+  } catch(e) {
+    setStatus('AI polish failed: '+e.message);
+  }
+  btn.disabled = false;
+}
+
+function showMessage(text, polished){
+  const display = document.getElementById('msg-display');
+  const edit    = document.getElementById('msg-edit');
+  display.textContent = text;
+  edit.value = text;
+  document.getElementById('copy-btn').disabled = false;
+  document.getElementById('polished-badge').style.display = polished ? '' : 'none';
+  if (_editMode) { display.style.display='none'; edit.style.display=''; }
+  else           { display.style.display=''; edit.style.display='none'; }
+}
+
+function getCurrentMessage(){
+  if (_editMode) return document.getElementById('msg-edit').value;
+  return document.getElementById('msg-display').textContent || '';
+}
+
+function onMsgEdit(){
+  document.getElementById('msg-display').textContent = document.getElementById('msg-edit').value;
+}
+
+function toggleEdit(){
+  _editMode = !_editMode;
+  const display = document.getElementById('msg-display');
+  const edit    = document.getElementById('msg-edit');
+  const btn     = document.getElementById('edit-toggle');
+  if (_editMode){
+    edit.value = display.textContent;
+    display.style.display = 'none'; edit.style.display = '';
+    btn.textContent = 'Preview'; btn.style.color = 'var(--accent)';
+  } else {
+    display.textContent = edit.value;
+    display.style.display = ''; edit.style.display = 'none';
+    btn.textContent = 'Edit'; btn.style.color = '';
+  }
+}
+
+async function copyMessage(){
+  const text = getCurrentMessage();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); }, 2000);
+  } catch(e) {
+    // Fallback for older mobile browsers
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); }, 2000);
+  }
+}
+
+function setStatus(msg){ document.getElementById('gen-status').textContent = msg; }
+</script>
+</body>
+</html>

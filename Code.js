@@ -183,6 +183,21 @@ function mondayOf(date) {
   return d;
 }
 
+function fmtDateRange(d1, d2) {
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function p(d){ var x=String(d||'').split('-'); return {m:parseInt(x[1]||1)-1,day:parseInt(x[2]||1)}; }
+  var a=p(d1), b=p(d2);
+  if (a.m===b.m) return a.day+'–'+b.day+' '+MONTHS[b.m];
+  return a.day+' '+MONTHS[a.m]+' – '+b.day+' '+MONTHS[b.m];
+}
+
+var DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function dowName(d) {
+  if (!d) return '';
+  var dt = new Date(d+'T00:00:00');
+  return DOW_NAMES[dt.getDay()];
+}
+
 // ════════════════════════════════════════════════════════════════
 // ROUTING
 // ════════════════════════════════════════════════════════════════
@@ -344,6 +359,8 @@ function doGet(e) {
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
   if (action === 'getWeeklyDiag')            return safeRespond(function(){ return getWeeklyDiag(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
+  if (action === 'getProjectWeeklyReport')   return safeRespond(function(){ return getProjectWeeklyReport(p.project||'', p.weekStart||''); });
+  if (action === 'get3MData')                return safeRespond(function(){ return get3MData(p.project||'', p.weekStart||''); });
   if (action === 'migrateAmanDaily')         return safeRespond(migrateAmanDailyToTabs);
   if (action === 'mergeCrmLog')              return safeRespond(mergeCrmLogTabs);
   if (action === 'testSiddharth')            return respond(testCreateSiddharthTask());
@@ -405,11 +422,15 @@ function doPost(e) {
     if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
+    if (data.action === 'getProjectWeeklyReport') return respond(getProjectWeeklyReport(data.project||'', data.weekStart||''));
+    if (data.action === 'get3MData')           return respond(get3MData(data.project||'', data.weekStart||''));
+    if (data.action === 'generate3MMessage')   return respond(generate3MMessage(data, authEmail));
 
     // Form submission actions
     if (data.action === 'submitApprovals')   return respond(submitApprovals(data));
     if (data.action === 'reassignTask')      return respond(reassignTask(data));
     if (data.action === 'assignTasks')       return respond(assignTasks(data));
+    if (data.action === 'bulkAssignTasks')   return respond(bulkAssignTasks(data, authEmail));
     if (data.action === 'markNotifSeen')     return respond(markNotificationSeen(data));
     if (data.action === 'createSelfTask')    return respond(createSelfAssignedTask(data));
     if (data.action === 'createDoneTask')    return respond(createDoneTask(data));
@@ -701,6 +722,24 @@ function assignTasks(data) {
     written++;
   });
   return {status:'ok', written:written};
+}
+
+// Bulk task creation — one call covers multiple project+person blocks (Monday planning form).
+// data.blocks = [{projectId,project,assignedTo,multiplier,tasks:[...]}, ...]
+function bulkAssignTasks(data, authEmail) {
+  var blocks = data.blocks || [];
+  var total = 0, errors = [];
+  var assignedBy = data.assignedBy || '';
+  var dateAssigned = data.dateAssigned || dateStr();
+  for (var i = 0; i < blocks.length; i++) {
+    var block = blocks[i];
+    block.assignedBy = assignedBy;
+    block.dateAssigned = dateAssigned;
+    var r = assignTasks(block);
+    if (r && r.status === 'ok') total += r.written || 0;
+    else errors.push(r && r.message ? r.message : 'error for '+(block.project||''));
+  }
+  return { status: errors.length ? 'partial' : 'ok', written: total, errors: errors };
 }
 
 function writeAssignHeaders(s) {
@@ -1604,7 +1643,7 @@ function finalizeMeetingLog(data, authEmail){
   logSheet.getRange(rowNum,17).setValue(authEmail||''); logSheet.getRange(rowNum,18).setValue(dateStr());
 
   var project = String(rows[rIdx][4]||'').trim();
-  var pdf = generateProjectReportPDF(project);
+  var pdf = generateProjectReportPDF(project, authEmail);
   if (pdf && pdf.fileId) logSheet.getRange(rowNum,20).setValue(pdf.fileId);
   return { status:'ok', logId:logId, pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
@@ -1664,7 +1703,7 @@ function approveMeetingLog(data, authEmail){
   if (typeof data.bodyPolished === 'string' && data.bodyPolished.trim()) sheet.getRange(row,11).setValue(data.bodyPolished);
   sheet.getRange(row,16).setValue('Approved'); sheet.getRange(row,17).setValue(data.reviewedBy||authEmail||''); sheet.getRange(row,18).setValue(today);
   var project = String(sheet.getRange(row,5).getValue()||'').trim();
-  var pdf = generateProjectReportPDF(project);
+  var pdf = generateProjectReportPDF(project, authEmail);
   if (pdf && pdf.fileId) sheet.getRange(row,20).setValue(pdf.fileId);
   return {status:'ok', disposition:'Approved', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
@@ -1690,7 +1729,7 @@ function buildEntryBodyHTML(e, decsBy){
 
 // Build the cumulative, newest-first client PDF for a project: cover index of all
 // visits/meetings (date + attendees) + each finalized entry, photos inlined as base64.
-function generateProjectReportPDF(project){
+function generateProjectReportPDF(project, callerEmail){
   var sheet = db().getSheetByName(MEETING_LOG_TAB);
   if (!sheet || sheet.getLastRow()<2) return null;
   var rows = sheet.getDataRange().getValues(), pl=String(project||'').toLowerCase();
@@ -1803,7 +1842,201 @@ function generateProjectReportPDF(project){
   // stable filename → each submission cleanly REPLACES the single cumulative PDF
   var old = folder.getFilesByName(pdf.getName()); while(old.hasNext()){ old.next().setTrashed(true); }
   var saved = folder.createFile(pdf);
+  if (callerEmail) { try { saved.addEditor(callerEmail); } catch(e) {} }
   return { fileId:saved.getId(), url:saved.getUrl() };
+}
+
+// ════════════════════════════════════════════════════════════════
+// 3M MESSAGE — Monday Morning Message generator
+// ════════════════════════════════════════════════════════════════
+
+// Assemble all auto-generated sections for a project's 3M message.
+function get3MData(project, weekStart) {
+  var s = db();
+  var pj = String(project||'').trim(), pjl = pj.toLowerCase();
+  var mon = weekStart || dateStr(mondayOf(new Date()));
+  var sat = addDaysToStr(mon, 5);
+  var lastMon = addDaysToStr(mon, -7);
+  var lastSat = addDaysToStr(mon, -2);
+
+  var out = {
+    project: pj, weekStart: mon,
+    weekRange: fmtDateRange(lastMon, lastSat),
+    stage: '', client: '',
+    lastWeekDone: [],
+    deliverables: [],
+    siteActivities: [],
+    meetings: [],
+    openIssues: []
+  };
+
+  var pSheet = s.getSheetByName(PROJECTS_TAB);
+  if (pSheet && pSheet.getLastRow() > 1) {
+    var pr = pSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pr.length; pi++) {
+      if (String(pr[pi][1]||'').trim().toLowerCase() !== pjl) continue;
+      out.stage  = String(pr[pi][2]||'').trim();
+      out.client = String(pr[pi][6]||'').trim();
+      break;
+    }
+  }
+
+  var aSheet = s.getSheetByName(ASSIGN_TAB);
+  if (aSheet && aSheet.getLastRow() > 1) {
+    var ar = aSheet.getDataRange().getValues();
+    for (var j = 1; j < ar.length; j++) {
+      if (String(ar[j][2]||'').trim().toLowerCase() !== pjl) continue;
+      var ss   = String(ar[j][13]||'').trim();
+      var ssd  = cellDate(ar[j][14]);
+      var dl   = cellDate(ar[j][10]);
+      var tt   = String(ar[j][4]||'');
+      var who  = String(ar[j][3]||'');
+      var draw = String(ar[j][12]||'') || String(ar[j][11]||'');
+      var dsp  = String(ar[j][COL_BLK_DISPO-1]||'').trim();
+      if (dsp === 'Parked' || dsp === 'Parked (Stalled)') continue;
+      if (ss === 'Reassigned') continue;
+
+      if (ss === 'Done' && ssd >= lastMon && ssd <= lastSat) {
+        out.lastWeekDone.push({ task: tt + (draw ? ' — '+draw : ''), who: who });
+      } else if (ss !== 'Done' && dl >= mon && dl <= sat) {
+        if (isVisitTask(tt)) {
+          out.siteActivities.push({ day: dowName(dl), date: dl, task: tt, who: who });
+        } else {
+          out.deliverables.push({ day: dowName(dl), date: dl, task: tt + (draw ? ' — '+draw : ''), who: who });
+        }
+      }
+    }
+    out.deliverables.sort(function(a,b){ return a.date.localeCompare(b.date); });
+    out.siteActivities.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  }
+
+  var mlSheet = s.getSheetByName(MEETING_LOG_TAB);
+  if (mlSheet && mlSheet.getLastRow() > 1) {
+    var mr = mlSheet.getDataRange().getValues();
+    for (var m = 1; m < mr.length; m++) {
+      if (String(mr[m][4]||'').trim().toLowerCase() !== pjl) continue;
+      var md = cellDate(mr[m][1]);
+      if (md < mon || md > sat) continue;
+      if (String(mr[m][15]||'').trim() === 'Deleted') continue;
+      out.meetings.push({ day: dowName(md), date: md, type: String(mr[m][3]||''), purpose: String(mr[m][8]||'') });
+    }
+  }
+
+  var iSheet = s.getSheetByName(SITE_ISSUES_TAB);
+  if (iSheet && iSheet.getLastRow() > 1) {
+    var ir = iSheet.getDataRange().getValues();
+    for (var k = 1; k < ir.length; k++) {
+      if (String(ir[k][3]||'').trim().toLowerCase() !== pjl) continue;
+      if (String(ir[k][10]||'').trim() === 'Resolved') continue;
+      out.openIssues.push(String(ir[k][6]||''));
+    }
+  }
+
+  return out;
+}
+
+// Build and AI-polish the full 3M message text.
+// data: { project, weekStart, stage, progressPct, clientActions:[{text,deadline,note}], importantNotes }
+function generate3MMessage(data, authEmail) {
+  var report = get3MData(data.project||'', data.weekStart||'');
+  var stage   = String(data.stage   || report.stage || '').trim();
+  var pct     = String(data.progressPct || '').trim();
+  var actions = data.clientActions || [];
+  var notes   = String(data.importantNotes || '').trim();
+  var SEP     = '━━━━━━━━━━━━━━';
+
+  var lines = [];
+  lines.push('Good Morning.');
+  lines.push('');
+  lines.push("Here’s your weekly project update for " + report.weekRange + '.');
+  lines.push('');
+  lines.push(SEP);
+  lines.push('✅ PROJECT STATUS');
+  lines.push('');
+  if (stage)  lines.push('Stage : ' + stage);
+  if (pct)    lines.push('Overall Progress : ' + pct + '%');
+  lines.push('');
+  if (report.lastWeekDone.length) {
+    lines.push('Last Week Completed');
+    report.lastWeekDone.forEach(function(t){ lines.push('* ' + t.task); });
+  } else {
+    lines.push('No completed items recorded for last week.');
+  }
+
+  if (report.deliverables.length) {
+    lines.push(''); lines.push(SEP);
+    lines.push('🏛 IDS Deliverables');
+    report.deliverables.forEach(function(d){
+      lines.push(''); lines.push('* ' + d.task);
+      lines.push('  (' + d.day + ')');
+    });
+  }
+
+  if (actions.length) {
+    lines.push(''); lines.push(SEP);
+    lines.push('👤 Client Action Required');
+    actions.forEach(function(ca, i){
+      if (!String(ca.text||'').trim()) return;
+      lines.push(''); lines.push((i+1) + '.');
+      lines.push(ca.text);
+      if (ca.deadline) lines.push('Before ' + ca.deadline);
+      if (ca.note)     lines.push(ca.note);
+    });
+  }
+
+  if (report.siteActivities.length) {
+    lines.push(''); lines.push(SEP);
+    lines.push('👷 Site Activities');
+    report.siteActivities.forEach(function(v){
+      lines.push(''); lines.push(v.day);
+      lines.push(v.task + (v.who ? ' — ' + v.who : ''));
+    });
+  }
+
+  if (report.meetings.length) {
+    lines.push(''); lines.push(SEP);
+    lines.push('📅 Meetings');
+    report.meetings.forEach(function(m){
+      lines.push(''); lines.push(m.day);
+      lines.push(m.type + (m.purpose ? '\n' + m.purpose : ''));
+    });
+  }
+
+  if (notes) {
+    lines.push(''); lines.push(SEP);
+    lines.push('⚠ Important Notes');
+    lines.push(notes);
+  }
+
+  lines.push(''); lines.push(SEP);
+  lines.push('Thank you.');
+  lines.push('We look forward to another productive week.');
+
+  var rawText = lines.join('\n');
+
+  var key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) return { status:'ok', message: rawText, polished: false };
+
+  try {
+    var prompt = 'You are polishing a Monday morning WhatsApp project update sent by Ideaform Design Studio to their client. '
+      + 'Keep every piece of information, all dates, names, and the structure exactly as-is. '
+      + 'Only improve the tone — make it warm, professional, and confident. '
+      + 'Do not add or remove sections. Return only the message text, no extra commentary.\n\n'
+      + rawText;
+    var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      payload: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:1500,
+        messages:[{ role:'user', content:prompt }] }),
+      muteHttpExceptions: true
+    });
+    var json = JSON.parse(resp.getContentText());
+    if (json.content && json.content[0] && json.content[0].text) {
+      return { status:'ok', message: json.content[0].text, polished: true };
+    }
+  } catch(e) { Logger.log('3M AI polish error: '+e); }
+
+  return { status:'ok', message: rawText, polished: false };
 }
 
 // Per-project meeting timeline for the projects dashboard drawer
@@ -1850,7 +2083,7 @@ function deleteMeetingLog(data, authEmail){
   var crm=s.getSheetByName(CRM_LOG_TAB);
   if(crm && crm.getLastRow()>1){ var cr=crm.getDataRange().getValues();
     for(var k=cr.length-1;k>=1;k--){ if(String(cr[k][1]||'').trim()===logId) crm.deleteRow(k+1); } }
-  var pdf=generateProjectReportPDF(project);
+  var pdf=generateProjectReportPDF(project, authEmail);
   return {status:'ok', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
 
@@ -5206,6 +5439,96 @@ function getProjectDetail(project){
         discipline:String(qr[bi][4]||''), stage:String(qr[bi][5]||''), status:String(qr[bi][6]||'') }); }
     out.billables.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   }
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════
+// getProjectWeeklyReport — weekly drill-down for the projects dashboard
+// ════════════════════════════════════════════════════════════════
+function getProjectWeeklyReport(project, weekStart) {
+  var s = db();
+  var pj = String(project||'').trim(), pjl = pj.toLowerCase();
+  var today = dateStr();
+  var mon   = weekStart || dateStr(mondayOf(new Date()));
+  var sat   = addDaysToStr(mon, 5);
+  var lastMon = addDaysToStr(mon, -7);
+  var lastSat = addDaysToStr(mon, -2);
+
+  var out = {
+    project: pj, weekStart: mon,
+    lastWeekRange: fmtDateRange(lastMon, lastSat),
+    thisWeekRange: fmtDateRange(mon, sat),
+    lastWeekDone: [],
+    inProgress: [],
+    delayed: [],
+    nextWeekTasks: [],
+    openIssues: [],
+    lastVisitDate: '', lastVisitBy: ''
+  };
+
+  var aSheet = s.getSheetByName(ASSIGN_TAB);
+  if (aSheet && aSheet.getLastRow() > 1) {
+    var ar = aSheet.getDataRange().getValues();
+    for (var j = 1; j < ar.length; j++) {
+      if (String(ar[j][2]||'').trim().toLowerCase() !== pjl) continue;
+      var ss   = String(ar[j][13]||'').trim();
+      var ssd  = cellDate(ar[j][14]);
+      var dl   = cellDate(ar[j][10]);
+      var tt   = String(ar[j][4]||'');
+      var who  = String(ar[j][3]||'');
+      var area = String(ar[j][11]||'');
+      var draw = String(ar[j][12]||'');
+      var dsp  = String(ar[j][COL_BLK_DISPO-1]||'').trim();
+      if (dsp === 'Parked' || dsp === 'Parked (Stalled)') continue;
+      if (ss === 'Reassigned') continue;
+
+      var task = { taskType:tt, assignedTo:who, area:area, drawing:draw, deadline:dl, selfStatus:ss };
+
+      if (ss === 'Done') {
+        if (ssd >= lastMon && ssd <= lastSat) out.lastWeekDone.push(task);
+      } else if (dl && dl < today) {
+        out.delayed.push(task);
+      } else if (dl >= mon && dl <= sat) {
+        out.nextWeekTasks.push(task);
+      } else {
+        out.inProgress.push(task);
+      }
+    }
+  }
+
+  // Last visit — scan SITE_EXECUTION and done visit tasks historically
+  var eSheet = s.getSheetByName(SITE_EXEC_TAB);
+  if (eSheet && eSheet.getLastRow() > 1) {
+    var er = eSheet.getDataRange().getValues();
+    for (var n = 1; n < er.length; n++) {
+      if (String(er[n][3]||'').trim().toLowerCase() !== pjl) continue;
+      var vd = cellDate(er[n][1]);
+      if (vd && vd > out.lastVisitDate) { out.lastVisitDate = vd; out.lastVisitBy = String(er[n][4]||''); }
+    }
+  }
+  if (aSheet && aSheet.getLastRow() > 1) {
+    var ar2 = aSheet.getDataRange().getValues();
+    for (var k = 1; k < ar2.length; k++) {
+      if (String(ar2[k][2]||'').trim().toLowerCase() !== pjl) continue;
+      if (!isVisitTask(String(ar2[k][4]||''))) continue;
+      if (String(ar2[k][13]||'').trim() !== 'Done') continue;
+      var vssd = cellDate(ar2[k][14]);
+      if (vssd && vssd > out.lastVisitDate) { out.lastVisitDate = vssd; out.lastVisitBy = String(ar2[k][3]||''); }
+    }
+  }
+
+  var iSheet = s.getSheetByName(SITE_ISSUES_TAB);
+  if (iSheet && iSheet.getLastRow() > 1) {
+    var ir = iSheet.getDataRange().getValues();
+    for (var m = 1; m < ir.length; m++) {
+      if (String(ir[m][3]||'').trim().toLowerCase() !== pjl) continue;
+      var ist = String(ir[m][10]||'').trim();
+      if (ist === 'Resolved') continue;
+      out.openIssues.push({ desc:String(ir[m][6]||''), status:ist,
+        assignedTo:String(ir[m][7]||''), targetDate:cellDate(ir[m][9]) });
+    }
+  }
+
   return out;
 }
 

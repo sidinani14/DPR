@@ -126,7 +126,6 @@
 ## Important functions in Apps Script
 - syncVisitSchedule() — main visit scheduler (runs Monday 8AM)
 - setupMondayTrigger() — sets up Monday trigger (run once)
-- fixShiftedTaskColumns() — fixes column shift data bug (run once if needed)
 - getWeeklyStats(weekStart) — returns team weekly scores
 - getDeepakWeeklyStats(weekStart) — returns Deepak's weekly scores
 - getAllTasks() — returns all tasks for dashboard

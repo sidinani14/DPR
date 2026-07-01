@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS · Assign Tasks</title>
+<script src="auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#202020;--surface3:#2A2A2A;--border:#2E2E2E;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--green:#4A9B6F;--red:#E0556B;--radius:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:50}
+.header-inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--accent)}
+.logo small{display:block;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);font-weight:400;margin-top:2px}
+.nav-links{display:flex;gap:10px}
+.nav-link{font-size:11px;color:var(--text3);text-decoration:none;padding:5px 10px;border:1px solid var(--border);border-radius:5px}
+.nav-link:hover{color:var(--accent);border-color:var(--accent)}
+.wrap{max-width:860px;margin:0 auto;padding:20px}
+
+/* Mode toggle */
+.mode-bar{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:22px;width:fit-content}
+.mode-btn{font-size:12px;font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;border:none;background:none;color:var(--text3)}
+.mode-btn.on{background:var(--surface2);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+
+/* Common form styles */
+.field{margin-bottom:14px}
+label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;border-radius:6px;padding:9px 11px;outline:none;color-scheme:dark}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+/* Single mode */
+#single-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+
+/* Bulk mode */
+.block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.block-head{background:var(--surface2);padding:13px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.block-head-fields{display:flex;gap:10px;flex:1;flex-wrap:wrap}
+.block-head-fields select{flex:1;min-width:160px;font-size:12px;padding:7px 9px}
+.block-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:5px;padding:5px 9px;cursor:pointer;margin-left:auto}
+.block-remove:hover{color:var(--red);border-color:var(--red)}
+.block-body{padding:12px 14px}
+.task-table{width:100%;border-collapse:collapse;font-size:12px}
+.task-table th{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:5px 7px;text-align:left;border-bottom:1px solid var(--border)}
+.task-table td{padding:4px 5px;vertical-align:middle}
+.task-table input,.task-table select{font-size:12px;padding:6px 7px;border-radius:5px}
+.task-table .td-del{width:32px;text-align:center}
+.del-row{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:4px}
+.del-row:hover{color:var(--red)}
+.add-row-btn{font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px dashed rgba(200,169,110,.3);border-radius:5px;padding:6px 14px;cursor:pointer;margin-top:8px}
+.add-row-btn:hover{background:rgba(200,169,110,.15)}
+.pts-badge{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);white-space:nowrap;padding:0 4px}
+
+.add-block-btn{font-size:12px;font-weight:600;color:var(--accent);background:rgba(200,169,110,.08);border:2px dashed rgba(200,169,110,.25);border-radius:var(--radius);padding:13px;cursor:pointer;width:100%;text-align:center;margin-bottom:20px}
+.add-block-btn:hover{background:rgba(200,169,110,.15)}
+
+/* Common meta fields */
+.meta-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap}
+.meta-row .field{margin:0;flex:1;min-width:160px}
+
+/* Submit */
+.submit-bar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;margin:0 -20px}
+.submit-inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.submit-btn{font-size:13px;font-weight:700;color:#000;background:var(--accent);border:none;border-radius:7px;padding:11px 28px;cursor:pointer}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed}
+.submit-status{font-size:12px;color:var(--text2)}
+.submit-count{font-size:12px;font-family:'DM Mono',monospace;color:var(--text3)}
+
+.priority-H{color:#E0556B}.priority-M{color:var(--accent)}.priority-L{color:var(--text3)}
+</style>
+</head>
+<body>
+<div class="header"><div class="header-inner">
+  <div class="logo">IDEAFORM · Assign Tasks<small>single task or monday bulk planning</small></div>
+  <div class="nav-links">
+    <a class="nav-link" href="dashboard.html">Tasks</a>
+    <a class="nav-link" href="projects.html">Projects</a>
+    <a class="nav-link" href="3m.html">3M Message</a>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <div class="mode-bar">
+    <button class="mode-btn on" id="btn-single" onclick="setMode('single')">Single Task</button>
+    <button class="mode-btn" id="btn-bulk" onclick="setMode('bulk')">Bulk Planning</button>
+  </div>
+
+  <!-- Meta row (shared by both modes) -->
+  <div class="meta-row">
+    <div class="field"><label>Assigned By</label>
+      <select id="meta-by"><option value="">Loading…</option></select></div>
+    <div class="field"><label>Date Assigned</label>
+      <input type="date" id="meta-date"></div>
+  </div>
+
+  <!-- ── SINGLE TASK MODE ── -->
+  <div id="single-form">
+    <div class="grid2">
+      <div class="field"><label>Project</label>
+        <select id="s-project" onchange="onSingleProject()"><option value="">Select project…</option></select></div>
+      <div class="field"><label>Assigned To</label>
+        <select id="s-member"><option value="">Select member…</option></select></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Stage / Task Type</label>
+        <select id="s-stage" onchange="onSingleStage()"><option value="">Select stage…</option></select></div>
+      <div class="field"><label>Area</label>
+        <input type="text" id="s-area" placeholder="e.g. Kitchen, Bedroom 2"></div>
+      <div class="field"><label>Drawing Name</label>
+        <input type="text" id="s-drawing" placeholder="e.g. Floor Plan, Elevation"></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Units <span id="s-pts-info" style="font-size:10px;color:var(--text3);font-weight:400"></span></label>
+        <input type="number" id="s-units" value="1" min="1" onchange="updateSinglePts()"></div>
+      <div class="field"><label>Deadline</label>
+        <input type="date" id="s-deadline"></div>
+      <div class="field"><label>Priority</label>
+        <select id="s-priority"><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></div>
+    </div>
+    <div class="field"><label>Notes</label>
+      <input type="text" id="s-notes" placeholder="Optional notes"></div>
+    <div style="font-size:12px;color:var(--text3);margin-top:6px" id="s-pts-preview"></div>
+  </div>
+
+  <!-- ── BULK PLANNING MODE ── -->
+  <div id="bulk-form" style="display:none">
+    <div id="blocks-container"></div>
+    <button class="add-block-btn" onclick="addBlock()">+ Add Project Block</button>
+  </div>
+
+  <div class="submit-bar">
+    <div class="submit-inner">
+      <div>
+        <div class="submit-count" id="submit-count">0 tasks</div>
+        <div class="submit-status" id="submit-status"></div>
+      </div>
+      <button class="submit-btn" id="submit-btn" onclick="submit()">Submit Tasks</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxoYY488eYAomVcsP9h3TwlYZIWDg0gmn4qrCyUiJbriAUIRJr_19VH0RM3NRZPBUoKYA/exec';
+function api(action, extra){ return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra||{}))}).then(r=>r.json()); }
+
+let CFG = { stages:[], projects:[], allMembers:[] };
+let MODE = 'single';
+let blockCount = 0;
+
+window.idsOnAuth = async function(user){
+  const [lists, cfg] = await Promise.all([api('getLists'), api('getConfig')]);
+  CFG.allMembers = lists.allMembers || [];
+  CFG.projects   = (lists.projects || []).filter(p => p.status !== 'Closed' && p.status !== 'Completed');
+  CFG.stages     = (cfg.stages || []).filter(s => s.label && !isVisitType(s.label));
+
+  // Assign-by default = current user's name
+  const byEl = document.getElementById('meta-by');
+  byEl.innerHTML = CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const myName = CFG.allMembers.find(m => m.toLowerCase().includes(String(user.name||'').split(' ')[0].toLowerCase())) || CFG.allMembers[0] || '';
+  byEl.value = myName;
+
+  document.getElementById('meta-date').value = today();
+
+  // Populate single-mode dropdowns
+  populateSingleDropdowns();
+
+  // If project param in URL, pre-select it in bulk mode
+  const urlP = new URLSearchParams(location.search).get('project');
+  if (urlP) { setMode('bulk'); addBlock(urlP); }
+};
+
+function today(){ return new Date().toISOString().split('T')[0]; }
+
+function isVisitType(s){ return /site visit|meeting|dper/i.test(s); }
+
+function populateSingleDropdowns(){
+  const ps = document.getElementById('s-project');
+  ps.innerHTML = '<option value="">Select project…</option>' + CFG.projects.map(p=>`<option value="${p.name}" data-id="${p.id||''}" data-mult="${p.multiplier||1}">${p.name}</option>`).join('');
+  const ms = document.getElementById('s-member');
+  ms.innerHTML = '<option value="">Select member…</option>' + CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const ss = document.getElementById('s-stage');
+  ss.innerHTML = '<option value="">Select stage…</option>' + CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.basePts||0}">${s.label}</option>`).join('');
+}
+
+function onSingleProject(){ updateSinglePts(); }
+function onSingleStage(){
+  const opt = document.getElementById('s-stage').selectedOptions[0];
+  const pts = opt ? (opt.dataset.pts||0) : 0;
+  document.getElementById('s-pts-info').textContent = pts ? '('+pts+' pts/unit)' : '';
+  updateSinglePts();
+}
+function updateSinglePts(){
+  const stageOpt = document.getElementById('s-stage').selectedOptions[0];
+  const projOpt  = document.getElementById('s-project').selectedOptions[0];
+  const basePts  = stageOpt ? parseFloat(stageOpt.dataset.pts||0) : 0;
+  const mult     = projOpt  ? parseFloat(projOpt.dataset.mult||1) : 1;
+  const units    = parseFloat(document.getElementById('s-units').value||1);
+  const weighted = Math.round(basePts * mult * units * 10) / 10;
+  document.getElementById('s-pts-preview').textContent =
+    basePts ? `Weighted pts: ${basePts} × ${mult} × ${units} = ${weighted}` : '';
+  updateCount();
+}
+
+// ── MODE SWITCH ──────────────────────────────────────────
+function setMode(m){
+  MODE = m;
+  document.getElementById('btn-single').classList.toggle('on', m==='single');
+  document.getElementById('btn-bulk').classList.toggle('on', m==='bulk');
+  document.getElementById('single-form').style.display = m==='single' ? '' : 'none';
+  document.getElementById('bulk-form').style.display   = m==='bulk'   ? '' : 'none';
+  if (m==='bulk' && !document.getElementById('blocks-container').children.length) addBlock();
+  updateCount();
+}
+
+// ── BULK BLOCKS ──────────────────────────────────────────
+function addBlock(preProject){
+  blockCount++;
+  const id = 'block-'+blockCount;
+  const projOpts = CFG.projects.map(p=>`<option value="${p.name}" data-id="${p.id||''}" data-mult="${p.multiplier||1}">${p.name}</option>`).join('');
+  const memOpts  = CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const div = document.createElement('div');
+  div.className = 'block'; div.id = id;
+  div.innerHTML = `
+    <div class="block-head">
+      <div class="block-head-fields">
+        <select class="b-project" onchange="onBlockProject('${id}')">
+          <option value="">Select project…</option>${projOpts}
+        </select>
+        <select class="b-member">
+          <option value="">Assign to…</option>${memOpts}
+        </select>
+        <span class="b-mult-badge" style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);align-self:center"></span>
+      </div>
+      <button class="block-remove" onclick="removeBlock('${id}')">✕ Remove</button>
+    </div>
+    <div class="block-body">
+      <table class="task-table">
+        <thead><tr>
+          <th>Stage / Task Type</th><th>Area</th><th>Drawing Name</th>
+          <th style="width:60px">Units</th><th style="width:110px">Deadline</th>
+          <th style="width:80px">Priority</th><th style="width:60px">Pts</th><th class="td-del"></th>
+        </tr></thead>
+        <tbody class="b-rows"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="addRow('${id}')">+ Add task</button>
+    </div>`;
+  document.getElementById('blocks-container').appendChild(div);
+  if (preProject) { div.querySelector('.b-project').value = preProject; onBlockProject(id); }
+  addRow(id);
+}
+
+function onBlockProject(blockId){
+  const block = document.getElementById(blockId);
+  const opt   = block.querySelector('.b-project').selectedOptions[0];
+  const mult  = opt ? parseFloat(opt.dataset.mult||1) : 1;
+  block.querySelector('.b-mult-badge').textContent = mult !== 1 ? 'mult ×'+mult : '';
+  // Refresh pts in existing rows
+  block.querySelectorAll('.b-rows tr').forEach(r => refreshRowPts(r, mult));
+  updateCount();
+}
+
+function removeBlock(id){ document.getElementById(id).remove(); updateCount(); }
+
+function addRow(blockId){
+  const block = document.getElementById(blockId);
+  const stageOpts = CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.basePts||0}">${s.label}</option>`).join('');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><select class="r-stage" onchange="onRowStage(this)">${stageOpts}</select></td>
+    <td><input type="text" class="r-area" placeholder="Area" oninput="updateCount()"></td>
+    <td><input type="text" class="r-draw" placeholder="Drawing name" oninput="updateCount()"></td>
+    <td><input type="number" class="r-units" value="1" min="1" style="width:54px" onchange="onRowStage(this)"></td>
+    <td><input type="date" class="r-deadline" oninput="updateCount()"></td>
+    <td><select class="r-priority"><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></td>
+    <td><span class="pts-badge r-pts">—</span></td>
+    <td class="td-del"><button class="del-row" onclick="this.closest('tr').remove();updateCount()">×</button></td>`;
+  block.querySelector('.b-rows').appendChild(tr);
+  // Trigger pts calc
+  const projOpt = block.querySelector('.b-project').selectedOptions[0];
+  const mult = projOpt ? parseFloat(projOpt.dataset.mult||1) : 1;
+  refreshRowPts(tr, mult);
+  updateCount();
+}
+
+function onRowStage(el){
+  const tr = el.closest('tr'), block = tr.closest('.block');
+  const projOpt = block.querySelector('.b-project').selectedOptions[0];
+  const mult = projOpt ? parseFloat(projOpt.dataset.mult||1) : 1;
+  refreshRowPts(tr, mult);
+  updateCount();
+}
+
+function refreshRowPts(tr, mult){
+  const stageOpt = tr.querySelector('.r-stage').selectedOptions[0];
+  const basePts  = stageOpt ? parseFloat(stageOpt.dataset.pts||0) : 0;
+  const units    = parseFloat(tr.querySelector('.r-units').value||1);
+  const w        = Math.round(basePts * mult * units * 10) / 10;
+  tr.querySelector('.r-pts').textContent = basePts ? w+'pts' : '—';
+}
+
+// ── COUNT UPDATE ──────────────────────────────────────────
+function updateCount(){
+  let n = 0;
+  if (MODE === 'single') n = 1;
+  else document.querySelectorAll('.b-rows tr').forEach(()=>n++);
+  document.getElementById('submit-count').textContent = n + ' task' + (n!==1?'s':'');
+}
+
+// ── SUBMIT ──────────────────────────────────────────────
+async function submit(){
+  const btn = document.getElementById('submit-btn');
+  const status = document.getElementById('submit-status');
+  const assignedBy  = document.getElementById('meta-by').value;
+  const dateAssigned = document.getElementById('meta-date').value;
+  btn.disabled = true; status.textContent = 'Submitting…';
+
+  try{
+    if (MODE === 'single'){
+      const projOpt  = document.getElementById('s-project').selectedOptions[0];
+      const stageOpt = document.getElementById('s-stage').selectedOptions[0];
+      if (!projOpt||!projOpt.value){ throw new Error('Select a project'); }
+      if (!document.getElementById('s-member').value){ throw new Error('Select a team member'); }
+      if (!stageOpt||!stageOpt.value){ throw new Error('Select a stage'); }
+      const data = {
+        action:'assignTasks',
+        projectId: projOpt.dataset.id||'',
+        project:   projOpt.value,
+        assignedTo: document.getElementById('s-member').value,
+        multiplier: parseFloat(projOpt.dataset.mult||1),
+        assignedBy, dateAssigned,
+        tasks:[{
+          taskType: stageOpt.value,
+          basePts:  parseFloat(stageOpt.dataset.pts||0),
+          units:    parseFloat(document.getElementById('s-units').value||1),
+          targetDate: document.getElementById('s-deadline').value,
+          area:     document.getElementById('s-area').value,
+          drawing:  document.getElementById('s-drawing').value,
+          priority: document.getElementById('s-priority').value,
+          notes:    document.getElementById('s-notes').value
+        }]
+      };
+      const r = await api('assignTasks', data);
+      if (r.status !== 'ok') throw new Error(r.message||'Failed');
+      status.textContent = '✓ Task created';
+      document.getElementById('s-area').value = '';
+      document.getElementById('s-drawing').value = '';
+      document.getElementById('s-notes').value = '';
+    } else {
+      // Bulk mode
+      const blocks = [];
+      let valid = true, errs = [];
+      document.querySelectorAll('.block').forEach(block => {
+        const projOpt = block.querySelector('.b-project').selectedOptions[0];
+        const member  = block.querySelector('.b-member').value;
+        if (!projOpt||!projOpt.value){ errs.push('A block has no project selected'); valid=false; return; }
+        if (!member){ errs.push('A block has no member selected'); valid=false; return; }
+        const mult = parseFloat(projOpt.dataset.mult||1);
+        const tasks = [];
+        block.querySelectorAll('.b-rows tr').forEach(tr => {
+          const stageOpt = tr.querySelector('.r-stage').selectedOptions[0];
+          if (!stageOpt||!stageOpt.value) return;
+          tasks.push({
+            taskType:   stageOpt.value,
+            basePts:    parseFloat(stageOpt.dataset.pts||0),
+            units:      parseFloat(tr.querySelector('.r-units').value||1),
+            targetDate: tr.querySelector('.r-deadline').value,
+            area:       tr.querySelector('.r-area').value,
+            drawing:    tr.querySelector('.r-draw').value,
+            priority:   tr.querySelector('.r-priority').value
+          });
+        });
+        if (!tasks.length){ errs.push('Block "'+projOpt.value+'" has no tasks'); valid=false; return; }
+        blocks.push({ projectId:projOpt.dataset.id||'', project:projOpt.value, assignedTo:member, multiplier:mult, tasks });
+      });
+      if (!valid) throw new Error(errs.join('; '));
+      if (!blocks.length) throw new Error('Add at least one project block with tasks');
+      const r = await api('bulkAssignTasks', { blocks, assignedBy, dateAssigned });
+      if (r.status === 'ok' || r.status === 'partial'){
+        const msg = '✓ '+r.written+' task'+(r.written!==1?'s':'')+' created';
+        status.textContent = r.errors&&r.errors.length ? msg+' (some errors)' : msg;
+        if (r.status === 'ok'){
+          document.getElementById('blocks-container').innerHTML = '';
+          blockCount = 0;
+          addBlock();
+        }
+      } else throw new Error(r.message||'Failed');
+    }
+  } catch(e){
+    status.textContent = '✗ '+e.message;
+  }
+  btn.disabled = false;
+}
+
+updateCount();
+</script>
+</body>
+</html>
