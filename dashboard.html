@@ -99,7 +99,46 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .reassign-busy{font-size:11px;color:var(--text3)}
 .reassign-ok{font-size:11px;font-weight:600;color:var(--green)}
 .reassign-err{font-size:11px;font-weight:600;color:var(--red)}
-
+/* ── Planning panel ── */
+.plan-panel-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none}
+.plan-panel-bg.open{display:block}
+.plan-panel{position:fixed;top:0;right:0;height:100%;width:min(680px,96vw);background:var(--surface);border-left:1px solid var(--border);z-index:201;transform:translateX(100%);transition:transform .25s;overflow-y:auto;display:flex;flex-direction:column}
+.plan-panel.open{transform:translateX(0)}
+.plan-ph{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+.plan-ph h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;flex:1}
+.plan-close{background:none;border:none;font-size:22px;color:var(--text2);cursor:pointer;line-height:1}
+.plan-body{padding:16px 18px;flex:1}
+.plan-meta{display:flex;gap:12px;flex-wrap:wrap;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px}
+.plan-meta .pf{flex:1;min-width:140px}
+label.pl{display:block;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+input.pi,select.ps{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;border-radius:6px;padding:8px 10px;outline:none;color-scheme:dark}
+input.pi:focus,select.ps:focus{border-color:var(--accent)}
+.plan-block{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.plan-bh{background:rgba(255,255,255,.03);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plan-bh select{flex:1;min-width:140px;font-size:12px;padding:6px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:5px;font-family:'DM Sans',sans-serif;outline:none}
+.plan-bh select:focus{border-color:var(--accent)}
+.plan-bh .plan-mult{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3)}
+.plan-bh .plan-rmv{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;margin-left:auto;white-space:nowrap}
+.plan-bh .plan-rmv:hover{color:var(--red);border-color:var(--red)}
+.plan-bb{padding:10px 12px}
+.plan-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.plan-tbl th{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:4px 6px;text-align:left;border-bottom:1px solid var(--border)}
+.plan-tbl td{padding:3px 4px;vertical-align:middle}
+.plan-tbl input,.plan-tbl select{width:100%;font-size:12px;padding:5px 6px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:5px;font-family:'DM Sans',sans-serif;outline:none;color-scheme:dark}
+.plan-tbl input:focus,.plan-tbl select:focus{border-color:var(--accent)}
+.plan-tbl .td-x{width:26px;text-align:center}
+.plan-del-row{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:2px 3px;border-radius:4px}
+.plan-del-row:hover{color:var(--red)}
+.plan-pts-badge{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);white-space:nowrap}
+.plan-add-row{font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px dashed rgba(200,169,110,.3);border-radius:5px;padding:5px 12px;cursor:pointer;margin-top:7px}
+.plan-add-row:hover{background:rgba(200,169,110,.15)}
+.plan-add-block{font-size:12px;font-weight:600;color:var(--accent);background:rgba(200,169,110,.06);border:2px dashed rgba(200,169,110,.2);border-radius:8px;padding:11px;cursor:pointer;width:100%;text-align:center;margin-bottom:14px}
+.plan-add-block:hover{background:rgba(200,169,110,.12)}
+.plan-foot{border-top:1px solid var(--border);padding:12px 18px;display:flex;align-items:center;gap:12px;position:sticky;bottom:0;background:var(--surface);z-index:5}
+.plan-submit{font-size:13px;font-weight:700;color:#000;background:var(--accent);border:none;border-radius:7px;padding:10px 24px;cursor:pointer}
+.plan-submit:disabled{opacity:.5;cursor:not-allowed}
+.plan-pstatus{font-size:12px;color:var(--text2);flex:1}
+.plan-count{font-size:11px;font-family:'DM Mono',monospace;color:var(--text3)}
 .park-btn{font-size:11px;font-weight:600;color:#A6AAB5;background:transparent;border:1px solid #7A7E88;border-radius:5px;padding:5px 10px;cursor:pointer}
 .park-btn:hover{background:rgba(120,120,130,.10)}
 .unpark-btn{font-size:11px;font-weight:600;color:var(--green);background:transparent;border:1px solid var(--green);border-radius:5px;padding:5px 10px;cursor:pointer}
@@ -119,7 +158,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div style="display:flex;align-items:center;gap:10px">
       <span style="background:#fff;border-radius:6px;padding:4px 8px;display:inline-flex;align-items:center"><img src="ideaform-logo.png" alt="Ideaform Design Studio" style="height:22px;display:block" onerror="this.parentNode.outerHTML='&lt;div class=\'logo-text\'&gt;Ideaform Design Studio&lt;/div&gt;'"></span>
       <div class="logo-sub">Task Dashboard</div>
-      <a href="tasks.html" style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.25);border-radius:5px;padding:5px 10px;font-weight:600;text-decoration:none;font-family:'DM Sans',sans-serif">+ Plan Tasks</a>
+      <button onclick="openPlanPanel()" style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.25);border-radius:5px;padding:5px 10px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+ Plan</button>
       <a href="projects.html" style="font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:5px 10px;text-decoration:none">Projects</a>
       <a href="3m.html" style="font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:5px 10px;text-decoration:none">3M</a>
     </div>
@@ -164,6 +203,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="unassigned-chips" id="unassigned-chips"></div>
 </div>
 
+<!-- Planning Panel -->
+<div class="plan-panel-bg" id="plan-panel-bg" onclick="closePlanPanel()"></div>
+<div class="plan-panel" id="plan-panel">
+  <div class="plan-ph">
+    <h3>Plan Tasks — Bulk Assignment</h3>
+    <button class="plan-close" onclick="closePlanPanel()">×</button>
+  </div>
+  <div class="plan-body">
+    <div class="plan-meta">
+      <div class="pf"><label class="pl">Assigned By</label><select class="ps" id="plan-by"><option>Loading…</option></select></div>
+      <div class="pf"><label class="pl">Date Assigned</label><input class="pi" type="date" id="plan-date"></div>
+    </div>
+    <div id="plan-blocks"></div>
+    <button class="plan-add-block" onclick="planAddBlock()">+ Add Project Block</button>
+  </div>
+  <div class="plan-foot">
+    <div class="plan-pstatus" id="plan-status"></div>
+    <div class="plan-count" id="plan-count">0 tasks</div>
+    <button class="plan-submit" id="plan-submit" onclick="planSubmit()">Submit</button>
+  </div>
+</div>
 
 <div class="filter-row">
   <div class="fb on blue" onclick="filterStatus('all',this)">All</div>
@@ -821,7 +881,174 @@ async function doReassign(row){
   }catch(e){ if(host) host.innerHTML='<span class="reassign-err">✗ Network error</span>'; }
 }
 
+// ── PLANNING PANEL ─────────────────────────────────────────────
+const PLAN_CFG={projects:[],allMembers:[],stages:[],loaded:false};
+let planBlockCount=0;
 
+async function openPlanPanel(){
+  document.getElementById('plan-panel-bg').classList.add('open');
+  document.getElementById('plan-panel').classList.add('open');
+  if(!PLAN_CFG.loaded){
+    document.getElementById('plan-status').textContent='Loading data…';
+    try{
+      const post=b=>fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(b)}).then(r=>r.json());
+      const [lists,cfg]=await Promise.all([post({action:'getLists'}),post({action:'getConfig'})]);
+      PLAN_CFG.allMembers=lists.allMembers||[];
+      PLAN_CFG.projects=(lists.projects||[]).filter(p=>p.status!=='Closed'&&p.status!=='Completed');
+      PLAN_CFG.stages=(cfg.stages||[]).filter(s=>s.label&&!/site visit|meeting|dper/i.test(s.label));
+      PLAN_CFG.loaded=true;
+      const byEl=document.getElementById('plan-by');
+      byEl.innerHTML=PLAN_CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+      const me=(window.IDS_USER&&window.IDS_USER.name)||'';
+      const myOpt=PLAN_CFG.allMembers.find(m=>me&&m.toLowerCase().includes(me.toLowerCase().split(' ')[0]));
+      if(myOpt) byEl.value=myOpt;
+      document.getElementById('plan-date').value=new Date().toISOString().split('T')[0];
+      document.getElementById('plan-status').textContent='';
+      if(!document.getElementById('plan-blocks').children.length) planAddBlock();
+    }catch(e){
+      document.getElementById('plan-status').textContent='✗ Could not load: '+e.message;
+    }
+  }
+}
+
+function closePlanPanel(){
+  document.getElementById('plan-panel-bg').classList.remove('open');
+  document.getElementById('plan-panel').classList.remove('open');
+}
+
+function planAddBlock(preProject){
+  planBlockCount++;
+  const id='pb-'+planBlockCount;
+  const projOpts=PLAN_CFG.projects.map(p=>`<option value="${p.name}" data-id="${p.id||''}" data-mult="${p.multiplier||1}">${p.name}</option>`).join('');
+  const memOpts=PLAN_CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const div=document.createElement('div');
+  div.className='plan-block'; div.id=id;
+  div.innerHTML=`
+    <div class="plan-bh">
+      <select class="pb-proj" onchange="planOnProject('${id}')"><option value="">Select project…</option>${projOpts}</select>
+      <select class="pb-mem"><option value="">Assign to…</option>${memOpts}</select>
+      <span class="plan-mult" id="${id}-mult"></span>
+      <button class="plan-rmv" onclick="document.getElementById('${id}').remove();planUpdateCount()">✕</button>
+    </div>
+    <div class="plan-bb">
+      <table class="plan-tbl">
+        <thead><tr>
+          <th>Stage / Task Type</th>
+          <th>Description <span style="font-size:8px;font-weight:400;color:var(--text3)">(area · drawing)</span></th>
+          <th style="width:52px">Units</th><th style="width:100px">Deadline</th>
+          <th style="width:72px">Priority</th><th style="width:50px">Pts</th><th class="td-x"></th>
+        </tr></thead>
+        <tbody class="pb-rows"></tbody>
+      </table>
+      <button class="plan-add-row" onclick="planAddRow('${id}')">+ Add task</button>
+    </div>`;
+  document.getElementById('plan-blocks').appendChild(div);
+  if(preProject){
+    const sel=div.querySelector('.pb-proj');
+    sel.value=preProject;
+    planOnProject(id);
+  }
+  planAddRow(id);
+}
+
+function planOnProject(blockId){
+  const block=document.getElementById(blockId);
+  const opt=block.querySelector('.pb-proj').selectedOptions[0];
+  const mult=opt?parseFloat(opt.dataset.mult||1):1;
+  const tag=document.getElementById(blockId+'-mult');
+  tag.textContent=mult!==1?'×'+mult:'';
+  block.querySelectorAll('.pb-rows tr').forEach(tr=>planRefreshPts(tr,mult));
+  planUpdateCount();
+}
+
+function planAddRow(blockId){
+  const block=document.getElementById(blockId);
+  const stageOpts=PLAN_CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.pts||0}">${s.label}</option>`).join('');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
+    <td><select class="pr-stage" onchange="planOnStage(this)">${stageOpts}</select></td>
+    <td><input type="text" class="pr-desc" placeholder="e.g. Kitchen — Floor Plan"></td>
+    <td><input type="number" class="pr-units" value="1" min="1" style="width:46px" oninput="planOnStage(this)"></td>
+    <td><input type="date" class="pr-dl"></td>
+    <td><select class="pr-pri"><option>High</option><option selected>Medium</option><option>Low</option></select></td>
+    <td><span class="plan-pts-badge pr-pts">—</span></td>
+    <td class="td-x"><button class="plan-del-row" onclick="this.closest('tr').remove();planUpdateCount()">×</button></td>`;
+  block.querySelector('.pb-rows').appendChild(tr);
+  const projOpt=block.querySelector('.pb-proj').selectedOptions[0];
+  planRefreshPts(tr,projOpt?parseFloat(projOpt.dataset.mult||1):1);
+  planUpdateCount();
+}
+
+function planOnStage(el){
+  const tr=el.closest('tr');
+  const block=tr.closest('.plan-block');
+  const projOpt=block.querySelector('.pb-proj').selectedOptions[0];
+  planRefreshPts(tr,projOpt?parseFloat(projOpt.dataset.mult||1):1);
+  planUpdateCount();
+}
+
+function planRefreshPts(tr,mult){
+  const opt=tr.querySelector('.pr-stage').selectedOptions[0];
+  const base=opt?parseFloat(opt.dataset.pts||0):0;
+  const units=parseFloat(tr.querySelector('.pr-units').value||1);
+  const w=Math.round(base*(mult||1)*units*10)/10;
+  tr.querySelector('.pr-pts').textContent=base?w+'pts':'—';
+}
+
+function planUpdateCount(){
+  let n=0;
+  document.querySelectorAll('.pb-rows tr').forEach(()=>n++);
+  document.getElementById('plan-count').textContent=n+' task'+(n!==1?'s':'');
+}
+
+async function planSubmit(){
+  const btn=document.getElementById('plan-submit');
+  const status=document.getElementById('plan-status');
+  const assignedBy=document.getElementById('plan-by').value;
+  const dateAssigned=document.getElementById('plan-date').value;
+  btn.disabled=true; status.textContent='Submitting…';
+  try{
+    const blocks=[]; const errs=[];
+    document.querySelectorAll('.plan-block').forEach(block=>{
+      const projOpt=block.querySelector('.pb-proj').selectedOptions[0];
+      const member=block.querySelector('.pb-mem').value;
+      if(!projOpt||!projOpt.value){errs.push('A block has no project selected');return;}
+      if(!member){errs.push('Block "'+projOpt.value+'" has no member');return;}
+      const mult=parseFloat(projOpt.dataset.mult||1);
+      const tasks=[];
+      block.querySelectorAll('.pb-rows tr').forEach(tr=>{
+        const sOpt=tr.querySelector('.pr-stage').selectedOptions[0];
+        if(!sOpt||!sOpt.value) return;
+        tasks.push({
+          taskType:sOpt.value, basePts:parseFloat(sOpt.dataset.pts||0),
+          units:parseFloat(tr.querySelector('.pr-units').value||1),
+          targetDate:tr.querySelector('.pr-dl').value,
+          description:tr.querySelector('.pr-desc').value,
+          priority:tr.querySelector('.pr-pri').value
+        });
+      });
+      if(!tasks.length){errs.push('"'+projOpt.value+'" has no tasks');return;}
+      blocks.push({projectId:projOpt.dataset.id||'',project:projOpt.value,assignedTo:member,multiplier:mult,tasks});
+    });
+    if(errs.length) throw new Error(errs.join('; '));
+    if(!blocks.length) throw new Error('Add at least one project block with tasks');
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'bulkAssignTasks',blocks,assignedBy,dateAssigned})}).then(x=>x.json());
+    if(r.status==='ok'||r.status==='partial'){
+      status.textContent='✓ '+r.written+' task'+(r.written!==1?'s':'')+' created'+(r.errors&&r.errors.length?' (some errors)':'');
+      if(r.status==='ok'){
+        document.getElementById('plan-blocks').innerHTML='';
+        planBlockCount=0; planAddBlock();
+        setTimeout(()=>{closePlanPanel();loadTasks();},1400);
+      }
+    } else throw new Error(r.message||'Submission failed');
+  }catch(e){status.textContent='✗ '+e.message;}
+  btn.disabled=false;
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closePlanPanel();});
+if(new URLSearchParams(location.search).get('plan')==='1'){
+  document.addEventListener('ids-auth',()=>openPlanPanel(),{once:true});
+}
 </script>
 </body>
 </html>
