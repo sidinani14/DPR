@@ -830,10 +830,14 @@ function getAllTasks() {
     }
     else if (selfStatus === 'Done') {
       if      (leadApproved === 'Yes') {
-        // Completed — only show if completed this week (Mon onwards)
+        // Completed — only show if completed this week (Mon onwards).
+        // When was it done? Prefer actual completion, then self-done date, then
+        // approval date. If NONE is recorded, treat it as an old task (Hidden) —
+        // never default to today, or every dateless approved task shows forever.
         var doneOn = (COL_ACTUALDATE > -1 ? cellDate(r[COL_ACTUALDATE]) : '') ||
-                     cellDate(r[COL_STATUSDATE]) || today;
-        status = doneOn >= monOfWeek ? 'Completed' : 'Hidden';
+                     cellDate(r[COL_STATUSDATE]) ||
+                     cellDate(r[is23col ? 18 : 17]);   // S — approval date
+        status = (doneOn && doneOn >= monOfWeek) ? 'Completed' : 'Hidden';
       }
       else if (leadApproved === 'No')      status = 'Rejected';
       else                                  status = 'Approval Pending'; // Pending

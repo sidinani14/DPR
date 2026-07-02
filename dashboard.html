@@ -592,6 +592,16 @@ async function loadTasks() {
       allTasks=data.tasks||[];
     }
 
+    // Only THIS WEEK's completed+approved tasks stay on the board; older ones drop off.
+    // (Mirrors the backend rule — safety net for approved rows whose completion date
+    // wasn't stamped, which the backend can otherwise mis-date as "this week".)
+    const _mon = mondayStr();
+    allTasks = allTasks.filter(t => {
+      if (t.status !== 'Completed') return true;               // upcoming/ongoing/delayed/pending always show
+      const doneOn = t.actualCompletion || t.selfStatusDate || t.approvalDate || '';
+      return doneOn && doneOn >= _mon;                          // completed → only if done on/after this Monday
+    });
+
     // Populate member filter (preserve current selection if possible)
     const prevMember = document.getElementById('member-filter').value;
     // Expand comma-separated assignees into individual names
