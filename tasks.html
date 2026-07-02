@@ -2,623 +2,278 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IDS · Bulk Task Planning</title>
 <script src="auth.js"></script>
-<script src="searchselect.js"></script>
-<style>:root{--ss-bg:#1A1A1A;--ss-fg:#F0EDE8;--ss-pop-bg:#161616;--ss-border:#2E2E2E;--ss-accent:#C8A96E;--ss-muted:#5A5652;--ss-hover:rgba(200,169,110,0.15)}</style>
-<script>SearchSelect.auto('.pb-project, .t-cat, .t-stage');</script>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#222;--surface3:#2A2A2A;--border:#2E2E2E;--border2:#3A3A3A;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--accent-light:rgba(200,169,110,.1);--green:#4A9B6F;--green-light:rgba(74,155,111,.12);--red:#C05050;--red-light:rgba(192,80,80,.12);--amber:#C8863A;--amber-light:rgba(200,134,58,.12);--radius:10px;--radius-sm:6px}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px}
-.header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px;position:sticky;top:0;z-index:100}
-.header-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
-.logo-text{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--accent)}
-.logo-sub{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px}
-.header-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
-.page{max-width:640px;margin:0 auto;padding:20px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
-.card-head{padding:13px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
-.card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text)}
-.card-sub{font-size:11px;color:var(--text3);margin-left:auto;font-family:'DM Mono',monospace}
-.card-body{padding:16px 18px}
-.field{margin-bottom:12px}.field:last-child{margin-bottom:0}
-.lbl{font-size:10px;color:var(--text2);margin-bottom:5px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:4px}
-.req{color:var(--red)}.opt{color:var(--text3)}
-select,input[type=text],input[type=date],input[type=number],textarea{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .15s}
-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235A5652' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-select:focus,input:focus,textarea:focus{border-color:var(--accent);background:var(--surface3)}
-input[type=date]{color-scheme:dark}
-textarea{resize:vertical;min-height:60px;line-height:1.5}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.row3{display:grid;grid-template-columns:1fr 1fr 80px;gap:8px}
-.divider{height:1px;background:var(--border);margin:13px 0}
-.auto-display{font-size:13px;color:var(--accent);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Mono',monospace}
-.task-block{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden}
-.task-block:last-child{margin-bottom:0}
-.task-block-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.task-block-title{font-size:11px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace;letter-spacing:.05em}
-.task-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer;font-family:'DM Sans',sans-serif}
-.task-remove:hover{color:var(--red);border-color:var(--red)}
-.task-block-body{padding:13px 14px}
-.pts-preview{background:var(--accent-light);border:1px solid rgba(200,169,110,.2);border-radius:var(--radius-sm);padding:8px 12px;margin-top:10px;display:flex;align-items:center;justify-content:space-between}
-.pts-label{font-size:11px;color:var(--accent);font-family:'DM Mono',monospace}
-.pts-val{font-size:16px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
-.rev-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.rev-opt{cursor:pointer}
-.rev-opt input{display:none}
-.rev-btn{display:block;padding:8px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;text-align:center}
-.rev-opt input:checked+.rev-btn.orig{border-color:var(--green);background:var(--green-light);color:var(--green);font-weight:500}
-.rev-opt input:checked+.rev-btn.int{border-color:var(--red);background:var(--red-light);color:var(--red);font-weight:500}
-.rev-opt input:checked+.rev-btn.cli{border-color:var(--amber);background:var(--amber-light);color:var(--amber);font-weight:500}
-.add-task-btn{width:100%;padding:11px;font-size:13px;color:var(--accent);background:var(--accent-light);border:1px dashed rgba(200,169,110,.3);border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
-.add-task-btn:hover{background:rgba(200,169,110,.18)}
-.add-task-btn:disabled{opacity:.35;cursor:not-allowed}
-.total-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;display:none}
-.total-label{font-size:12px;color:var(--text2);font-family:'DM Mono',monospace}
-.total-value{font-size:20px;font-weight:600;color:var(--accent);font-family:'DM Mono',monospace}
-.total-count{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px;text-align:right}
-.skeleton{height:40px;background:linear-gradient(90deg,var(--border) 25%,var(--surface2) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm)}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;z-index:100}
-.submit-bar-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:12px}
-.sbar-info{flex:1}
-.sbar-name{font-size:13px;font-weight:500;color:var(--text)}
-.sbar-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
-.submit-btn{padding:11px 28px;background:var(--accent);color:#0F0F0F;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;white-space:nowrap;transition:opacity .15s;flex-shrink:0}
-.submit-btn:hover{opacity:.85}
-.submit-btn:disabled{opacity:.3;cursor:not-allowed}
-.sending{display:none;position:fixed;inset:0;background:rgba(15,15,15,.92);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px}
-.sending.show{display:flex}
-.spinner{width:34px;height:34px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.sending-txt{font-size:13px;color:var(--text2)}
-.success{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px}
-.success.show{display:flex}
-.success-icon{width:56px;height:56px;border-radius:50%;background:var(--green-light);border:1.5px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
-.success-icon svg{width:24px;height:24px;stroke:var(--green)}
-.success-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px}
-.success-sub{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px;max-width:360px}
-.close-btn{padding:10px 24px;background:var(--accent);color:#0F0F0F;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
-.toast.show{opacity:1}
-@media(max-width:420px){.row2,.row3{grid-template-columns:1fr}}
+:root{--bg:#0F0F0F;--surface:#1A1A1A;--surface2:#202020;--surface3:#2A2A2A;--border:#2E2E2E;--text:#F0EDE8;--text2:#9A9690;--text3:#5A5652;--accent:#C8A96E;--green:#4A9B6F;--red:#E0556B;--radius:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:50}
+.header-inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--accent)}
+.logo small{display:block;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);font-weight:400;margin-top:2px}
+.nav-links{display:flex;gap:10px}
+.nav-link{font-size:11px;color:var(--text3);text-decoration:none;padding:5px 10px;border:1px solid var(--border);border-radius:5px}
+.nav-link:hover{color:var(--accent);border-color:var(--accent)}
+.wrap{max-width:860px;margin:0 auto;padding:20px}
+
+/* Common form styles */
+.field{margin-bottom:14px}
+label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;border-radius:6px;padding:9px 11px;outline:none;color-scheme:dark}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+
+/* Bulk blocks */
+.block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.block-head{background:var(--surface2);padding:13px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.block-head-fields{display:flex;gap:10px;flex:1;flex-wrap:wrap}
+.block-head-fields select{flex:1;min-width:160px;font-size:12px;padding:7px 9px}
+.block-remove{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:5px;padding:5px 9px;cursor:pointer;margin-left:auto}
+.block-remove:hover{color:var(--red);border-color:var(--red)}
+.block-body{padding:12px 14px}
+.task-table{width:100%;border-collapse:collapse;font-size:12px}
+.task-table th{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:5px 7px;text-align:left;border-bottom:1px solid var(--border)}
+.task-table td{padding:4px 5px;vertical-align:middle}
+.task-table input,.task-table select{font-size:12px;padding:6px 7px;border-radius:5px}
+.task-table .td-del{width:32px;text-align:center}
+.del-row{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:4px}
+.del-row:hover{color:var(--red)}
+.add-row-btn{font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px dashed rgba(200,169,110,.3);border-radius:5px;padding:6px 14px;cursor:pointer;margin-top:8px}
+.add-row-btn:hover{background:rgba(200,169,110,.15)}
+.pts-badge{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);white-space:nowrap;padding:0 4px}
+
+.add-block-btn{font-size:12px;font-weight:600;color:var(--accent);background:rgba(200,169,110,.08);border:2px dashed rgba(200,169,110,.25);border-radius:var(--radius);padding:13px;cursor:pointer;width:100%;text-align:center;margin-bottom:20px}
+.add-block-btn:hover{background:rgba(200,169,110,.15)}
+
+/* Common meta fields */
+.meta-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap}
+.meta-row .field{margin:0;flex:1;min-width:160px}
+
+/* Submit */
+.submit-bar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;margin:0 -20px}
+.submit-inner{max-width:860px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.submit-btn{font-size:13px;font-weight:700;color:#000;background:var(--accent);border:none;border-radius:7px;padding:11px 28px;cursor:pointer}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed}
+.submit-status{font-size:12px;color:var(--text2)}
+.submit-count{font-size:12px;font-family:'DM Mono',monospace;color:var(--text3)}
 </style>
 </head>
 <body>
-<header class="header">
-  <div class="header-inner">
-    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Bulk Task Planning</div></div>
-    <div class="header-date" id="header-date"></div>
+<div class="header"><div class="header-inner">
+  <div class="logo">IDEAFORM · Bulk Task Planning<small>plan the week — one block per project</small></div>
+  <div class="nav-links">
+    <a class="nav-link" href="dashboard.html">Tasks</a>
+    <a class="nav-link" href="projects.html">Projects</a>
+    <a class="nav-link" href="3m.html">3M Message</a>
   </div>
-</header>
-<div class="page">
-  <div class="card">
-    <div class="card-head"><div class="card-title">Assignment details</div><div class="card-sub">required</div></div>
-    <div class="card-body">
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Assigned by <span class="req">*</span></div>
-          <div id="assigner-wrap"><div class="skeleton"></div></div>
-        </div>
-        <div class="field">
-          <div class="lbl">Assign to <span class="req">*</span></div>
-          <div id="assignee-wrap"><div class="skeleton"></div></div>
-        </div>
+</div></div>
+
+<div class="wrap">
+  <!-- Meta row -->
+  <div class="meta-row">
+    <div class="field"><label>Assigned By</label>
+      <select id="meta-by"><option value="">Loading…</option></select></div>
+    <div class="field"><label>Date Assigned</label>
+      <input type="date" id="meta-date"></div>
+  </div>
+
+  <!-- Bulk planning blocks -->
+  <div id="blocks-container"></div>
+  <button class="add-block-btn" onclick="addBlock()">+ Add Project Block</button>
+
+  <div class="submit-bar">
+    <div class="submit-inner">
+      <div>
+        <div class="submit-count" id="submit-count">0 tasks</div>
+        <div class="submit-status" id="submit-status"></div>
       </div>
+      <button class="submit-btn" id="submit-btn" onclick="submit()">Submit Tasks</button>
     </div>
   </div>
-
-  <!-- Project blocks — one per project -->
-  <div id="project-blocks"></div>
-
-  <button class="add-task-btn" id="add-proj-btn" onclick="addProjectBlock()" disabled style="margin-bottom:14px">
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
-    Add another project
-  </button>
-
-  <div class="total-strip" id="total-strip">
-    <div><div class="total-label">Total weighted points</div><div class="total-count" id="total-count"></div></div>
-    <div class="total-value" id="total-pts">0.0</div>
-  </div>
 </div>
-
-<div class="submit-bar">
-  <div class="submit-bar-inner">
-    <div class="sbar-info">
-      <div class="sbar-name" id="sbar-name">Loading…</div>
-      <div class="sbar-sub" id="sbar-sub">fill all required fields</div>
-    </div>
-    <button class="submit-btn" id="submit-btn" onclick="submitTasks()" disabled>Assign Tasks</button>
-  </div>
-</div>
-
-<div class="sending" id="sending"><div class="spinner"></div><div class="sending-txt">Saving tasks…</div></div>
-<div class="success" id="success">
-  <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 7"/></svg></div>
-  <div class="success-title">Tasks Assigned!</div>
-  <div class="success-sub" id="success-sub"></div>
-  <button class="close-btn" onclick="resetForm()">Assign More Tasks</button>
-</div>
-<div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
-let TEAM=[], ALL_MEMBERS=[], PROJECTS=[], STAGES=[], TASK_GROUPS=[], STAGE_IDX={};
-let projBlockCount = 0;
-let taskCount=0;
+const API = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
+function api(action, extra){ return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({action},extra||{}))}).then(r=>r.json()); }
 
-document.addEventListener('ids-auth', () => {   // gated by auth.js
-  document.getElementById('header-date').textContent =
-    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
-  fetchAll();
-});
+let CFG = { stages:[], projects:[], allMembers:[] };
+let blockCount = 0;
 
-async function fetchAll() {
-  const demo = APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+window.idsOnAuth = async function(user){
   try {
-    if (demo) {
-      TEAM       = ["Achal Rathore", "Himanshu Malviya", "Deepak Soni", "Poorvi Goyal", "Sahil Maurya", "Aaditya Koshti", "Aman Raghuwanshi", "Bhavesh Bhagwat", "Aashi Agrawal", "Siddharth Inani", "Astha Inani"];
-      ALL_MEMBERS = ["Aaditya Koshti", "Aashi Agrawal", "Achal Rathore", "Aman Raghuwanshi", "Astha Inani", "Bhavesh Bhagwat", "Deepak Soni", "Himanshu Malviya", "Poorvi Goyal", "Sahil Maurya", "Siddharth Inani"];
-      PROJECTS = [
-  {id:"P001",name:"Ajay Chordia",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P002",name:"Rohit Jain",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P003",name:"Tarun Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P004",name:"Vishal Gautam",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P005",name:"Dr. Aalok Somani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P006",name:"Yuga Doshi",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P007",name:"Amit Maheshwari",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P008",name:"Tulsivanam",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"P009",name:"Naman Maheshwari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P010",name:"Bhandari Furnitures",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P011",name:"Multani Jewellers",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P012",name:"Abhay Nagar",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"P013",name:"Agrawal House Harda",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P014",name:"Harsh Gupta",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P015",name:"Krishna Mandowara",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P016",name:"Sanjay Chauhan",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P017",name:"Simrol Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
-  {id:"P018",name:"Venkatesh Mandir",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P019",name:"Bhopal Resort",discipline:"Hospitality Mid (50-150 keys)",multiplier:1.8,status:""},
-  {id:"P020",name:"Abhay Dhoot",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P021",name:"Madhur Business Park",discipline:"High-rise Commercial",multiplier:1.0,status:""},
-  {id:"P022",name:"Ratnesh Agrawal - Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P023",name:"Sawariya Enclave Township",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P024",name:"Sawariya Hills",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P025",name:"Aditya Jhawar",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P026",name:"Shrijii Township Narmadapuram",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"P027",name:"Ritesh Somani",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P028",name:"Sameer Yadav",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P029",name:"Hemant kakani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P030",name:"Nilesh Lathi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"P031",name:"BBM Indore",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P032",name:"BBM Mhow",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"P033",name:"Param - 40' x 60' Ratnesh",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P034",name:"Sai Kripa Biaora",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"P035",name:"Chaman Rai",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Aditya Modi",discipline:"Hospitality 5-star (150+ keys)",multiplier:2.5,status:""},
-  {id:"",name:"Sonu Sengar",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
-  {id:"",name:"Nikhar Garg Farm house",discipline:"Hospitality Boutique (<50 keys)",multiplier:1.2,status:""},
-  {id:"",name:"Satnam Bagga Commercial",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Kunjan Anil Mittal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Vikas Gupta",discipline:"High-rise Commercial",multiplier:1.0,status:""},
-  {id:"",name:"Shivesh Kanadiya",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"",name:"140 Mittal",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"",name:"Tinu Doshi",discipline:"High-rise Residential/ Resi-commercial",multiplier:1.8,status:""},
-  {id:"",name:"Deedwaniya Parisar",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Alankar Wadhwani",discipline:"Luxury Residential (Large >8k sft)",multiplier:1.5,status:""},
-  {id:"",name:"Pradeep Sodani",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Payal Khandelwal",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Bhavesh Kothari",discipline:"Premium Residential (Small <8k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Shubham Samriddhi",discipline:"Township / Plotted Dev. (> 10 acre)",multiplier:1.8,status:""},
-  {id:"",name:"SBRE Mhow",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"",name:"SBRE Budni",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"",name:"SBRE HGB",discipline:"Township / Plotted Dev. (< 10 acre)",multiplier:1.2,status:""},
-  {id:"",name:"Deokar Hospital",discipline:"Commercial (Small <5k sft)",multiplier:1.0,status:""},
-  {id:"",name:"Pratik Jain",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Mayank Makhija",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Shubham Samridddhi Self Residence",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Girish Laddha",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Gagan Beesani 2 Projects",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Anand Shah 2bhk",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Nakoda Estate",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Shaily Farm House",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"KK Farm House",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Anand Beesani",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Govind Laddha",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Narmada House Biaora - Lakshya",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Laabham Housing",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Rajpal Bhati Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Pradeep Mundra",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Gurudwara",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"SBRE Row Housing",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Anand Malviya",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Tarun Maheshwari Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Dinesh Maheshwari",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"SBRE Itarsi",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"SBRE Babai",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"AD Fefartal Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Sampat Demo Flats",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Vaibhav Beesani",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Apex Pools",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Navneet Palrecha",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Kurawar Township",discipline:"",multiplier:1.0,status:""},
-  {id:"",name:"Shaily Ahuja",discipline:"",multiplier:1.0,status:""}
-];
-      STAGES   = [
-  {label:"Concept / Schematic \u2014 Layout",pts:3.0,category:"Concept / Schematic"},
-  {label:"Concept / Schematic \u2014 3D Massing",pts:2.0,category:"Concept / Schematic"},
-  {label:"Design Development \u2014 Plan",pts:4.0,category:"Design Development"},
-  {label:"Design Development \u2014 Elevation",pts:3.0,category:"Design Development"},
-  {label:"Design Development \u2014 Section",pts:3.0,category:"Design Development"},
-  {label:"Working Drawing \u2014 Floor Plan",pts:2.0,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Reflected Ceiling Plan",pts:2.0,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 External Elevation",pts:2.0,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Section Detail",pts:1.5,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Door / Window Schedule",pts:1.5,category:"Construction Documents"},
-  {label:"Working Drawing \u2014 Toilet Detail",pts:1.5,category:"Construction Documents"},
-  {label:"Structural \u2014 Foundation Layout",pts:3.0,category:"Construction Documents"},
-  {label:"Structural \u2014 Beam & Slab",pts:3.0,category:"Construction Documents"},
-  {label:"Structural \u2014 Lintel & Staircase",pts:2.5,category:"Construction Documents"},
-  {label:"Structural \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Electrical \u2014 Slab Drawing",pts:2.0,category:"Construction Documents"},
-  {label:"Electrical \u2014 Wall Drawing",pts:2.0,category:"Construction Documents"},
-  {label:"Electrical \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Plumbing \u2014 Underground Sanitation",pts:2.5,category:"Construction Documents"},
-  {label:"Plumbing \u2014 Per Floor",pts:2.0,category:"Construction Documents"},
-  {label:"Plumbing \u2014 Rainwater Disposal",pts:1.5,category:"Construction Documents"},
-  {label:"Plumbing \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Firefighting / HVAC Layout",pts:2.0,category:"Construction Documents"},
-  {label:"Firefighting / HVAC Layout \u2014 Check & Release",pts:1.0,category:"Coordination / Approvals"},
-  {label:"ID Concept \u2014 Mood Board",pts:2.0,category:"Interior Design"},
-  {label:"ID Concept \u2014 Space Planning",pts:3.0,category:"Interior Design"},
-  {label:"ID Design \u2014 2D Layout per Room",pts:2.0,category:"Interior Design"},
-  {label:"ID Design \u2014 Elevation per Room",pts:2.0,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Furniture Layout",pts:2.0,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 False Ceiling",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Flooring Pattern",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Wall Panelling",pts:2.0,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Electrical Layout",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Plumbing Layout",pts:1.5,category:"Interior Design"},
-  {label:"ID Working Drawing \u2014 Joinery Detail",pts:2.0,category:"Interior Design"},
-  {label:"Material Selection \u2014 Finishes",pts:1.5,category:"Interior Design"},
-  {label:"Material Selection \u2014 Furniture",pts:1.5,category:"Interior Design"},
-  {label:"BOQ \u2014 Interior",pts:2.0,category:"Interior Design"},
-  {label:"3D Modelling \u2014 Exterior",pts:3.0,category:"3D / Visualization"},
-  {label:"3D Modelling \u2014 Interior per Room",pts:2.0,category:"3D / Visualization"},
-  {label:"3D Rendering \u2014 Exterior View",pts:2.0,category:"3D / Visualization"},
-  {label:"3D Rendering \u2014 Interior View",pts:1.5,category:"3D / Visualization"},
-  {label:"3D Rendering \u2014 Aerial / Bird's Eye",pts:2.5,category:"3D / Visualization"},
-  {label:"Walkthrough / Animation",pts:4.0,category:"3D / Visualization"},
-  {label:"Photoshop / Post-processing",pts:1.0,category:"3D / Visualization"},
-  {label:"Presentation Deck",pts:1.5,category:"3D / Visualization"},
-  {label:"Coordination \u2014 Consultant",pts:1.0,category:"Coordination / Approvals"},
-  {label:"Approval / Liaison \u2014 Corporation",pts:2.0,category:"Coordination / Approvals"},
-  {label:"Sale / Corporation Drawing",pts:2.0,category:"Construction Documents"},
-  {label:"Area Statement / BOQ",pts:1.5,category:"Coordination / Approvals"},
-  {label:"Procurement \u2014 Vendor Coordination",pts:1.0,category:"Coordination / Approvals"}
-];
-    } else {
-      const [l,c] = await Promise.all([
-        fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})}).then(r=>r.json()),
-        fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getConfig'})}).then(r=>r.json()),
-      ]);
-      if (l.error) throw new Error('Lists: '+l.error);
-      if (c.error) throw new Error('Config: '+c.error);
-      TEAM        = l.team       || [];
-      ALL_MEMBERS = l.allMembers || l.team || []; // fallback to team if allMembers not present
-      PROJECTS    = l.projects   || [];
-      STAGES   = (c.stages  || []).filter(s => s.pts > 0); // skip category headers
-      TASK_GROUPS = c.taskGroups || [];
-      STAGE_IDX = {}; STAGES.forEach((s,i)=>{ STAGE_IDX[s.label]=i; });
+    const [lists, cfg] = await Promise.all([api('getLists'), api('getConfig')]);
+    CFG.allMembers = (lists && lists.allMembers) ? lists.allMembers : [];
+    CFG.projects   = ((lists && lists.projects) ? lists.projects : []).filter(p => p.status !== 'Closed' && p.status !== 'Completed');
+    CFG.stages     = ((cfg && cfg.stages) ? cfg.stages : []).filter(s => s.label && !isVisitType(s.label));
+
+    if (!CFG.allMembers.length || !CFG.projects.length) {
+      document.getElementById('submit-status').textContent = CFG.allMembers.length ? '' : '⚠ Could not load team list — check connection';
     }
-    buildForm();
+
+    const byEl = document.getElementById('meta-by');
+    byEl.innerHTML = CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
+    const myName = CFG.allMembers.find(m => m.toLowerCase().includes(String(user.name||'').split(' ')[0].toLowerCase())) || CFG.allMembers[0] || '';
+    byEl.value = myName;
+
+    document.getElementById('meta-date').value = today();
+
+    const urlP = new URLSearchParams(location.search).get('project');
+    addBlock(urlP || undefined);
   } catch(e) {
-    document.getElementById('sbar-name').textContent = 'Failed to load: '+e.message;
+    document.getElementById('submit-status').textContent = '✗ Failed to load form data: ' + e.message;
   }
-}
+};
 
-function buildForm() {
-  const teamOpts = '<option value="">— select —</option>'+ALL_MEMBERS.map(t=>`<option>${t}</option>`).join('');
+function today(){ return new Date().toISOString().split('T')[0]; }
 
-  ['assigner','assignee'].forEach(id => {
-    const s=document.createElement('select'); s.id=id; s.onchange=updateBar;
-    // Assignee gets an "Unassigned" option; assigner does not
-    if (id === 'assignee') {
-      s.innerHTML = '<option value="">— Unassigned (fill later) —</option>' +
-        ALL_MEMBERS.map(t=>`<option>${t}</option>`).join('');
-    } else {
-      s.innerHTML = teamOpts;
-    }
-    document.getElementById(`${id}-wrap`).innerHTML='';
-    document.getElementById(`${id}-wrap`).appendChild(s);
-  });
+function isVisitType(s){ return /site visit|meeting|dper/i.test(s); }
 
-  document.getElementById('add-proj-btn').disabled=false;
-  document.getElementById('submit-btn').disabled=false;
-  document.getElementById('sbar-name').textContent='Select assigner and assignee';
-  addProjectBlock(); // add first project block
-}
-
-function projOptions() {
-  return '<option value="">— select project —</option>'+
-    PROJECTS.map((p,i)=>`<option value="${i}">${p.name}${p.id?' ('+p.id+')':''}</option>`).join('');
-}
-
-function stageOpts() {
-  return '<option value="">— select task type —</option>'+
-    STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
-}
-function catOpts() {
-  if (!TASK_GROUPS.length) return '<option value="__all">All tasks</option>';
-  return '<option value="">— select category —</option>'+
-    TASK_GROUPS.map(g=>`<option value="${g.name}">${g.name}</option>`).join('');
-}
-function fillStages(catSel) {
-  const block = catSel.closest('.task-block');
-  const taskSel = block.querySelector('.t-stage');
-  let labels;
-  if (catSel.value === '__all' || !TASK_GROUPS.length) labels = STAGES.map(s=>s.label);
-  else { const g = TASK_GROUPS.find(x=>x.name===catSel.value); labels = g ? g.tasks : []; }
-  taskSel.innerHTML = '<option value="">— select task —</option>' +
-    labels.map(lb => { const idx = STAGE_IDX[lb]; return idx==null ? '' :
-      `<option value="${idx}">${STAGES[idx].label} · ${STAGES[idx].pts}pts</option>`; }).join('');
-  recalcAll();
-}
-
-function addProjectBlock() {
-  projBlockCount++;
-  const pid = `pb${projBlockCount}`;
+// ── BULK BLOCKS ──────────────────────────────────────────
+function addBlock(preProject){
+  blockCount++;
+  const id = 'block-'+blockCount;
+  const projOpts = CFG.projects.map(p=>`<option value="${p.name}" data-id="${p.id||''}" data-mult="${p.multiplier||1}">${p.name}</option>`).join('');
+  const memOpts  = CFG.allMembers.map(m=>`<option value="${m}">${m}</option>`).join('');
   const div = document.createElement('div');
-  div.className = 'card'; div.id = pid;
-  div.style.marginBottom = '14px';
+  div.className = 'block'; div.id = id;
   div.innerHTML = `
-    <div class="card-head">
-      <div class="card-title">Project ${projBlockCount}</div>
-      ${projBlockCount > 1 ? `<button onclick="removeProjBlock('${pid}')" style="margin-left:auto;font-size:11px;color:var(--red);background:none;border:1px solid var(--red);border-radius:4px;padding:2px 10px;cursor:pointer;font-family:'DM Sans',sans-serif">Remove</button>` : ''}
+    <div class="block-head">
+      <div class="block-head-fields">
+        <select class="b-project" onchange="onBlockProject('${id}')">
+          <option value="">Select project…</option>${projOpts}
+        </select>
+        <select class="b-member">
+          <option value="">Assign to…</option>${memOpts}
+        </select>
+        <span class="b-mult-badge" style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);align-self:center"></span>
+      </div>
+      <button class="block-remove" onclick="removeBlock('${id}')">✕ Remove</button>
     </div>
-    <div class="card-body">
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Project <span class="req">*</span></div>
-          <select class="pb-project" onchange="onProjBlockChange(this)">${projOptions()}</select>
-        </div>
-        <div class="field">
-          <div class="lbl">Project ID <span class="opt">optional</span></div>
-          <input type="text" class="pb-proj-id" placeholder="e.g. P001">
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Discipline <span style="font-size:10px;color:var(--text3)">auto from project</span></div>
-        <div class="auto-display pb-disc-display">— select project first —</div>
-      </div>
-      <div class="divider"></div>
-      <div class="pb-tasks"></div>
-      <button class="add-task-btn" onclick="addTaskToBlock('${pid}')" style="margin-top:8px">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
-        Add task to this project
-      </button>
+    <div class="block-body">
+      <table class="task-table">
+        <thead><tr>
+          <th>Stage / Task Type</th><th>Description <span style="font-size:8px;font-weight:400;color:var(--text3)">(area · drawing)</span></th>
+          <th style="width:60px">Units</th><th style="width:110px">Deadline</th>
+          <th style="width:80px">Priority</th><th style="width:60px">Pts</th><th class="td-del"></th>
+        </tr></thead>
+        <tbody class="b-rows"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="addRow('${id}')">+ Add task</button>
     </div>`;
-  document.getElementById('project-blocks').appendChild(div);
-  addTaskToBlock(pid);
-  recalcAll();
+  document.getElementById('blocks-container').appendChild(div);
+  if (preProject) { div.querySelector('.b-project').value = preProject; onBlockProject(id); }
+  addRow(id);
 }
 
-function removeProjBlock(pid) {
-  document.getElementById(pid).remove();
-  recalcAll();
+function onBlockProject(blockId){
+  const block = document.getElementById(blockId);
+  const opt   = block.querySelector('.b-project').selectedOptions[0];
+  const mult  = opt ? parseFloat(opt.dataset.mult||1) : 1;
+  block.querySelector('.b-mult-badge').textContent = mult !== 1 ? 'mult ×'+mult : '';
+  // Refresh pts in existing rows
+  block.querySelectorAll('.b-rows tr').forEach(r => refreshRowPts(r, mult));
+  updateCount();
 }
 
-function onProjBlockChange(sel) {
-  const idx  = parseInt(sel.value);
-  const proj = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
-  const card = sel.closest('.card-body');
-  const disp = card?.querySelector('.pb-disc-display');
-  const idIn = card?.querySelector('.pb-proj-id');
-  if (disp) {
-    if (proj) { disp.textContent = proj.discipline + '  ·  ' + proj.multiplier + 'x'; disp.style.color = 'var(--accent)'; }
-    else { disp.textContent = '— select project first —'; disp.style.color = 'var(--text2)'; }
-  }
-  if (idIn && proj?.id) idIn.value = proj.id;
-  updateBar(); recalcAll();
+function removeBlock(id){ document.getElementById(id).remove(); updateCount(); }
+
+function addRow(blockId){
+  const block = document.getElementById(blockId);
+  const stageOpts = CFG.stages.map(s=>`<option value="${s.label}" data-pts="${s.pts||0}">${s.label}</option>`).join('');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><select class="r-stage" onchange="onRowStage(this)">${stageOpts}</select></td>
+    <td><input type="text" class="r-desc" placeholder="e.g. Kitchen — Floor Plan" oninput="updateCount()"></td>
+    <td><input type="number" class="r-units" value="1" min="1" style="width:54px" onchange="onRowStage(this)"></td>
+    <td><input type="date" class="r-deadline" oninput="updateCount()"></td>
+    <td><select class="r-priority"><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></td>
+    <td><span class="pts-badge r-pts">—</span></td>
+    <td class="td-del"><button class="del-row" onclick="this.closest('tr').remove();updateCount()">×</button></td>`;
+  block.querySelector('.b-rows').appendChild(tr);
+  // Trigger pts calc
+  const projOpt = block.querySelector('.b-project').selectedOptions[0];
+  const mult = projOpt ? parseFloat(projOpt.dataset.mult||1) : 1;
+  refreshRowPts(tr, mult);
+  updateCount();
 }
 
-function addTaskToBlock(pid) {
-  const container = document.querySelector(`#${pid} .pb-tasks`);
-  if (!container) return;
-  const taskId = `${pid}-t${Date.now()}`;
-  const today  = new Date().toISOString().split('T')[0];
-  const div = document.createElement('div');
-  div.className = 'task-block'; div.id = taskId;
-  div.innerHTML = `
-    <div class="task-block-head">
-      <div class="task-block-title">TASK</div>
-      <button class="task-remove" onclick="document.getElementById('${taskId}').remove();recalcAll()">✕ Remove</button>
-    </div>
-    <div class="task-block-body">
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Category <span class="req">*</span></div>
-          <select class="t-cat" onchange="fillStages(this)">${catOpts()}</select>
-        </div>
-        <div class="field">
-          <div class="lbl">Task type / stage <span class="req">*</span></div>
-          <select class="t-stage" onchange="recalcAll()"><option value="">— select category first —</option></select>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Description <span class="opt">area · drawing</span></div>
-        <input type="text" class="t-description" placeholder="e.g. Drawing Room — Floor Plan v2">
-      </div>
-      <div class="row3">
-        <div class="field">
-          <div class="lbl">Units <span class="req">*</span></div>
-          <input type="number" class="t-units" min="0.25" max="50" step="any" value="1" oninput="recalcAll()">
-        </div>
-        <div class="field">
-          <div class="lbl">Target date <span class="req">*</span></div>
-          <input type="date" class="t-date" value="${today}">
-        </div>
-        <div class="field">
-          <div class="lbl">Priority</div>
-          <select class="t-priority">
-            <option value="Low">Low</option>
-            <option value="Medium" selected>Medium</option>
-            <option value="High">High</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Revision Type <span class="opt">optional</span></div>
-        <div class="rev-row">
-          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="" checked><span class="rev-btn orig">Original Task</span></label>
-          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="Internal"><span class="rev-btn int">Internal Revision</span></label>
-          <label class="rev-opt"><input type="radio" name="rev-${taskId}" value="Client"><span class="rev-btn cli">Client Revision</span></label>
-        </div>
-      </div>
-      <div class="field">
-        <div class="lbl">Instructions <span class="opt">optional</span></div>
-        <textarea class="t-notes" placeholder="What needs to be done..."></textarea>
-      </div>
-      <div class="pts-preview">
-        <div class="pts-label">Weighted points</div>
-        <div class="pts-val t-pts-display">—</div>
-      </div>
-    </div>`;
-  container.appendChild(div);
-  recalcAll();
+function onRowStage(el){
+  const tr = el.closest('tr'), block = tr.closest('.block');
+  const projOpt = block.querySelector('.b-project').selectedOptions[0];
+  const mult = projOpt ? parseFloat(projOpt.dataset.mult||1) : 1;
+  refreshRowPts(tr, mult);
+  updateCount();
 }
 
-// onProjectChange replaced by onProjBlockChange in multi-project mode
-
-function recalcAll() {
-  let total=0, taskCount=0;
-  document.querySelectorAll('.card[id^="pb"]').forEach(pb => {
-    const projSel = pb.querySelector('.pb-project');
-    const idx     = parseInt(projSel?.value);
-    const proj    = (!isNaN(idx) && PROJECTS[idx]) ? PROJECTS[idx] : null;
-    const mult    = proj ? proj.multiplier : 1;
-    pb.querySelectorAll('.task-block').forEach(tb => {
-      const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-      const stage    = (!isNaN(stageIdx) && STAGES[stageIdx]) ? STAGES[stageIdx] : null;
-      const units    = parseFloat(tb.querySelector('.t-units')?.value)||1;
-      const disp     = tb.querySelector('.t-pts-display');
-      if (stage && stage.pts) {
-        const pts = parseFloat((stage.pts*mult*units).toFixed(2));
-        if(disp) disp.textContent = pts+' pts';
-        total+=pts; taskCount++;
-      } else { if(disp) disp.textContent='—'; }
-    });
-  });
-  document.getElementById('total-pts').textContent=total.toFixed(1);
-  document.getElementById('total-count').textContent=`across ${taskCount} task${taskCount!==1?'s':''}`;
-  document.getElementById('total-strip').style.display=total>0?'flex':'none';
+function refreshRowPts(tr, mult){
+  const stageOpt = tr.querySelector('.r-stage').selectedOptions[0];
+  const basePts  = stageOpt ? parseFloat(stageOpt.dataset.pts||0) : 0;
+  const units    = parseFloat(tr.querySelector('.r-units').value||1);
+  const w        = Math.round(basePts * mult * units * 10) / 10;
+  tr.querySelector('.r-pts').textContent = basePts ? w+'pts' : '—';
 }
 
-function updateBar() {
-  const assigner=document.getElementById('assigner')?.value;
-  const assignee=document.getElementById('assignee')?.value;
-  document.getElementById('sbar-name').textContent=assigner?`Assigning as ${assigner}`:'Select your name';
-  document.getElementById('sbar-sub').textContent=assignee?`→ ${assignee}`:'select assignee first';
+// ── COUNT UPDATE ──────────────────────────────────────────
+function updateCount(){
+  let n = 0;
+  document.querySelectorAll('.b-rows tr').forEach(()=>n++);
+  document.getElementById('submit-count').textContent = n + ' task' + (n!==1?'s':'');
 }
 
-async function submitTasks() {
-  const assigner = document.getElementById('assigner')?.value;
-  const assignee = document.getElementById('assignee')?.value;
-  if (!assigner) { toast('Select your name');        return; }
-  // assignee is optional — if blank task is created as Unassigned
+// ── SUBMIT ──────────────────────────────────────────────
+async function submit(){
+  const btn = document.getElementById('submit-btn');
+  const status = document.getElementById('submit-status');
+  const assignedBy  = document.getElementById('meta-by').value;
+  const dateAssigned = document.getElementById('meta-date').value;
+  btn.disabled = true; status.textContent = 'Submitting…';
 
-  const today = new Date().toISOString().substring(0,10);
-  const allPayloads = [];
-  let valid = true, totalTasks = 0, totalPts = 0;
-
-  document.querySelectorAll('.card[id^="pb"]').forEach((pb, pi) => {
-    if (!valid) return;
-    const projSel = pb.querySelector('.pb-project');
-    const projIdx = parseInt(projSel?.value);
-    if (isNaN(projIdx) || projIdx < 0) { toast(`Select project for block ${pi+1}`); valid=false; return; }
-    const proj   = PROJECTS[projIdx];
-    const projId = pb.querySelector('.pb-proj-id')?.value.trim() || proj.id || '';
-    const tasks  = [];
-
-    pb.querySelectorAll('.task-block').forEach((tb, ti) => {
-      if (!valid) return;
-      const stageIdx = parseInt(tb.querySelector('.t-stage')?.value);
-      if (isNaN(stageIdx)||stageIdx<0) { toast(`Select task type in project ${pi+1}`); valid=false; return; }
-      const stage   = STAGES[stageIdx];
-      const units   = parseFloat(tb.querySelector('.t-units')?.value)||1;
-      const tDate   = tb.querySelector('.t-date')?.value||today;
-      const priority= tb.querySelector('.t-priority')?.value||'Medium';
-      const description = tb.querySelector('.t-description')?.value.trim()||'';
-      const notes   = tb.querySelector('.t-notes')?.value.trim()||'';
-      const revType = Array.from(tb.querySelectorAll('input[type=radio]')).find(r=>r.checked&&r.name.startsWith('rev-'))?.value||'';
-      const pts     = parseFloat((stage.pts*proj.multiplier*units).toFixed(2));
-      tasks.push({taskType:stage.label,basePts:stage.pts,units,weightedPts:pts,
-                  targetDate:tDate,priority,description,notes,revisionType:revType});
-      totalPts += pts; totalTasks++;
-    });
-
-    if (tasks.length > 0) {
-      allPayloads.push({
-        action:'assignTasks', assignedBy:assigner, assignedTo:assignee||'Unassigned',
-        project:proj.name, projectId:projId,
-        discipline:proj.discipline, multiplier:proj.multiplier,
-        dateAssigned:today, tasks,
+  try{
+    const blocks = [];
+    let valid = true, errs = [];
+    document.querySelectorAll('.block').forEach(block => {
+      const projOpt = block.querySelector('.b-project').selectedOptions[0];
+      const member  = block.querySelector('.b-member').value;
+      if (!projOpt||!projOpt.value){ errs.push('A block has no project selected'); valid=false; return; }
+      if (!member){ errs.push('A block has no member selected'); valid=false; return; }
+      const mult = parseFloat(projOpt.dataset.mult||1);
+      const tasks = [];
+      block.querySelectorAll('.b-rows tr').forEach(tr => {
+        const stageOpt = tr.querySelector('.r-stage').selectedOptions[0];
+        if (!stageOpt||!stageOpt.value) return;
+        tasks.push({
+          taskType:    stageOpt.value,
+          basePts:     parseFloat(stageOpt.dataset.pts||0),
+          units:       parseFloat(tr.querySelector('.r-units').value||1),
+          targetDate:  tr.querySelector('.r-deadline').value,
+          description: tr.querySelector('.r-desc').value,
+          priority:    tr.querySelector('.r-priority').value
+        });
       });
-    }
-  });
-
-  if (!valid || allPayloads.length === 0) { if(valid) toast('Add at least one task'); return; }
-
-  document.getElementById('sending').classList.add('show');
-  try {
-    if (APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      for (let pi=0; pi<allPayloads.length; pi++) {
-        const res = await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          headers: {'Content-Type': 'text/plain'},
-          body: JSON.stringify(allPayloads[pi]),
-        }).then(r=>r.json()).catch(()=>({status:'error',message:'No response'}));
-        if (res.status !== 'ok') {
-          document.getElementById('sending').classList.remove('show');
-          toast('Error saving tasks: ' + (res.message || res.code || JSON.stringify(res)));
-          return;
-        }
-        if ((res.written||0) === 0) {
-          document.getElementById('sending').classList.remove('show');
-          toast('Backend reported 0 tasks written — payload may be malformed. Check console.');
-          console.warn('assignTasks response:', res, 'payload:', allPayloads[pi]);
-          return;
-        }
+      if (!tasks.length){ errs.push('Block "'+projOpt.value+'" has no tasks'); valid=false; return; }
+      blocks.push({ projectId:projOpt.dataset.id||'', project:projOpt.value, assignedTo:member, multiplier:mult, tasks });
+    });
+    if (!valid) throw new Error(errs.join('; '));
+    if (!blocks.length) throw new Error('Add at least one project block with tasks');
+    const r = await api('bulkAssignTasks', { blocks, assignedBy, dateAssigned });
+    if (r.status === 'ok' || r.status === 'partial'){
+      const msg = '✓ '+r.written+' task'+(r.written!==1?'s':'')+' created';
+      status.textContent = r.errors&&r.errors.length ? msg+' (some errors)' : msg;
+      if (r.status === 'ok'){
+        document.getElementById('blocks-container').innerHTML = '';
+        blockCount = 0;
+        addBlock();
       }
-    }
-    document.getElementById('sending').classList.remove('show');
-    const projNames = allPayloads.map(p=>p.project).join(', ');
-    document.getElementById('success-sub').innerHTML=
-      `<strong>${totalTasks} task${totalTasks!==1?'s':''}</strong> assigned to <strong>${assignee||'Unassigned pool'}</strong><br>`+
-      `Projects: ${projNames}<br>Total: ${totalPts.toFixed(1)} weighted pts`;
-    document.getElementById('success').classList.add('show');
-  } catch(err) {
-    document.getElementById('sending').classList.remove('show');
-    toast('Submission failed: ' + err.message);
+    } else throw new Error(r.message||'Failed');
+  } catch(e){
+    status.textContent = '✗ '+e.message;
   }
+  btn.disabled = false;
 }
 
-function resetForm() {
-  document.getElementById('success').classList.remove('show');
-  document.getElementById('assigner').value='';
-  document.getElementById('assignee').value='';
-  document.getElementById('project-blocks').innerHTML='';
-  projBlockCount=0; addProjectBlock(); updateBar(); recalcAll();
-}
-
-function toast(msg) {
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),2800);
-}
+updateCount();
 </script>
 </body>
 </html>
