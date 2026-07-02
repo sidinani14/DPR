@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>IDS · Task Assignment</title>
+<title>IDS · Bulk Task Planning</title>
 <script src="auth.js"></script>
 <script src="searchselect.js"></script>
 <style>:root{--ss-bg:#1A1A1A;--ss-fg:#F0EDE8;--ss-pop-bg:#161616;--ss-border:#2E2E2E;--ss-accent:#C8A96E;--ss-muted:#5A5652;--ss-hover:rgba(200,169,110,0.15)}</style>
@@ -90,7 +90,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 <body>
 <header class="header">
   <div class="header-inner">
-    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Task Assignment</div></div>
+    <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Bulk Task Planning</div></div>
     <div class="header-date" id="header-date"></div>
   </div>
 </header>
@@ -448,15 +448,9 @@ function addTaskToBlock(pid) {
           <select class="t-stage" onchange="recalcAll()"><option value="">— select category first —</option></select>
         </div>
       </div>
-      <div class="row2">
-        <div class="field">
-          <div class="lbl">Area / Space <span class="opt">optional</span></div>
-          <input type="text" class="t-area" placeholder="e.g. Drawing Room">
-        </div>
-        <div class="field">
-          <div class="lbl">Drawing name <span class="opt">optional</span></div>
-          <input type="text" class="t-drawing" placeholder="e.g. Floor Plan v2">
-        </div>
+      <div class="field">
+        <div class="lbl">Description <span class="opt">area · drawing</span></div>
+        <input type="text" class="t-description" placeholder="e.g. Drawing Room — Floor Plan v2">
       </div>
       <div class="row3">
         <div class="field">
@@ -557,13 +551,12 @@ async function submitTasks() {
       const units   = parseFloat(tb.querySelector('.t-units')?.value)||1;
       const tDate   = tb.querySelector('.t-date')?.value||today;
       const priority= tb.querySelector('.t-priority')?.value||'Medium';
-      const area    = tb.querySelector('.t-area')?.value.trim()||'';
-      const drawing = tb.querySelector('.t-drawing')?.value.trim()||'';
+      const description = tb.querySelector('.t-description')?.value.trim()||'';
       const notes   = tb.querySelector('.t-notes')?.value.trim()||'';
       const revType = Array.from(tb.querySelectorAll('input[type=radio]')).find(r=>r.checked&&r.name.startsWith('rev-'))?.value||'';
       const pts     = parseFloat((stage.pts*proj.multiplier*units).toFixed(2));
       tasks.push({taskType:stage.label,basePts:stage.pts,units,weightedPts:pts,
-                  targetDate:tDate,priority,area,drawing,notes,revisionType:revType});
+                  targetDate:tDate,priority,description,notes,revisionType:revType});
       totalPts += pts; totalTasks++;
     });
 
