@@ -88,6 +88,7 @@ table.leads tr:hover td{background:var(--surface2)}
 <div class="header"><div class="header-inner">
   <div class="logo">IDEAFORM · Projects Health<small>which projects need attention today</small></div>
   <div class="controls">
+    <input type="text" id="proj-search" placeholder="🔍 Search project…" oninput="render()" class="sel" style="cursor:text;min-width:150px">
     <select class="sel" id="lead-filter" onchange="render()"><option value="all">All leads</option></select>
     <select class="sel" id="status-filter" onchange="render()">
       <option value="all">All statuses</option>
@@ -146,8 +147,9 @@ function passStatus(p,f){
 function render(){
   const lead=document.getElementById('lead-filter').value;
   const sf=document.getElementById('status-filter').value;
+  const q=(document.getElementById('proj-search').value||'').trim().toLowerCase();
   const c=DATA.counts||{};
-  let cards=(DATA.projects||[]).filter(p=>(lead==='all'||p.lead===lead) && passStatus(p,sf));
+  let cards=(DATA.projects||[]).filter(p=>(lead==='all'||p.lead===lead) && passStatus(p,sf) && (!q || (p.name||'').toLowerCase().includes(q)));
   const strip=`<div class="strip">
     <div class="scell"><div class="sval">${c.total||0}</div><div class="slbl">Projects</div></div>
     <div class="scell"><div class="sval ${c.neglected?'red':''}">${c.neglected||0}</div><div class="slbl">Neglected</div></div>
