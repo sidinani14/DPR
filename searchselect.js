@@ -176,19 +176,22 @@
       list.style.maxHeight = Math.max(96, (up ? above : below) - 52) + 'px';
     }
     var _reposition = function () { if (pop.classList.contains('ss-show')) position(); };
-    function open() {
+    function open(seed) {
       if (pop.classList.contains('ss-show')) return;
       closeAll();
       injectStyles();
       pop.classList.add('ss-show');
       trigger.classList.add('ss-open');
-      search.value = '';
+      search.value = seed || '';
       buildList();
       position();
       window.addEventListener('scroll', _reposition, true);
       window.addEventListener('resize', _reposition);
-      // focus the search box → opens the mobile keyboard
-      setTimeout(function () { search.focus(); }, 0);
+      // focus the search box → opens the mobile keyboard; keep cursor at end
+      setTimeout(function () {
+        search.focus();
+        var v = search.value; search.value = ''; search.value = v;
+      }, 0);
       openInstance = api;
     }
     function close() {
@@ -203,6 +206,16 @@
     trigger.addEventListener('click', function (e) {
       e.preventDefault();
       pop.classList.contains('ss-show') ? close() : open();
+    });
+    // Type-ahead: focus the control (Tab/click) and just start typing — the popup
+    // opens seeded with that character and filters live, no need to open first.
+    trigger.addEventListener('keydown', function (e) {
+      if (pop.classList.contains('ss-show')) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault(); open();
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault(); open(e.key);
+      }
     });
     search.addEventListener('input', buildList);
     search.addEventListener('keydown', function (e) {
