@@ -282,12 +282,22 @@ const STAGES = ['Design Finalization','Civil Work','Plaster','Electrical','Plumb
 let googleUser   = null;
 let leadName     = '';
 let projects     = [];
+let CFG_STAGES   = [];   // assign-task stages {label,pts,category} from getConfig
+let TASK_GROUPS  = [];   // task categories {name,tasks[]}
+let STAGE_IDX    = {};   // label → index in CFG_STAGES
 let pbCount      = 0;
 let ibCount      = 0;
+let taskCount    = 0;
 let connCount    = 0;
 const CONN_TYPES = ['Call','WhatsApp','Meeting','Site Visit','Email','Other'];
+const CONN_WITH  = ['Client','Contractor','Consultant','Vendor','Other'];
 
-// ── EPIC G: client connections (DPER) ────────────────────────
+// single-select chip helpers (mirror the DPR form)
+function pickConnChip(el){ el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); }
+function connChips(cid, vals){ return `<div class="chips" id="${cid}">`+vals.map(v=>`<div class="chip" data-val="${v}" onclick="pickConnChip(this)">${v}</div>`).join('')+`</div>`; }
+function connChipVal(cid){ const on=document.querySelector('#'+cid+' .chip.on'); return on?on.dataset.val:''; }
+
+// ── EPIC G: client connections (DPER) — same layout as DPR ───
 function addConnection(){
   connCount++; const id=connCount;
   const projOpts = '<option value="">Select project…</option>'+projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
@@ -295,7 +305,9 @@ function addConnection(){
   div.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px';
   div.innerHTML=
     `<div class="field"><label>Project</label><select class="conn-proj" id="cn-proj-${id}">${projOpts}</select></div>`+
-    `<div class="field"><label>Type of contact</label><select id="cn-type-${id}">${CONN_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div>`+
+    `<div class="field"><label>Connected with</label>${connChips('cn-with-'+id, CONN_WITH)}</div>`+
+    `<div class="field"><label>Name <span class="opt">who you connected with</span></label><input type="text" id="cn-name-${id}" placeholder="e.g. Mr. Ramesh / ABC Contractors"></div>`+
+    `<div class="field"><label>Type of contact</label>${connChips('cn-type-'+id, CONN_TYPES)}</div>`+
     `<div class="field"><label>Notes</label><textarea id="cn-notes-${id}" placeholder="What was discussed? Any action items?" style="min-height:45px"></textarea></div>`+
     `<button type="button" onclick="document.getElementById('cn-${id}').remove()" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer">✕ Remove</button>`;
   document.getElementById('conn-blocks').appendChild(div);
@@ -305,9 +317,13 @@ function collectConnections(){
   document.querySelectorAll('#conn-blocks > .pb-block').forEach(d=>{
     const id=d.id.replace('cn-','');
     const project=(document.getElementById('cn-proj-'+id)||{}).value||'';
-    const type=(document.getElementById('cn-type-'+id)||{}).value||'';
-    const notes=(document.getElementById('cn-notes-'+id)||{}).value||'';
-    if(project||notes) out.push({project,type,notes});
+    if(!project) return;
+    const role=connChipVal('cn-with-'+id);
+    const name=((document.getElementById('cn-name-'+id)||{}).value||'').trim();
+    const type=connChipVal('cn-type-'+id);
+    const notes=((document.getElementById('cn-notes-'+id)||{}).value||'').trim();
+    const composite=[ role+(name?' ('+name+')':''), notes ].filter(Boolean).join(' — ');
+    out.push({project, type, notes:composite});
   });
   return out;
 }
@@ -333,9 +349,17 @@ function onGoogleSignIn(resp) {
 // ── Projects ──────────────────────────────────────────────
 async function loadProjects() {
   try {
-    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'getLists'})});
+    const [r, cr] = await Promise.all([
+      fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})}),
+      fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getConfig'})})
+    ]);
     const d = await r.json();
+    try {
+      const c = await cr.json();
+      CFG_STAGES = (c.stages||[]).filter(s=>s.pts>0);
+      TASK_GROUPS = c.taskGroups||[];
+      STAGE_IDX={}; CFG_STAGES.forEach((s,i)=>{STAGE_IDX[s.label]=i;});
+    } catch(ce){}
     const EXCL = ['completed','closed','dead','cancelled','proposal','new lead'];
     projects = (d.projects||[]).filter(p=>!EXCL.some(x=>(p.status||'').toLowerCase().includes(x)));
     // Refresh project dropdowns
@@ -562,6 +586,64 @@ function setIBPri(pId,iId,val){
   document.getElementById(`ib-pri-${pId}-${iId}`).value=val;
 }
 
+// ── Task assignment blocks within project (same model as Plan Tasks) ──
+function memberOpts(){ return Object.values(EMAIL_MAP).filter((v,i,a)=>a.indexOf(v)===i).sort().map(m=>`<option>${m}</option>`).join(''); }
+function projMultiplier(name){ const p=projects.find(p=>p.name===name); return (p&&p.multiplier)?parseFloat(p.multiplier):1; }
+function taskCatOpts(){ if(!TASK_GROUPS.length) return '<option value="__all">All tasks</option>'; return '<option value="">Category…</option>'+TASK_GROUPS.map(g=>`<option value="${g.name}">${g.name}</option>`).join(''); }
+
+function addTaskBlock(projId){
+  taskCount++; const tid=`${projId}-${taskCount}`;
+  const div=document.createElement('div');
+  div.className='task-block-dper'; div.id=`tb-${tid}`;
+  div.style.cssText='border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--surface2)';
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--accent);font-weight:600">Task</span>
+      <button type="button" onclick="this.closest('.task-block-dper').remove()" style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:5px;font-size:11px;padding:2px 8px;cursor:pointer">✕</button>
+    </div>
+    <div class="field"><div class="lbl">Category</div><select class="tk-cat" onchange="fillTaskStages(this)">${taskCatOpts()}</select></div>
+    <div class="field"><div class="lbl">Task type / stage</div><select class="tk-stage" onchange="calcTaskPts(this)"><option value="">Select category first…</option></select></div>
+    <div class="field"><div class="lbl">Description <span class="opt">area · drawing</span></div><input type="text" class="tk-desc" placeholder="e.g. Kitchen — Floor Plan"></div>
+    <div class="field-row">
+      <div><div class="lbl" style="font-size:10px">Units</div><input type="number" class="tk-units" value="1" min="1" step="1" onchange="calcTaskPts(this)" style="width:100%"></div>
+      <div><div class="lbl" style="font-size:10px">Target date</div><input type="date" class="tk-date"></div>
+    </div>
+    <div class="field-row">
+      <div><div class="lbl" style="font-size:10px">Priority</div><select class="tk-pri"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+      <div><div class="lbl" style="font-size:10px">Assign to</div><select class="tk-assign"><option value="">— select —</option>${memberOpts()}</select></div>
+    </div>
+    <div class="tk-pts" style="font-size:11px;color:var(--accent);margin-top:6px;font-family:monospace"></div>`;
+  document.getElementById(`pb-tasks-${projId}`).appendChild(div);
+  if(taskCatOpts().indexOf('__all')>-1) fillTaskStages(div.querySelector('.tk-cat'));
+}
+
+function fillTaskStages(catSel){
+  const block=catSel.closest('.task-block-dper');
+  const stageSel=block.querySelector('.tk-stage');
+  let labels=[];
+  if(catSel.value==='__all'){ labels=CFG_STAGES.map(s=>s.label); }
+  else if(catSel.value){ const g=TASK_GROUPS.find(x=>x.name===catSel.value); labels=g?g.tasks:[]; }
+  stageSel.innerHTML='<option value="">Select task…</option>'+labels.map(lb=>{
+    const idx=STAGE_IDX[lb];
+    return idx==null?'':`<option value="${idx}">${CFG_STAGES[idx].label} · ${CFG_STAGES[idx].pts}pts</option>`;
+  }).join('');
+  calcTaskPts(catSel);
+}
+
+function calcTaskPts(el){
+  const block=el.closest('.task-block-dper');
+  const projBlock=block.closest('.proj-block');
+  const projId=projBlock?projBlock.id.replace('pb-',''):'';
+  const projName=document.getElementById(`pb-proj-${projId}`)?.value||'';
+  const mult=projMultiplier(projName);
+  const idx=parseInt(block.querySelector('.tk-stage').value);
+  const stage=(!isNaN(idx)&&CFG_STAGES[idx])?CFG_STAGES[idx]:null;
+  const units=parseFloat(block.querySelector('.tk-units').value||1);
+  const disp=block.querySelector('.tk-pts');
+  if(stage){ const w=Math.round(stage.pts*mult*units*10)/10; disp.textContent=`${stage.pts} × ${mult} × ${units} = ${w} pts`; }
+  else disp.textContent='';
+}
+
 // ── Collect data ───────────────────────────────────────────
 function collectProjects(){
   const result=[];
@@ -588,11 +670,30 @@ function collectProjects(){
         reportedBy :leadName,
       });
     });
+    // Directly-assigned tasks (same model as Plan Tasks)
+    const tasks=[];
+    b.querySelectorAll('.task-block-dper').forEach(tb=>{
+      const idx=parseInt(tb.querySelector('.tk-stage')?.value);
+      if(isNaN(idx)||!CFG_STAGES[idx]) return;
+      const assignedTo=(tb.querySelector('.tk-assign')?.value||'').trim();
+      if(!assignedTo) return;
+      const stage=CFG_STAGES[idx];
+      tasks.push({
+        taskType   :stage.label,
+        basePts    :stage.pts,
+        units      :parseFloat(tb.querySelector('.tk-units')?.value)||1,
+        description:(tb.querySelector('.tk-desc')?.value||'').trim(),
+        targetDate :tb.querySelector('.tk-date')?.value||'',
+        priority   :tb.querySelector('.tk-pri')?.value||'Medium',
+        assignedTo :assignedTo,
+      });
+    });
     result.push({
       id,proj,
       siteVisit   :(document.getElementById(`pb-vtype-${id}`)?.value==='Site Visit')?'Yes':'No',
       visitType   :(document.getElementById(`pb-vtype-${id}`)?.value||''),
       visitHours  :parseFloat(document.getElementById(`pb-vhrs-${id}`)?.value)||0,
+      tasks,
       stage       :stages,
       worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
       pctPlan     :parseInt(document.getElementById(`pb-pctplan-${id}`)?.value)||0,
@@ -714,6 +815,23 @@ async function submitAll(){
         if(p.siddharthPending && r.siddharthError) siddharthErrors.push(p.proj+': '+r.siddharthError);
         if(p.siddharthPending && r.siddharthTaskId) console.log('Siddharth task created:', r.siddharthTaskId);
       } catch(e){ console.log('Could not parse submitDPER response', e); }
+
+      // 2b. Directly-assigned tasks for this project (grouped by assignee)
+      if(p.tasks && p.tasks.length){
+        const mult=projMultiplier(p.proj);
+        const byWho={};
+        p.tasks.forEach(t=>{ (byWho[t.assignedTo]=byWho[t.assignedTo]||[]).push(t); });
+        for(const [assignee,tks] of Object.entries(byWho)){
+          await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+            body:JSON.stringify({
+              action:'assignTasks', assignedBy:leadName, assignedTo:assignee,
+              project:p.proj, projectId:'', multiplier:mult, dateAssigned:p.date||date,
+              tasks:tks.map(t=>({taskType:t.taskType, basePts:t.basePts, units:t.units,
+                weightedPts:Math.round(t.basePts*mult*t.units*10)/10,
+                targetDate:t.targetDate, priority:t.priority, description:t.description}))
+            })}).catch(err=>console.log('assignTasks error', p.proj, err));
+        }
+      }
     }
 
     // EPIC G — log client connections once (member = the DPER lead)
@@ -1043,6 +1161,11 @@ function buildPBInnerHTML(id, projOpts) {
       <div class="lbl">Issues on Site</div>
       <div id="pb-iss-${id}"></div>
       <button class="add-btn" onclick="addIssueBlock(${id})">+ Add Issue</button>
+    </div>
+    <div class="field">
+      <div class="lbl">Tasks to Assign <span class="opt">assign design/execution work directly</span></div>
+      <div id="pb-tasks-${id}"></div>
+      <button class="add-btn" onclick="addTaskBlock(${id})">+ Add Task</button>
     </div>
     <div class="field">
       <div class="lbl">Pending Discussion with Siddharth</div>

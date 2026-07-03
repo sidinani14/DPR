@@ -742,7 +742,7 @@ function renderTaskList(tasks) {
   };
   const priMap={'Low':'p-low','Medium':'p-med','High':'p-high'};
   const canPark = isSiddharth();
-  const PARKABLE = ['Upcoming','Ongoing','Delayed','Approval Pending','Revision Required'];
+  const PARKABLE = ['Upcoming','Ongoing','Delayed','Approval Pending','Revision Required','Blocked'];
 
   document.getElementById('task-list').innerHTML=tasks.map(t=>{
     const isOverdue = t.targetDate && t.targetDate<today && t.status!=='Completed';
