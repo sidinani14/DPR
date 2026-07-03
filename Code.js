@@ -37,52 +37,26 @@ function calcVisitPts(taskType, hours) {
   return 0;
 }
 
-// Approx hours for a DPER site-visit duration label like "2–3 hours" / "Under 1 hour" / "4+ hours".
-function dperVisitHours(label) {
-  var s = String(label || '').toLowerCase();
-  if (!s) return 0;
-  if (s.indexOf('under 1') > -1 || s.indexOf('<1') > -1 || s.indexOf('less than 1') > -1) return 1;
-  if (s.indexOf('4+') > -1 || s.indexOf('4 +') > -1 || s.indexOf('more than 4') > -1)     return 5;
-  var nums = s.match(/\d+(\.\d+)?/g);
-  if (nums && nums.length >= 2) return (parseFloat(nums[0]) + parseFloat(nums[1])) / 2; // "2–3" → 2.5
-  if (nums && nums.length === 1) return parseFloat(nums[0]);
-  return 2;
-}
-
-// Points for a completed site visit. Prefers the CONFIG "visits" band table
-// (matched on the duration label); falls back to hours × 2 (site-visit rate).
-function dperVisitPts(label) {
-  try {
-    var cfg = readConfig();
-    var want = String(label || '').trim().toLowerCase();
-    var band = (cfg.visits || []).filter(function (v) {
-      return String(v.duration || '').trim().toLowerCase() === want;
-    })[0];
-    if (band && band.pts) return Math.round(band.pts * 10) / 10;
-  } catch (e) {}
-  return calcVisitPts('Site Visit', dperVisitHours(label));
-}
-
-// Write a completed "Site Visit" task to TASK_ASSIGNMENTS for the DPER lead (Deepak),
-// so the visit carries points and shows on the dashboard / feeds Task Completion.
-// Auto Done + LeadApproved=Yes (self-reported visit). Returns {taskId, pts}.
-function createDperVisitTask(data, pts) {
+// Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
+// lead (Deepak), so the visit carries points and feeds Task Completion. Points use
+// the DPR rule (Site Visit ×2/hr, Meeting ×1/hr). Auto Done + LeadApproved=Yes.
+function createDperVisitTask(data, taskType, hours, pts) {
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
   var day    = data.date || dateStr();
   var lead   = data.lead || 'Deepak Soni';
-  var dur    = data.visitDuration || '';
-  var taskId = 'SV-' + Date.now();
-  var desc   = dur ? ('Site visit · ' + dur) : 'Site visit';
+  var h      = parseFloat(hours) || 0;
+  var taskId = (taskType === 'Meeting' ? 'MT-' : 'SV-') + Date.now();
+  var desc   = taskType + ' · ' + h + ' hr' + (h === 1 ? '' : 's');
   aSheet.appendRow([
-    taskId, '', data.project || '', lead, 'Site Visit', 1, pts, 1, pts,
+    taskId, '', data.project || '', lead, taskType, 1, pts, 1, pts,
     day, day,
-    desc,                       // L Description
-    '',                         // M Drawing
-    'Done', day, day,           // N SelfStatus, O SelfStatusDate, P ActualCompletion
-    'Yes', 'Auto (DPER)', day,  // Q LeadApproved, R ApprovedBy, S ApprovalDate
-    '',                         // T RevisionTag
-    '[DPER site visit' + (dur ? ' · ' + dur : '') + ']',  // U Notes
-    lead, 'Medium'              // V AssignedBy, W Priority
+    desc,                        // L Description
+    '',                          // M Drawing
+    'Done', day, day,            // N SelfStatus, O SelfStatusDate, P ActualCompletion
+    'Yes', 'Auto (DPER)', day,   // Q LeadApproved, R ApprovedBy, S ApprovalDate
+    '',                          // T RevisionTag
+    '[DPER ' + taskType + ' · ' + h + 'h]',  // U Notes
+    lead, 'Medium'               // V AssignedBy, W Priority
   ]);
   return { taskId: taskId, pts: pts };
 }
@@ -4921,45 +4895,25 @@ function handleDPERSubmission(data) {
       ]);
     }
 
-    // EPIC K — a DPER site visit auto-publishes a client Site Visit Log (no second form).
-    // Tasks are already created by writeSiteIssues above, so skipTasks=true here.
-    var meetingLogId = null;
+    // Site Visit / Meeting → a completed, points-bearing task for the lead (Deepak).
+    // Points use the SAME rule as DPR visit scoring: Site Visit ×2/hr, Meeting ×1/hr.
+    // (No client Site Visit Log is created here — that is handled separately.)
     var visitTaskId  = null;
     var visitPts     = 0;
     try {
-      if (String(data.siteVisit||'').toLowerCase() === 'yes') {
-        // Points + a completed Site Visit task for the lead (Deepak)
-        visitPts = dperVisitPts(data.visitDuration || '');
-        try {
-          var vt = createDperVisitTask(data, visitPts);
-          visitTaskId = vt.taskId;
-        } catch (vtErr) { Logger.log('DPER visit-task error: ' + vtErr); }
-
-        var mlActions = { Client:[], IDS:[], Contractor:[], Other:[] };
-        issues.forEach(function(iss){
-          var item = { owner:String(iss.assignedTo||''), text:String(iss.description||''), deadline:cellDate(iss.targetDate)||'' };
-          if (!item.text) return;
-          if ((iss.issueType||'')==='Design') mlActions.IDS.push(item); else mlActions.Contractor.push(item);
-        });
-        if (data.clientConcerns) mlActions.Client.push({ owner:'', text:String(data.clientConcerns), deadline:'' });
-        if (data.blocking)       mlActions.Other.push({ owner:'', text:String(data.blocking), deadline:'' });
-        var mlRes = submitMeetingLog({
-          type:'Site Visit', project:data.project||'', date:data.date||dateStr(),
-          time:data.time||'', loggedBy:data.lead||'Deepak Soni',
-          teamAttendees:(data.lead?[data.lead]:[]), clientAttendees:'',
-          purpose:['Progress review','Quality check'],
-          body:String(data.visitSummary||data.worksToday||''), actions:mlActions,
-          duration:String(data.visitDuration||''), photoIds:[], videoLinks:[], skipTasks:true
-        }, '');
-        meetingLogId = mlRes && mlRes.logId;
+      var vtype = String(data.visitType || '').trim();
+      var vhrs  = parseFloat(data.visitHours || 0) || 0;
+      if ((vtype === 'Site Visit' || vtype === 'Meeting') && vhrs > 0) {
+        visitPts = calcVisitPts(vtype, vhrs);
+        var vt = createDperVisitTask(data, vtype, vhrs, visitPts);
+        visitTaskId = vt.taskId;
       }
-    } catch(mlErr){ Logger.log('DPER→meetingLog error: '+mlErr); }
+    } catch (vErr) { Logger.log('DPER visit-task error: ' + vErr); }
 
     Logger.log('DPER submitted: ' + subId + ' / ' + (data.project||''));
     return {
       status           : 'ok',
       subId            : subId,
-      meetingLogId     : meetingLogId,
       visitTaskId      : visitTaskId,
       visitPts         : visitPts,
       siddharthTaskId  : siddharthTaskId,

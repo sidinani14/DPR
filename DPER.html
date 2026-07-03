@@ -496,9 +496,12 @@ function toggleBlocker(id){
 }
 
 function toggleVisit(id){
-  const box=document.getElementById(`pb-sv-${id}`);
+  const sel=document.getElementById(`pb-vtype-${id}`);
   const wrap=document.getElementById(`pb-visit-${id}`);
-  if(wrap) wrap.classList.toggle('hidden', !box.checked);
+  const type=sel?sel.value:'';
+  if(wrap) wrap.classList.toggle('hidden', !type);
+  const rate=document.getElementById(`pb-vrate-${id}`);
+  if(rate) rate.textContent = type==='Meeting' ? 'Meeting ×1 pt/hr' : 'Site Visit ×2 pts/hr';
   saveDraft(); generateAllWA();
 }
 
@@ -587,9 +590,9 @@ function collectProjects(){
     });
     result.push({
       id,proj,
-      siteVisit   :document.getElementById(`pb-sv-${id}`)?.checked?'Yes':'No',
-      visitDuration:(document.getElementById(`pb-vdur-${id}`)?.value||''),
-      visitSummary:(document.getElementById(`pb-vsum-${id}`)?.value||'').trim(),
+      siteVisit   :(document.getElementById(`pb-vtype-${id}`)?.value==='Site Visit')?'Yes':'No',
+      visitType   :(document.getElementById(`pb-vtype-${id}`)?.value||''),
+      visitHours  :parseFloat(document.getElementById(`pb-vhrs-${id}`)?.value)||0,
       stage       :stages,
       worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
       pctPlan     :parseInt(document.getElementById(`pb-pctplan-${id}`)?.value)||0,
@@ -693,7 +696,7 @@ async function submitAll(){
           action:'submitDPER', date:p.date||date,
           time:new Date().toTimeString().substring(0,5),
           project:p.proj, lead:leadName,
-          siteVisit:p.siteVisit, visitDuration:p.visitDuration, visitSummary:p.visitSummary,
+          siteVisit:p.siteVisit, visitType:p.visitType, visitHours:p.visitHours,
           stage:p.stage,
           worksToday:p.worksToday, pctPlan:p.pctPlan, pctOverall:p.pctOverall,
           workTomorrow:p.workTomorrow, onTrack:p.onTrack, delayReason:p.delayReason,
@@ -800,9 +803,8 @@ function collectDraftData() {
     blocks.push({
       id,
       proj        : document.getElementById('pb-proj-'+id)?.value||'',
-      sv          : document.getElementById('pb-sv-'+id)?.checked||false,
-      vdur        : document.getElementById('pb-vdur-'+id)?.value||'',
-      vsum        : document.getElementById('pb-vsum-'+id)?.value||'',
+      vtype       : document.getElementById('pb-vtype-'+id)?.value||'',
+      vhrs        : document.getElementById('pb-vhrs-'+id)?.value||'',
       stageChips,
       works       : document.getElementById('pb-works-'+id)?.value||'',
       pctPlan     : document.getElementById('pb-pctplan-'+id)?.value||'0',
@@ -880,9 +882,9 @@ function resumeDraft() {
     document.getElementById('proj-blocks').appendChild(div);
 
     // Set values
-    if (b.sv) { document.getElementById('pb-sv-'+id).checked = true; toggleVisit(id); }
-    { const vd=document.getElementById('pb-vdur-'+id); if(vd) vd.value=b.vdur||''; }
-    { const vs=document.getElementById('pb-vsum-'+id); if(vs) vs.value=b.vsum||''; }
+    { const vt=document.getElementById('pb-vtype-'+id); if(vt) vt.value=b.vtype||''; }
+    { const vh=document.getElementById('pb-vhrs-'+id); if(vh) vh.value=b.vhrs||''; }
+    if (b.vtype) toggleVisit(id);
     document.getElementById('pb-works-'+id).value    = b.works||'';
     document.getElementById('pb-pctplan-'+id).value  = b.pctPlan||0;
     document.getElementById('pb-pctover-'+id).value  = b.pctOver||0;
@@ -963,23 +965,16 @@ function buildPBInnerHTML(id, projOpts) {
       <select class="pb-proj-select" id="pb-proj-${id}" onchange="saveDraft();generateAllWA()">
         <option value="">Select project…</option>${projOpts}
       </select>
-      <label class="pb-visit-check">
-        <input type="checkbox" id="pb-sv-${id}" onchange="toggleVisit(${id})"> Site Visit
-      </label>
+      <select class="pb-visit-type" id="pb-vtype-${id}" onchange="toggleVisit(${id})" style="flex-shrink:0;width:118px;font-size:12px">
+        <option value="">— No visit —</option>
+        <option>Site Visit</option>
+        <option>Meeting</option>
+      </select>
       <button class="remove-pb" onclick="removePB(${id})">✕</button>
     </div>
     <div class="field hidden" id="pb-visit-${id}" style="background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.25);border-radius:8px;padding:10px 12px">
-      <div class="lbl">Site Visit Duration <span class="opt">counts toward your points</span></div>
-      <select id="pb-vdur-${id}" onchange="saveDraft()">
-        <option value="">Select duration…</option>
-        <option>Under 1 hour</option>
-        <option>1–2 hours</option>
-        <option>2–3 hours</option>
-        <option>3–4 hours</option>
-        <option>4+ hours</option>
-      </select>
-      <div class="lbl" style="margin-top:10px">Visit Summary <span class="opt">what you inspected / decisions on site</span></div>
-      <textarea id="pb-vsum-${id}" oninput="saveDraft();generateAllWA()" placeholder="Site observations, quality checks, decisions taken…" style="min-height:50px"></textarea>
+      <div class="lbl">Hours on site / in meeting <span class="opt" id="pb-vrate-${id}">Site Visit ×2 pts/hr</span></div>
+      <input type="number" id="pb-vhrs-${id}" min="0.5" step="0.5" placeholder="e.g. 2.5" oninput="saveDraft();generateAllWA()">
     </div>
     <div class="field">
       <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
