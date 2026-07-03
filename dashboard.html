@@ -372,10 +372,16 @@ function renderHeatmap() {
           return doneOn >= weekDays[0] && doneOn <= weekDays[5];
         })
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
+      // Done but awaiting lead approval — work is finished, person is effectively free
+      const apprPts = openTasks
+        .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                    t.status === 'Approval Pending' &&
+                    t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5])
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
       const pendPts = openTasks
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                     t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5] &&
-                    t.status !== 'Delayed')
+                    t.status !== 'Delayed' && t.status !== 'Approval Pending')
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
       const delayedPts2 = allTasks
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
@@ -385,19 +391,22 @@ function renderHeatmap() {
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                     t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5]).length;
       const donePct   = Math.min(100, Math.round(donePts / wkTgt * 100));
-      const pendPct   = Math.min(100 - donePct, Math.round(pendPts / wkTgt * 100));
-      const delayPct  = Math.min(100 - donePct - pendPct, Math.round(delayedPts2 / wkTgt * 100));
+      const apprPct   = Math.min(100 - donePct, Math.round(apprPts / wkTgt * 100));
+      const pendPct   = Math.min(100 - donePct - apprPct, Math.round(pendPts / wkTgt * 100));
+      const delayPct  = Math.min(100 - donePct - apprPct - pendPct, Math.round(delayedPts2 / wkTgt * 100));
       const pctLabel  = Math.round(donePts/wkTgt*100);
 
       html += `<tr>
         <td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${pctLabel}% complete</span></td>
         <td><div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;display:flex">
-          <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done"></div>
+          <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done (approved)"></div>
+          <div style="height:100%;width:${apprPct}%;background:#FBBC04;transition:width .3s" title="${apprPts.toFixed(1)} pts done — awaiting approval"></div>
           <div style="height:100%;width:${pendPct}%;background:#4A9EFF;transition:width .3s" title="${pendPts.toFixed(1)} pts pending"></div>
           <div style="height:100%;width:${delayPct}%;background:#EA4335;transition:width .3s" title="${delayedPts2.toFixed(1)} pts delayed (overdue)"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:2px;font-size:9px">
           <span style="color:#2ED573">■ Done: ${donePts.toFixed(1)}</span>
+          ${apprPts>0?`<span style="color:#FBBC04">■ Approval: ${apprPts.toFixed(1)}</span>`:''}
           <span style="color:#4A9EFF">■ Pending: ${pendPts.toFixed(1)}</span>
           ${delayedPts2>0?`<span style="color:#EA4335">■ Delayed: ${delayedPts2.toFixed(1)}</span>`:''}
           <span style="color:rgba(255,255,255,0.3)">■ Open: ${openCount}</span>
@@ -431,11 +440,18 @@ function renderHeatmap() {
                      (t.actualCompletion || t.selfStatusDate || '') === today)
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
-      // Pending today — non-completed tasks due today
+      // Done today but awaiting lead approval — person is effectively free
+      const apprPts = allTasks
+        .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
+                     t.status === 'Approval Pending' &&
+                     (t.actualCompletion || t.selfStatusDate || '') === today)
+        .reduce((s,t)=>s+(t.weightedPts||0), 0);
+
+      // Pending today — non-completed tasks due today (excludes approval-pending)
       const pendPts = allTasks
         .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                      t.targetDate === today &&
-                     t.status !== 'Completed')
+                     t.status !== 'Completed' && t.status !== 'Approval Pending')
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
       // Delayed — all overdue tasks (any date)
@@ -444,10 +460,11 @@ function renderHeatmap() {
                      t.status === 'Delayed')
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
-      const totalLoad = donePts + pendPts + delayedPts;
+      const totalLoad = donePts + apprPts + pendPts + delayedPts;
       const donePct   = Math.min(100, Math.round(donePts   / dayTgt * 100));
-      const pendPct   = Math.min(100 - donePct, Math.round(pendPts   / dayTgt * 100));
-      const delPct    = Math.min(100 - donePct - pendPct, Math.round(delayedPts / dayTgt * 100));
+      const apprPct   = Math.min(100 - donePct, Math.round(apprPts / dayTgt * 100));
+      const pendPct   = Math.min(100 - donePct - apprPct, Math.round(pendPts   / dayTgt * 100));
+      const delPct    = Math.min(100 - donePct - apprPct - pendPct, Math.round(delayedPts / dayTgt * 100));
       const loadPct   = Math.round(totalLoad / dayTgt * 100);
 
       const statusLabel = totalLoad === 0
@@ -462,7 +479,8 @@ function renderHeatmap() {
         <td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${dayTgt}p/day</span></td>
         <td>
           <div style="width:100%;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;height:22px;display:flex">
-            <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done today"></div>
+            <div style="height:100%;width:${donePct}%;background:#2ED573;transition:width .3s" title="${donePts.toFixed(1)} pts done today (approved)"></div>
+            <div style="height:100%;width:${apprPct}%;background:#FBBC04;transition:width .3s" title="${apprPts.toFixed(1)} pts done today — awaiting approval"></div>
             <div style="height:100%;width:${pendPct}%;background:#4A9EFF;transition:width .3s" title="${pendPts.toFixed(1)} pts pending today"></div>
             <div style="height:100%;width:${delPct}%;background:#EA4335;transition:width .3s" title="${delayedPts.toFixed(1)} pts delayed (overdue)"></div>
           </div>
@@ -479,7 +497,8 @@ function renderHeatmap() {
     });
     html += '</tbody></table>';
     html += '<div style="display:flex;gap:16px;margin-top:8px;font-size:10px;color:rgba(255,255,255,0.4);padding:0 4px">';
-    html += '<span><span style="color:#2ED573">■</span> Done & approved today</span>';
+    html += '<span><span style="color:#2ED573">■</span> Done &amp; approved today</span>';
+    html += '<span><span style="color:#FBBC04">■</span> Done — awaiting approval</span>';
     html += '<span><span style="color:#4A9EFF">■</span> Pending due today</span>';
     html += '<span><span style="color:#EA4335">■</span> Overdue / delayed</span></div>';
   }
