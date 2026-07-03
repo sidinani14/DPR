@@ -765,7 +765,6 @@ function renderTaskList(tasks) {
           <div class="tm">Pts: <span>${t.weightedPts}</span></div>
           <div class="tm ${isOverdue?'overdue':''}">Due: <span>${t.targetDate}${isOverdue?' ('+daysOvd+'d overdue)':''}</span></div>
           <div class="tm">By: <span>${t.assignedBy}</span></div>
-          <div class="tm">Priority: <span><span class="priority-dot ${priMap[t.priority]||'p-med'}"></span>${t.priority}</span></div>
         </div>
         ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
         ${t.completedDate?`<div class="task-done-date">✓ Completed ${t.completedDate}</div>`:''}

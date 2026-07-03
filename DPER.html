@@ -73,6 +73,8 @@ textarea{min-height:62px;resize:vertical;}
 
 /* Pct inputs */
 .pct-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.pb-more-toggle{background:none;border:1px dashed var(--border2,var(--border));color:var(--text2);font-size:11px;padding:7px 10px;border-radius:6px;cursor:pointer;margin-bottom:10px;width:100%;text-align:left;font-family:inherit;}
+.pb-more-toggle:hover{border-color:var(--accent);color:var(--accent);}
 .pct-field{display:flex;flex-direction:column;gap:4px;}
 .pct-input-wrap{display:flex;align-items:center;gap:6px;}
 .pct-input-wrap input{width:70px;text-align:center;padding:8px 10px;}
@@ -519,6 +521,14 @@ function toggleBlocker(id){
   generateAllWA();
 }
 
+function toggleMore(id){
+  const wrap=document.getElementById('pb-more-'+id);
+  const btn=document.getElementById('pb-more-btn-'+id);
+  if(!wrap) return;
+  const open = !wrap.classList.toggle('hidden');
+  if(btn) btn.innerHTML = open ? '− Less details' : '＋ More details <span style="opacity:.6">(% progress · materials)</span>';
+}
+
 function toggleVisit(id){
   const sel=document.getElementById(`pb-vtype-${id}`);
   const wrap=document.getElementById(`pb-visit-${id}`);
@@ -608,10 +618,7 @@ function addTaskBlock(projId){
       <div><div class="lbl" style="font-size:10px">Units</div><input type="number" class="tk-units" value="1" min="1" step="1" onchange="calcTaskPts(this)" style="width:100%"></div>
       <div><div class="lbl" style="font-size:10px">Target date</div><input type="date" class="tk-date"></div>
     </div>
-    <div class="field-row">
-      <div><div class="lbl" style="font-size:10px">Priority</div><select class="tk-pri"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
-      <div><div class="lbl" style="font-size:10px">Assign to</div><select class="tk-assign"><option value="">— select —</option>${memberOpts()}</select></div>
-    </div>
+    <div class="field"><div class="lbl" style="font-size:10px">Assign to</div><select class="tk-assign"><option value="">— select —</option>${memberOpts()}</select></div>
     <div class="tk-pts" style="font-size:11px;color:var(--accent);margin-top:6px;font-family:monospace"></div>`;
   document.getElementById(`pb-tasks-${projId}`).appendChild(div);
   if(taskCatOpts().indexOf('__all')>-1) fillTaskStages(div.querySelector('.tk-cat'));
@@ -684,7 +691,6 @@ function collectProjects(){
         units      :parseFloat(tb.querySelector('.tk-units')?.value)||1,
         description:(tb.querySelector('.tk-desc')?.value||'').trim(),
         targetDate :tb.querySelector('.tk-date')?.value||'',
-        priority   :tb.querySelector('.tk-pri')?.value||'Medium',
         assignedTo :assignedTo,
       });
     });
@@ -828,7 +834,7 @@ async function submitAll(){
               project:p.proj, projectId:'', multiplier:mult, dateAssigned:p.date||date,
               tasks:tks.map(t=>({taskType:t.taskType, basePts:t.basePts, units:t.units,
                 weightedPts:Math.round(t.basePts*mult*t.units*10)/10,
-                targetDate:t.targetDate, priority:t.priority, description:t.description}))
+                targetDate:t.targetDate, description:t.description}))
             })}).catch(err=>console.log('assignTasks error', p.proj, err));
         }
       }
@@ -1104,20 +1110,21 @@ function buildPBInnerHTML(id, projOpts) {
       <div class="lbl">Works Completed Today</div>
       <textarea id="pb-works-${id}" oninput="saveDraft();generateAllWA()" placeholder="Describe work done today…"></textarea>
     </div>
-    <div class="pct-row">
-      <div class="pct-field">
-        <div class="lbl">% Works per Plan</div>
-        <div class="pct-input-wrap">
-          <input type="number" id="pb-pctplan-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()">
-          <span class="pct-label">%</span>
+    <button type="button" class="pb-more-toggle" id="pb-more-btn-${id}" onclick="toggleMore(${id})">＋ More details <span style="opacity:.6">(% progress · materials)</span></button>
+    <div class="pb-more hidden" id="pb-more-${id}">
+      <div class="pct-row">
+        <div class="pct-field">
+          <div class="lbl">% Works per Plan</div>
+          <div class="pct-input-wrap"><input type="number" id="pb-pctplan-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()"><span class="pct-label">%</span></div>
+        </div>
+        <div class="pct-field">
+          <div class="lbl">% Overall Completion</div>
+          <div class="pct-input-wrap"><input type="number" id="pb-pctover-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()"><span class="pct-label">%</span></div>
         </div>
       </div>
-      <div class="pct-field">
-        <div class="lbl">% Overall Completion</div>
-        <div class="pct-input-wrap">
-          <input type="number" id="pb-pctover-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()">
-          <span class="pct-label">%</span>
-        </div>
+      <div class="field" style="margin-top:10px">
+        <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
+        <textarea id="pb-proc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
       </div>
     </div>
     <div class="field">
@@ -1141,10 +1148,6 @@ function buildPBInnerHTML(id, projOpts) {
     <div class="field hidden" id="pb-drf-${id}">
       <div class="lbl">Reason for Delay / Risk</div>
       <textarea id="pb-dr-${id}" oninput="saveDraft();generateAllWA()" placeholder="Specify reason…" style="min-height:50px"></textarea>
-    </div>
-    <div class="field">
-      <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
-      <textarea id="pb-proc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
     </div>
     <div class="field">
       <div class="lbl">Was Client Updated?</div>
