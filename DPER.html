@@ -495,6 +495,13 @@ function toggleBlocker(id){
   generateAllWA();
 }
 
+function toggleVisit(id){
+  const box=document.getElementById(`pb-sv-${id}`);
+  const wrap=document.getElementById(`pb-visit-${id}`);
+  if(wrap) wrap.classList.toggle('hidden', !box.checked);
+  saveDraft(); generateAllWA();
+}
+
 // ── Issue blocks within project ────────────────────────────
 function addIssueBlock(projId){
   ibCount++;
@@ -581,6 +588,8 @@ function collectProjects(){
     result.push({
       id,proj,
       siteVisit   :document.getElementById(`pb-sv-${id}`)?.checked?'Yes':'No',
+      visitDuration:(document.getElementById(`pb-vdur-${id}`)?.value||''),
+      visitSummary:(document.getElementById(`pb-vsum-${id}`)?.value||'').trim(),
       stage       :stages,
       worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
       pctPlan     :parseInt(document.getElementById(`pb-pctplan-${id}`)?.value)||0,
@@ -684,7 +693,8 @@ async function submitAll(){
           action:'submitDPER', date:p.date||date,
           time:new Date().toTimeString().substring(0,5),
           project:p.proj, lead:leadName,
-          siteVisit:p.siteVisit, stage:p.stage,
+          siteVisit:p.siteVisit, visitDuration:p.visitDuration, visitSummary:p.visitSummary,
+          stage:p.stage,
           worksToday:p.worksToday, pctPlan:p.pctPlan, pctOverall:p.pctOverall,
           workTomorrow:p.workTomorrow, onTrack:p.onTrack, delayReason:p.delayReason,
           idleTime:'No', idleReason:'',
@@ -791,6 +801,8 @@ function collectDraftData() {
       id,
       proj        : document.getElementById('pb-proj-'+id)?.value||'',
       sv          : document.getElementById('pb-sv-'+id)?.checked||false,
+      vdur        : document.getElementById('pb-vdur-'+id)?.value||'',
+      vsum        : document.getElementById('pb-vsum-'+id)?.value||'',
       stageChips,
       works       : document.getElementById('pb-works-'+id)?.value||'',
       pctPlan     : document.getElementById('pb-pctplan-'+id)?.value||'0',
@@ -868,7 +880,9 @@ function resumeDraft() {
     document.getElementById('proj-blocks').appendChild(div);
 
     // Set values
-    if (b.sv) document.getElementById('pb-sv-'+id).checked = true;
+    if (b.sv) { document.getElementById('pb-sv-'+id).checked = true; toggleVisit(id); }
+    { const vd=document.getElementById('pb-vdur-'+id); if(vd) vd.value=b.vdur||''; }
+    { const vs=document.getElementById('pb-vsum-'+id); if(vs) vs.value=b.vsum||''; }
     document.getElementById('pb-works-'+id).value    = b.works||'';
     document.getElementById('pb-pctplan-'+id).value  = b.pctPlan||0;
     document.getElementById('pb-pctover-'+id).value  = b.pctOver||0;
@@ -950,9 +964,22 @@ function buildPBInnerHTML(id, projOpts) {
         <option value="">Select project…</option>${projOpts}
       </select>
       <label class="pb-visit-check">
-        <input type="checkbox" id="pb-sv-${id}" onchange="saveDraft();generateAllWA()"> Site Visit
+        <input type="checkbox" id="pb-sv-${id}" onchange="toggleVisit(${id})"> Site Visit
       </label>
       <button class="remove-pb" onclick="removePB(${id})">✕</button>
+    </div>
+    <div class="field hidden" id="pb-visit-${id}" style="background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.25);border-radius:8px;padding:10px 12px">
+      <div class="lbl">Site Visit Duration <span class="opt">counts toward your points</span></div>
+      <select id="pb-vdur-${id}" onchange="saveDraft()">
+        <option value="">Select duration…</option>
+        <option>Under 1 hour</option>
+        <option>1–2 hours</option>
+        <option>2–3 hours</option>
+        <option>3–4 hours</option>
+        <option>4+ hours</option>
+      </select>
+      <div class="lbl" style="margin-top:10px">Visit Summary <span class="opt">what you inspected / decisions on site</span></div>
+      <textarea id="pb-vsum-${id}" oninput="saveDraft();generateAllWA()" placeholder="Site observations, quality checks, decisions taken…" style="min-height:50px"></textarea>
     </div>
     <div class="field">
       <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
