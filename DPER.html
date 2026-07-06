@@ -8,7 +8,7 @@
 <script src="auth.js"></script>
 <script src="searchselect.js"></script>
 <style>:root{--ss-bg:#FFFFFF;--ss-fg:#1A1917;--ss-pop-bg:#FFFFFF;--ss-border:#E2DFD8;--ss-accent:#1F3A5F;--ss-muted:#9E9B94;--ss-hover:rgba(31,58,95,0.10)}</style>
-<script>SearchSelect.auto('.pb-proj-select,[id^="ib-assign-"],.conn-proj');</script>
+<script>SearchSelect.auto('.pb-proj-select,[id^="ib-assign-"],.conn-proj,.tk-cat,.tk-stage,.tk-assign,.unp-proj,.unp-type');</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -241,6 +241,16 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
+  <!-- Unplanned / additional work -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">✎</span><span class="section-title">Unplanned Work Today</span></div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Anything you did today that wasn't already assigned — logged to your name (pending approval), so your day is fully accounted for.</p>
+      <div id="unplanned-blocks"></div>
+      <button class="add-proj-btn" onclick="addUnplanned()">+ Add unplanned task</button>
+    </div>
+  </div>
+
   <!-- S4: WhatsApp -->
   <div class="section">
     <div class="section-head" style="background:#1B5E20">
@@ -329,6 +339,50 @@ function collectConnections(){
     const notes=((document.getElementById('cn-notes-'+id)||{}).value||'').trim();
     const composite=[ role+(name?' ('+name+')':''), notes ].filter(Boolean).join(' — ');
     out.push({project, type, notes:composite});
+  });
+  return out;
+}
+
+// ── Unplanned work (mirrors DPR "tasks completed") — self-logged Done tasks ──
+let unpCount = 0;
+function addUnplanned(){
+  unpCount++; const id=unpCount;
+  const projOpts='<option value="">Select project…</option>'+projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  const stageOpts='<option value="">Task type…</option>'+CFG_STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
+  const div=document.createElement('div'); div.className='pb-block'; div.id='unp-'+id;
+  div.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px';
+  div.innerHTML=
+    `<div class="field"><label>Project</label><select class="unp-proj" id="unp-proj-${id}" onchange="calcUnpPts(${id})">${projOpts}</select></div>`+
+    `<div class="field"><label>Task type</label><select class="unp-type" id="unp-type-${id}" onchange="calcUnpPts(${id})">${stageOpts}</select></div>`+
+    `<div class="field-row">`+
+      `<div><div class="lbl" style="font-size:10px">Units</div><input type="number" class="unp-units" id="unp-units-${id}" value="1" min="1" step="1" oninput="calcUnpPts(${id})" style="width:100%"></div>`+
+      `<div><div class="lbl" style="font-size:10px">Points</div><div class="unp-pts" id="unp-pts-${id}" style="font-size:13px;color:var(--accent);font-weight:600;padding:8px 0">—</div></div>`+
+    `</div>`+
+    `<div class="field"><label>Description <span class="opt">what was done</span></label><input type="text" id="unp-desc-${id}" placeholder="e.g. Supervised plaster work, coordinated material delivery"></div>`+
+    `<button type="button" onclick="document.getElementById('unp-${id}').remove()" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer">✕ Remove</button>`;
+  document.getElementById('unplanned-blocks').appendChild(div);
+}
+function calcUnpPts(id){
+  const idx=parseInt(document.getElementById('unp-type-'+id)?.value);
+  const stage=(!isNaN(idx)&&CFG_STAGES[idx])?CFG_STAGES[idx]:null;
+  const units=parseFloat(document.getElementById('unp-units-'+id)?.value||1);
+  const mult=projMultiplier(document.getElementById('unp-proj-'+id)?.value||'');
+  const disp=document.getElementById('unp-pts-'+id);
+  if(disp) disp.textContent = stage ? (Math.round(stage.pts*mult*units*10)/10+' pts') : '—';
+}
+function collectUnplanned(){
+  const out=[];
+  document.querySelectorAll('#unplanned-blocks > .pb-block').forEach(d=>{
+    const id=d.id.replace('unp-','');
+    const idx=parseInt(document.getElementById('unp-type-'+id)?.value);
+    if(isNaN(idx)||!CFG_STAGES[idx]) return;
+    out.push({
+      project :document.getElementById('unp-proj-'+id)?.value||'',
+      taskType:CFG_STAGES[idx].label,
+      basePts :CFG_STAGES[idx].pts,
+      units   :parseFloat(document.getElementById('unp-units-'+id)?.value||1),
+      area    :(document.getElementById('unp-desc-'+id)?.value||'').trim(),
+    });
   });
   return out;
 }
@@ -847,6 +901,13 @@ async function submitAll(){
     const conns = collectConnections();
     if (conns.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'logConnections', member:leadName, connections:conns})}).catch(()=>{});
+
+    // Unplanned work today → self-logged Done tasks (same as DPR)
+    for(const u of collectUnplanned()){
+      await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'createDoneTask', member:leadName, project:u.project,
+          taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, date})}).catch(()=>{});
+    }
 
     // Clear draft on successful submit
     clearDraft();
