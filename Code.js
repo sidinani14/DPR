@@ -179,6 +179,18 @@ function dateStr(d) {
   return (d ? new Date(d) : new Date()).toISOString().substring(0, 10);
 }
 
+// Serialize sheet-mutating actions so concurrent/bulk submissions can't lose
+// rows (Apps Script can run doPost calls in parallel; unguarded appendRow +
+// getLastRow races drop writes). Flush inside the lock so writes commit before
+// the lock is released. Proceeds even if the lock can't be acquired in time.
+function withLock(fn) {
+  var lock = LockService.getScriptLock();
+  var got  = false;
+  try { lock.waitLock(30000); got = true; } catch (e) {}
+  try { return fn(); }
+  finally { if (got) { try { SpreadsheetApp.flush(); } catch (e) {} try { lock.releaseLock(); } catch (e) {} } }
+}
+
 // Convert a sheet cell value (Date object or string) to YYYY-MM-DD
 // Google Sheets stores dates as Date objects - toISOString() shifts timezone
 function cellDate(v) {
@@ -454,11 +466,11 @@ function doPost(e) {
     // Form submission actions
     if (data.action === 'submitApprovals')   return respond(submitApprovals(data));
     if (data.action === 'reassignTask')      return respond(reassignTask(data));
-    if (data.action === 'assignTasks')       return respond(assignTasks(data));
-    if (data.action === 'bulkAssignTasks')   return respond(bulkAssignTasks(data, authEmail));
+    if (data.action === 'assignTasks')       return respond(withLock(function(){ return assignTasks(data); }));
+    if (data.action === 'bulkAssignTasks')   return respond(withLock(function(){ return bulkAssignTasks(data, authEmail); }));
     if (data.action === 'markNotifSeen')     return respond(markNotificationSeen(data));
-    if (data.action === 'createSelfTask')    return respond(createSelfAssignedTask(data));
-    if (data.action === 'createDoneTask')    return respond(createDoneTask(data));
+    if (data.action === 'createSelfTask')    return respond(withLock(function(){ return createSelfAssignedTask(data); }));
+    if (data.action === 'createDoneTask')    return respond(withLock(function(){ return createDoneTask(data); }));
     if (data.action === 'createSiddharthTask') return respond(createSiddharthTask(data));
     // Default: DPR submission
     var cfg = readConfig();

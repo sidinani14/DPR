@@ -259,15 +259,19 @@ async function submit(){
     });
     if (!valid) throw new Error(errs.join('; '));
     if (!blocks.length) throw new Error('Add at least one project block with tasks');
+    const expected = blocks.reduce((n,b)=>n+b.tasks.length,0);
     const r = await api('bulkAssignTasks', { blocks, assignedBy, dateAssigned });
-    if (r.status === 'ok' || r.status === 'partial'){
-      const msg = '✓ '+r.written+' task'+(r.written!==1?'s':'')+' created';
-      status.textContent = r.errors&&r.errors.length ? msg+' (some errors)' : msg;
-      if (r.status === 'ok'){
-        document.getElementById('blocks-container').innerHTML = '';
-        blockCount = 0;
-        addBlock();
-      }
+    const written = Number(r.written)||0;
+    // Only clear the form if EVERY task was written. Any shortfall keeps the
+    // form intact so nothing is silently lost and the user can re-submit.
+    if ((r.status === 'ok' || r.status === 'partial') && written >= expected){
+      status.textContent = '✓ '+written+' task'+(written!==1?'s':'')+' created';
+      document.getElementById('blocks-container').innerHTML = '';
+      blockCount = 0;
+      addBlock();
+    } else if (r.status === 'ok' || r.status === 'partial'){
+      status.textContent = '⚠ Only '+written+' of '+expected+' saved — form kept. Check the dashboard and re-add any missing tasks.'
+        + (r.errors&&r.errors.length ? ' ('+r.errors[0]+')' : '');
     } else throw new Error(r.message||'Failed');
   } catch(e){
     status.textContent = '✗ '+e.message;
