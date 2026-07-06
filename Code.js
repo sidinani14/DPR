@@ -5611,7 +5611,10 @@ function getWeeklyProjectDigest(weekStart){
   var e=s.getSheetByName(SITE_EXEC_TAB);
   if(e){ var er=e.getDataRange().getValues();
     for(var i=1;i<er.length;i++){ var k=String(er[i][3]||'').trim().toLowerCase(); if(!P[k])continue;
-      var d=cellDate(er[i][1]); touch(k,d); if(inWk(d)) P[k].visits.push({date:d, who:String(er[i][4]||'')}); } }
+      var d=cellDate(er[i][1]); touch(k,d);
+      // Only rows where a site visit was actually done (col F) count as a visit —
+      // a daily project report alone is not a visit.
+      if(inWk(d) && String(er[i][5]||'').trim().toLowerCase()==='yes') P[k].visits.push({date:d, who:String(er[i][4]||'')}); } }
   var dl=s.getSheetByName(DECISION_LOG_TAB);
   if(dl){ var dr=dl.getDataRange().getValues();
     for(var i=1;i<dr.length;i++){ if(String(dr[i][8]||'').trim()==='Deleted')continue;
