@@ -434,6 +434,7 @@ function doPost(e) {
     if (data.action === 'getDeepakIssues')     return respond(getIssuesByReporter(data.lead||'Deepak Soni', true));
     if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
     if (data.action === 'updateIssueStatus')   return respond(updateIssueStatus(data.issueId||'', data.status||'', data.targetDate||''));
+    if (data.action === 'updateTaskStatuses')  { updateTaskStatusesFromDPR(data.statuses||[], data.date||''); return respond({status:'ok'}); }
     if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
     if (data.action === 'logConnections')      return respond(logConnections(data));
     if (data.action === 'submitBillables')     return respond(submitBillables(data));

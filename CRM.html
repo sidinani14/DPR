@@ -33,6 +33,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 .form-wrap{max-width:660px;margin:0 auto;padding:14px;}
 .section{background:var(--surface);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;border:1px solid var(--border);}
+.mt-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.mt-type{font-size:13px;font-weight:600;color:var(--text);}
+.mt-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.mt-meta{font-size:10px;color:var(--text3);margin-top:4px;}
+.mt-overdue{color:#8B2020;font-weight:600;}
+.mt-status{display:flex;gap:6px;margin-top:8px;}
+.mt-status label{flex:1;cursor:pointer;}
+.mt-status input{display:none;}
+.mt-btn{display:block;text-align:center;font-size:11px;padding:6px;border-radius:5px;border:1.5px solid var(--border);background:#fff;color:var(--text2);}
+.mt-status input:checked+.mt-btn{border-color:var(--accent);color:var(--accent);font-weight:600;}
+.mt-status input:checked+.mt-btn.ip{border-color:#1565C0;color:#1565C0;}
+.mt-status input:checked+.mt-btn.done{border-color:#2D6A2D;color:#2D6A2D;background:#EAF3EA;}
 .section-head{background:var(--accent);padding:12px 18px;display:flex;align-items:center;gap:10px;}
 .section-num{width:22px;height:22px;border-radius:50%;background:rgba(245,166,35,0.3);color:#F5A623;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .section-title{color:#fff;font-size:13px;font-weight:600;flex:1;}
@@ -283,6 +295,18 @@ textarea{min-height:62px;resize:vertical;}
     </div>
     <div class="section-body" id="issues-panel">
       <div class="no-issues">Sign in to load issues…</div>
+    </div>
+  </div>
+
+  <!-- ── Your open tasks ───────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">✓</span>
+      <span class="section-title">Your Open Tasks</span>
+      <span class="section-badge" id="mytasks-badge">—</span>
+    </div>
+    <div class="section-body" id="mytasks-panel">
+      <div class="no-issues">Sign in to load your tasks…</div>
     </div>
   </div>
 
@@ -632,6 +656,7 @@ function onGoogleSignIn(resp) {
   loadProjects();
   loadIssues();
   loadOpenLeads();
+  fetchMyTasks();
 }
 
 // ════════════════════════════════════════
@@ -766,6 +791,57 @@ function renderMselTags(key){
 }
 function removeMsel(key,name){ const a=mselState[key],i=a.indexOf(name); if(i>=0)a.splice(i,1); renderMselOpts(key); renderMselTags(key); }
 function getMsel(key){ return (mselState[key]||[]).slice(); }
+
+// ════════════════════════════════════════
+// YOUR OPEN TASKS (mirrors DPR)
+// ════════════════════════════════════════
+let myTasks = [];
+async function fetchMyTasks(){
+  const panel=document.getElementById('mytasks-panel'), badge=document.getElementById('mytasks-badge');
+  panel.innerHTML='<div class="no-issues">Loading your tasks…</div>'; badge.textContent='…';
+  try{
+    const res=await fetch(`${APPS_SCRIPT_URL}?action=getOpenTasksForMember&member=${encodeURIComponent(crmUser)}`);
+    const data=await res.json();
+    const all=data.tasks||[];
+    window._pendingT = all.filter(t=>t.status==='Approval Pending');
+    myTasks = all.filter(t=>t.status!=='Approval Pending');
+    renderMyTasks();
+  }catch(e){ panel.innerHTML='<div class="no-issues">Could not load tasks</div>'; badge.textContent='error'; }
+}
+function renderMyTasks(){
+  const panel=document.getElementById('mytasks-panel'), badge=document.getElementById('mytasks-badge');
+  const pending=window._pendingT||[];
+  badge.textContent = myTasks.length ? myTasks.length+' open' : (pending.length?'all submitted ✓':'none ✓');
+  if(!myTasks.length && !pending.length){ panel.innerHTML='<div class="no-issues">No open tasks assigned to you ✓</div>'; return; }
+  const today=new Date().toISOString().substring(0,10);
+  const desc=t=>(t.area||'')+((t.area&&t.drawing)?' — ':'')+(t.drawing||'');
+  const openHtml=myTasks.map((t,i)=>{
+    const overdue=t.targetDate&&t.targetDate<today;
+    const cur=t.status==='Ongoing'?'Ongoing':'Not Started';
+    return `<div class="mt-card" id="mt-${i}">
+      <div class="mt-type">${esc(t.taskType)}${t.revisionTag?' 🔴 '+esc(t.revisionTag):''}</div>
+      <div class="mt-sub">${esc(t.project)}${desc(t)?' · '+esc(desc(t)):''}</div>
+      <div class="mt-meta"><span class="${overdue?'mt-overdue':''}">Due ${t.targetDate||'—'}${overdue?' ⚠':''}</span> · ${t.weightedPts||0} pts</div>
+      <div class="mt-status">
+        <label><input type="radio" name="mt-r-${i}" value="Not Started" ${cur==='Not Started'?'checked':''}><span class="mt-btn">Not started</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''}><span class="mt-btn ip">In progress</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Done"><span class="mt-btn done">Done</span></label>
+      </div>
+    </div>`;
+  }).join('');
+  const pendHtml=pending.map(t=>`<div class="mt-card" style="opacity:.7;border-left:3px solid #C8863A">
+    <div class="mt-type">${esc(t.taskType)}</div><div class="mt-sub">${esc(t.project)}${desc(t)?' · '+esc(desc(t)):''}</div>
+    <div style="font-size:11px;color:#C8863A;font-weight:600;margin-top:4px">⏳ Awaiting approval — no action needed</div></div>`).join('');
+  panel.innerHTML = openHtml + pendHtml;
+}
+function collectTaskStatuses(){
+  const today=new Date().toISOString().substring(0,10);
+  return myTasks.map((t,i)=>({
+    member:crmUser, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
+    status:document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started',
+    actualCompletionDate:today
+  })).filter(s=>s.status!=='Not Started');
+}
 
 // ════════════════════════════════════════
 // OPEN ISSUES — Section 0
@@ -1654,6 +1730,11 @@ async function submitAll() {
       await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({action:'updateIssueStatus',issueId,status:newStatus,targetDate:act.targetDate||''})});
     }
+
+    // 1b. Open-task status updates (mark Done / In progress)
+    const taskStatuses = collectTaskStatuses();
+    if (taskStatuses.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).catch(()=>{});
 
     // 2. Main CRM submission
     const leads    = collectLeads();
