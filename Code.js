@@ -5910,6 +5910,9 @@ function getDeepakWeeklyStats(weekStart) {
   var tasksAssignedThisWeek = 0, tasksCompletedThisWeek = 0;
   var taskDetails = [];
   var dLate = 0, dWnd = 0;   // reliability: late/overdue and Work-Not-Done tasks
+  // "How Deepak spent his week" — activity breakdown from his own tasks
+  var act = { visitCount:0, visitHours:0, visitPts:0, meetCount:0, meetHours:0,
+              meetPts:0, workCount:0, workPts:0, outCount:0, outPts:0 };
 
   if (asSheet && asSheet.getLastRow() > 1) {
     var asRows   = asSheet.getDataRange().getValues();
@@ -5937,6 +5940,17 @@ function getDeepakWeeklyStats(weekStart) {
       // Must have been assigned this week
       if (!assignedDt || assignedDt < mon || assignedDt > sat) continue;
       tasksAssignedThisWeek++;
+
+      // Activity breakdown (regardless of approval) — how Deepak spent his week
+      var wpts = parseFloat(ar[8]) || 0;      // I Weighted Pts
+      var tt   = String(ar[4] || '').trim();  // E Stage/TaskType
+      if (assignedTo === 'Deepak Soni') {
+        if (tt === 'Site Visit')   { act.visitCount++; act.visitHours += wpts/2; act.visitPts += wpts; }
+        else if (tt === 'Meeting') { act.meetCount++;  act.meetHours  += wpts;   act.meetPts  += wpts; }
+        else                       { act.workCount++;  act.workPts    += wpts; }
+      } else {                                 // assigned BY Deepak to a teammate
+        act.outCount++; act.outPts += wpts;
+      }
 
       // Completed within the same week
       if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= (dateStr() > sat ? dateStr() : sat)) {
@@ -6020,9 +6034,18 @@ function getDeepakWeeklyStats(weekStart) {
 
   var total = Math.round((s_visit + s_client + s_tasks + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
 
+  act.visitHours = Math.round(act.visitHours * 10) / 10;
+  act.meetHours  = Math.round(act.meetHours * 10) / 10;
+  act.visitPts   = Math.round(act.visitPts * 10) / 10;
+  act.meetPts    = Math.round(act.meetPts * 10) / 10;
+  act.workPts    = Math.round(act.workPts * 10) / 10;
+  act.outPts     = Math.round(act.outPts * 10) / 10;
+  act.totalHours = Math.round((act.visitHours + act.meetHours) * 10) / 10;
+
   return {
     weekStart      : mon,
     weekEnd        : sat,
+    activity       : act,
     totalSites     : totalSites,
     visitedCount   : visitedCount,
     clientCount    : clientCount,
