@@ -79,6 +79,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 </div></div>
 
 <div class="wrap">
+  <div id="draft-banner" style="display:none;background:rgba(200,169,110,.1);border:1px solid rgba(200,169,110,.3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--accent);align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <span id="draft-banner-text">You have an unsaved task plan.</span>
+    <span style="display:flex;gap:8px">
+      <button onclick="restoreDraft()" style="font-size:11px;font-weight:600;color:#000;background:var(--accent);border:none;border-radius:5px;padding:5px 12px;cursor:pointer">Restore</button>
+      <button onclick="discardDraft()" style="font-size:11px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:5px;padding:5px 12px;cursor:pointer">Discard</button>
+    </span>
+  </div>
   <!-- Meta row -->
   <div class="meta-row">
     <div class="field"><label>Assigned By</label>
@@ -129,6 +136,7 @@ window.idsOnAuth = async function(user){
 
     const urlP = new URLSearchParams(location.search).get('project');
     addBlock(urlP || undefined);
+    maybeShowDraftBanner();
   } catch(e) {
     document.getElementById('submit-status').textContent = '✗ Failed to load form data: ' + e.message;
   }
@@ -137,6 +145,64 @@ window.idsOnAuth = async function(user){
 function today(){ return new Date().toISOString().split('T')[0]; }
 
 function isVisitType(s){ return /site visit|meeting|dper/i.test(s); }
+
+// ── DRAFT AUTOSAVE — never lose a filled form on a failed submit ──
+const DRAFT_KEY='ids_plan_draft';
+let _draftT=null;
+function planDraft(){
+  const blocks=[];
+  document.querySelectorAll('.block').forEach(b=>{
+    const rows=[];
+    b.querySelectorAll('.b-rows .trow').forEach(tr=>{
+      rows.push({ stage:tr.querySelector('.r-stage')?.value||'', units:tr.querySelector('.r-units')?.value||'1',
+        deadline:tr.querySelector('.r-deadline')?.value||'', desc:tr.querySelector('.r-desc')?.value||'' });
+    });
+    blocks.push({ project:b.querySelector('.b-project')?.value||'', member:b.querySelector('.b-member')?.value||'', rows });
+  });
+  return { ts:Date.now(), by:document.getElementById('meta-by')?.value||'', date:document.getElementById('meta-date')?.value||'', blocks };
+}
+function draftHasContent(d){ return !!(d && d.blocks && d.blocks.some(b=> b.project || (b.rows||[]).some(r=>r.stage||r.desc))); }
+function saveDraft(){ try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){} }
+function saveDraftSoon(){ clearTimeout(_draftT); _draftT=setTimeout(saveDraft, 500); }
+function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} const b=document.getElementById('draft-banner'); if(b) b.style.display='none'; }
+function discardDraft(){ clearDraft(); }
+function restoreDraft(){
+  let d; try{ d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); }catch(e){}
+  if(!d||!d.blocks){ clearDraft(); return; }
+  const byEl=document.getElementById('meta-by');
+  if(d.by && [...byEl.options].some(o=>o.value===d.by)) byEl.value=d.by;
+  if(d.date) document.getElementById('meta-date').value=d.date;
+  document.getElementById('blocks-container').innerHTML=''; blockCount=0;
+  d.blocks.forEach(bd=>{
+    addBlock();
+    const block=document.getElementById('block-'+blockCount);
+    if(bd.project){ const ps=block.querySelector('.b-project'); ps.value=bd.project; ps.dispatchEvent(new Event('change')); onBlockProject(block.id); }
+    if(bd.member){ const ms=block.querySelector('.b-member'); ms.value=bd.member; ms.dispatchEvent(new Event('change')); }
+    block.querySelectorAll('.b-rows .trow').forEach(r=>r.remove());   // drop the default empty row
+    (bd.rows||[]).forEach(rd=>{
+      addRow(block.id);
+      const tr=block.querySelector('.b-rows .trow:last-child');
+      if(rd.stage){ const ss=tr.querySelector('.r-stage'); ss.value=rd.stage; ss.dispatchEvent(new Event('change')); }
+      tr.querySelector('.r-units').value=rd.units||'1';
+      tr.querySelector('.r-deadline').value=rd.deadline||'';
+      tr.querySelector('.r-desc').value=rd.desc||'';
+      onRowStage(tr.querySelector('.r-stage'));
+    });
+    if(!(bd.rows||[]).length) addRow(block.id);
+  });
+  document.getElementById('draft-banner').style.display='none';
+  updateCount();
+}
+function maybeShowDraftBanner(){
+  let d; try{ d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); }catch(e){}
+  if(!draftHasContent(d)) return;
+  const when=d.ts?new Date(d.ts).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const n=d.blocks.reduce((a,b)=>a+(b.rows||[]).filter(r=>r.stage).length,0);
+  document.getElementById('draft-banner-text').textContent='You have an unsaved task plan'+(when?' from '+when:'')+(n?` (${n} task${n!==1?'s':''})`:'')+'.';
+  document.getElementById('draft-banner').style.display='flex';
+}
+document.addEventListener('input',  e=>{ if(e.target.closest('.block')||e.target.closest('.meta-row')) saveDraftSoon(); });
+document.addEventListener('change', e=>{ if(e.target.closest('.block')||e.target.closest('.meta-row')) saveDraftSoon(); });
 
 // ── BULK BLOCKS ──────────────────────────────────────────
 function addBlock(preProject){
@@ -223,6 +289,7 @@ function updateCount(){
   let n = 0;
   document.querySelectorAll('.b-rows .trow').forEach(()=>n++);
   document.getElementById('submit-count').textContent = n + ' task' + (n!==1?'s':'');
+  saveDraftSoon();
 }
 
 // ── SUBMIT ──────────────────────────────────────────────
@@ -266,6 +333,7 @@ async function submit(){
     // form intact so nothing is silently lost and the user can re-submit.
     if ((r.status === 'ok' || r.status === 'partial') && written >= expected){
       status.textContent = '✓ '+written+' task'+(written!==1?'s':'')+' created';
+      clearDraft();                                    // submitted safely — drop the saved draft
       document.getElementById('blocks-container').innerHTML = '';
       blockCount = 0;
       addBlock();
