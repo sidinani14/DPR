@@ -527,19 +527,21 @@ function getLists() {
   // team = Active = Yes only (for DPR form member selector)
   // allMembers = everyone (for Task Assignment form assignee dropdowns)
   var tSheet = s.getSheetByName(TEAM_TAB);
-  var team = [], emails = [], allMembers = [], allEmails = [];
+  var team = [], emails = [], allMembers = [], allEmails = [], targets = {};
   if (tSheet) {
     var tRows = tSheet.getDataRange().getValues();
     for (var i = 1; i < tRows.length; i++) {
       var name   = String(tRows[i][0] || '').trim();
       var email  = String(tRows[i][4] || '').trim();
       var active = String(tRows[i][5] || '').trim().toLowerCase();
+      var wtgt   = parseFloat(tRows[i][2]) || 0;   // C WeeklyTarget
       if (!name) continue;
       // Departed — removed from all forms & dashboards
       if (EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
       // All members regardless of active status
       allMembers.push(name);
       allEmails.push(email);
+      if (wtgt > 0) targets[name] = wtgt;
       // Active only — for DPR form
       if (active !== 'no') { team.push(name); emails.push(email); }
     }
@@ -565,7 +567,7 @@ function getLists() {
     }
   }
 
-  return { team:team, emails:emails, allMembers:allMembers, projects:projects };
+  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -723,42 +725,51 @@ function writeSummaryHeaders(s) {
 function assignTasks(data) {
   var sheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
   var tasks = data.tasks || [];
+  if (!tasks.length) return {status:'ok', written:0};
   var today = dateStr();
-  var written = 0;
   var stalledSet = stalledProjectSet();
+  var isStalled  = !!stalledSet[String(data.project||'').trim().toLowerCase()];
 
-  tasks.forEach(function(t) {
-    var tUnits      = parseFloat(t.units) || 1;
-    var tWeighted   = Math.round((t.basePts||0) * (data.multiplier||1) * tUnits * 10) / 10;
-    sheet.appendRow([
-      'T-' + Utilities.getUuid().substring(0,8).toUpperCase(), // A
-      data.projectId    || '',        // B
-      data.project      || '',        // C
-      data.assignedTo   || '',        // D
-      t.taskType        || '',        // E
-      data.multiplier   || 1,         // F Disc. Multiplier (number)
-      t.basePts         || 0,         // G Stage Base Pts
-      tUnits,                         // H Units
-      tWeighted,                      // I Weighted Pts = F × G × H
-      data.dateAssigned || today,     // J
-      t.targetDate      || '',        // K
-      t.description || t.area || '', // L Description (was Area)
-      t.drawing         || '',        // M Drawing Name (legacy; new tasks leave blank)
-      'Not Started',                  // N SelfStatus
-      '',                             // O SelfStatusDate
-      '',                             // P ActualCompletionDate
-      'Pending',                      // Q LeadApproved
-      '',                             // R ApprovedBy
-      '',                             // S ApprovalDate
-      '',                             // T RevisionTag
-      t.notes           || '',        // U Notes
-      data.assignedBy   || '',        // V AssignedBy
-      t.priority        || 'Medium',  // W Priority
-    ]);
-    parkRowIfStalled(sheet, data.project || '', stalledSet);  // stalled project → auto-park
-    written++;
+  // Write ALL rows in a single setValues call — far faster and atomic than
+  // appendRow-per-task, which flushes each row and fails/drops rows on larger
+  // bulk submissions. 27 cols wide (through the block-workflow columns).
+  ensureCols(sheet, COL_PARK_REASON);
+  var W = COL_PARK_REASON;   // 27
+  var rows = tasks.map(function(t) {
+    var tUnits    = parseFloat(t.units) || 1;
+    var tWeighted = Math.round((t.basePts||0) * (data.multiplier||1) * tUnits * 10) / 10;
+    var r = [];
+    for (var c = 0; c < W; c++) r.push('');
+    r[0]  = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase(); // A TaskID
+    r[1]  = data.projectId  || '';                 // B
+    r[2]  = data.project    || '';                 // C
+    r[3]  = data.assignedTo || '';                 // D
+    r[4]  = t.taskType      || '';                 // E
+    r[5]  = data.multiplier || 1;                  // F
+    r[6]  = t.basePts       || 0;                  // G
+    r[7]  = tUnits;                                // H
+    r[8]  = tWeighted;                             // I
+    r[9]  = data.dateAssigned || today;            // J
+    r[10] = t.targetDate    || '';                 // K Deadline
+    r[11] = t.description || t.area || '';          // L Description
+    r[12] = t.drawing       || '';                 // M
+    r[13] = 'Not Started';                         // N SelfStatus
+    r[16] = 'Pending';                             // Q LeadApproved
+    r[20] = t.notes         || '';                 // U
+    r[21] = data.assignedBy || '';                 // V
+    r[22] = t.priority      || 'Medium';           // W
+    if (isStalled) {                               // auto-park on stalled projects
+      r[13] = 'Parked';                            // N
+      r[COL_BLK_PRIOR-1]  = 'Not Started';         // X
+      r[COL_BLK_ORIGDL-1] = t.targetDate || '';    // Y
+      r[10] = '';                                  // K no deadline while parked
+      r[COL_BLK_DISPO-1]  = 'Parked (Stalled)';    // Z
+      r[COL_PARK_REASON-1]= 'Project stalled — no client response'; // AA
+    }
+    return r;
   });
-  return {status:'ok', written:written};
+  sheet.getRange(sheet.getLastRow()+1, 1, rows.length, W).setValues(rows);
+  return {status:'ok', written:rows.length};
 }
 
 // Bulk task creation — one call covers multiple project+person blocks (Monday planning form).

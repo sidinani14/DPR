@@ -609,10 +609,16 @@ async function loadTasks() {
         {row:6,assignedTo:'Deepak Soni',assignedBy:'Astha',project:'Ajay Chordia',discipline:'Luxury Residential',taskType:'3D Rendering — Interior View',area:'Living Room',drawing:'Final Render v3',units:3,weightedPts:6.75,targetDate:'2026-05-09',priority:'High',status:'Completed',notes:'',revisionTag:'',revisionType:'',completedDate:'2026-05-08'},
       ];
     } else {
-      const res  = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getAllTasks'})});
+      const [res, listsRes] = await Promise.all([
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getAllTasks'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})})
+      ]);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       allTasks=data.tasks||[];
+      // Weekly targets come from the TEAM tab (col C) — overrides the hardcoded
+      // defaults so a change in the sheet (e.g. Deepak 30→72) reflects here.
+      try { const lists = await listsRes.json(); if (lists && lists.targets) Object.assign(TEAM_TARGETS, lists.targets); } catch(e){}
     }
 
     // Only THIS WEEK's completed+approved tasks stay on the board; older ones drop off.
