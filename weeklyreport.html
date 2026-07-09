@@ -181,9 +181,9 @@ const TARGETS = {
 // (5-minute margin from the 8-hour target counts as a full day.)
 const BIO = {
   'Aaditya Koshti': { days:2, lateCount:0, avgHrs:'07:25', hrsScore:7, punctScore:15, att:[
-    {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'08:59',s:'P',l:false},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'—',s:'A',l:false,n:'Absent'},{d:'Fri 3',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 4',t:'—',s:'A',l:false,n:'Absent'} ]},
-  'Aashi Agrawal': { days:4, lateCount:0, avgHrs:'08:27', hrsScore:10, punctScore:15, att:[
-    {d:'Mon 29',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 30',t:'18:00',s:'P',l:false,n:'Single punch 18:00 — biometric incomplete'},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'09:05',s:'P',l:false},{d:'Fri 3',t:'09:08',s:'P',l:false},{d:'Sat 4',t:'09:08',s:'P',l:false} ]},
+    {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'08:59',s:'P',l:false},{d:'Wed 1',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Thu 2',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Fri 3',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Sat 4',t:'—',s:'L',l:false,n:'Approved leave'} ]},
+  'Aashi Agrawal': { days:4, lateCount:0, avgHrs:'08:20', hrsScore:10, punctScore:15, att:[
+    {d:'Mon 29',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 30',t:'09:10',s:'P',l:false},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'09:05',s:'P',l:false},{d:'Fri 3',t:'09:08',s:'P',l:false},{d:'Sat 4',t:'09:08',s:'P',l:false} ]},
   'Achal Rathore': { days:5, lateCount:2, avgHrs:'07:23', hrsScore:7, punctScore:9, att:[
     {d:'Mon 29',t:'14:43',s:'H',l:false,n:'Half day (04:26)'},{d:'Tue 30',t:'09:58',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Wed 1',t:'10:41',s:'P',l:true,n:'1 min late'},{d:'Thu 2',t:'10:39',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Fri 3',t:'10:41',s:'P',l:true,n:'1 min late'},{d:'Sat 4',t:'—',s:'A',l:false,n:'Absent'} ]},
   'Bhavesh Bhagwat': { days:5, lateCount:1, avgHrs:'07:18', hrsScore:7, punctScore:12, att:[
@@ -192,8 +192,8 @@ const BIO = {
     {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'09:00',s:'P',l:false},{d:'Wed 1',t:'09:00',s:'P',l:false},{d:'Thu 2',t:'09:08',s:'P',l:false},{d:'Fri 3',t:'09:05',s:'P',l:false},{d:'Sat 4',t:'09:02',s:'P',l:false} ]},
   'Poorvi Goyal': { days:6, lateCount:0, avgHrs:'08:24', hrsScore:10, punctScore:15, att:[
     {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'09:01',s:'P',l:false},{d:'Wed 1',t:'09:05',s:'P',l:false},{d:'Thu 2',t:'09:05',s:'P',l:false},{d:'Fri 3',t:'09:03',s:'P',l:false},{d:'Sat 4',t:'09:05',s:'P',l:false} ]},
-  'Sahil Maurya': { days:5, lateCount:3, avgHrs:'06:49', hrsScore:4, punctScore:6, att:[
-    {d:'Mon 29',t:'19:41',s:'P',l:false,n:'Single punch 19:41 — biometric incomplete'},{d:'Tue 30',t:'09:12',s:'P',l:true,n:'2 min late'},{d:'Wed 1',t:'09:10',s:'P',l:false},{d:'Thu 2',t:'11:10',s:'P',l:true,n:'120 min late'},{d:'Fri 3',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 4',t:'09:11',s:'P',l:true,n:'1 min late'} ]},
+  'Sahil Maurya': { days:5, lateCount:3, avgHrs:'07:03', hrsScore:7, punctScore:6, att:[
+    {d:'Mon 29',t:'09:10',s:'P',l:false},{d:'Tue 30',t:'09:12',s:'P',l:true,n:'2 min late'},{d:'Wed 1',t:'09:10',s:'P',l:false},{d:'Thu 2',t:'11:10',s:'P',l:true,n:'120 min late'},{d:'Fri 3',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 4',t:'09:11',s:'P',l:true,n:'1 min late'} ]},
   'Deepak Soni': { days:5, lateCount:0, avgHrs:'08:30', hrsScore:10, punctScore:15, att:[
     {d:'Mon 29',t:'09:10',s:'P',l:false},{d:'Tue 30',t:'09:00',s:'P',l:false,n:'Present (E)'},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'09:08',s:'P',l:false},{d:'Fri 3',t:'09:05',s:'P',l:false},{d:'Sat 4',t:'09:02',s:'P',l:false} ]},
   'Aman Raghuwanshi': { days:6, lateCount:0, avgHrs:'08:35', hrsScore:10, punctScore:15, att:[
@@ -202,13 +202,13 @@ const BIO = {
 
 // ── IMPROVE suggestions (contenteditable in report) ────────
 const IMPROVE = {
-  'Aaditya Koshti': ['Only 2/6 present — absent Wed 1 to Sat 4 (leave). Punctual and ~7.4 h when in; attendance is the priority next week.'],
-  'Aashi Agrawal': ['Punctual all week and a strong 8.4 h average; absent Mon 29 and Wed 1. Tue 30 has only a single evening punch — please fix the missed biometric. Aim for full attendance.'],
+  'Aaditya Koshti': ['On pre-approved leave Wed 1 to Sat 4; present and punctual Mon 29 and Tue 30 (~7.4 h). No attendance concern.'],
+  'Aashi Agrawal': ['Punctual all week and a strong 8.3 h average; absent Mon 29 and Wed 1 — aim for full attendance and push output.'],
   'Achal Rathore': ['Half day Mon 29 and absent Sat 4; two arrivals just past the 10:40 shift (Wed 1 and Fri 3 at 10:41). Protect mornings and lift output toward the 72-pt lead target.'],
   'Bhavesh Bhagwat': ['Absent Mon 29 and a half day Tue 30 pulled hours to 7.3 h; Saturday 4 arrival was late (10:42). Tighten mornings and keep full days.'],
   'Himanshu Malviya': ['Benchmark week — full 6/6 attendance, zero late, solid 8.0 h. Convert the consistency into output toward the lead target.'],
   'Poorvi Goyal': ['Full attendance, zero late, and among the best hours on the team (8.4 h). Excellent discipline — now push output.'],
-  'Sahil Maurya': ['Three late arrivals (incl. Thu 2 at 11:10) and absent Fri 3; Mon 29 shows only a single evening punch — fix the missed biometric. Hours low at 6.8 h — priority is punctuality and full days.'],
+  'Sahil Maurya': ['Three late arrivals (incl. Thu 2 at 11:10) and absent Fri 3 — tighten punctuality and keep full days. Hours fine when in (~7.1 h).'],
 };
 
 // ── Score calculation ─────────────────────────────────────
@@ -258,9 +258,9 @@ function chip(t){return t>=85?'c-ex':t>=70?'c-go':t>=50?'c-av':'c-lo';}
 function chipLabel(t){return t>=85?'Excellent':t>=70?'Good':t>=50?'Average':'Needs Work';}
 function statusChip(s){ if(s && s.presentDays===0) return '<span class="chip" style="background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.6)">Absent</span>'; return '<span class="chip '+chip(s.total)+'">'+chipLabel(s.total)+'</span>'; }
 
-function attClass(d){if(d.s==='A')return'aa';if(d.l)return'al';if(d.s==='HD')return'ah';return'ap';}
-function attColor(d){if(d.s==='A')return'#EA4335';if(d.l)return'#FBBC04';if(d.s==='HD')return'#F5A623';return'#2ED573';}
-function attLabel(d){if(d.s==='A')return'Absent';if(d.s==='HD')return'Half Day';if(d.s==='E')return'On Time (E)';return d.l?'⚠ Late':'On Time';}
+function attClass(d){if(d.s==='L'||d.s==='A')return'aa';if(d.l)return'al';if(d.s==='HD')return'ah';return'ap';}
+function attColor(d){if(d.s==='L')return'#9AA0A6';if(d.s==='A')return'#EA4335';if(d.l)return'#FBBC04';if(d.s==='HD')return'#F5A623';return'#2ED573';}
+function attLabel(d){if(d.s==='L')return'Leave';if(d.s==='A')return'Absent';if(d.s==='HD')return'Half Day';if(d.s==='E')return'On Time (E)';return d.l?'⚠ Late':'On Time';}
 
 // ── Header ─────────────────────────────────────────────────
 function hdr(){return `<div class="rh"><div class="rh-logo"><img src="data:image/jpeg;base64,${LOGO_B64}" alt="Ideaform Design Studio"></div><div class="rh-meta"><div class="rh-title">Weekly Performance Report</div><div class="rh-week">${WEEK_LABEL}</div><div class="rh-gen">Week of ${WEEK_LABEL} · Ideaform Design Studio · Confidential</div></div></div>`;}
