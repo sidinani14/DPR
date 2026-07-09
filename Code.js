@@ -1900,6 +1900,17 @@ function generateProjectReportPDF(project, callerEmail){
   var old = folder.getFilesByName(pdf.getName()); while(old.hasNext()){ old.next().setTrashed(true); }
   var saved = folder.createFile(pdf);
   if (callerEmail) { try { saved.addEditor(callerEmail); } catch(e) {} }
+  // Point EVERY shareable entry of this project at the freshly-generated PDF, so
+  // an older entry's saved link never opens a stale copy (e.g. one that still
+  // contains logs deleted since). createFile makes a new fileId each time.
+  try {
+    var fid = saved.getId();
+    for (var pi = 1; pi < rows.length; pi++) {
+      if (String(rows[pi][4]||'').toLowerCase() !== pl) continue;
+      var pst = String(rows[pi][15]||'').trim();
+      if (pst === 'Final' || pst === 'Approved') sheet.getRange(pi+1, 20).setValue(fid);
+    }
+  } catch(e) {}
   return { fileId:saved.getId(), url:saved.getUrl() };
 }
 
