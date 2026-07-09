@@ -140,8 +140,8 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
 <button class="edit-btn" onclick="window.print()">🖨 Print / Export PDF</button>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec';
-const WEEK_START      = '2026-06-22';
-const WEEK_LABEL      = '22 – 27 June 2026';
+const WEEK_START      = '2026-06-29';
+const WEEK_LABEL      = '29 June – 4 July 2026';
 const INCLUDE_DEEPAK_AMAN = true;   // Deepak & Aman included this week
 const COMMEND = [
   {name:'Himanshu Malviya & Aman Raghuwanshi', detail:'Full 6/6 attendance with zero late arrivals — Aman with the stronger hours (8.8 h avg) and Himanshu rock-steady at 8.1 h.'},
@@ -173,42 +173,42 @@ const TARGETS = {
   'Poorvi Goyal':48, 'Sahil Maurya':48,
 };
 
-// ── Biometric — Week 15-20 June (from uploaded attendance file) ──
+// ── Biometric — Week 29 Jun – 4 Jul 2026 (from uploaded attendance files) ──
 // hrs score: ≥8h avg→10, 7-8h→7, <7h→4
 // punct score: 0 late→15, 1→12, 2→9, 3+→6
 // Achal threshold: 10:40 | Others: 09:10
 // Hours rule (avgHrs → hrsScore /10): ≥ 7:55 (475 min) → 10 · 7:00–7:54 → 7 · < 7:00 → 4
 // (5-minute margin from the 8-hour target counts as a full day.)
 const BIO = {
-  'Aaditya Koshti': { days:6, lateCount:1, avgHrs:'08:12', hrsScore:10, punctScore:12, att:[
-    {d:'Mon 22',t:'10:23',s:'P',l:true,n:'73 min late'},{d:'Tue 23',t:'09:03',s:'E',l:false,n:'Present (E)'},{d:'Wed 24',t:'09:04',s:'P',l:false},{d:'Thu 25',t:'08:50',s:'P',l:false},{d:'Fri 26',t:'09:05',s:'P',l:false},{d:'Sat 27',t:'09:07',s:'P',l:false} ]},
-  'Aashi Agrawal': { days:5, lateCount:0, avgHrs:'07:02', hrsScore:7, punctScore:15, att:[
-    {d:'Mon 22',t:'09:02',s:'P',l:false},{d:'Tue 23',t:'08:55',s:'P',l:false},{d:'Wed 24',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 25',t:'09:06',s:'P',l:false},{d:'Fri 26',t:'09:08',s:'E',l:false,n:'Present (E)'},{d:'Sat 27',t:'09:08',s:'P',l:false} ]},
-  'Achal Rathore': { days:6, lateCount:3, avgHrs:'07:49', hrsScore:7, punctScore:6, att:[
-    {d:'Mon 22',t:'10:40',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Tue 23',t:'10:31',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Wed 24',t:'13:19',s:'P',l:true,n:'159 min late'},{d:'Thu 25',t:'10:30',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Fri 26',t:'12:21',s:'P',l:true,n:'101 min late'},{d:'Sat 27',t:'10:41',s:'P',l:true,n:'1 min late'} ]},
-  'Bhavesh Bhagwat': { days:3, lateCount:1, avgHrs:'08:48', hrsScore:10, punctScore:12, att:[
-    {d:'Mon 22',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 23',t:'—',s:'A',l:false,n:'Absent'},{d:'Wed 24',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 25',t:'09:13',s:'P',l:true,n:'3 min late'},{d:'Fri 26',t:'09:02',s:'P',l:false},{d:'Sat 27',t:'09:06',s:'P',l:false} ]},
-  'Himanshu Malviya': { days:6, lateCount:0, avgHrs:'08:04', hrsScore:10, punctScore:15, att:[
-    {d:'Mon 22',t:'09:02',s:'P',l:false},{d:'Tue 23',t:'09:01',s:'P',l:false},{d:'Wed 24',t:'09:06',s:'P',l:false},{d:'Thu 25',t:'09:08',s:'P',l:false},{d:'Fri 26',t:'09:02',s:'P',l:false},{d:'Sat 27',t:'09:02',s:'P',l:false} ]},
-  'Poorvi Goyal': { days:6, lateCount:1, avgHrs:'08:51', hrsScore:10, punctScore:12, att:[
-    {d:'Mon 22',t:'09:02',s:'P',l:false},{d:'Tue 23',t:'09:03',s:'P',l:false},{d:'Wed 24',t:'09:42',s:'P',l:true,n:'32 min late'},{d:'Thu 25',t:'09:03',s:'P',l:false},{d:'Fri 26',t:'09:05',s:'P',l:false},{d:'Sat 27',t:'09:02',s:'P',l:false} ]},
-  'Sahil Maurya': { days:3, lateCount:3, avgHrs:'07:54', hrsScore:7, punctScore:6, att:[
-    {d:'Mon 22',t:'09:13',s:'P',l:true,n:'3 min late'},{d:'Tue 23',t:'—',s:'A',l:false,n:'Absent'},{d:'Wed 24',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 25',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Fri 26',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Sat 27',t:'—',s:'A',l:false,n:'Absent'} ]},
-  'Deepak Soni': { days:5, lateCount:1, avgHrs:'07:25', hrsScore:7, punctScore:12, att:[
-    {d:'Mon 22',t:'11:11',s:'P',l:true,n:'121 min late'},{d:'Tue 23',t:'09:01',s:'E',l:false,n:'Present (E)'},{d:'Wed 24',t:'09:00',s:'P',l:false},{d:'Thu 25',t:'—',s:'A',l:false,n:'Absent'},{d:'Fri 26',t:'09:02',s:'P',l:false},{d:'Sat 27',t:'09:02',s:'P',l:false} ]},
-  'Aman Raghuwanshi': { days:6, lateCount:0, avgHrs:'08:46', hrsScore:10, punctScore:15, att:[
-    {d:'Mon 22',t:'08:57',s:'E',l:false,n:'Present (E)'},{d:'Tue 23',t:'08:59',s:'P',l:false},{d:'Wed 24',t:'09:01',s:'P',l:false},{d:'Thu 25',t:'09:00',s:'P',l:false},{d:'Fri 26',t:'08:59',s:'P',l:false},{d:'Sat 27',t:'09:02',s:'P',l:false} ]},
+  'Aaditya Koshti': { days:2, lateCount:0, avgHrs:'07:25', hrsScore:7, punctScore:15, att:[
+    {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'08:59',s:'P',l:false},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'—',s:'A',l:false,n:'Absent'},{d:'Fri 3',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 4',t:'—',s:'A',l:false,n:'Absent'} ]},
+  'Aashi Agrawal': { days:4, lateCount:0, avgHrs:'08:27', hrsScore:10, punctScore:15, att:[
+    {d:'Mon 29',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 30',t:'18:00',s:'P',l:false,n:'Single punch 18:00 — biometric incomplete'},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'09:05',s:'P',l:false},{d:'Fri 3',t:'09:08',s:'P',l:false},{d:'Sat 4',t:'09:08',s:'P',l:false} ]},
+  'Achal Rathore': { days:5, lateCount:2, avgHrs:'07:23', hrsScore:7, punctScore:9, att:[
+    {d:'Mon 29',t:'14:43',s:'H',l:false,n:'Half day (04:26)'},{d:'Tue 30',t:'09:58',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Wed 1',t:'10:41',s:'P',l:true,n:'1 min late'},{d:'Thu 2',t:'10:39',s:'P',l:false,n:'Within threshold (10:40)'},{d:'Fri 3',t:'10:41',s:'P',l:true,n:'1 min late'},{d:'Sat 4',t:'—',s:'A',l:false,n:'Absent'} ]},
+  'Bhavesh Bhagwat': { days:5, lateCount:1, avgHrs:'07:18', hrsScore:7, punctScore:12, att:[
+    {d:'Mon 29',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 30',t:'09:07',s:'H',l:false,n:'Half day (04:06)'},{d:'Wed 1',t:'09:06',s:'P',l:false},{d:'Thu 2',t:'09:10',s:'P',l:false},{d:'Fri 3',t:'09:07',s:'P',l:false},{d:'Sat 4',t:'10:42',s:'P',l:true,n:'92 min late'} ]},
+  'Himanshu Malviya': { days:6, lateCount:0, avgHrs:'07:58', hrsScore:10, punctScore:15, att:[
+    {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'09:00',s:'P',l:false},{d:'Wed 1',t:'09:00',s:'P',l:false},{d:'Thu 2',t:'09:08',s:'P',l:false},{d:'Fri 3',t:'09:05',s:'P',l:false},{d:'Sat 4',t:'09:02',s:'P',l:false} ]},
+  'Poorvi Goyal': { days:6, lateCount:0, avgHrs:'08:24', hrsScore:10, punctScore:15, att:[
+    {d:'Mon 29',t:'08:58',s:'P',l:false},{d:'Tue 30',t:'09:01',s:'P',l:false},{d:'Wed 1',t:'09:05',s:'P',l:false},{d:'Thu 2',t:'09:05',s:'P',l:false},{d:'Fri 3',t:'09:03',s:'P',l:false},{d:'Sat 4',t:'09:05',s:'P',l:false} ]},
+  'Sahil Maurya': { days:5, lateCount:3, avgHrs:'06:49', hrsScore:4, punctScore:6, att:[
+    {d:'Mon 29',t:'19:41',s:'P',l:false,n:'Single punch 19:41 — biometric incomplete'},{d:'Tue 30',t:'09:12',s:'P',l:true,n:'2 min late'},{d:'Wed 1',t:'09:10',s:'P',l:false},{d:'Thu 2',t:'11:10',s:'P',l:true,n:'120 min late'},{d:'Fri 3',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 4',t:'09:11',s:'P',l:true,n:'1 min late'} ]},
+  'Deepak Soni': { days:5, lateCount:0, avgHrs:'08:30', hrsScore:10, punctScore:15, att:[
+    {d:'Mon 29',t:'09:10',s:'P',l:false},{d:'Tue 30',t:'09:00',s:'P',l:false,n:'Present (E)'},{d:'Wed 1',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 2',t:'09:08',s:'P',l:false},{d:'Fri 3',t:'09:05',s:'P',l:false},{d:'Sat 4',t:'09:02',s:'P',l:false} ]},
+  'Aman Raghuwanshi': { days:6, lateCount:0, avgHrs:'08:35', hrsScore:10, punctScore:15, att:[
+    {d:'Mon 29',t:'09:02',s:'P',l:false},{d:'Tue 30',t:'08:58',s:'P',l:false},{d:'Wed 1',t:'09:00',s:'P',l:false,n:'Present (E)'},{d:'Thu 2',t:'08:46',s:'P',l:false},{d:'Fri 3',t:'09:07',s:'P',l:false,n:'Present (E)'},{d:'Sat 4',t:'08:57',s:'H',l:false,n:'Half day (08:03)'} ]},
 };
 
 // ── IMPROVE suggestions (contenteditable in report) ────────
 const IMPROVE = {
-  'Aaditya Koshti': ['Full 6/6 attendance and a strong 8.2 h average, but Monday’s 10:23 arrival cost punctuality — keep mornings tight and lift output to the 48-pt target.'],
-  'Aashi Agrawal': ['Punctual all week; absent Wed 24. Avg 7.0 h — lift daily hours toward 8 and keep full attendance. Push output and DPR.'],
-  'Achal Rathore': ['Full attendance but three late arrivals (Wed 1:19 PM, Fri 12:21, Sat just over the 10:40 shift) pulled punctuality down. Avg 7.8 h — protect mornings and ramp output toward the 72-pt lead target.'],
-  'Bhavesh Bhagwat': ['Strong hours (8.8 h) and punctual when in, but absent Mon–Wed — attendance is the priority next week. Lift output.'],
-  'Himanshu Malviya': ['Benchmark week — full 6/6 attendance, zero late, solid 8.1 h. Now convert it into output toward the lead target.'],
-  'Poorvi Goyal': ['Best hours on the team (8.9 h) and full attendance; just the Wednesday 09:42 late to tidy up. Convert consistency into output.'],
-  'Sahil Maurya': ['Only 3/6 present (absent Tue, Wed, Sat) and arrivals just past 09:10 — tighten attendance and punctuality; hours are fine when in (7.9 h).'],
+  'Aaditya Koshti': ['Only 2/6 present — absent Wed 1 to Sat 4 (leave). Punctual and ~7.4 h when in; attendance is the priority next week.'],
+  'Aashi Agrawal': ['Punctual all week and a strong 8.4 h average; absent Mon 29 and Wed 1. Tue 30 has only a single evening punch — please fix the missed biometric. Aim for full attendance.'],
+  'Achal Rathore': ['Half day Mon 29 and absent Sat 4; two arrivals just past the 10:40 shift (Wed 1 and Fri 3 at 10:41). Protect mornings and lift output toward the 72-pt lead target.'],
+  'Bhavesh Bhagwat': ['Absent Mon 29 and a half day Tue 30 pulled hours to 7.3 h; Saturday 4 arrival was late (10:42). Tighten mornings and keep full days.'],
+  'Himanshu Malviya': ['Benchmark week — full 6/6 attendance, zero late, solid 8.0 h. Convert the consistency into output toward the lead target.'],
+  'Poorvi Goyal': ['Full attendance, zero late, and among the best hours on the team (8.4 h). Excellent discipline — now push output.'],
+  'Sahil Maurya': ['Three late arrivals (incl. Thu 2 at 11:10) and absent Fri 3; Mon 29 shows only a single evening punch — fix the missed biometric. Hours low at 6.8 h — priority is punctuality and full days.'],
 };
 
 // ── Score calculation ─────────────────────────────────────
