@@ -1738,6 +1738,15 @@ function removeLogPhoto(logId, which){
   Logger.log('Log not found: '+logId); return {status:'error', message:'log not found'};
 }
 
+// ▶▶ EDIT THE TWO LINES BELOW, then select "FIX_LOG_PHOTO" in the toolbar and press Run.
+//    (The editor's Run button can't take arguments, so set them here instead.)
+function FIX_LOG_PHOTO(){
+  var LOG_ID = 'ML-014';   // ← the Log ID from MEETING_LOG column A
+  var PHOTO  = 0;          // ← 0 = just LIST the photos (see View ▸ Logs);  1, 2, 3… = the photo number to REMOVE
+  if(!PHOTO) return listLogPhotos(LOG_ID);
+  return removeLogPhoto(LOG_ID, PHOTO);
+}
+
 // Current decision items for a log (id/cat/owner/text), applying any pending edits.
 function decisionsForLog(logId, edits){
   var sheet = db().getSheetByName(DECISION_LOG_TAB);
