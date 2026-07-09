@@ -160,10 +160,17 @@ async function submitLog(){
   const date=document.getElementById('date').value;
   try{
     // upload photos one-by-one
-    const photoIds=[]; let folderId='';
+    const photoIds=[]; let folderId=''; const failed=[];
     for(let i=0;i<photoFiles.length;i++){ msg('Uploading photo '+(i+1)+'/'+photoFiles.length+'…');
-      const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project,date,name:photoFiles[i].name,mime:photoFiles[i].mime,dataUrl:photoFiles[i].dataUrl})}).then(x=>x.json());
-      if(r.fileId){photoIds.push(r.fileId); folderId=r.folderId||folderId;}
+      const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project,date,name:photoFiles[i].name,mime:photoFiles[i].mime,dataUrl:photoFiles[i].dataUrl})}).then(x=>x.json()).catch(()=>({}));
+      if(r&&r.fileId){photoIds.push(r.fileId); folderId=r.folderId||folderId;}
+      else failed.push({name:photoFiles[i].name, msg:(r&&r.message)||''});
+    }
+    // Don't silently submit a photo-less log — surface upload failures.
+    if(failed.length){
+      const drive = /permission|Drive|createFolder|createFile/i.test(failed[0].msg||'');
+      msg('⚠ '+failed.length+' of '+photoFiles.length+' photo(s) failed to upload'+(drive?' — Google Drive access is not authorised yet. Ask Siddharth to authorise Drive, then re-add the photos.':' — please try again.'));
+      go.disabled=false; return;
     }
     msg('Cleaning up wording & saving…');
     const payload={action:'submitMeetingLog', type:LOG_TYPE, project, date,
