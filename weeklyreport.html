@@ -155,6 +155,15 @@ const LOGO_B64        = '/9j/4AAQSkZJRgABAQEAYABgAAD/4QA6RXhpZgAATU0AKgAAAAgAA1E
 
 const WEEK_END    = '2026-05-23';
 const WEEK_DAYS   = 6;
+const OUTAGE_DAYS = 1;                                 // 1 Jul 2026 — form submission was down
+const DPR_DEN     = Math.max(1, WEEK_DAYS - OUTAGE_DAYS);   // DPR scored out of 5 (Jul 1 excused)
+// Attendance scores must reflect real days present: reinstate the documented
+// absent-day penalty (−2 punctuality, −1.5 hours per non-present day) so a
+// low-attendance week can't earn full punctuality/hours. DPR credited out of
+// the working days that had a working form (Jul 1 excluded).
+function adjPunct(bio){ const ab=Math.max(0,WEEK_DAYS-((bio&&bio.days)!=null?bio.days:WEEK_DAYS)); return Math.max(0,((bio&&bio.punctScore)!=null?bio.punctScore:15)-2*ab); }
+function adjHrs(bio){   const ab=Math.max(0,WEEK_DAYS-((bio&&bio.days)!=null?bio.days:WEEK_DAYS)); return Math.max(0,((bio&&bio.hrsScore)!=null?bio.hrsScore:7)-1.5*ab); }
+function dprScore(daysFiled){ return Math.min(15, Math.round(Math.min(daysFiled||0, DPR_DEN)/DPR_DEN*15*10)/10); }
 
 // ── Team ─────────────────────────────────────────────────
 const ROLES = {
@@ -221,21 +230,17 @@ function scoreCalc(m, taskData) {
   // Output /50
   const s_output = Math.min(50, Math.round(approvedPts / tgt * 50 * 10) / 10);
 
-  // DPR /15
+  // DPR /15 — out of the working days that had a working form (Jul 1 excused),
+  // NOT out of present days (so a 2-day week can't score full for 2 filings).
   const effectiveDprDays = dprDays || 0;
   const presentDays = (bio.days != null ? bio.days : WEEK_DAYS);
-  const s_dpr = presentDays > 0 ? Math.min(15, Math.round(Math.min(effectiveDprDays, presentDays) / presentDays * 15 * 10) / 10) : 0;
+  const s_dpr = dprScore(effectiveDprDays);
 
-  // Punctuality /20 — scaled from biometric base (/15) to /20
-  // absent-day penalty removed — punctuality/hours scored on present days only
-  const punctBase   = bio.punctScore ?? 15;
-  const punctScaled = Math.round(Math.min(15, punctBase) * 10) / 10;  // /15
-  const s_punct     = presentDays > 0 ? punctScaled : 0;
+  // Punctuality /15 base — with the absent-day penalty applied.
+  const s_punct = Math.round(adjPunct(bio) * 10) / 10;
 
-  // Hours /15 — scaled from biometric base (/10) to /15
-  const hrsBase   = bio.hrsScore ?? 7;
-  const hrsScaled = Math.round(Math.min(10, hrsBase) * 10) / 10;  // /10
-  const s_hrs     = presentDays > 0 ? hrsScaled : 0;
+  // Hours /10 base — with the absent-day penalty applied.
+  const s_hrs = Math.round(adjHrs(bio) * 10) / 10;
 
   // Reliability /10 — 10 minus delay penalties (−1 late, −2 reassigned)
   const s_reliability = Math.max(0, Math.round((10 - (taskData.reliabilityPenalty || 0)) * 10) / 10);
@@ -410,7 +415,7 @@ function buildIndividualPage(m, taskData){
     <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
     <div class="pg">
       ${paramCard('Output<br>Approved Pts',s.s_output,50,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
-      ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${s.presentDays} present days filed`)}
+      ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${DPR_DEN} working days filed · 1 Jul excused (form outage)`)}
       ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
       ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
       ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
@@ -720,7 +725,8 @@ async function loadAndRender(){
     const ds = deepakStats.scores;
     const bd = BIO['Deepak Soni'];   // real biometric from the uploaded file
     if (bd) {
-      ds.s_punct = bd.punctScore; ds.s_hrs = bd.hrsScore;
+      ds.s_punct = Math.round(adjPunct(bd)*10)/10; ds.s_hrs = Math.round(adjHrs(bd)*10)/10;
+      ds.s_dper = dprScore(deepakStats.dperDaysCount);   // Jul 1 excused
       deepakStats.daysPresent = bd.days; deepakStats.lateCount = bd.lateCount; deepakStats.absentDays = WEEK_DAYS - bd.days;
       ds.total = Math.round((ds.s_visit + ds.s_client + ds.s_tasks + ds.s_dper + ds.s_punct + ds.s_hrs + ds.s_reliability) * 10) / 10;
     }
@@ -744,7 +750,8 @@ async function loadAndRender(){
     const as = amanStats.scores;
     const ba = BIO['Aman Raghuwanshi'];   // real biometric from the uploaded file
     if (ba) {
-      as.s_punct = ba.punctScore; as.s_hrs = ba.hrsScore;
+      as.s_punct = Math.round(adjPunct(ba)*10)/10; as.s_hrs = Math.round(adjHrs(ba)*10)/10;
+      as.s_dpr = dprScore(amanStats.dprDaysCount);   // Jul 1 excused
       amanStats.daysPresent = ba.days; amanStats.lateCount = ba.lateCount; amanStats.absentDays = WEEK_DAYS - ba.days;
       as.total = Math.round((as.output + as.s_dpr + as.s_punct + as.s_hrs + as.s_reliability) * 10) / 10;
     }
