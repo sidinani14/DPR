@@ -1730,10 +1730,21 @@ function removeLogPhoto(logId, which){
     else { ids=ids.filter(function(id){ return id!==String(which).trim(); }); }
     if(ids.length===before){ Logger.log('Nothing removed — check the number/ID.'); return {status:'error', message:'no match'}; }
     sh.getRange(i+1,14).setValue(ids.join(','));               // overwrite col N (photoIds)
-    var pdf=generateProjectReportPDF(String(rows[i][4]||'').trim(), Session.getActiveUser().getEmail());
+    var pdf=generateProjectReportPDF(String(rows[i][4]||'').trim(), '');
     if(pdf&&pdf.fileId) sh.getRange(i+1,20).setValue(pdf.fileId);
     Logger.log('Removed '+(before-ids.length)+' photo(s); '+ids.length+' remain. New PDF: '+(pdf&&pdf.url));
     return {status:'ok', remaining:ids.length, pdfUrl:pdf&&pdf.url};
+  }}
+  Logger.log('Log not found: '+logId); return {status:'error', message:'log not found'};
+}
+// Just rebuild a log's project PDF from the current (already-edited) photo list.
+function rebuildLogPdf(logId){
+  var sh=db().getSheetByName(MEETING_LOG_TAB), rows=sh.getDataRange().getValues();
+  for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===String(logId).trim()){
+    var pdf=generateProjectReportPDF(String(rows[i][4]||'').trim(), '');
+    if(pdf&&pdf.fileId) sh.getRange(i+1,20).setValue(pdf.fileId);
+    Logger.log('Rebuilt PDF for project '+rows[i][4]+': '+(pdf&&pdf.url));
+    return {status:'ok', pdfUrl:pdf&&pdf.url};
   }}
   Logger.log('Log not found: '+logId); return {status:'error', message:'log not found'};
 }
@@ -1742,7 +1753,8 @@ function removeLogPhoto(logId, which){
 //    (The editor's Run button can't take arguments, so set them here instead.)
 function FIX_LOG_PHOTO(){
   var LOG_ID = 'ML-014';   // ← the Log ID from MEETING_LOG column A
-  var PHOTO  = 0;          // ← 0 = just LIST the photos (see View ▸ Logs);  1, 2, 3… = the photo number to REMOVE
+  var PHOTO  = 0;          // ← 0 = LIST photos (View ▸ Logs);  1,2,3… = the photo number to REMOVE;  'rebuild' = only rebuild the PDF
+  if(PHOTO==='rebuild') return rebuildLogPdf(LOG_ID);
   if(!PHOTO) return listLogPhotos(LOG_ID);
   return removeLogPhoto(LOG_ID, PHOTO);
 }
