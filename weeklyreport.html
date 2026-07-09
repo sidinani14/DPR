@@ -496,23 +496,6 @@ function buildDeepakPage(d){
       </tr>`).join('')
     : `<tr><td colspan="5" style="padding:10px 8px;font-size:8.5px;color:rgba(255,255,255,0.35);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week — full marks awarded':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
 
-  // How Deepak spent his week — activity breakdown
-  const a = d.activity || {visitCount:0,visitHours:0,visitPts:0,meetCount:0,meetHours:0,meetPts:0,workCount:0,workPts:0,outCount:0,outPts:0,totalHours:0};
-  const actCard=(icon,label,main,sub)=>`<div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 10px">
-    <div style="font-size:8px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.6px">${icon} ${label}</div>
-    <div style="font-size:15px;font-weight:800;color:#fff;margin-top:2px">${main}</div>
-    <div style="font-size:8px;color:rgba(255,255,255,0.45);margin-top:1px">${sub}</div>
-  </div>`;
-  const spentPanel=`<div style="margin-top:4mm">
-    <div class="section-title" style="margin-bottom:2mm">How Deepak Spent His Week &nbsp;·&nbsp; ${a.totalHours} hrs on site / in meetings</div>
-    <div style="display:flex;gap:3mm">
-      ${actCard('🏗️','Site Visits',a.visitCount+' visits',a.visitHours+' hrs · '+a.visitPts+' pts')}
-      ${actCard('🤝','Meetings',a.meetCount+' meetings',a.meetHours+' hrs · '+a.meetPts+' pts')}
-      ${actCard('✎','Unplanned work',a.workCount+' tasks',a.workPts+' pts')}
-      ${actCard('↗','Assigned to team',a.outCount+' tasks',a.outPts+' pts')}
-    </div>
-  </div>`;
-
   return `<div class="page">
     ${hdr()}
     <div class="ind-top">
@@ -579,7 +562,6 @@ function buildDeepakPage(d){
         </table>
       </div>
     </div>
-    ${spentPanel}
   </div>`;
 }
 
