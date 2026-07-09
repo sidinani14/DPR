@@ -36,6 +36,7 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 <script>
 const API='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
 let TEAM=[], PROJECTS=[], LOG_TYPE='Meeting', actCount=0, photoFiles=[];
+const PHOTO_THUMBS={};   // fileId → dataUrl, so the review gallery can preview uploaded photos
 const EXTRA_ATTENDEES=['Siddharth Inani'];   // directors not in the active TEAM list
 const PURPOSE={
   Meeting:['Project requirement gathering','Design presentation/ feedback','Approvals and decision making','Project progress review','Issue resolution','Material or Vendor selection','Weekly or regular call','Other'],
@@ -163,7 +164,7 @@ async function submitLog(){
     const photoIds=[]; let folderId=''; const failed=[];
     for(let i=0;i<photoFiles.length;i++){ msg('Uploading photo '+(i+1)+'/'+photoFiles.length+'…');
       const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project,date,name:photoFiles[i].name,mime:photoFiles[i].mime,dataUrl:photoFiles[i].dataUrl})}).then(x=>x.json()).catch(()=>({}));
-      if(r&&r.fileId){photoIds.push(r.fileId); folderId=r.folderId||folderId;}
+      if(r&&r.fileId){photoIds.push(r.fileId); folderId=r.folderId||folderId; PHOTO_THUMBS[r.fileId]=photoFiles[i].dataUrl;}
       else failed.push({name:photoFiles[i].name, msg:(r&&r.message)||''});
     }
     // Don't silently submit a photo-less log — surface upload failures.
@@ -201,9 +202,7 @@ function renderReview(){
       <input type="text" id="rv-it-${it.id}" value="${qattr(it.text)}"></div>`).join('');
   const purposeHtml=(PURPOSE[REVIEW.type]||[]).map(p=>`<div class="chip ${REVIEW.purpose.includes(p)?'on':''}" data-v="${qattr(p)}" onclick="this.classList.toggle('on')">${esc(p)}</div>`).join('');
   const attHtml=attendeeList().map(t=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" class="rv-ta" value="${qattr(t)}" ${REVIEW.teamAttendees.includes(t)?'checked':''} style="width:auto">${esc(t)}</label>`).join('');
-  const photoBlock = REVIEW.type==='Site Visit' ? `
-      <div class="field"><div class="lbl">Photos <span class="opt">add more if you missed any</span></div>
-        <input type="file" accept="image/*" multiple onchange="onReviewPhotos(this)"><div id="rv-ph" class="sub" style="margin-top:4px">${REVIEW.photoIds.length} photo(s) attached</div></div>` : '';
+  const photoBlock = photoGalleryHtml();
   document.getElementById('app').innerHTML=`
     <div class="card">
       <h1>Review &amp; edit before sharing</h1>
@@ -226,15 +225,38 @@ function captureReview(){
   if(document.querySelector('.rv-ta')) REVIEW.teamAttendees=[...document.querySelectorAll('.rv-ta:checked')].map(c=>c.value);
   const cl=document.getElementById('rv-clients'); if(cl) REVIEW.clientAttendees=cl.value;
 }
+// Thumbnail gallery for the review screen — each photo has an × to remove it.
+function photoGalleryHtml(){
+  if(REVIEW.type!=='Site Visit') return '';
+  const thumbs=(REVIEW.photoIds||[]).map((id,i)=>{
+    const src=PHOTO_THUMBS[id];
+    const inner = src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover">`
+                      : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;color:#6E6E70">Photo ${i+1}</div>`;
+    return `<div style="position:relative;width:74px;height:74px;border-radius:6px;overflow:hidden;border:1px solid #E3E3E5;background:#F4F4F5">${inner}
+      <button type="button" title="Remove this photo" onclick="removeReviewPhoto('${qattr(id)}')" style="position:absolute;top:2px;right:2px;width:19px;height:19px;border:none;border-radius:50%;background:rgba(192,57,43,.92);color:#fff;font-size:13px;line-height:1;cursor:pointer;padding:0">×</button></div>`;
+  }).join('');
+  return `<div class="field"><div class="lbl">Photos <span class="opt">tap × to remove · add more below</span></div>
+    ${REVIEW.photoIds.length?`<div id="rv-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">${thumbs}</div>`:''}
+    <input type="file" accept="image/*" multiple onchange="onReviewPhotos(this)">
+    <div id="rv-ph" class="sub" style="margin-top:4px">${REVIEW.photoIds.length} photo(s) attached</div></div>`;
+}
+function removeReviewPhoto(id){
+  captureReview();                                            // keep in-progress edits
+  REVIEW.photoIds=(REVIEW.photoIds||[]).filter(x=>x!==id);
+  renderReview();                                             // regenerating the PDF later omits it
+}
 async function onReviewPhotos(input){
-  const ph=document.getElementById('rv-ph');
+  const ph=document.getElementById('rv-ph'); const failed=[];
   for(const f of input.files){
     if(ph) ph.textContent='Uploading…';
     const dataUrl=await new Promise(r=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(f);});
-    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project:REVIEW.project,date:REVIEW.date,name:f.name,mime:f.type,dataUrl})}).then(x=>x.json());
-    if(r.fileId){ REVIEW.photoIds.push(r.fileId); REVIEW.folderId=r.folderId||REVIEW.folderId; }
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project:REVIEW.project,date:REVIEW.date,name:f.name,mime:f.type,dataUrl})}).then(x=>x.json()).catch(()=>({}));
+    if(r&&r.fileId){ REVIEW.photoIds.push(r.fileId); REVIEW.folderId=r.folderId||REVIEW.folderId; PHOTO_THUMBS[r.fileId]=dataUrl; }
+    else failed.push((r&&r.message)||'');
   }
-  input.value=''; if(ph) ph.textContent=REVIEW.photoIds.length+' photo(s) attached';
+  input.value='';
+  captureReview(); renderReview();                            // repaint gallery with the new thumbnails
+  if(failed.length){ const el=document.getElementById('rv-ph'); if(el){ const drive=/permission|Drive|createFolder|createFile/i.test(failed[0]); el.textContent='⚠ '+failed.length+' photo(s) failed'+(drive?' — Drive not authorised':', try again')+' · '+REVIEW.photoIds.length+' attached'; el.style.color='#C0392B'; } }
 }
 async function finalizeLog(){
   const gb=document.getElementById('genbtn'); gb.disabled=true; msg('Generating the report PDF…');
