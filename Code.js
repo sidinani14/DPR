@@ -461,6 +461,8 @@ function doPost(e) {
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
     if (data.action === 'getProjectWeeklyReport') return respond(getProjectWeeklyReport(data.project||'', data.weekStart||''));
     if (data.action === 'get3MData')           return respond(get3MData(data.project||'', data.weekStart||''));
+    if (data.action === 'savePlanDraft')       return respond(savePlanDraft(authEmail, data.draft||''));
+    if (data.action === 'getPlanDraft')        return respond(getPlanDraft(authEmail));
     if (data.action === 'generate3MMessage')   return respond(generate3MMessage(data, authEmail));
 
     // Form submission actions
@@ -5588,6 +5590,30 @@ function getProjectWeeklyReport(project, weekStart) {
   return out;
 }
 
+// Plan Tasks drafts — one per user (keyed by verified email), so an
+// unsubmitted bulk plan survives a failed submit even across devices.
+function savePlanDraft(email, draft){
+  var sh = getOrCreate('PLAN_DRAFTS', function(s){ s.appendRow(['Email','Draft','Updated']); });
+  var key = String(email||'').toLowerCase();
+  var val = String(draft||'').slice(0, 48000);
+  var rows = sh.getDataRange().getValues();
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][0]||'').toLowerCase()===key){ sh.getRange(i+1,2,1,2).setValues([[val, new Date()]]); return {status:'ok'}; }
+  }
+  sh.appendRow([email, val, new Date()]);
+  return {status:'ok'};
+}
+function getPlanDraft(email){
+  var sh = db().getSheetByName('PLAN_DRAFTS'); if(!sh) return {draft:''};
+  var key = String(email||'').toLowerCase();
+  var rows = sh.getDataRange().getValues();
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][0]||'').toLowerCase()===key)
+      return {draft:String(rows[i][1]||''), updated: rows[i][2]? new Date(rows[i][2]).getTime() : 0};
+  }
+  return {draft:''};
+}
+
 // ════════════════════════════════════════════════════════════════
 // getWeeklyProjectDigest — per-project weekly summary (managers only).
 // Buckets every source by project for the Mon–Sat week. "Active" = at least
@@ -5603,7 +5629,7 @@ function getWeeklyProjectDigest(weekStart){
   if(pSheet){ var pr=pSheet.getDataRange().getValues();
     for(var i=1;i<pr.length;i++){ var nm=String(pr[i][1]||'').trim(); if(!nm) continue; var k=nm.toLowerCase();
       if(!P[k]){ P[k]={name:nm, stage:String(pr[i][2]||'').trim(), lastActivity:'',
-        meetings:[], tasksDone:[], connections:[], others:[], billing:[], visits:[], actions:[], issues:[]}; order.push(k); } }
+        meetings:[], tasksDone:[], connections:[], others:[], billing:[], visits:[], actions:[], issues:[], progress:[]}; order.push(k); } }
   }
   function touch(k,d){ if(P[k]&&d&&(!P[k].lastActivity||d>P[k].lastActivity)) P[k].lastActivity=d; }
 
@@ -5613,10 +5639,15 @@ function getWeeklyProjectDigest(weekStart){
       var k=String(mr[i][4]||'').trim().toLowerCase(); if(!P[k])continue; var d=cellDate(mr[i][1]); touch(k,d);
       if(inWk(d)) P[k].meetings.push({date:d, type:String(mr[i][3]||''), who:[String(mr[i][6]||''),String(mr[i][7]||'')].filter(Boolean).join(', ')}); } }
   var a=s.getSheetByName(ASSIGN_TAB);
+  var visitHrs={};   // project|date → hours (from Site Visit/Meeting tasks) for the visit lines
   if(a){ var ar=a.getDataRange().getValues();
     for(var i=1;i<ar.length;i++){ var k=String(ar[i][2]||'').trim().toLowerCase(); if(!P[k])continue;
+      var tt=String(ar[i][4]||'').trim();
+      var isVM=(tt==='Site Visit'||tt==='Meeting');
       var ss=String(ar[i][13]||'').trim(), sd=cellDate(ar[i][14]); touch(k,sd);
-      if(ss==='Done'&&inWk(sd)) P[k].tasksDone.push({date:sd, who:String(ar[i][3]||''), task:String(ar[i][4]||'')}); } }
+      if(isVM){ var wp=parseFloat(ar[i][8])||0; var hrs=(tt==='Site Visit')?wp/2:wp; var vd=cellDate(ar[i][9])||sd; if(hrs>0) visitHrs[k+'|'+vd]=(visitHrs[k+'|'+vd]||0)+Math.round(hrs*10)/10; }
+      // De-dupe: visit/meeting tasks show under "Site visits", not "Tasks completed"
+      if(ss==='Done'&&inWk(sd)&&!isVM) P[k].tasksDone.push({date:sd, who:String(ar[i][3]||''), task:tt}); } }
   var c=s.getSheetByName(CRM_LOG_TAB);
   if(c){ var cr=c.getDataRange().getValues();
     for(var i=1;i<cr.length;i++){ var k=String(cr[i][6]||'').trim().toLowerCase(); if(!P[k])continue;
@@ -5636,9 +5667,14 @@ function getWeeklyProjectDigest(weekStart){
   if(e){ var er=e.getDataRange().getValues();
     for(var i=1;i<er.length;i++){ var k=String(er[i][3]||'').trim().toLowerCase(); if(!P[k])continue;
       var d=cellDate(er[i][1]); touch(k,d);
+      if(!inWk(d)) continue;
       // Only rows where a site visit was actually done (col F) count as a visit —
-      // a daily project report alone is not a visit.
-      if(inWk(d) && String(er[i][5]||'').trim().toLowerCase()==='yes') P[k].visits.push({date:d, who:String(er[i][4]||'')}); } }
+      // a daily project report alone is not a visit. Attach measured hours.
+      if(String(er[i][5]||'').trim().toLowerCase()==='yes')
+        P[k].visits.push({date:d, who:String(er[i][4]||''), hours:visitHrs[k+'|'+d]||0});
+      // Site-progress narrative (Works Completed Today, col H)
+      var works=String(er[i][7]||'').trim();
+      if(works) P[k].progress.push({date:d, text:works}); } }
   var dl=s.getSheetByName(DECISION_LOG_TAB);
   if(dl){ var dr=dl.getDataRange().getValues();
     for(var i=1;i<dr.length;i++){ if(String(dr[i][8]||'').trim()==='Deleted')continue;

@@ -873,7 +873,7 @@ function renderIssues(issues) {
     return;
   }
   let html='';
-  [...open].sort((a,b)=>b.priority-a.priority).forEach(iss=>{
+  [...open].sort((a,b)=>String(a.targetDate||a.date||'').localeCompare(String(b.targetDate||b.date||''))).forEach(iss=>{
     const act=issueActions[iss.issueId];
     const isRes=act?.action==='resolve', isEsc=act?.action==='escalate', isBlk=act?.action==='block';
     const sLabel=isRes?'✓ Resolved':isEsc?'🔴 Escalated':isBlk?'🚫 Invalid':iss.status;
@@ -885,7 +885,7 @@ function renderIssues(issues) {
         <span class="ic-status ${sCls}" style="margin-left:auto">${sLabel}</span>
       </div>
       <div class="ic-desc">${iss.description}</div>
-      <div class="ic-meta">${priLabel(iss.priority)} · Target: ${iss.targetDate||'—'} · ${iss.date}${iss.assignedTo?' · → '+iss.assignedTo:''}</div>
+      <div class="ic-meta">Target: ${iss.targetDate||'—'} · ${iss.date}${iss.assignedTo?' · → '+iss.assignedTo:''}</div>
       <div class="ic-actions">
         <button class="ia-btn ia-resolve" onclick="issAction('${iss.issueId}','resolve',this)" ${isRes?'disabled':''}>✓ Resolve</button>
         <button class="ia-btn ia-escalate" onclick="issAction('${iss.issueId}','escalate',this)" ${isEsc?'disabled':''}>🔴 Escalate</button>
@@ -1420,16 +1420,8 @@ function addNewIssue() {
       </div>
     </div>
     <textarea id="ni-desc-${id}" placeholder="Describe the issue clearly…" style="min-height:50px;margin-bottom:8px"></textarea>
-    <div class="field-row" style="margin-bottom:0">
-      <div>
-        <span class="lbl" style="font-size:10px;display:block;margin-bottom:4px">Priority</span>
-        <div class="pri-btns">
-          <div class="pri-btn" id="nip-1-${id}" onclick="setNIPri(${id},1)">Low</div>
-          <div class="pri-btn on-2" id="nip-2-${id}" onclick="setNIPri(${id},2)">Med</div>
-          <div class="pri-btn" id="nip-3-${id}" onclick="setNIPri(${id},3)">High</div>
-        </div>
-        <input type="hidden" id="ni-pri-${id}" value="2">
-      </div>
+    <input type="hidden" id="ni-pri-${id}" value="2">
+    <div class="field" style="margin-bottom:0">
       <div>
         <span class="lbl" style="font-size:10px;display:block;margin-bottom:4px">Target Date</span>
         <input type="date" id="ni-tdate-${id}">
@@ -1465,10 +1457,8 @@ function setNIKind(id, kind){
 }
 
 function setNIPri(id, val) {
-  [1,2,3].forEach(n=>{
-    document.getElementById('nip-'+n+'-'+id).className='pri-btn'+(n===val?' on-'+n:'');
-  });
-  document.getElementById('ni-pri-'+id).value=val;
+  [1,2,3].forEach(n=>{ const b=document.getElementById('nip-'+n+'-'+id); if(b) b.className='pri-btn'+(n===val?' on-'+n:''); });
+  const h=document.getElementById('ni-pri-'+id); if(h) h.value=val;
 }
 
 // ════════════════════════════════════════

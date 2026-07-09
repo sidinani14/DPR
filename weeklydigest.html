@@ -77,7 +77,8 @@ function render(d){
     +'<div class="cv-sum"><b>'+d.counts.active+'</b> projects active this week · <b>'+d.counts.inactive+'</b> with no movement</div></div></div>';
   (d.active||[]).forEach(function(p){
     html+='<div class="page proj"><div class="ph"><span class="pn">'+esc(p.name)+'</span><span class="pstage">'+esc(p.stage||'—')+'</span></div>';
-    html+=block('Meetings &amp; site visits', mergeMV(p), m=>'<div class="li"><span class="d">'+shortD(m.date)+'</span> · '+esc(m.type)+(m.who?' · '+esc(m.who):'')+'</div>');
+    html+=block('Meetings &amp; site visits', mergeMV(p), m=>'<div class="li"><span class="d">'+shortD(m.date)+'</span> · '+esc(m.type)+(m.hours?' · '+m.hours+' hr'+(m.hours!==1?'s':''):'')+(m.who?' · '+esc(m.who):'')+'</div>');
+    html+=block('Site progress', p.progress, x=>'<div class="li"><span class="d">'+shortD(x.date)+'</span> · '+esc(x.text)+'</div>');
     html+=block('Tasks completed', p.tasksDone, t=>'<div class="li"><span class="d">'+shortD(t.date)+'</span> · '+esc(t.who)+' — '+esc(t.task)+'</div>');
     html+=block('Connections', p.connections, c=>'<div class="li"><span class="d">'+shortD(c.date)+'</span> · '+esc(c.type)+' · '+esc(c.by)+(c.notes?' — '+esc(c.notes):'')+'</div>');
     html+=block('Other activities', p.others, c=>'<div class="li"><span class="d">'+shortD(c.date)+'</span> · '+esc(c.type)+' · '+esc(c.by)+'</div>');
@@ -93,6 +94,6 @@ function render(d){
     +'<div class="foot">© Ideaform Design Studio · '+wk+' · Confidential</div></div>';
   document.getElementById('out').innerHTML=html;
 }
-function mergeMV(p){ return (p.meetings||[]).concat((p.visits||[]).map(v=>({date:v.date,type:'Site visit',who:v.who}))).sort((a,b)=>(b.date||'').localeCompare(a.date||'')); }
+function mergeMV(p){ return (p.meetings||[]).concat((p.visits||[]).map(v=>({date:v.date,type:'Site visit',who:v.who,hours:v.hours}))).sort((a,b)=>(b.date||'').localeCompare(a.date||'')); }
 </script>
 </body></html>

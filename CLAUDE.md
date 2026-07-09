@@ -6,28 +6,47 @@
 - Team: ~11 members
 
 ## Key URLs
-- Apps Script: https://script.google.com/macros/s/AKfycbziJSWTVf1sRqi6rKjmgjrg0DomsVKIm2DDBZWq7oHp2eCHDJ0bz9svlm8Do3G1xkEgBw/exec
+- Apps Script (PROD deployment all frontends use): https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec
+  (scriptId 18W1_ciQs1QW1EeItd-r55Y7mxs_rZR28SwNHwSdk1OYlzGZxgW-P85xv; redeploy with `clasp deploy -i <that id>`. Hit the 200-version limit before — delete old versions in the editor if deploy fails. See memory dpr-apps-script-deployment.)
 - Productivity Sheet ID: 1PH1nJoPmQWS9wixuhw9B7oo0jIkhJw13htzbzlBWffk
 - Scorecard Sheet ID: 198sgwhnp2GY5KYyVITMZAPLEoiEuMrHIFUat5deG3vk
-- Live site (custom domain): https://team.ideaformdesignstudio.com (served from the GitHub Pages repo root; old sidinani14.github.io/DPR path no longer serves)
+- Live site (custom domain): https://team.ideaformdesignstudio.com (served from the GitHub Pages repo ROOT — files are dashboard.html/projects.html/tasks.html/etc., NOT under /DPR/). `.nojekyll` present so Pages serves statically.
 
-## Files in this repo
-- IDS_Script_final.js — Google Apps Script backend (deploy via Apps Script editor)
-- IDS_Task_Dashboard_final.html → deployed at /DPR/dashboard
-- IDS_Projects_Dashboard.html → deployed at /DPR/projects
-- IDS_Weekly_Report_Final.html → deployed at /DPR/weeklyreport
-- dper.html → deployed at /DPR/dper (Deepak's DPER form)
-- IDS_DPR_Form_final.html → deployed at /DPR/dpr
-- IDS_Task_Assignment_final.html → deployed at /DPR/assign
-- IDS_Lead_Approval_final.html → deployed at /DPR/approve
+## Files in this repo (current names — served at repo root)
+- Code.js — Apps Script backend (push via `clasp push`; browser JS excluded by .claspignore)
+- index.html — workspace home (tile grid, TOOLS array)
+- dashboard.html · projects.html · myprojects.html (projects you lead) · weeklyreport.html · weeklydigest.html
+- dpr.html · DPER.html · CRM.html · meetlog.html · approval.html · leads.html · 3m.html
+- tasks.html — **Bulk Task Planning** (the "Plan Tasks" form; was assign.html, now deleted)
+- searchselect.js · auth.js — shared browser components (not pushed to Apps Script)
 
 ## Sheet structure — TASK_ASSIGNMENTS (23 cols A–W)
 - A: TaskID, B: ProjectID, C: ProjectName, D: AssignedTo
 - E: Stage/TaskType, F: Discipline, G: BasePts, H: Multiplier, I: WeightedPts
-- J: AssignedDate, K: Deadline, L: Area, M: DrawingName
+- J: AssignedDate, K: Deadline, L: Description (was Area), M: DrawingName (legacy; new tasks blank)
 - N: SelfStatus, O: SelfStatusDate, P: ActualCompletionDate
 - Q: LeadApproved, R: ApprovedBy, S: ApprovalDate
-- T: RevisionTag, U: Notes, V: AssignedBy, W: Priority
+- T: RevisionTag, U: Notes, V: AssignedBy, W: Priority (no longer set/shown — deadline is the priority)
+- Writes go through assignTasks (batch setValues) / bulkAssignTasks, all wrapped in
+  withLock (LockService) so concurrent/bulk submits don't drop rows.
+
+## Recent changes (2026-07)
+- tasks.html = Bulk Task Planning (assign.html deleted). Auto-saves a draft to
+  localStorage + server (PLAN_DRAFTS tab, savePlanDraft/getPlanDraft) so a failed
+  submit never loses the form; "Restore/Discard" banner on reopen.
+- Weekly targets now read from TEAM tab col C (WeeklyTarget) via getLists.targets;
+  dashboard merges them over its hardcoded defaults (Deepak = 72, not 30).
+- DPER: Site Visit/Meeting + hours per project (points via calcVisitPts, DPR rate);
+  "Unplanned Work" (self-logged Done tasks); per-project "Tasks to Assign" + "Your
+  Open Tasks" (status update via updateTaskStatuses). Issues drop the Design type
+  and priority. Weekly report has a "How Deepak Spent His Week" activity panel.
+- DPER + CRM both show "Your Open Tasks" (getOpenTasksForMember + updateTaskStatuses).
+- Project Digest: a visit counts only when SiteVisitDone=Yes (col F); shows visit
+  hours + a "Site progress" narrative (SITE_EXECUTION col H); visit/meeting tasks
+  de-duped out of "Tasks completed".
+- searchselect.js: type-ahead — focus a dropdown and start typing to filter.
+- Site-issue priority removed from DPER/CRM forms + open-issues display (sorted by
+  target date now); task priority removed from Plan Tasks + DPER + dashboard.
 
 ## Sheet structure — SITE_EXECUTION (22 cols A–V)
 - A: SubmissionID, B: Date, C: Time, D: ProjectName, E: Execution Lead

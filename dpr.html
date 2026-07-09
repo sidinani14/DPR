@@ -851,10 +851,12 @@ function projNameOptions() {
 
 // ── EPIC G: project connections (DPR) — chip UI ──────────────
 const CONN_WITH=['Client','Contractor','Consultant','Vendor','Other'];
+const CONN_TYPE_ICON={'Call':'📞','WhatsApp':'💬','Meeting':'🤝','Site Visit':'🏗️','Email':'📧','Other':'📌'};
+const CONN_WITH_ICON={'Client':'👤','Contractor':'👷','Consultant':'📐','Vendor':'🏪','Other':'👥'};
 function pickChip(el){ el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); }
 function chipVal(containerId){ const on=document.querySelector('#'+containerId+' .chip.on'); return on?on.dataset.val:''; }
-function chipsHtml(containerId, vals){
-  return `<div class="chips" id="${containerId}">`+vals.map(v=>`<div class="chip" data-val="${v}" onclick="pickChip(this)">${v}</div>`).join('')+`</div>`;
+function chipsHtml(containerId, vals, icons){
+  return `<div class="chips" id="${containerId}">`+vals.map(v=>`<div class="chip" data-val="${v}" onclick="pickChip(this)">${icons&&icons[v]?icons[v]+' ':''}${v}</div>`).join('')+`</div>`;
 }
 function addConnection(){
   connCount++; const id=connCount;
@@ -862,9 +864,9 @@ function addConnection(){
   div.innerHTML=
     `<div class="cn-head"><span class="cn-num">Connection ${id}</span><button type="button" class="cn-x" onclick="this.closest('.conn-block').remove()">✕</button></div>`+
     `<div class="field"><div class="lbl">Project</div><select class="conn-proj" id="cn-proj-${id}">${projNameOptions()}</select></div>`+
-    `<div class="field"><div class="lbl">Connected with</div>${chipsHtml('cn-with-'+id, CONN_WITH)}</div>`+
+    `<div class="field"><div class="lbl">Connected with</div>${chipsHtml('cn-with-'+id, CONN_WITH, CONN_WITH_ICON)}</div>`+
     `<div class="field"><div class="lbl">Name <span class="opt">who you connected with</span></div><input type="text" id="cn-name-${id}" placeholder="e.g. Mr. Ramesh / ABC Contractors"></div>`+
-    `<div class="field"><div class="lbl">Type of contact</div>${chipsHtml('cn-type-'+id, CONN_TYPES)}</div>`+
+    `<div class="field"><div class="lbl">Type of contact</div>${chipsHtml('cn-type-'+id, CONN_TYPES, CONN_TYPE_ICON)}</div>`+
     `<div class="field"><div class="lbl">Notes <span class="opt">outcome, follow-up</span></div><textarea id="cn-notes-${id}" placeholder="What was discussed? Any action items?"></textarea></div>`;
   document.getElementById('conn-blocks').appendChild(div);
 }

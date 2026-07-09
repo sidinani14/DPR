@@ -534,7 +534,7 @@ function renderIssues(issues) {
   }
 
   let html = '';
-  [...open].sort((a,b)=>b.priority-a.priority).forEach(iss=>{
+  [...open].sort((a,b)=>String(a.targetDate||a.date||'').localeCompare(String(b.targetDate||b.date||''))).forEach(iss=>{
     const act = issueActions[iss.issueId];
     const isRes = act?.action==='resolve';
     const isEsc = act?.action==='escalate';
@@ -547,7 +547,7 @@ function renderIssues(issues) {
         <span class="ic-status ${statusCls}" style="margin-left:auto">${statusLabel}</span>
       </div>
       <div class="ic-desc">${iss.description}</div>
-      <div class="ic-meta">${priLabel(iss.priority)} · Target: ${iss.targetDate||'—'} · ${iss.date}</div>
+      <div class="ic-meta">Target: ${iss.targetDate||'—'} · ${iss.date}</div>
       <div class="ic-actions">
         <button class="ia-btn ia-resolve" onclick="issAction('${iss.issueId}','resolve',this)" ${isRes?'disabled':''}>✓ Resolve</button>
         <button class="ia-btn ia-escalate" onclick="issAction('${iss.issueId}','escalate',this)" ${isEsc?'disabled':''}>🔴 Escalate</button>
@@ -688,20 +688,10 @@ function addIssueBlock(projId){
       <input type="hidden" id="ib-type-${projId}-${id}">
     </div>
     <textarea id="ib-desc-${projId}-${id}" oninput="generateAllWA()" placeholder="Describe the issue…" style="min-height:50px;margin-bottom:8px"></textarea>
-    <div class="field-row" style="margin-bottom:0">
-      <div>
-        <div class="lbl" style="font-size:10px;margin-bottom:4px">Priority</div>
-        <div class="pri-btns">
-          <div class="pri-btn" id="ibp-1-${projId}-${id}" onclick="setIBPri(${projId},${id},1)">Low</div>
-          <div class="pri-btn on-2" id="ibp-2-${projId}-${id}" onclick="setIBPri(${projId},${id},2)">Med</div>
-          <div class="pri-btn" id="ibp-3-${projId}-${id}" onclick="setIBPri(${projId},${id},3)">High</div>
-        </div>
-        <input type="hidden" id="ib-pri-${projId}-${id}" value="2">
-      </div>
-      <div>
-        <div class="lbl" style="font-size:10px;margin-bottom:4px">Target Date</div>
-        <input type="date" id="ib-date-${projId}-${id}">
-      </div>
+    <input type="hidden" id="ib-pri-${projId}-${id}" value="2">
+    <div class="field" style="margin-bottom:8px">
+      <div class="lbl" style="font-size:10px;margin-bottom:4px">Target Date</div>
+      <input type="date" id="ib-date-${projId}-${id}">
     </div>
     <div class="field">
       <div class="lbl" style="font-size:10px;margin-bottom:4px">Assign To <span class="opt">for design/deliverable issues</span></div>
@@ -721,10 +711,8 @@ function selIssType(el,pId,iId){
 }
 
 function setIBPri(pId,iId,val){
-  [1,2,3].forEach(n=>{
-    document.getElementById(`ibp-${n}-${pId}-${iId}`).className='pri-btn'+(n===val?` on-${n}`:'');
-  });
-  document.getElementById(`ib-pri-${pId}-${iId}`).value=val;
+  [1,2,3].forEach(n=>{ const b=document.getElementById(`ibp-${n}-${pId}-${iId}`); if(b) b.className='pri-btn'+(n===val?` on-${n}`:''); });
+  const h=document.getElementById(`ib-pri-${pId}-${iId}`); if(h) h.value=val;
 }
 
 // ── Task assignment blocks within project (same model as Plan Tasks) ──
@@ -911,7 +899,8 @@ function copyWA(id){
 async function submitAll(){
   if(!googleUser){toast('Sign in first');return;}
   const projs=collectProjects();
-  if(!projs.length){toast('Add at least one project report');return;}
+  const hasOther = collectTaskStatuses().length || collectUnplanned().length || collectConnections().length || Object.keys(issueActions).length;
+  if(!projs.length && !hasOther){ toast('Nothing to submit — add a report, a task update, or an activity'); return; }
   const date=document.getElementById('f-date')?.value||'';
 
   document.getElementById('submit-btn').disabled=true;

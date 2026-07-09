@@ -136,6 +136,17 @@ window.idsOnAuth = async function(user){
 
     const urlP = new URLSearchParams(location.search).get('project');
     addBlock(urlP || undefined);
+    // Pull any server-saved draft (survives across devices); keep whichever is newer
+    try {
+      const sv = await api('getPlanDraft');
+      if (sv && sv.draft) {
+        const local = localStorage.getItem(DRAFT_KEY);
+        let localTs=0, svTs=0;
+        try{ localTs=JSON.parse(local||'{}').ts||0; }catch(e){}
+        try{ svTs=JSON.parse(sv.draft).ts||0; }catch(e){}
+        if (!local || svTs > localTs) localStorage.setItem(DRAFT_KEY, sv.draft);
+      }
+    } catch(e){}
     maybeShowDraftBanner();
   } catch(e) {
     document.getElementById('submit-status').textContent = '✗ Failed to load form data: ' + e.message;
@@ -162,9 +173,14 @@ function planDraft(){
   return { ts:Date.now(), by:document.getElementById('meta-by')?.value||'', date:document.getElementById('meta-date')?.value||'', blocks };
 }
 function draftHasContent(d){ return !!(d && d.blocks && d.blocks.some(b=> b.project || (b.rows||[]).some(r=>r.stage||r.desc))); }
-function saveDraft(){ try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){} }
+let _srvT=null;
+function pushServerDraft(){ try{ const d=planDraft(); if(draftHasContent(d)) api('savePlanDraft',{draft:JSON.stringify(d)}); }catch(e){} }
+function saveDraft(){
+  try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){}
+  clearTimeout(_srvT); _srvT=setTimeout(pushServerDraft, 3000);   // also persist server-side (cross-device)
+}
 function saveDraftSoon(){ clearTimeout(_draftT); _draftT=setTimeout(saveDraft, 500); }
-function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} const b=document.getElementById('draft-banner'); if(b) b.style.display='none'; }
+function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} const b=document.getElementById('draft-banner'); if(b) b.style.display='none'; try{ api('savePlanDraft',{draft:''}); }catch(e){} }
 function discardDraft(){ clearDraft(); }
 function restoreDraft(){
   let d; try{ d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); }catch(e){}
