@@ -2635,7 +2635,7 @@ function sendDailyApprovalEmail() {
 
     var subject = 'IDS · ' + lt.length + ' task' + (lt.length !== 1 ? 's' : '') +
                   ' pending approval — ' + today;
-    GmailApp.sendEmail(lead.email, subject, '', {htmlBody: buildEmailBody(lt, byDate, today)});
+    MailApp.sendEmail(lead.email, subject, '', {htmlBody: buildEmailBody(lt, byDate, today)});
     Logger.log('Email sent → ' + lead.name + ' (' + lt.length + ' tasks)');
   });
 }
@@ -4063,7 +4063,7 @@ function sendVisitNotification(entry, nextDate, hist, isOverdue, email) {
   body += '</div></div>';
 
   try {
-    GmailApp.sendEmail(email, subject, '', {htmlBody:body});
+    MailApp.sendEmail(email, subject, '', {htmlBody:body});
     Logger.log('Email sent to '+entry.assignee+' ('+email+')');
   } catch(e) {
     Logger.log('Email failed for '+entry.assignee+': '+e);
