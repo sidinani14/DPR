@@ -110,18 +110,37 @@
       if (rb) rb.onclick = function () {
         window.__idsDenied = false;
         try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
+        // Re-initialize (no auto_select → fresh account picker) BEFORE rendering.
+        try { google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false }); _inited = true; } catch (e) {}
         buildGate('signin');
-        // Re-initialize GIS without auto_select so user sees the account picker
         try {
-          google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false });
           google.accounts.id.prompt(function(n){ if(n.isNotDisplayed()||n.isSkippedMoment()) renderButton(); });
         } catch(e) { renderButton(); }
       };
     }
   }
 
+  // GIS must be initialize()'d with the client_id BEFORE any prompt or
+  // renderButton — otherwise Google's OAuth endpoint is hit without client_id
+  // ("Missing required parameter: client_id"). Idempotent; safe to call often.
+  var _inited = false;
+  function ensureInit() {
+    if (_inited) return true;
+    if (!(window.google && google.accounts && google.accounts.id)) return false;
+    try {
+      var opts = { client_id: CLIENT_ID, callback: onCredential, auto_select: true };
+      var hint = storeGet(HINT_KEY) || '';
+      if (hint) opts.login_hint = hint;
+      google.accounts.id.initialize(opts);
+      _inited = true;
+      return true;
+    } catch (e) { return false; }
+  }
+
   function renderButton() {
-    if (!(window.google && google.accounts && google.accounts.id)) { setTimeout(renderButton, 200); return; }
+    // Wait for initialize (not merely for GIS to load) — a button rendered
+    // before initialize carries no client_id and errors on click.
+    if (!ensureInit()) { setTimeout(renderButton, 150); return; }
     var el = document.getElementById('ids-btn');
     if (el) google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with' });
   }
@@ -196,13 +215,9 @@
     function showSignin(){ if(!_signinShown){ _signinShown=true; buildGate('signin'); } }
     var _signinTimer = setTimeout(showSignin, 4000);
     loadGis(function () {
-      try {
-        // Note: use_fedcm_for_prompt intentionally omitted — FedCM can silently swallow
-        // the prompt callback, leaving the page stuck on "Checking access…" forever.
-        var initOpts = { client_id: CLIENT_ID, callback: onCredential, auto_select: true };
-        if (loginHint) initOpts.login_hint = loginHint;
-        google.accounts.id.initialize(initOpts);
-      } catch (e) { clearTimeout(_signinTimer); showSignin(); return; }
+      // Always initialize (with client_id) before prompting. use_fedcm_for_prompt
+      // intentionally omitted — FedCM can silently swallow the prompt callback.
+      if (!ensureInit()) { clearTimeout(_signinTimer); showSignin(); return; }
       try {
         google.accounts.id.prompt(function(n){
           if(n.isNotDisplayed()||n.isSkippedMoment()){ clearTimeout(_signinTimer); showSignin(); }
