@@ -30,6 +30,24 @@
 - Writes go through assignTasks (batch setValues) / bulkAssignTasks, all wrapped in
   withLock (LockService) so concurrent/bulk submits don't drop rows.
 
+## Field work / attendance capture (2026-07-11) — Part A
+- DPR form (dpr.html) **Section 4 "Field work today"**: flat, repeatable block —
+  each row = type (Site Visit / Meeting / **Material Selection**) + project +
+  **start time + end time** + notes. Duration = end−start drives visit points
+  (Site Visit & Material Selection ×2/hr, Meeting ×1/hr); each row still creates a
+  Done visit task (createDoneTask, hours-based pts) so scoring is unchanged.
+- Replaced (removed) the old per-project "Site visit or client meeting" toggle
+  (p-vtype/p-vdur/p-vnotes + toggleVisit) to avoid double-capture.
+- Material Selection added to isVisitTask/calcVisitPts (Code.js, ×2) + isVisitType/
+  isVisitRate2 (dpr.html) + weekly project-digest reverse-rate (wp/2).
+- New **FIELD_WORK** sheet (writeFieldWork in doPost, from data['Field Work']):
+  A FW ID · B Date · C Member · D Email · E Type · F Project · G Start · H End ·
+  I Engaged Hrs · J Notes · K Source · L Approved(Pending). Feeds the upcoming
+  attendance import (Part B): per member+date, first start→last end = the field-day
+  window (hours score); engaged sum = points. Approved gates it into scores.
+- Assigned pre-scheduled visit-task hours (atc-visit-hrs) + unplanned visit-task
+  rows (t-visit-hrs) still use plain hours and do NOT write FIELD_WORK — only Sec 4.
+
 ## Recent changes (2026-07)
 - tasks.html = Bulk Task Planning (assign.html deleted). Auto-saves a draft to
   localStorage + server (PLAN_DRAFTS tab, savePlanDraft/getPlanDraft) so a failed
