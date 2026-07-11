@@ -248,9 +248,22 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 4: Project connections (EPIC G) -->
+  <!-- Section 4: Field work today (site visits / meetings / material selections) -->
   <div class="card">
-    <div class="card-head"><div class="card-num">4</div><div class="card-title">Project connections today</div><div class="card-sub">optional</div></div>
+    <div class="card-head"><div class="card-num">4</div><div class="card-title">Field work today</div><div class="card-sub">site visits · meetings · material selection</div></div>
+    <div class="card-body">
+      <p style="font-size:12px;color:var(--text2);margin:-2px 0 12px">Add each site visit, client meeting or material selection you did today with its <b>start &amp; end time</b>. This earns your visit points <b>and</b> records your attendance for a day out of office.</p>
+      <div id="fw-blocks"></div>
+      <button class="add-proj" onclick="addFieldWork()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+        Add site visit / meeting / material selection
+      </button>
+    </div>
+  </div>
+
+  <!-- Section 5: Project connections (EPIC G) -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">5</div><div class="card-title">Project connections today</div><div class="card-sub">optional</div></div>
     <div class="card-body">
       <p style="font-size:12px;color:var(--text2);margin:-2px 0 12px">Log every contact — calls, WhatsApp, meetings, site visits. Each ongoing project should be connected at least once a week.</p>
       <div id="conn-blocks"></div>
@@ -261,9 +274,9 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 5: Billables reached (EPIC H) -->
+  <!-- Section 6: Billables reached (EPIC H) -->
   <div class="card">
-    <div class="card-head"><div class="card-num">5</div><div class="card-title">Billables reached today</div><div class="card-sub">needs approval</div></div>
+    <div class="card-head"><div class="card-num">6</div><div class="card-title">Billables reached today</div><div class="card-sub">needs approval</div></div>
     <div class="card-body">
       <div class="field">
         <div class="lbl">Any billable stage reached today?</div>
@@ -282,9 +295,9 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 6: Accountability -->
+  <!-- Section 7: Accountability -->
   <div class="card">
-    <div class="card-head"><div class="card-num">6</div><div class="card-title">Accountability</div></div>
+    <div class="card-head"><div class="card-num">7</div><div class="card-title">Accountability</div></div>
     <div class="card-body">
       <div class="field">
         <div class="lbl">Arrived on time today? <span class="req">*</span></div>
@@ -304,9 +317,9 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 7: Summary -->
+  <!-- Section 8: Summary -->
   <div class="card">
-    <div class="card-head"><div class="card-num">7</div><div class="card-title">Today's summary</div></div>
+    <div class="card-head"><div class="card-num">8</div><div class="card-title">Today's summary</div></div>
     <div class="card-body">
       <div class="field">
         <div class="lbl">Full list of deliverables released today <span class="req">*</span></div>
@@ -374,8 +387,8 @@ let projCount  = 0;
 const VISIT_TYPES_ARCH = ['Site Visit (Architecture)', 'Site Visit (Interiors)'];
 const VISIT_TYPES_MTG  = ['Client Meeting (Regular)', 'Client Meeting'];
 // CRM-created meeting/visit tasks use plain 'Site Visit' / 'Meeting' types
-function isVisitType(t) { return VISIT_TYPES_ARCH.indexOf(t)>-1 || VISIT_TYPES_MTG.indexOf(t)>-1 || t==='Site Visit' || t==='Meeting'; }
-function isVisitRate2(t){ return VISIT_TYPES_ARCH.indexOf(t)>-1 || t==='Site Visit'; }  // ×2/hr (else ×1/hr)
+function isVisitType(t) { return VISIT_TYPES_ARCH.indexOf(t)>-1 || VISIT_TYPES_MTG.indexOf(t)>-1 || t==='Site Visit' || t==='Meeting' || t==='Material Selection'; }
+function isVisitRate2(t){ return VISIT_TYPES_ARCH.indexOf(t)>-1 || t==='Site Visit' || t==='Material Selection'; }  // ×2/hr (else ×1/hr)
 
 window.addEventListener('DOMContentLoaded', () => {
   setHeaderDate(); setDeadlineBanner();
@@ -849,6 +862,35 @@ function projNameOptions() {
     PROJECTS.map(p=>`<option value="${(p.name||'').replace(/"/g,'&quot;')}">${p.name}</option>`).join('');
 }
 
+// ── Section 4: Field work today (site visits / meetings / material selections) ──
+// Start/end time per engagement → hours drive visit points; the day's window
+// (first start → last end) feeds attendance. Site Visit + Material Selection ×2/hr,
+// Meeting ×1/hr — matches isVisitRate2 / calcVisitPts on the backend.
+const FW_TYPES=['Site Visit','Meeting','Material Selection'];
+function fwRate(t){ return (t==='Site Visit'||t==='Material Selection')?2:1; }
+function fwHours(start,end){
+  if(!start||!end) return 0;
+  const s=start.split(':'), e=end.split(':');
+  if(s.length<2||e.length<2) return 0;
+  let mins=(+e[0]*60 + +e[1]) - (+s[0]*60 + +s[1]);
+  if(mins<=0) return 0;                       // end must be after start
+  return Math.round((mins/60)*100)/100;
+}
+let fwCount=0;
+function addFieldWork(){
+  fwCount++; const id=fwCount;
+  const div=document.createElement('div'); div.className='fw-block'; div.id='fw-'+id;
+  div.style.cssText='border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface2)';
+  div.innerHTML=
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">FIELD WORK ${id}</span><button type="button" onclick="this.closest('.fw-block').remove();calcScore()" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;line-height:1">×</button></div>`+
+    `<div class="row2" style="margin-bottom:8px"><div class="field" style="margin-bottom:0"><div class="lbl">Type</div><select class="fw-type" onchange="calcScore()">${FW_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div>`+
+    `<div class="field" style="margin-bottom:0"><div class="lbl">Project</div><select class="fw-proj">${projNameOptions()}</select></div></div>`+
+    `<div class="row2" style="margin-bottom:8px"><div class="field" style="margin-bottom:0"><div class="lbl">Start time</div><input type="time" class="fw-start" onchange="calcScore()"></div><div class="field" style="margin-bottom:0"><div class="lbl">End time</div><input type="time" class="fw-end" onchange="calcScore()"></div></div>`+
+    `<div style="font-size:12px;color:var(--text3);margin-bottom:8px"><span class="fw-dur">—</span> · <span class="fw-pts" style="color:var(--accent);font-weight:600">— pts</span></div>`+
+    `<div class="field" style="margin-bottom:0"><div class="lbl">Notes <span class="opt">optional</span></div><textarea class="fw-notes" style="min-height:44px" placeholder="Key decisions, client feedback, next steps…"></textarea></div>`;
+  document.getElementById('fw-blocks').appendChild(div);
+}
+
 // ── EPIC G: project connections (DPR) — chip UI ──────────────
 const CONN_WITH=['Client','Contractor','Consultant','Vendor','Other'];
 const CONN_TYPE_ICON={'Call':'📞','WhatsApp':'💬','Meeting':'🤝','Site Visit':'🏗️','Email':'📧','Other':'📌'};
@@ -992,37 +1034,6 @@ function addProject(removable=true) {
           Add task / drawing
         </button>
       </div>
-      <div class="divider"></div>
-      <div class="field">
-        <div class="visit-row" onclick="toggleVisit('${id}')">
-          <button class="tog" id="${id}-tog" type="button"></button>
-          <span class="visit-lbl">Site visit or client meeting for this project today</span>
-        </div>
-        <div class="visit-detail" id="${id}-vd">
-          <div class="row2" style="margin-bottom:10px">
-            <div class="field" style="margin-bottom:0">
-              <div class="lbl">Visit type</div>
-              <select class="p-vtype">
-                <option>Client meeting</option><option>Site visit</option>
-                <option>Client meeting + site visit</option>
-              </select>
-            </div>
-            <div class="field" style="margin-bottom:0">
-              <div class="lbl">Hours spent</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <input type="number" class="p-vdur" min="0.5" max="12" step="0.5" placeholder="e.g. 2.5"
-                  oninput="calcScore()"
-                  style="width:90px;font-size:13px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
-                <span class="p-vpts-display" style="font-size:12px;color:var(--accent);font-weight:600"></span>
-              </div>
-            </div>
-          </div>
-          <div class="field" style="margin-bottom:0">
-            <div class="lbl">Visit notes <span class="opt">optional</span></div>
-            <textarea class="p-vnotes" style="min-height:52px" placeholder="Key decisions, client feedback, next steps…"></textarea>
-          </div>
-        </div>
-      </div>
     </div>`;
   document.getElementById('proj-blocks').appendChild(div);
   addTask(`${id}-tasks`);
@@ -1114,11 +1125,6 @@ function onProjSelect(sel) {
   calcScore();
 }
 
-function toggleVisit(id) {
-  document.getElementById(`${id}-tog`).classList.toggle('on');
-  document.getElementById(`${id}-vd`).classList.toggle('open');
-}
-
 function calcScore() {
   let totalPts=0, totalUnits=0, projTouched=0;
 
@@ -1163,22 +1169,21 @@ function calcScore() {
         if(disp){ disp.textContent='—'; disp.style.color='var(--text3)'; disp.style.fontWeight='normal'; }
       }
     });
-    const tog=document.getElementById(`${pb.id}-tog`);
-    if (tog&&tog.classList.contains('on')){
-      const vtype = pb.querySelector('.p-vtype')?.value||'';
-      const vhrs  = parseFloat(pb.querySelector('.p-vdur')?.value)||0;
-      let vpts = 0;
-      if (vhrs > 0) {
-        // Site visit = hours×2, Client meeting = hours×1
-        const isSiteVisit = vtype.toLowerCase().includes('site visit');
-        vpts = isSiteVisit ? vhrs * 2 : vhrs * 1;
-        totalPts += vpts; totalUnits += 1;
-      }
-      // Update pts display next to hours input
-      const vdisp = pb.querySelector('.p-vpts-display');
-      if (vdisp) vdisp.textContent = vpts > 0 ? vpts.toFixed(1) + ' pts' : '';
-    }
   });
+
+  // Section 4: field work today (start/end → hours × rate)
+  document.querySelectorAll('.fw-block').forEach(fb=>{
+    const type =fb.querySelector('.fw-type')?.value||'';
+    const start=fb.querySelector('.fw-start')?.value||'';
+    const end  =fb.querySelector('.fw-end')?.value||'';
+    const hrs=fwHours(start,end);
+    const pts=Math.round(hrs*fwRate(type)*10)/10;
+    const durEl=fb.querySelector('.fw-dur'), ptsEl=fb.querySelector('.fw-pts');
+    if(durEl) durEl.textContent = hrs>0 ? (hrs+' hrs') : '—';
+    if(ptsEl) ptsEl.textContent = pts>0 ? (pts.toFixed(1)+' pts') : '— pts';
+    if(hrs>0){ totalPts+=pts; totalUnits+=1; }
+  });
+
   document.getElementById('sc-pts').textContent=totalPts.toFixed(1);
   document.getElementById('sc-units').textContent=totalUnits;
   document.getElementById('sc-proj').textContent=projTouched;
@@ -1259,29 +1264,35 @@ function collectData() {
         });
       }
     });
-    const hasVisit=document.getElementById(`${pb.id}-tog`)?.classList.contains('on');
-    const vhrs_collect=parseFloat(pb.querySelector('.p-vdur')?.value)||0;
-    const vtype=pb.querySelector('.p-vtype')?.value||'';
-    // The per-project site-visit/meeting toggle must also create a Done visit task in
-    // TASK_ASSIGNMENTS (hours-based pts), so it shows as completed and earns points.
-    if (hasVisit && vhrs_collect>0) {
-      const isSiteVisit = vtype.toLowerCase().includes('site visit');
-      doneTasks.push({
-        taskType: isSiteVisit ? 'Site Visit' : 'Meeting',
-        area:'', drawing:'', units:1, basePts:0,
-        project: proj.name, member: member, discipline: proj.discipline,
-        date: new Date().toISOString().substring(0,10),
-        visitHours: vhrs_collect,
-      });
-    }
-    data[`P${pi} Visit Hours`] = vhrs_collect;
+    data[`P${pi} Visit Hours`] = 0;
     data[`P${pi} Name`]        = proj.name;
     data[`P${pi} Discipline`]  = proj.discipline;
     data[`P${pi} Multiplier`]  = proj.multiplier;
     data[`P${pi} Tasks`]       = tasks.join(' | ');
-    data[`P${pi} Visit`]       = hasVisit?`${vtype} · ${vhrs_collect}hrs`:'No';
-    data[`P${pi} Visit Notes`] = hasVisit?pb.querySelector('.p-vnotes')?.value||'':'';
+    data[`P${pi} Visit`]       = 'No';   // per-project visit toggle replaced by Section 4 field work
+    data[`P${pi} Visit Notes`] = '';
   });
+
+  // Section 4: field work today → Done visit tasks (points, hours×rate) +
+  // FIELD_WORK store (start/end → attendance in Part B).
+  const fieldWork=[];
+  document.querySelectorAll('.fw-block').forEach(fb=>{
+    const type   =fb.querySelector('.fw-type')?.value||'';
+    const project=fb.querySelector('.fw-proj')?.value||'';
+    const start  =fb.querySelector('.fw-start')?.value||'';
+    const end    =fb.querySelector('.fw-end')?.value||'';
+    const notes  =fb.querySelector('.fw-notes')?.value.trim()||'';
+    const hrs=fwHours(start,end);
+    if(!project || hrs<=0) return;
+    fieldWork.push({type, project, start, end, hours:hrs, notes});
+    doneTasks.push({
+      taskType:type, area:'', drawing:'', units:1, basePts:0,
+      project, member, discipline:'',
+      date:new Date().toISOString().substring(0,10),
+      visitHours:hrs,
+    });
+  });
+  data['Field Work']    = JSON.stringify(fieldWork);
   data['Ongoing Tasks'] = JSON.stringify(ongoingTasks);
   data['Done Tasks']    = JSON.stringify(doneTasks);
   return data;

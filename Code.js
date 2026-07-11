@@ -26,15 +26,42 @@ var VISIT_TYPES_MTG  = ['Client Meeting (Regular)', 'Client Meeting'];
 function isVisitTask(taskType) {
   var t = String(taskType||'').trim();
   return VISIT_TYPES_ARCH.indexOf(t) > -1 || VISIT_TYPES_MTG.indexOf(t) > -1 ||
-         t === 'Site Visit' || t === 'Meeting';   // CRM-created meeting/visit tasks
+         t === 'Site Visit' || t === 'Meeting' ||
+         t === 'Material Selection';   // CRM/field-work meeting/visit tasks
 }
 
 function calcVisitPts(taskType, hours) {
   var t = String(taskType||'').trim();
   var h = parseFloat(hours) || 0;
-  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit') return Math.round(h * 2 * 10) / 10;
+  // Site Visit + Material Selection = ×2/hr; Meeting = ×1/hr
+  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection') return Math.round(h * 2 * 10) / 10;
   if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting')    return Math.round(h * 1 * 10) / 10;
   return 0;
+}
+
+// Persist the DPR "Field work today" entries (start/end per engagement) to FIELD_WORK.
+// Points already flow through the Done-visit-task path; this row store feeds the
+// attendance import (Part B): first start → last end = the member's field-day window.
+// Each row is 'Pending' until Siddharth approves it in the import grid.
+function writeFieldWork(data) {
+  var raw = data['Field Work']; if (!raw) return;
+  var items; try { items = JSON.parse(raw); } catch(e) { return; }
+  if (!items || !items.length) return;
+  var sheet = getOrCreate(FIELD_WORK_TAB, function(sh){
+    sh.getRange(1,1,1,12).setValues([['FW ID','Date','Member','Email','Type','Project','Start','End','Engaged Hrs','Notes','Source','Approved']]);
+    sh.setFrozenRows(1);
+  });
+  var date = dateStr(data['Timestamp']);
+  var member = data['Member'] || '';
+  var email  = data['Member Email'] || '';
+  var stamp  = new Date().getTime();
+  var rows = items.map(function(it, n){
+    return ['FW-'+stamp+'-'+n, date, member, email,
+      String(it.type||''), String(it.project||''),
+      String(it.start||''), String(it.end||''),
+      parseFloat(it.hours)||0, String(it.notes||''), 'self', 'Pending'];
+  });
+  sheet.getRange(sheet.getLastRow()+1, 1, rows.length, 12).setValues(rows);
 }
 
 // Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
@@ -87,6 +114,7 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
+var FIELD_WORK_TAB   = 'FIELD_WORK';    // one row per field engagement (visit/meeting/material selection) with start/end → feeds attendance (Part B)
 var LOGS_ROOT_FOLDER = 'IDS Logs';      // Drive root for per-project report folders
 function ensureCols(sheet, n){ var m=sheet.getMaxColumns(); if (m < n) sheet.insertColumnsAfter(m, n-m); }
 // Insert a new data row at the TOP (row 2, just under the header) so the latest
@@ -499,6 +527,10 @@ function doPost(e) {
         Logger.log('Created ' + doneTasks.length + ' done tasks in TASK_ASSIGNMENTS');
       } catch(err) { Logger.log('Done tasks error: ' + err); }
     }
+
+    // Field work today (start/end per visit/meeting/material selection) → FIELD_WORK
+    // (points already carried by the Done visit tasks above; this feeds attendance)
+    try { writeFieldWork(data); } catch(err) { Logger.log('Field work error: ' + err); }
 
     // Section 3 ongoing tasks → self-assigned, deadline = tomorrow
     if (data['Ongoing Tasks']) {
@@ -5654,9 +5686,9 @@ function getWeeklyProjectDigest(weekStart){
   if(a){ var ar=a.getDataRange().getValues();
     for(var i=1;i<ar.length;i++){ var k=String(ar[i][2]||'').trim().toLowerCase(); if(!P[k])continue;
       var tt=String(ar[i][4]||'').trim();
-      var isVM=(tt==='Site Visit'||tt==='Meeting');
+      var isVM=(tt==='Site Visit'||tt==='Meeting'||tt==='Material Selection');
       var ss=String(ar[i][13]||'').trim(), sd=cellDate(ar[i][14]); touch(k,sd);
-      if(isVM){ var wp=parseFloat(ar[i][8])||0; var hrs=(tt==='Site Visit')?wp/2:wp; var vd=cellDate(ar[i][9])||sd; if(hrs>0) visitHrs[k+'|'+vd]=(visitHrs[k+'|'+vd]||0)+Math.round(hrs*10)/10; }
+      if(isVM){ var wp=parseFloat(ar[i][8])||0; var hrs=(tt==='Site Visit'||tt==='Material Selection')?wp/2:wp; var vd=cellDate(ar[i][9])||sd; if(hrs>0) visitHrs[k+'|'+vd]=(visitHrs[k+'|'+vd]||0)+Math.round(hrs*10)/10; }
       // De-dupe: visit/meeting tasks show under "Site visits", not "Tasks completed"
       if(ss==='Done'&&inWk(sd)&&!isVM) P[k].tasksDone.push({date:sd, who:String(ar[i][3]||''), task:tt}); } }
   var c=s.getSheetByName(CRM_LOG_TAB);
