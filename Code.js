@@ -1705,60 +1705,6 @@ function finalizeMeetingLog(data, authEmail){
   return { status:'ok', logId:logId, pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
 }
 
-// ── Run-once maintenance: remove a photo from an already-generated log ────────
-// 1. In MEETING_LOG, copy the log's ID from column A.
-// 2. Run  listLogPhotos('ML-xxx')  → View ▸ Logs shows each photo's number + file name.
-// 3. Run  removeLogPhoto('ML-xxx', 2)  (the number to drop) → rebuilds the client PDF.
-//    (You can also pass the Drive file ID instead of the number.)
-function listLogPhotos(logId){
-  var sh=db().getSheetByName(MEETING_LOG_TAB), rows=sh.getDataRange().getValues();
-  for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===String(logId).trim()){
-    var ids=String(rows[i][13]||'').split(',').map(function(s){return s.trim();}).filter(String);
-    ids.forEach(function(id,n){ var nm; try{ nm=DriveApp.getFileById(id).getName(); }catch(e){ nm='(file missing / no Drive access)'; }
-      Logger.log((n+1)+'.  '+id+'   '+nm); });
-    Logger.log(ids.length+' photo(s) in '+logId+'  (project: '+rows[i][4]+')');
-    return ids;
-  }}
-  Logger.log('Log not found: '+logId); return [];
-}
-function removeLogPhoto(logId, which){
-  var sh=db().getSheetByName(MEETING_LOG_TAB), rows=sh.getDataRange().getValues();
-  for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===String(logId).trim()){
-    var ids=String(rows[i][13]||'').split(',').map(function(s){return s.trim();}).filter(String);
-    var before=ids.length;
-    if(/^\d+$/.test(String(which))){ var n=parseInt(which,10)-1; if(n>=0&&n<ids.length) ids.splice(n,1); }
-    else { ids=ids.filter(function(id){ return id!==String(which).trim(); }); }
-    if(ids.length===before){ Logger.log('Nothing removed — check the number/ID.'); return {status:'error', message:'no match'}; }
-    sh.getRange(i+1,14).setValue(ids.join(','));               // overwrite col N (photoIds)
-    var pdf=generateProjectReportPDF(String(rows[i][4]||'').trim(), '');
-    if(pdf&&pdf.fileId) sh.getRange(i+1,20).setValue(pdf.fileId);
-    Logger.log('Removed '+(before-ids.length)+' photo(s); '+ids.length+' remain. New PDF: '+(pdf&&pdf.url));
-    return {status:'ok', remaining:ids.length, pdfUrl:pdf&&pdf.url};
-  }}
-  Logger.log('Log not found: '+logId); return {status:'error', message:'log not found'};
-}
-// Just rebuild a log's project PDF from the current (already-edited) photo list.
-function rebuildLogPdf(logId){
-  var sh=db().getSheetByName(MEETING_LOG_TAB), rows=sh.getDataRange().getValues();
-  for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===String(logId).trim()){
-    var pdf=generateProjectReportPDF(String(rows[i][4]||'').trim(), '');
-    if(pdf&&pdf.fileId) sh.getRange(i+1,20).setValue(pdf.fileId);
-    Logger.log('Rebuilt PDF for project '+rows[i][4]+': '+(pdf&&pdf.url));
-    return {status:'ok', pdfUrl:pdf&&pdf.url};
-  }}
-  Logger.log('Log not found: '+logId); return {status:'error', message:'log not found'};
-}
-
-// ▶▶ EDIT THE TWO LINES BELOW, then select "FIX_LOG_PHOTO" in the toolbar and press Run.
-//    (The editor's Run button can't take arguments, so set them here instead.)
-function FIX_LOG_PHOTO(){
-  var LOG_ID = 'ML-014';   // ← the Log ID from MEETING_LOG column A
-  var PHOTO  = 0;          // ← 0 = LIST photos (View ▸ Logs);  1,2,3… = the photo number to REMOVE;  'rebuild' = only rebuild the PDF
-  if(PHOTO==='rebuild') return rebuildLogPdf(LOG_ID);
-  if(!PHOTO) return listLogPhotos(LOG_ID);
-  return removeLogPhoto(LOG_ID, PHOTO);
-}
-
 // Current decision items for a log (id/cat/owner/text), applying any pending edits.
 function decisionsForLog(logId, edits){
   var sheet = db().getSheetByName(DECISION_LOG_TAB);
