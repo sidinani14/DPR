@@ -189,8 +189,8 @@ const TARGETS = {
 // Hours rule (avgHrs → hrsScore /10): ≥ 7:55 (475 min) → 10 · 7:00–7:54 → 7 · < 7:00 → 4
 // (5-minute margin from the 8-hour target counts as a full day.)
 const BIO = {
-  'Aaditya Koshti': { days:6, lateCount:1, avgHrs:'06:02', hrsScore:4, punctScore:12, att:[
-    {d:'Mon 6',t:'09:54',s:'P',l:true,n:'44 min late'},{d:'Tue 7',t:'09:08',s:'P',l:false,n:'Short day (02:10)'},{d:'Wed 8',t:'09:07',s:'P',l:false,n:'Short day (03:25)'},{d:'Thu 9',t:'09:04',s:'P',l:false},{d:'Fri 10',t:'09:05',s:'P',l:false},{d:'Sat 11',t:'09:00',s:'P',l:false} ]},
+  'Aaditya Koshti': { days:6, lateCount:1, avgHrs:'08:42', hrsScore:10, punctScore:12, att:[
+    {d:'Mon 6',t:'09:54',s:'P',l:true,n:'44 min late'},{d:'Tue 7',t:'09:08',s:'P',l:false},{d:'Wed 8',t:'09:07',s:'P',l:false},{d:'Thu 9',t:'09:04',s:'P',l:false},{d:'Fri 10',t:'09:05',s:'P',l:false},{d:'Sat 11',t:'09:00',s:'P',l:false} ]},
   'Aashi Agrawal': { days:6, lateCount:4, avgHrs:'08:27', hrsScore:10, punctScore:6, att:[
     {d:'Mon 6',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Tue 7',t:'09:08',s:'P',l:false},{d:'Wed 8',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Thu 9',t:'09:11',s:'P',l:true,n:'1 min late'},{d:'Fri 10',t:'09:13',s:'P',l:true,n:'3 min late'},{d:'Sat 11',t:'09:09',s:'P',l:false} ]},
   'Achal Rathore': { days:5, lateCount:0, avgHrs:'07:44', hrsScore:7, punctScore:15, att:[
@@ -211,7 +211,7 @@ const BIO = {
 
 // ── IMPROVE suggestions (contenteditable in report) ────────
 const IMPROVE = {
-  'Aaditya Koshti': ['Full 6/6 attendance, but hours are well below par (6.0 h avg) with several very short days (2–3.5 h) and a late Monday (09:54). Put in full working days.'],
+  'Aaditya Koshti': ['Full 6/6 attendance and a strong 8.7 h average — only blemish was a late Monday (09:54). Solid week; keep mornings tight and push output.'],
   'Aashi Agrawal': ['Full attendance and a strong 8.4 h average, but four arrivals 1–3 min past the 09:10 grace pulled punctuality down. Leave a few minutes earlier to clear it.'],
   'Achal Rathore': ['Absent Tue; otherwise within the 10:40 shift every day and zero late. Cover the missed day and lift output toward the 72-pt lead target.'],
   'Bhavesh Bhagwat': ['Absent Mon and three late arrivals (incl. Thu 10:07) — tighten mornings. Hours are strong at 9.0 h when in.'],
