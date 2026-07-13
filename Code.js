@@ -5680,7 +5680,7 @@ function getWeeklyProjectDigest(weekStart){
   if(ml){ var mr=ml.getDataRange().getValues();
     for(var i=1;i<mr.length;i++){ if(String(mr[i][15]||'').trim()==='Deleted')continue;
       var k=String(mr[i][4]||'').trim().toLowerCase(); if(!P[k])continue; var d=cellDate(mr[i][1]); touch(k,d);
-      if(inWk(d)) P[k].meetings.push({date:d, type:String(mr[i][3]||''), who:[String(mr[i][6]||''),String(mr[i][7]||'')].filter(Boolean).join(', ')}); } }
+      if(inWk(d)) P[k].meetings.push({date:d, type:String(mr[i][3]||''), hours:parseFloat(mr[i][11])||0, who:[String(mr[i][6]||''),String(mr[i][7]||'')].filter(Boolean).join(', ')}); } }
   var a=s.getSheetByName(ASSIGN_TAB);
   var visitHrs={};   // project|date → hours (from Site Visit/Meeting tasks) for the visit lines
   if(a){ var ar=a.getDataRange().getValues();
@@ -5690,7 +5690,7 @@ function getWeeklyProjectDigest(weekStart){
       var ss=String(ar[i][13]||'').trim(), sd=cellDate(ar[i][14]); touch(k,sd);
       if(isVM){ var wp=parseFloat(ar[i][8])||0; var hrs=(tt==='Site Visit'||tt==='Material Selection')?wp/2:wp; var vd=cellDate(ar[i][9])||sd; if(hrs>0) visitHrs[k+'|'+vd]=(visitHrs[k+'|'+vd]||0)+Math.round(hrs*10)/10; }
       // De-dupe: visit/meeting tasks show under "Site visits", not "Tasks completed"
-      if(ss==='Done'&&inWk(sd)&&!isVM) P[k].tasksDone.push({date:sd, who:String(ar[i][3]||''), task:tt}); } }
+      if(ss==='Done'&&inWk(sd)&&!isVM) P[k].tasksDone.push({date:sd, who:String(ar[i][3]||''), task:tt, desc:[String(ar[i][11]||''),String(ar[i][12]||'')].filter(Boolean).join(' · ')}); } }
   var c=s.getSheetByName(CRM_LOG_TAB);
   if(c){ var cr=c.getDataRange().getValues();
     for(var i=1;i<cr.length;i++){ var k=String(cr[i][6]||'').trim().toLowerCase(); if(!P[k])continue;

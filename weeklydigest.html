@@ -79,7 +79,7 @@ function render(d){
     html+='<div class="page proj"><div class="ph"><span class="pn">'+esc(p.name)+'</span><span class="pstage">'+esc(p.stage||'—')+'</span></div>';
     html+=block('Meetings &amp; site visits', mergeMV(p), m=>'<div class="li"><span class="d">'+shortD(m.date)+'</span> · '+esc(m.type)+(m.hours?' · '+m.hours+' hr'+(m.hours!==1?'s':''):'')+(m.who?' · '+esc(m.who):'')+'</div>');
     html+=block('Site progress', p.progress, x=>'<div class="li"><span class="d">'+shortD(x.date)+'</span> · '+esc(x.text)+'</div>');
-    html+=block('Tasks completed', p.tasksDone, t=>'<div class="li"><span class="d">'+shortD(t.date)+'</span> · '+esc(t.who)+' — '+esc(t.task)+'</div>');
+    html+=block('Tasks completed', p.tasksDone, t=>'<div class="li"><span class="d">'+shortD(t.date)+'</span> · '+esc(t.who)+' — '+(t.desc?'<b>'+esc(t.desc)+'</b> · ':'')+esc(t.task)+'</div>');
     html+=block('Connections', p.connections, c=>'<div class="li"><span class="d">'+shortD(c.date)+'</span> · '+esc(c.type)+' · '+esc(c.by)+(c.notes?' — '+esc(c.notes):'')+'</div>');
     html+=block('Other activities', p.others, c=>'<div class="li"><span class="d">'+shortD(c.date)+'</span> · '+esc(c.type)+' · '+esc(c.by)+'</div>');
     html+=block('Billing', p.billing, b=>'<div class="li"><span class="d">'+shortD(b.date)+'</span> · '+esc(b.event)+'</div>');
