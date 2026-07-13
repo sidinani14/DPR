@@ -191,6 +191,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
 let allTasks=[], statusFilter='all', memberFilter='all', projectFilter='all', dateFilter='', dueFilter='';
+let ROSTER=[];   // full team roster from getLists.allMembers — so members with no tasks yet still show + are assignable
 // Local (IST) date — backend due dates are IST, so never use UTC toISOString here
 function localDateStr(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function weekEndStr(){ const d=new Date(); d.setDate(d.getDate()+(6-d.getDay())); return localDateStr(d); }
@@ -287,7 +288,7 @@ function renderHeatmap() {
   const members = [...new Set(
     [...openTasks, ...doneTasks].map(t=>
       t.assignedTo.split(',').map(a=>a.trim())
-    ).flat()
+    ).flat().concat(ROSTER)
   )].filter(m=>m && m!=='Unassigned' && !EXCLUDED_MEMBERS.includes(m)).sort();
 
   function hmColor(pts, target) {
@@ -618,7 +619,7 @@ async function loadTasks() {
       allTasks=data.tasks||[];
       // Weekly targets come from the TEAM tab (col C) — overrides the hardcoded
       // defaults so a change in the sheet (e.g. Deepak 30→72) reflects here.
-      try { const lists = await listsRes.json(); if (lists && lists.targets) Object.assign(TEAM_TARGETS, lists.targets); } catch(e){}
+      try { const lists = await listsRes.json(); if (lists){ if(lists.targets) Object.assign(TEAM_TARGETS, lists.targets); ROSTER = (lists.allMembers||[]).filter(m=>m && !EXCLUDED_MEMBERS.includes(m)); } } catch(e){}
     }
 
     // Only THIS WEEK's completed+approved tasks stay on the board; older ones drop off.
@@ -638,7 +639,7 @@ async function loadTasks() {
     allTasks.forEach(t => {
       t.assignedTo.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>memberSet.add(a));
     });
-    const members = [...memberSet].filter(m=>!EXCLUDED_MEMBERS.includes(m)).sort();
+    const members = [...new Set([...memberSet, ...ROSTER])].filter(m=>!EXCLUDED_MEMBERS.includes(m)).sort();
     document.getElementById('member-filter').innerHTML='<option value="all">All team</option>'+members.map(m=>`<option value="${m}">${m}</option>`).join('');
     // Restore previous member selection if still valid
     if (prevMember && prevMember !== 'all' && members.includes(prevMember)) {
@@ -812,7 +813,7 @@ async function doUnpark(row){
 
 // ── REASSIGN (lead only) ─────────────────────────────────────
 function allMembers(){
-  return [...new Set(allTasks.flatMap(t=>t.assignedTo.split(',').map(a=>a.trim())).filter(Boolean))]
+  return [...new Set([...allTasks.flatMap(t=>t.assignedTo.split(',').map(a=>a.trim())).filter(Boolean), ...ROSTER])]
     .filter(m=>!EXCLUDED_MEMBERS.includes(m)).sort();
 }
 function memberOpenPts(name){
