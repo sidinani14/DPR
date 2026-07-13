@@ -127,9 +127,14 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
   .edit-btn{display:none;}
   @page{size:297mm 210mm;margin:0;}
   html,body{width:297mm;background:#0F1923;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  /* Lock every page to EXACTLY one landscape sheet so nothing spills onto a blank next page */
-  .page{width:297mm;height:210mm;min-height:210mm;max-height:210mm;margin:0;overflow:hidden;page-break-after:always;break-after:page;page-break-inside:avoid;}
+  /* Each page fills at least one landscape sheet; a page with more content than
+     fits (e.g. a long completed-tasks table) flows onto extra sheets instead of
+     being clipped, so no rows are ever lost when exporting. */
+  .page{width:297mm;min-height:210mm;height:auto;max-height:none;margin:0;overflow:visible;page-break-after:always;break-after:page;}
   .page:last-child{page-break-after:auto;break-after:auto;}
+  /* keep each task row intact across a sheet break and repeat the table header */
+  table.tasks tr{page-break-inside:avoid;break-inside:avoid;}
+  table.tasks thead{display:table-header-group;}
 }
 [contenteditable]{outline:none;cursor:text;border-bottom:1px dashed rgba(245,166,35,0.3);}
 [contenteditable]:focus{background:rgba(245,166,35,0.06);border-radius:3px;}
