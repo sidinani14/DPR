@@ -53,7 +53,7 @@ const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5H
 const MEMBER='Achal Rathore', ROLE='Technical Lead';
 const FROM='2026-05-15', TO='2026-07-11', WINDOW='15 May – 11 July 2026';
 const DAILY_TGT=12, WEEK_TGT=72, JUNIOR_TGT=48, ONTIME_TGT=80, LATE_LABEL='10:30';
-const SCHED=['Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','Nikhar Garg Farm house','BBM Mhow','BBM 140'];
+const SCHED=['Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','BBM Mhow','BBM 140'];
 const ALL_PROJECTS=['Kharat House','Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','Anand Beesani','Stone Gallery Showroom','Dr. Aalok Somani','Highway Resort Bhopal','Nikhar Garg Farm house','Nilesh Lathi','Ritesh Somani Warehouse','BBM Mhow','BBM 140','Rohit Jain'];
 
 // ── Biometric attendance (15 May–11 Jul), present-days avg hrs; absences separate ──
@@ -97,7 +97,8 @@ function stacked(data,o){
     const ah=hh(d.a), bh=hh(d.b);
     if(d.b){s+=`<rect x="${x}" y="${yb-bh}" width="${bw}" height="${bh}" fill="${cb}"/>`;yb-=bh;}
     if(d.a){s+=`<rect x="${x}" y="${yb-ah}" width="${bw}" height="${ah}" rx="2" fill="${ca}"/>`;yb-=ah;}
-    s+=`<text x="${x+bw/2}" y="${yb-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${(d.a+d.b)||''}</text>`;
+    const tot=Math.round((d.a+d.b)*10)/10;
+    s+=`<text x="${x+bw/2}" y="${yb-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${tot?(Number.isInteger(tot)?tot:tot.toFixed(1)):''}</text>`;
     s+=`<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="var(--t3)">${esc(d.l)}</text>`;});
   s+=`</svg>`; return s;
 }
@@ -155,10 +156,10 @@ function renderAttendance(){
 }
 function attInsights(a){
   return `<div style="margin-top:16px">
-   <div class="ins">Late past the ${LATE_LABEL} accommodation on <b>${a.late} of ${a.worked} days (${a.latePct}%)</b> — despite the start time having already been moved to suit him, punctuality is not an exception, it is the norm.</div>
-   <div class="ins">He is in the building about <b>${hm(a.avgSpan)}</b> a day, but only <b>${hm(a.avgHrs)}</b> of that is time in office — the rest goes to <b>lunch/tea breaks averaging ${hm(a.brkAvg)} per day</b> (longest ${hm(a.maxBreak)}). Across the period that is <b>${hm(a.totalBreak)} of break time</b>, roughly <b>${(a.totalBreak/8).toFixed(1)} full working days</b> lost.</div>
-   <div class="ins">Time in office falls short of the 8-hour expectation on <b>${a.under8} of ${a.worked} days</b>. Combined with a late start and breaks split across the middle of the day, the remaining stretch of uninterrupted working time is minimal — which is what a technical lead's output depends on.</div>
-   <div class="ins">Collapse days recur: 4h00 (12 Jun), arrivals of <b>13:19</b> (24 Jun) and <b>14:43</b> (29 Jun), plus <b>${a.absent} absences</b> in the window.</div>
+   <div class="ins">You arrived after ${LATE_LABEL} on <b>${a.late} of ${a.worked} days (${a.latePct}%)</b>. The start time was already moved to ${LATE_LABEL} to suit your circumstances — yet lateness is still the norm rather than the exception.</div>
+   <div class="ins">You are in the building about <b>${hm(a.avgSpan)}</b> a day, but only <b>${hm(a.avgHrs)}</b> of that is time in office — the rest goes to <b>lunch and tea breaks averaging ${hm(a.brkAvg)} a day</b> (longest ${hm(a.maxBreak)}). Across this period that is <b>${hm(a.totalBreak)}</b> of break time — roughly <b>${(a.totalBreak/8).toFixed(1)} full working days</b>.</div>
+   <div class="ins">Your time in office is under the 8-hour expectation on <b>${a.under8} of ${a.worked} days</b>. A late start, plus breaks taken separately through the middle of the day, leaves very little unbroken working time — and sustained focus is exactly what your output as a technical lead depends on.</div>
+   <div class="ins">There is also a pattern of collapsed days: 4h00 on 12 Jun, arrivals of <b>13:19</b> on 24 Jun and <b>14:43</b> on 29 Jun, plus <b>${a.absent} absences</b> in this window.</div>
   </div>`;
 }
 
@@ -195,14 +196,14 @@ function renderLive(d){
       <div><div class="chart-t">Approved points / week</div>${bars(ptsBars,{max:WEEK_TGT*1.2,targets:[WEEK_TGT,JUNIOR_TGT],targetLabels:['Lead '+WEEK_TGT,'Junior '+JUNIOR_TGT],targetColors:['var(--green)','var(--amber)']})}</div>
       <div><div class="chart-t">Planned tasks — on-time (green) vs delayed (red)</div>${stacked(otBars)}</div>
     </div>
-    <div class="ins" style="margin-top:14px">Averages <b>${avgWk.toFixed(0)} pts/week</b> (<b>${(avgWk/6).toFixed(1)} pts/day</b> vs the ${DAILY_TGT}/day target) — ${avgWk<JUNIOR_TGT?`<b>below even the ${JUNIOR_TGT}-pt junior target</b>, let alone `:'against '}his ${WEEK_TGT}-pt lead target (<b>${Math.round((1-avgWk/WEEK_TGT)*100)}% short</b>).</div>
+    <div class="ins" style="margin-top:14px">You averaged <b>${avgWk.toFixed(1)} pts/week</b> (<b>${(avgWk/6).toFixed(1)} pts/day</b> against a ${DAILY_TGT}/day target) — <b>${Math.round((1-avgWk/WEEK_TGT)*100)}% short</b> of your ${WEEK_TGT}-pt target as a technical lead${avgWk<JUNIOR_TGT?`, and <b>below even the ${JUNIOR_TGT}-pt target set for a junior</b>`:''}.</div>
   </section>`;
 
   // planning & accountability — the core issue
   const lateRows=late.length?late.slice(0,12).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n">${esc(t.doneDate)}</td><td class="n"><span class="pill ${t.daysLate>14?'bad':'warn'}">${t.daysLate}d late</span></td></tr>`).join(''):'<tr><td colspan="5" style="color:var(--t3)">No planned tasks completed late in this window.</td></tr>';
   const overRows=over.length?over.slice(0,8).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n"><span class="pill bad">${t.daysOverdue}d overdue</span></td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--t3)">None open past deadline.</td></tr>';
   let planSec=`<section><h2>Planning · Planned vs Unplanned Work</h2>
-    <div class="h2sub">Where his points actually come from — and why the headline on-time number is misleading</div>
+    <div class="h2sub">Where your points actually come from — and why your on-time number is misleading</div>
     <div class="tiles" style="margin-bottom:16px">
       <div class="tile"><div class="v" style="color:var(--blue)">${plPts.toFixed(0)}</div><div class="l">Points — planned</div><div class="x">${T.plannedTasks||0} tasks assigned ahead</div></div>
       <div class="tile"><div class="v" style="color:var(--amber)">${unPts.toFixed(0)}</div><div class="l">Points — unplanned</div><div class="x">${T.unplannedTasks||0} self-logged in DPR</div></div>
@@ -210,8 +211,8 @@ function renderLive(d){
       <div class="tile"><div class="v" style="color:${late.length?'var(--red)':'var(--green)'}">${late.length}</div><div class="l">Planned tasks finished late</div><div class="x">${over.length} still open past due</div></div>
     </div>
     <div><div class="chart-t">Points per week — planned (blue) vs unplanned self-logged (amber)</div>${stacked(splitBars,{ca:'var(--blue)',cb:'var(--amber)'})}</div>
-    <div class="ins" style="margin-top:14px"><b>Why the on-time % cannot be taken at face value.</b> When work is logged as <i>unplanned</i> in the DPR, the system records it with <b>deadline = the day it was completed</b> — so it is <b>always counted on-time by construction</b>. <b>${unPct}% of his points (${unPts.toFixed(0)} pts / ${T.unplannedTasks||0} tasks)</b> came in this way. The ${onPct}% above is therefore computed on <b>planned tasks only</b>; the unplanned share is excluded.</div>
-    <div class="ins">Because the work is not planned in advance, there is <b>no forward view of how loaded or free he is</b> — the core management problem. Tasks appear only after they are done.</div>
+    <div class="ins" style="margin-top:14px"><b>Why your on-time percentage cannot be taken at face value.</b> When you log work as <i>unplanned</i> in the DPR, the system records it with <b>deadline = the day you completed it</b> — so it is counted on-time automatically, by construction. <b>${unPct}% of your points (${unPts.toFixed(1)} pts across ${T.unplannedTasks||0} tasks)</b> came in this way. The ${onPct}% above is therefore measured on <b>planned tasks only</b>; unplanned work is excluded, because it cannot be late.</div>
+    <div class="ins">This is the central issue. Because the work is not planned in advance, <b>there is no forward view of how loaded or free you are</b>. Tasks only become visible after they are already done, so work cannot be distributed, deadlines cannot be committed to clients, and no one — including you — can tell whether your week is full or empty until it is over.</div>
     <div style="margin-top:16px"><div class="chart-t">Planned tasks completed after their deadline</div>
       <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Completed</th><th class="n">Delay</th></tr></thead><tbody>${lateRows}</tbody></table></div></div>
     <div style="margin-top:14px"><div class="chart-t">Still open past deadline</div>
@@ -239,28 +240,26 @@ function renderLive(d){
   let auditSec=`<section><h2>Site-Visit Schedule Audit</h2>
     <div class="h2sub">Required: a site visit every 15 days to each of the 7 scheduled projects · gaps &gt; 15 days are missed visits · <b>in-office meetings and material selections do not count</b></div>
     <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Visits</th><th class="n">Expected</th><th class="n">Status</th><th>Gaps &gt; 15 days</th></tr></thead><tbody>${ar}</tbody></table></div>
-    <div class="ins" style="margin-top:12px">Counts <b>Site Visit records only</b> (logged site-visit tasks and site-visit logs where he attended) — meetings and material selections held in office are excluded, as they do not satisfy the 15-day site-visit requirement. Any project showing a gap missed its cadence.</div></section>`;
+    <div class="ins" style="margin-top:12px">This counts <b>site visits only</b> (site-visit tasks and site-visit logs you attended). Meetings and material selections held in the office are excluded — they do not satisfy the 15-day site-visit requirement. Every project showing a gap is one where you missed the cadence you are responsible for.</div></section>`;
 
   // dpr + reliability
   const dprBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:w.dprDays||0,t:(w.dprDays||0)+'',c:(w.dprDays||0)>=5?'var(--green)':(w.dprDays||0)>=3?'var(--amber)':'var(--red)'};});
   const relBars=order.map(k=>{const w=wi[k]||{};const v=(w.relLate||0)+2*(w.relWnd||0);return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v,t:v+'',c:v?'var(--red)':'var(--green)'};});
-  const batch=(dprInfo.batchDays||[]);
-  const batchRows=batch.length?batch.map(b=>`<tr><td class="n">${esc(b.date)}</td><td class="n"><span class="pill bad">${b.count} reports</span></td><td>${esc((b.times||[]).join(' · '))}</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--t3)">No same-day batches detected.</td></tr>';
+  const dprDays=dprInfo.distinctDays||0, workDays=nWeeks*6;
   let dprSec=`<section><h2>DPR Consistency &amp; Reliability</h2>
-    <div class="h2sub">Distinct days a report was filed (of 6/week) · reliability penalty (late −1, work-not-done −2)</div>
+    <div class="h2sub">Days a daily report was filed (of 6/week) · reliability penalty (late −1, work-not-done −2)</div>
     <div class="tiles" style="margin-bottom:16px">
-      <div class="tile"><div class="v" style="color:${dprInfo.distinctDays>=nWeeks*5?'var(--green)':'var(--red)'}">${dprInfo.distinctDays||0}</div><div class="l">Distinct days filed</div><div class="x">of ${nWeeks*6} working days</div></div>
-      <div class="tile"><div class="v">${dprInfo.submissions||0}</div><div class="l">Total submissions</div><div class="x">${(dprInfo.submissions||0)>(dprInfo.distinctDays||0)?'more submissions than days':'1 per day'}</div></div>
-      <div class="tile"><div class="v" style="color:${batch.length?'var(--red)':'var(--green)'}">${batch.length}</div><div class="l">Batch-filed days</div><div class="x">&gt;1 report in one sitting</div></div>
-      <div class="tile"><div class="v" style="color:${relTot?'var(--red)':'var(--green)'}">${relTot}</div><div class="l">Reliability penalty</div><div class="x">across ${nWeeks} weeks</div></div>
+      <div class="tile"><div class="v" style="color:${dprDays>=workDays*0.85?'var(--green)':'var(--red)'}">${dprDays}</div><div class="l">Days reported</div><div class="x">of ${workDays} working days</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${workDays-dprDays}</div><div class="l">Days with no report</div><div class="x">${Math.round((workDays-dprDays)/workDays*100)}% of the period</div></div>
+      <div class="tile"><div class="v" style="color:${relTot?'var(--red)':'var(--green)'}">−${relTot}</div><div class="l">Reliability penalty</div><div class="x">late −1 · work-not-done −2</div></div>
+      <div class="tile"><div class="v">${nWeeks}</div><div class="l">Weeks reviewed</div><div class="x">${WINDOW}</div></div>
     </div>
     <div class="grid2">
-      <div><div class="chart-t">Distinct DPR days / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
+      <div><div class="chart-t">Days reported / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
       <div><div class="chart-t">Reliability penalty / week (lower is better)</div>${bars(relBars,{color:'var(--red)'})}</div>
     </div>
-    <div class="ins" style="margin-top:12px">Reports were filed on <b>${dprInfo.distinctDays||0} distinct days</b> out of ${nWeeks*6} working days${(dprInfo.submissions||0)>(dprInfo.distinctDays||0)?`, from <b>${dprInfo.submissions} submissions</b> — i.e. multiple reports entered in a single sitting rather than daily`:''}. Reports are <b>not filed in real time</b>, so mid-week there is no live view of what he is working on or how loaded he is.</div>
-    ${batch.length?`<div style="margin-top:14px"><div class="chart-t">Days where several reports were filed at once</div>
-      <div style="overflow-x:auto"><table><thead><tr><th class="n">Date</th><th class="n">Reports</th><th>Submission times</th></tr></thead><tbody>${batchRows}</tbody></table></div></div>`:''}
+    <div class="ins" style="margin-top:12px">You filed a report on <b>${dprDays} of ${workDays} working days</b>${relTot?`, and carry a reliability penalty of <b>−${relTot}</b> across the period (tasks missed past their deadline, or work a lead had to take off you and reassign)`:''}.</div>
+    <div class="ins">Just as important as the count: the daily report is <b>not being filed each day as the work happens</b> — it is written up later, in one go. That defeats its purpose. The DPR exists so the studio can see <b>during</b> the week what you are working on and how loaded you are; filled in retrospectively, it becomes a record of the past instead of a live picture, and nobody can plan around you.</div>
   </section>`;
 
   document.getElementById('live').innerHTML = out+planSec+projSec+auditSec+dprSec;
@@ -271,6 +270,22 @@ function render(){
   const app=document.getElementById('app'); app.style.display='block';
   app.innerHTML=`
     <div class="rh"><div><h1>Performance Review — ${esc(MEMBER)}</h1><div class="sub">${esc(ROLE)} · ${WINDOW} · Confidential</div></div><div class="badge">Under Review</div></div>
+    <section>
+      <h2>Achal — please read this in full</h2>
+      <div class="h2sub">${WINDOW}</div>
+      <div style="font-size:13.5px;color:var(--t2);line-height:1.65">
+        This review covers your work as <b>Technical Lead</b> from <b>${WINDOW}</b>. Every number in it comes straight from
+        your own biometric attendance record and the studio's task data — none of it is opinion, and none of it has been
+        adjusted. Where a measure flatters you, that is said plainly too.
+        <br><br>
+        You are the studio's technical lead. That role carries a <b>${WEEK_TGT}-point weekly target</b> and the responsibility
+        to plan work, visit your sites, and be someone the team and the clients can rely on. The pages below set out, honestly,
+        where that has and has not happened — on <b>attendance and punctuality</b>, <b>hours actually in office</b>,
+        <b>output against target</b>, <b>planning</b>, <b>site visits</b>, and <b>reliability</b>.
+        <br><br>
+        Read it carefully. The purpose is not to catalogue faults — it is to show you exactly what has to change, and by how much.
+      </div>
+    </section>
     ${renderAttendance()}
     <div id="live"><section><div class="loading">Loading task, project, site-visit &amp; DPR data from the sheet…</div></section></div>
     <div class="foot">© Ideaform Design Studio · Performance Review · ${WINDOW} · Confidential — for internal HR use</div>`;

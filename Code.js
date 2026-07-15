@@ -4789,7 +4789,7 @@ function getMemberReview(name, fromStr, toStr) {
   });
 
   // every-15-day visit audit for the scheduled projects
-  var SCHED = ['Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','Nikhar Garg Farm house','BBM Mhow','BBM 140'];
+  var SCHED = ['Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','BBM Mhow','BBM 140'];
   function dayGap(a,b){ return Math.round((new Date(b+'T00:00:00Z') - new Date(a+'T00:00:00Z'))/86400000); }
   var totalDays = dayGap(from, to) + 1;
   var audit = SCHED.map(function(pn){
