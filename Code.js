@@ -110,7 +110,8 @@ function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase
 // with the dashboard) — callable by managers only.
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
-  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1 };
+  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1,
+  getMemberReview:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -405,6 +406,7 @@ function doGet(e) {
   if (action === 'getOpenTasksForMember')    return safeRespond(function() { return getOpenTasksForMember(member); });
   if (action === 'getNotifications')         return safeRespond(function() { return getNotificationsForMember(member); });
   if (action === 'getWeeklyStats')           return safeRespond(function() { return getWeeklyStats(p.weekStart||''); });
+  if (action === 'getMemberReview')          return safeRespond(function() { return getMemberReview(p.member||'', p.from||'', p.to||''); });
   if (action === 'getProjectStats')          return safeRespond(getProjectStats);
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
@@ -449,6 +451,7 @@ function doPost(e) {
     if (data.action === 'getOpenTasksForMember') return respond(getOpenTasksForMember(data.member||''));
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
     if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
+    if (data.action === 'getMemberReview')        return respond(getMemberReview(data.member||'', data.from||'', data.to||''));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
@@ -4652,6 +4655,105 @@ function getWeeklyStats(weekStart) {
   }
 
   return {stats: results, weekStart: mon, weekEnd: sat};
+}
+
+// ════════════════════════════════════════════════════════════════
+// getMemberReview — one member across a date range, for the individual
+// performance-review report. Weekly trend (output/on-time/delayed/DPR/
+// reliability) + project-wise rollup + site-visit dates + every-15-day
+// visit audit + client-communication counts. Manager-only.
+// ════════════════════════════════════════════════════════════════
+function getMemberReview(name, fromStr, toStr) {
+  name = String(name || '').trim();
+  if (!name) return {error: 'no member'};
+  var s = db();
+  var from = fromStr || dateStr(mondayOf(new Date()));
+  var to   = toStr   || dateStr();
+  var today = dateStr();
+
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  var asRows  = asSheet ? asSheet.getDataRange().getValues() : [];
+  var asHeaders = asRows[0] ? asRows[0].map(function(h){ return String(h||'').trim(); }) : [];
+  var is23  = asHeaders.length >= 23 || asHeaders.indexOf('Actual Completion Date') > -1;
+  var C_LAPPR = is23 ? 16 : 15, C_SDT = 14, C_ADT = is23 ? 15 : -1, C_DL = 10;
+
+  function monday(ds){ var d=new Date(ds+'T00:00:00Z'); var wd=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-wd); return d.toISOString().slice(0,10); }
+  var weeks = {};
+  function wk(ds){ var k=monday(ds); if(!weeks[k]) weeks[k]={week:k, approvedPts:0, onTime:0, delayed:0, dprDays:0, relLate:0, relWnd:0}; return weeks[k]; }
+  var projects = {};
+  function proj(p){ if(!projects[p]) projects[p]={project:p, tasks:0, pts:0, onTime:0, delayed:0, visits:[], comms:0}; return projects[p]; }
+  var visitDates = {};
+  function addVisit(p, d){ if(!p||!d) return; if(!visitDates[p]) visitDates[p]=[]; visitDates[p].push(d); }
+
+  // TASK_ASSIGNMENTS — completed/approved output + reliability, one pass
+  for (var i=1; i<asRows.length; i++){
+    var r = asRows[i];
+    if (String(r[3]||'').trim() !== name) continue;
+    var tt = String(r[4]||'').trim();
+    var pname = String(r[2]||'').trim();
+    var pts = parseFloat(r[8]) || 0;
+    var appr = String(r[C_LAPPR]||'').trim() === 'Yes';
+    var done = String(r[13]||'').trim() === 'Done';
+    var doneDate = (C_ADT>-1 ? cellDate(r[C_ADT]) : '') || cellDate(r[C_SDT]);
+    var dl = cellDate(r[C_DL]);
+    if (done && appr && doneDate >= from && doneDate <= to){
+      var onT = dl && doneDate <= dl;
+      var w = wk(doneDate); w.approvedPts += pts; if(onT) w.onTime++; else w.delayed++;
+      var pr = proj(pname); pr.tasks++; pr.pts += pts; if(onT) pr.onTime++; else pr.delayed++;
+      if (isVisitTask(tt)) addVisit(pname, doneDate);
+    }
+    if (dl && dl >= from && dl <= to){
+      var self = String(r[13]||'').trim();
+      if (self === 'Work Not Done') { wk(dl).relWnd++; }
+      else if (dl < today){ var ot = appr && doneDate && doneDate <= dl; if(!ot) wk(dl).relLate++; }
+    }
+  }
+
+  // DPR days per week
+  var sum = s.getSheetByName(SUMMARY_TAB);
+  if (sum){ var sr = sum.getDataRange().getValues();
+    for (var j=1; j<sr.length; j++){ if(String(sr[j][2]||'').trim()!==name) continue; var d=cellDate(sr[j][0]); if(d>=from && d<=to) wk(d).dprDays++; } }
+
+  // Site visits from MEETING_LOG (member is an attendee or the logger)
+  var ml = s.getSheetByName(MEETING_LOG_TAB);
+  if (ml){ var mr = ml.getDataRange().getValues(); var nl = name.toLowerCase();
+    for (var k=1; k<mr.length; k++){ if(String(mr[k][15]||'').trim()==='Deleted') continue;
+      var who = (String(mr[k][6]||'')+','+String(mr[k][5]||'')).toLowerCase();
+      if (who.indexOf(nl) === -1) continue;
+      var md = cellDate(mr[k][1]); if(md<from || md>to) continue;
+      addVisit(String(mr[k][4]||'').trim(), md);
+    } }
+
+  // Communication from CRM_LOG (rows the member logged)
+  var cl = s.getSheetByName(CRM_LOG_TAB);
+  if (cl){ var cr = cl.getDataRange().getValues();
+    for (var m=1; m<cr.length; m++){ if(String(cr[m][3]||'').trim()!==name) continue; var cd=cellDate(cr[m][2]); if(cd<from||cd>to) continue;
+      var cp=String(cr[m][6]||'').trim(); if(cp) proj(cp).comms++; } }
+
+  // fold de-duped visit dates into projects
+  Object.keys(visitDates).forEach(function(pn){
+    var seen={}, uniq=[]; visitDates[pn].sort().forEach(function(d){ if(!seen[d]){seen[d]=1;uniq.push(d);} });
+    proj(pn).visits = uniq; visitDates[pn]=uniq;
+  });
+
+  // every-15-day visit audit for the scheduled projects
+  var SCHED = ['Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','Nikhar Garg Farm house','BBM Mhow','BBM 140'];
+  function dayGap(a,b){ return Math.round((new Date(b+'T00:00:00Z') - new Date(a+'T00:00:00Z'))/86400000); }
+  var totalDays = dayGap(from, to) + 1;
+  var audit = SCHED.map(function(pn){
+    var v = (visitDates[pn]||[]).slice().sort();
+    var gaps = [], prev = from;
+    v.forEach(function(d){ if(dayGap(prev,d)>15) gaps.push({from:prev, to:d, days:dayGap(prev,d)}); prev=d; });
+    if (dayGap(prev,to)>15) gaps.push({from:prev, to:to, days:dayGap(prev,to)});
+    return {project:pn, visits:v, count:v.length, expected:Math.floor(totalDays/15), missedGaps:gaps};
+  });
+
+  return {
+    member:name, from:from, to:to,
+    weeks:    Object.keys(weeks).sort().map(function(k){ return weeks[k]; }),
+    projects: Object.keys(projects).sort().map(function(k){ return projects[k]; }),
+    visitAudit: audit
+  };
 }
 
 // ════════════════════════════════════════════════════════════════
