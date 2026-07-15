@@ -4679,11 +4679,20 @@ function getMemberReview(name, fromStr, toStr) {
 
   function monday(ds){ var d=new Date(ds+'T00:00:00Z'); var wd=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-wd); return d.toISOString().slice(0,10); }
   var weeks = {};
-  function wk(ds){ var k=monday(ds); if(!weeks[k]) weeks[k]={week:k, approvedPts:0, onTime:0, delayed:0, dprDays:0, relLate:0, relWnd:0}; return weeks[k]; }
+  function wk(ds){ var k=monday(ds); if(!weeks[k]) weeks[k]={week:k, approvedPts:0, plannedPts:0, unplannedPts:0,
+    onTime:0, delayed:0, plannedTasks:0, unplannedTasks:0, dprDays:0, dprSubs:0, relLate:0, relWnd:0}; return weeks[k]; }
   var projects = {};
-  function proj(p){ if(!projects[p]) projects[p]={project:p, tasks:0, pts:0, onTime:0, delayed:0, visits:[], comms:0}; return projects[p]; }
+  function proj(p){ if(!projects[p]) projects[p]={project:p, tasks:0, pts:0, plannedPts:0, unplannedPts:0,
+    onTime:0, delayed:0, visits:[], comms:0}; return projects[p]; }
   var visitDates = {};
   function addVisit(p, d){ if(!p||!d) return; if(!visitDates[p]) visitDates[p]=[]; visitDates[p].push(d); }
+  // Only a real SITE VISIT counts toward the 15-day cadence — meetings and
+  // material selections happen in office and do not qualify.
+  function isSiteVisitOnly(t){ var x=String(t||'').trim();
+    return x==='Site Visit' || VISIT_TYPES_ARCH.indexOf(x)>-1; }
+
+  var lateDetail = [], overdueOpen = [];
+  var tot = {plannedTasks:0, unplannedTasks:0, plannedPts:0, unplannedPts:0, plannedOnTime:0, plannedDelayed:0};
 
   // TASK_ASSIGNMENTS — completed/approved output + reliability, one pass
   for (var i=1; i<asRows.length; i++){
@@ -4696,28 +4705,71 @@ function getMemberReview(name, fromStr, toStr) {
     var done = String(r[13]||'').trim() === 'Done';
     var doneDate = (C_ADT>-1 ? cellDate(r[C_ADT]) : '') || cellDate(r[C_SDT]);
     var dl = cellDate(r[C_DL]);
+    // Unplanned = self-logged through the DPR (createDoneTask stamps the note and
+    // sets Deadline = completion date, which would otherwise always read "on time").
+    var notes = String(r[20]||'').trim();
+    var by    = String(r[21]||'').trim();
+    var unplanned = notes.indexOf('Unplanned task') === 0 ||
+                    (by === name && dl && doneDate && dl === doneDate);
+
     if (done && appr && doneDate >= from && doneDate <= to){
-      var onT = dl && doneDate <= dl;
-      var w = wk(doneDate); w.approvedPts += pts; if(onT) w.onTime++; else w.delayed++;
-      var pr = proj(pname); pr.tasks++; pr.pts += pts; if(onT) pr.onTime++; else pr.delayed++;
-      if (isVisitTask(tt)) addVisit(pname, doneDate);
+      var w = wk(doneDate); w.approvedPts += pts;
+      var pr = proj(pname); pr.tasks++; pr.pts += pts;
+      if (unplanned){
+        w.unplannedPts += pts; w.unplannedTasks++; pr.unplannedPts += pts;
+        tot.unplannedTasks++; tot.unplannedPts += pts;
+      } else {
+        var onT = dl && doneDate <= dl;
+        w.plannedPts += pts; w.plannedTasks++; pr.plannedPts += pts;
+        tot.plannedTasks++; tot.plannedPts += pts;
+        if (onT){ w.onTime++; pr.onTime++; tot.plannedOnTime++; }
+        else {
+          w.delayed++; pr.delayed++; tot.plannedDelayed++;
+          if (dl) lateDetail.push({project:pname, task:tt, deadline:dl, doneDate:doneDate,
+            daysLate: Math.round((new Date(doneDate+'T00:00:00Z')-new Date(dl+'T00:00:00Z'))/86400000)});
+        }
+      }
+      if (isSiteVisitOnly(tt)) addVisit(pname, doneDate);
+    }
+    // still open past its deadline
+    if (!done && dl && dl < today && dl >= from){
+      overdueOpen.push({project:pname, task:tt, deadline:dl,
+        daysOverdue: Math.round((new Date(today+'T00:00:00Z')-new Date(dl+'T00:00:00Z'))/86400000)});
     }
     if (dl && dl >= from && dl <= to){
       var self = String(r[13]||'').trim();
       if (self === 'Work Not Done') { wk(dl).relWnd++; }
-      else if (dl < today){ var ot = appr && doneDate && doneDate <= dl; if(!ot) wk(dl).relLate++; }
+      else if (dl < today){ var ot2 = appr && doneDate && doneDate <= dl; if(!ot2) wk(dl).relLate++; }
     }
   }
+  lateDetail.sort(function(a,b){ return b.daysLate - a.daysLate; });
+  overdueOpen.sort(function(a,b){ return b.daysOverdue - a.daysOverdue; });
 
-  // DPR days per week
+  // DPR — count DISTINCT days (not submissions). Every DPR is stamped with the
+  // submission date, so batch-filing several reports in one sitting would
+  // otherwise read as several "DPR days".
+  var dprByDate = {};
   var sum = s.getSheetByName(SUMMARY_TAB);
   if (sum){ var sr = sum.getDataRange().getValues();
-    for (var j=1; j<sr.length; j++){ if(String(sr[j][2]||'').trim()!==name) continue; var d=cellDate(sr[j][0]); if(d>=from && d<=to) wk(d).dprDays++; } }
+    for (var j=1; j<sr.length; j++){ if(String(sr[j][2]||'').trim()!==name) continue;
+      var d=cellDate(sr[j][0]); if(d<from || d>to) continue;
+      if(!dprByDate[d]) dprByDate[d]=[];
+      dprByDate[d].push(String(sr[j][1]||''));   // B = submission time HH:MM
+      wk(d).dprSubs++;
+    } }
+  Object.keys(dprByDate).forEach(function(d){ wk(d).dprDays++; });   // 1 per distinct day
+  var dprDistinct = Object.keys(dprByDate).length;
+  var dprSubs = 0, batchDays = [];
+  Object.keys(dprByDate).sort().forEach(function(d){
+    var t = dprByDate[d]; dprSubs += t.length;
+    if (t.length > 1) batchDays.push({date:d, count:t.length, times:t});
+  });
 
-  // Site visits from MEETING_LOG (member is an attendee or the logger)
+  // Site visits from MEETING_LOG — Site Visit type only (member attended/logged)
   var ml = s.getSheetByName(MEETING_LOG_TAB);
   if (ml){ var mr = ml.getDataRange().getValues(); var nl = name.toLowerCase();
     for (var k=1; k<mr.length; k++){ if(String(mr[k][15]||'').trim()==='Deleted') continue;
+      if (String(mr[k][3]||'').trim() !== 'Site Visit') continue;   // exclude in-office meetings
       var who = (String(mr[k][6]||'')+','+String(mr[k][5]||'')).toLowerCase();
       if (who.indexOf(nl) === -1) continue;
       var md = cellDate(mr[k][1]); if(md<from || md>to) continue;
@@ -4752,7 +4804,11 @@ function getMemberReview(name, fromStr, toStr) {
     member:name, from:from, to:to,
     weeks:    Object.keys(weeks).sort().map(function(k){ return weeks[k]; }),
     projects: Object.keys(projects).sort().map(function(k){ return projects[k]; }),
-    visitAudit: audit
+    visitAudit: audit,
+    totals: tot,                       // planned vs unplanned tasks + pts, planned on-time/delayed
+    lateDetail: lateDetail.slice(0,25), // planned tasks finished after deadline, worst first
+    overdueOpen: overdueOpen.slice(0,25),
+    dpr: { distinctDays: dprDistinct, submissions: dprSubs, batchDays: batchDays }
   };
 }
 

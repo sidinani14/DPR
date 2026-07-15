@@ -88,14 +88,15 @@ function bars(data, o){
 }
 // stacked (on-time green / delayed red)
 function stacked(data,o){
-  o=o||{}; const n=data.length,bw=30,gap=22,padL=20,padB=26,padT=10,H=170; const W=padL+n*(bw+gap)+10;
+  o=o||{}; const ca=o.ca||'var(--green)', cb=o.cb||'var(--red)';
+  const n=data.length,bw=30,gap=22,padL=20,padB=26,padT=10,H=170; const W=padL+n*(bw+gap)+10;
   let max=Math.max.apply(null,data.map(d=>d.a+d.b).concat([1]))*1.12;
   const hh=v=>(H-padT-padB)*(v/max);
   let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
   data.forEach((d,i)=>{const x=padL+i*(bw+gap); let yb=H-padB;
     const ah=hh(d.a), bh=hh(d.b);
-    if(d.b){s+=`<rect x="${x}" y="${yb-bh}" width="${bw}" height="${bh}" fill="var(--red)"/>`;yb-=bh;}
-    if(d.a){s+=`<rect x="${x}" y="${yb-ah}" width="${bw}" height="${ah}" rx="2" fill="var(--green)"/>`;yb-=ah;}
+    if(d.b){s+=`<rect x="${x}" y="${yb-bh}" width="${bw}" height="${bh}" fill="${cb}"/>`;yb-=bh;}
+    if(d.a){s+=`<rect x="${x}" y="${yb-ah}" width="${bw}" height="${ah}" rx="2" fill="${ca}"/>`;yb-=ah;}
     s+=`<text x="${x+bw/2}" y="${yb-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${(d.a+d.b)||''}</text>`;
     s+=`<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="var(--t3)">${esc(d.l)}</text>`;});
   s+=`</svg>`; return s;
@@ -150,31 +151,56 @@ function attInsights(a){
 function renderLive(d){
   const weeks=d.weeks||[], projects=(d.projects||[]), audit=d.visitAudit||[];
   // index weeks by monday for aligned bars over the ATT week list
+  const T=d.totals||{}, dprInfo=d.dpr||{}, late=d.lateDetail||[], over=d.overdueOpen||[];
   const wi={}; weeks.forEach(w=>wi[w.week]=w);
   const order=ATT.map(w=>w.week);
-  const ptsBars=order.map(k=>{const w=wi[k]||{};const v=w.approvedPts||0;return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:+v.toFixed(1),t:v.toFixed(0),c:v>=WEEK_TGT?'var(--green)':v>=JUNIOR_TGT?'var(--amber)':'var(--red)'};});
-  const otBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',a:w.onTime||0,b:w.delayed||0};});
+  const lbl=k=>dd(ATT.find(x=>x.week===k).daily[0].date)+'';
+  const ptsBars=order.map(k=>{const w=wi[k]||{};const v=w.approvedPts||0;return {l:lbl(k),v:+v.toFixed(1),t:v.toFixed(0),c:v>=WEEK_TGT?'var(--green)':v>=JUNIOR_TGT?'var(--amber)':'var(--red)'};});
+  const otBars=order.map(k=>{const w=wi[k]||{};return {l:lbl(k),a:w.onTime||0,b:w.delayed||0};});
+  const splitBars=order.map(k=>{const w=wi[k]||{};return {l:lbl(k),a:+(w.plannedPts||0).toFixed(1),b:+(w.unplannedPts||0).toFixed(1)};});
   const totalPts=weeks.reduce((s,w)=>s+(w.approvedPts||0),0);
-  const totOn=weeks.reduce((s,w)=>s+(w.onTime||0),0), totDel=weeks.reduce((s,w)=>s+(w.delayed||0),0);
-  const onPct=(totOn+totDel)?Math.round(totOn/(totOn+totDel)*100):0;
+  const pOn=T.plannedOnTime||0, pDel=T.plannedDelayed||0;
+  const onPct=(pOn+pDel)?Math.round(pOn/(pOn+pDel)*100):0;
+  const plPts=T.plannedPts||0, unPts=T.unplannedPts||0;
+  const unPct=totalPts?Math.round(unPts/totalPts*100):0;
   const nWeeks=order.length, avgWk=totalPts/nWeeks;
   const dprTot=weeks.reduce((s,w)=>s+(w.dprDays||0),0);
   const relTot=weeks.reduce((s,w)=>s+(w.relLate||0)+2*(w.relWnd||0),0);
 
   // output section
   let out=`<section><h2>Output &amp; Task Completion</h2>
-    <div class="h2sub">Approved points per week vs the ${WEEK_TGT}-pt lead target (and the ${JUNIOR_TGT}-pt junior target) · on-time vs delayed</div>
+    <div class="h2sub">Approved points per week vs the ${WEEK_TGT}-pt lead target (and the ${JUNIOR_TGT}-pt junior target)</div>
     <div class="tiles" style="margin-bottom:16px">
       <div class="tile"><div class="v" style="color:${avgWk>=WEEK_TGT?'var(--green)':'var(--red)'}">${avgWk.toFixed(0)}</div><div class="l">Avg pts / week</div><div class="x">target ${WEEK_TGT} · junior ${JUNIOR_TGT}</div></div>
-      <div class="tile"><div class="v">${Math.round(avgWk/6)}</div><div class="l">Avg pts / day</div><div class="x">target ${DAILY_TGT}/day</div></div>
-      <div class="tile"><div class="v" style="color:${onPct>=ONTIME_TGT?'var(--green)':'var(--red)'}">${onPct}%</div><div class="l">On-time delivery</div><div class="x">target ${ONTIME_TGT}% · ${totDel} delayed</div></div>
+      <div class="tile"><div class="v">${(avgWk/6).toFixed(1)}</div><div class="l">Avg pts / day</div><div class="x">target ${DAILY_TGT}/day</div></div>
+      <div class="tile"><div class="v" style="color:${onPct>=ONTIME_TGT?'var(--green)':'var(--red)'}">${onPct}%</div><div class="l">On-time — planned only</div><div class="x">${pOn} on-time · ${pDel} delayed · target ${ONTIME_TGT}%</div></div>
       <div class="tile"><div class="v">${totalPts.toFixed(0)}</div><div class="l">Total approved pts</div><div class="x">${nWeeks} weeks</div></div>
     </div>
     <div class="grid2">
       <div><div class="chart-t">Approved points / week</div>${bars(ptsBars,{max:WEEK_TGT*1.2,targets:[WEEK_TGT,JUNIOR_TGT],targetLabels:['Lead '+WEEK_TGT,'Junior '+JUNIOR_TGT],targetColors:['var(--green)','var(--amber)']})}</div>
-      <div><div class="chart-t">Tasks on-time (green) vs delayed (red)</div>${stacked(otBars)}</div>
+      <div><div class="chart-t">Planned tasks — on-time (green) vs delayed (red)</div>${stacked(otBars)}</div>
     </div>
-    <div class="ins" style="margin-top:14px">Averages <b>${avgWk.toFixed(0)} pts/week</b> — ${avgWk<JUNIOR_TGT?`<b>below even the ${JUNIOR_TGT}-pt junior target</b>, and `:''}${Math.round((1-avgWk/WEEK_TGT)*100)}% under his ${WEEK_TGT}-pt lead target. On-time delivery ${onPct}% vs the ${ONTIME_TGT}% target${onPct<ONTIME_TGT?' — largely because work is not planned ahead, so deadlines are set loosely or missed':''}.</div>
+    <div class="ins" style="margin-top:14px">Averages <b>${avgWk.toFixed(0)} pts/week</b> (<b>${(avgWk/6).toFixed(1)} pts/day</b> vs the ${DAILY_TGT}/day target) — ${avgWk<JUNIOR_TGT?`<b>below even the ${JUNIOR_TGT}-pt junior target</b>, let alone `:'against '}his ${WEEK_TGT}-pt lead target (<b>${Math.round((1-avgWk/WEEK_TGT)*100)}% short</b>).</div>
+  </section>`;
+
+  // planning & accountability — the core issue
+  const lateRows=late.length?late.slice(0,12).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n">${esc(t.doneDate)}</td><td class="n"><span class="pill ${t.daysLate>14?'bad':'warn'}">${t.daysLate}d late</span></td></tr>`).join(''):'<tr><td colspan="5" style="color:var(--t3)">No planned tasks completed late in this window.</td></tr>';
+  const overRows=over.length?over.slice(0,8).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n"><span class="pill bad">${t.daysOverdue}d overdue</span></td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--t3)">None open past deadline.</td></tr>';
+  let planSec=`<section><h2>Planning · Planned vs Unplanned Work</h2>
+    <div class="h2sub">Where his points actually come from — and why the headline on-time number is misleading</div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:var(--blue)">${plPts.toFixed(0)}</div><div class="l">Points — planned</div><div class="x">${T.plannedTasks||0} tasks assigned ahead</div></div>
+      <div class="tile"><div class="v" style="color:var(--amber)">${unPts.toFixed(0)}</div><div class="l">Points — unplanned</div><div class="x">${T.unplannedTasks||0} self-logged in DPR</div></div>
+      <div class="tile"><div class="v" style="color:${unPct>40?'var(--red)':'var(--amber)'}">${unPct}%</div><div class="l">Output that was unplanned</div><div class="x">never visible in advance</div></div>
+      <div class="tile"><div class="v" style="color:${late.length?'var(--red)':'var(--green)'}">${late.length}</div><div class="l">Planned tasks finished late</div><div class="x">${over.length} still open past due</div></div>
+    </div>
+    <div><div class="chart-t">Points per week — planned (blue) vs unplanned self-logged (amber)</div>${stacked(splitBars,{ca:'var(--blue)',cb:'var(--amber)'})}</div>
+    <div class="ins" style="margin-top:14px"><b>Why the on-time % cannot be taken at face value.</b> When work is logged as <i>unplanned</i> in the DPR, the system records it with <b>deadline = the day it was completed</b> — so it is <b>always counted on-time by construction</b>. <b>${unPct}% of his points (${unPts.toFixed(0)} pts / ${T.unplannedTasks||0} tasks)</b> came in this way. The ${onPct}% above is therefore computed on <b>planned tasks only</b>; the unplanned share is excluded.</div>
+    <div class="ins">Because the work is not planned in advance, there is <b>no forward view of how loaded or free he is</b> — the core management problem. Tasks appear only after they are done.</div>
+    <div style="margin-top:16px"><div class="chart-t">Planned tasks completed after their deadline</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Completed</th><th class="n">Delay</th></tr></thead><tbody>${lateRows}</tbody></table></div></div>
+    <div style="margin-top:14px"><div class="chart-t">Still open past deadline</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Overdue</th></tr></thead><tbody>${overRows}</tbody></table></div></div>
   </section>`;
 
   // project-wise
@@ -186,8 +212,8 @@ function renderLive(d){
       <td class="n">${pr.onTime||0}</td><td class="n" style="color:${pr.delayed?'var(--red)':'inherit'}">${pr.delayed||0}</td>
       <td class="n">${(pr.visits||[]).length}</td><td class="n">${pr.comms||0}</td></tr>`;}).join('');
   let projSec=`<section><h2>Project-wise Breakdown</h2>
-    <div class="h2sub">All ${ALL_PROJECTS.length} assigned projects · tasks, points, delayed, site visits and client communication (${WINDOW})</div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+    <div class="h2sub">All ${ALL_PROJECTS.length} assigned projects · tasks, points, delayed, site visits (meetings excluded) and client communication (${WINDOW})</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Site visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 
   // site-visit audit
   let ar=audit.map(a=>{const gaps=a.missedGaps||[];const cls=gaps.length?'bad':'ok';
@@ -196,22 +222,33 @@ function renderLive(d){
       <td class="n"><span class="pill ${cls}">${gaps.length?gaps.length+' gap'+(gaps.length>1?'s':''):'OK'}</span></td>
       <td style="font-size:11px">${esc(gapTxt)}</td></tr>`;}).join('');
   let auditSec=`<section><h2>Site-Visit Schedule Audit</h2>
-    <div class="h2sub">Required: a visit every 15 days to each of the 7 scheduled projects · gaps &gt; 15 days are missed visits</div>
+    <div class="h2sub">Required: a site visit every 15 days to each of the 7 scheduled projects · gaps &gt; 15 days are missed visits · <b>in-office meetings and material selections do not count</b></div>
     <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Visits</th><th class="n">Expected</th><th class="n">Status</th><th>Gaps &gt; 15 days</th></tr></thead><tbody>${ar}</tbody></table></div>
-    <div class="ins" style="margin-top:12px">Site-visit dates are drawn from logged visit tasks + meeting logs where Achal is an attendee. Any project showing gaps missed its 15-day cadence.</div></section>`;
+    <div class="ins" style="margin-top:12px">Counts <b>Site Visit records only</b> (logged site-visit tasks and site-visit logs where he attended) — meetings and material selections held in office are excluded, as they do not satisfy the 15-day site-visit requirement. Any project showing a gap missed its cadence.</div></section>`;
 
   // dpr + reliability
   const dprBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:w.dprDays||0,t:(w.dprDays||0)+'',c:(w.dprDays||0)>=5?'var(--green)':(w.dprDays||0)>=3?'var(--amber)':'var(--red)'};});
   const relBars=order.map(k=>{const w=wi[k]||{};const v=(w.relLate||0)+2*(w.relWnd||0);return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v,t:v+'',c:v?'var(--red)':'var(--green)'};});
+  const batch=(dprInfo.batchDays||[]);
+  const batchRows=batch.length?batch.map(b=>`<tr><td class="n">${esc(b.date)}</td><td class="n"><span class="pill bad">${b.count} reports</span></td><td>${esc((b.times||[]).join(' · '))}</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--t3)">No same-day batches detected.</td></tr>';
   let dprSec=`<section><h2>DPR Consistency &amp; Reliability</h2>
-    <div class="h2sub">Daily reports filed per week (of 6) · reliability penalty per week (late −1, work-not-done −2)</div>
+    <div class="h2sub">Distinct days a report was filed (of 6/week) · reliability penalty (late −1, work-not-done −2)</div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:${dprInfo.distinctDays>=nWeeks*5?'var(--green)':'var(--red)'}">${dprInfo.distinctDays||0}</div><div class="l">Distinct days filed</div><div class="x">of ${nWeeks*6} working days</div></div>
+      <div class="tile"><div class="v">${dprInfo.submissions||0}</div><div class="l">Total submissions</div><div class="x">${(dprInfo.submissions||0)>(dprInfo.distinctDays||0)?'more submissions than days':'1 per day'}</div></div>
+      <div class="tile"><div class="v" style="color:${batch.length?'var(--red)':'var(--green)'}">${batch.length}</div><div class="l">Batch-filed days</div><div class="x">&gt;1 report in one sitting</div></div>
+      <div class="tile"><div class="v" style="color:${relTot?'var(--red)':'var(--green)'}">${relTot}</div><div class="l">Reliability penalty</div><div class="x">across ${nWeeks} weeks</div></div>
+    </div>
     <div class="grid2">
-      <div><div class="chart-t">DPR days filed / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
+      <div><div class="chart-t">Distinct DPR days / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
       <div><div class="chart-t">Reliability penalty / week (lower is better)</div>${bars(relBars,{color:'var(--red)'})}</div>
     </div>
-    <div class="ins" style="margin-top:12px">DPR filed <b>${dprTot}</b> days across the window; reliability penalties total <b>${relTot}</b>. ${dprTot<nWeeks*4?'Planning discipline (daily reporting) is inconsistent — consistent with the pattern of not planning work ahead.':''}</div></section>`;
+    <div class="ins" style="margin-top:12px">Reports were filed on <b>${dprInfo.distinctDays||0} distinct days</b> out of ${nWeeks*6} working days${(dprInfo.submissions||0)>(dprInfo.distinctDays||0)?`, from <b>${dprInfo.submissions} submissions</b> — i.e. multiple reports entered in a single sitting rather than daily`:''}. Reports are <b>not filed in real time</b>, so mid-week there is no live view of what he is working on or how loaded he is.</div>
+    ${batch.length?`<div style="margin-top:14px"><div class="chart-t">Days where several reports were filed at once</div>
+      <div style="overflow-x:auto"><table><thead><tr><th class="n">Date</th><th class="n">Reports</th><th>Submission times</th></tr></thead><tbody>${batchRows}</tbody></table></div></div>`:''}
+  </section>`;
 
-  document.getElementById('live').innerHTML = out+projSec+auditSec+dprSec;
+  document.getElementById('live').innerHTML = out+planSec+projSec+auditSec+dprSec;
 }
 
 function render(){
