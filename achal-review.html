@@ -1,0 +1,239 @@
+<meta charset="utf-8">
+<title>IDS · Performance Review — Achal Rathore</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="auth.js"></script>
+<style>
+:root{--bg:#0F1923;--card:#16212E;--line:rgba(255,255,255,.08);--t1:#fff;--t2:rgba(255,255,255,.72);--t3:rgba(255,255,255,.42);--accent:#F5A623;--red:#EA4335;--amber:#FBBC04;--green:#2ED573;--blue:#4F9DF7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',system-ui,-apple-system,sans-serif;line-height:1.5;padding:0 0 60px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.rh{display:flex;align-items:center;gap:16px;padding:26px 0 18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.rh h1{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.rh .sub{font-size:12px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:1.4px}
+.badge{margin-left:auto;font-size:11px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:20px;padding:5px 12px;text-transform:uppercase;letter-spacing:1px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+h2{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.6px;margin-bottom:4px}
+.h2sub{font-size:12px;color:var(--t3);margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.tile{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
+.tile .v{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.tile .l{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-top:3px}
+.tile .x{font-size:11px;color:var(--t2);margin-top:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.chart-t{font-size:11px;color:var(--t2);font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px}
+svg{max-width:100%;height:auto;overflow:visible}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--t2)}
+td.n,th.n{text-align:center}
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.pill.ok{background:rgba(46,213,115,.15);color:var(--green)}
+.pill.bad{background:rgba(234,67,53,.15);color:var(--red)}
+.pill.warn{background:rgba(251,188,4,.15);color:var(--amber)}
+.ins{font-size:13px;color:var(--t2);padding:9px 0 9px 16px;border-left:2px solid var(--accent);margin:8px 0;background:rgba(245,166,35,.04)}
+.ins b{color:var(--t1)}
+.strip{display:flex;flex-wrap:wrap;gap:3px}
+.cell{width:26px;height:26px;border-radius:4px;font-size:8px;display:flex;align-items:center;justify-content:center;color:#0F1923;font-weight:700}
+.loading{color:var(--t3);font-size:13px;padding:8px 0}
+.foot{font-size:10.5px;color:var(--t3);text-align:center;padding:14px 0}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+@media print{body{background:#fff;color:#111}section{break-inside:avoid;border-color:#ddd;background:#fff}.badge{color:var(--red)}}
+</style>
+
+<div id="gate" style="max-width:430px;margin:16vh auto;text-align:center;color:var(--t2);padding:20px">
+  <div style="font-size:40px">🔒</div>
+  <h2 style="color:var(--accent);margin:10px 0 6px;letter-spacing:1px">Performance Review</h2>
+  <p style="font-size:13px;color:var(--t3)">Sign in with an authorised Ideaform account (Siddharth / Astha).</p>
+</div>
+
+<div id="app" class="wrap" style="display:none"></div>
+
+<script>
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
+const MEMBER='Achal Rathore', ROLE='Technical Lead';
+const FROM='2026-05-15', TO='2026-07-11', WINDOW='15 May – 11 July 2026';
+const DAILY_TGT=12, WEEK_TGT=72, JUNIOR_TGT=48, ONTIME_TGT=80, LATE_LABEL='10:30';
+const SCHED=['Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','Nikhar Garg Farm house','BBM Mhow','BBM 140'];
+const ALL_PROJECTS=['Kharat House','Amit Maheshwari','Tarun Maheshwari','Simrol Resort','Venkatesh Mandir','Anand Beesani','Stone Gallery Showroom','Dr. Aalok Somani','Highway Resort Bhopal','Nikhar Garg Farm house','Nilesh Lathi','Ritesh Somani Warehouse','BBM Mhow','BBM 140','Rohit Jain'];
+
+// ── Biometric attendance (15 May–11 Jul), present-days avg hrs; absences separate ──
+const ATT=[{"week":"2026-05-11","present":2,"absent":0,"late":2,"avgLate":11,"avgHrs":5.38,"avgGap":1.06,"daily":[{"date":"2026-05-15","present":true,"in":"10:41","hrs":5.78,"gap":1.17,"late":true},{"date":"2026-05-16","present":true,"in":"10:40","hrs":4.97,"gap":0.95,"late":true}]},{"week":"2026-05-18","present":5,"absent":1,"late":5,"avgLate":12,"avgHrs":7.01,"avgGap":1.4,"daily":[{"date":"2026-05-18","present":true,"in":"10:35","hrs":6.48,"gap":2.22,"late":true},{"date":"2026-05-19","present":false},{"date":"2026-05-20","present":true,"in":"10:48","hrs":6.03,"gap":1.88,"late":true},{"date":"2026-05-21","present":true,"in":"10:32","hrs":8.08,"gap":0.32,"late":true},{"date":"2026-05-22","present":true,"in":"10:54","hrs":7.82,"gap":0.48,"late":true},{"date":"2026-05-23","present":true,"in":"10:41","hrs":6.63,"gap":2.08,"late":true}]},{"week":"2026-05-25","present":6,"absent":0,"late":5,"avgLate":9,"avgHrs":7.9,"avgGap":0.82,"daily":[{"date":"2026-05-25","present":true,"in":"10:38","hrs":6.97,"gap":2.27,"late":true},{"date":"2026-05-26","present":true,"in":"10:38","hrs":8.67,"gap":0.45,"late":true},{"date":"2026-05-27","present":true,"in":"10:35","hrs":7.53,"gap":1.2,"late":true},{"date":"2026-05-28","present":true,"in":"10:30","hrs":7.67,"gap":1.03,"late":false},{"date":"2026-05-29","present":true,"in":"10:41","hrs":8.58,"gap":0,"late":true},{"date":"2026-05-30","present":true,"in":"10:41","hrs":7.98,"gap":0,"late":true}]},{"week":"2026-06-01","present":5,"absent":1,"late":5,"avgLate":8,"avgHrs":7.18,"avgGap":1.2,"daily":[{"date":"2026-06-01","present":false},{"date":"2026-06-02","present":true,"in":"10:35","hrs":8.3,"gap":0,"late":true},{"date":"2026-06-03","present":true,"in":"10:39","hrs":7.17,"gap":1.75,"late":true},{"date":"2026-06-04","present":true,"in":"10:38","hrs":7.77,"gap":1.2,"late":true},{"date":"2026-06-05","present":true,"in":"10:41","hrs":6.03,"gap":2.08,"late":true},{"date":"2026-06-06","present":true,"in":"10:38","hrs":6.63,"gap":0.98,"late":true}]},{"week":"2026-06-08","present":6,"absent":0,"late":4,"avgLate":10,"avgHrs":7.22,"avgGap":0.92,"daily":[{"date":"2026-06-08","present":true,"in":"10:38","hrs":7.83,"gap":1.72,"late":true},{"date":"2026-06-09","present":true,"in":"10:38","hrs":8.77,"gap":0.53,"late":true},{"date":"2026-06-10","present":true,"in":"10:37","hrs":7.15,"gap":2.1,"late":true},{"date":"2026-06-11","present":true,"in":"10:45","hrs":8.27,"gap":0.65,"late":true},{"date":"2026-06-12","present":true,"in":"9:00","hrs":4,"gap":0,"late":false},{"date":"2026-06-13","present":true,"in":"10:30","hrs":7.33,"gap":0.5,"late":false}]},{"week":"2026-06-15","present":5,"absent":1,"late":5,"avgLate":10,"avgHrs":7.61,"avgGap":0.98,"daily":[{"date":"2026-06-15","present":true,"in":"10:40","hrs":7.9,"gap":0.82,"late":true},{"date":"2026-06-16","present":true,"in":"10:40","hrs":7.82,"gap":1.2,"late":true},{"date":"2026-06-17","present":false},{"date":"2026-06-18","present":true,"in":"10:40","hrs":6.7,"gap":0.78,"late":true},{"date":"2026-06-19","present":true,"in":"10:40","hrs":9.17,"gap":0.58,"late":true},{"date":"2026-06-20","present":true,"in":"10:39","hrs":6.47,"gap":1.5,"late":true}]},{"week":"2026-06-22","present":6,"absent":0,"late":5,"avgLate":60,"avgHrs":7.59,"avgGap":0.31,"daily":[{"date":"2026-06-22","present":true,"in":"10:40","hrs":8.15,"gap":0.5,"late":true},{"date":"2026-06-23","present":true,"in":"10:31","hrs":9.88,"gap":0,"late":true},{"date":"2026-06-24","present":true,"in":"13:19","hrs":6.47,"gap":0,"late":true},{"date":"2026-06-25","present":true,"in":"10:30","hrs":8.92,"gap":0.5,"late":false},{"date":"2026-06-26","present":true,"in":"12:21","hrs":4.13,"gap":0.3,"late":true},{"date":"2026-06-27","present":true,"in":"10:41","hrs":8,"gap":0.57,"late":true}]},{"week":"2026-06-29","present":5,"absent":1,"late":4,"avgLate":71,"avgHrs":7.38,"avgGap":0.35,"daily":[{"date":"2026-06-29","present":true,"in":"14:43","hrs":4.43,"gap":0,"late":true},{"date":"2026-06-30","present":true,"in":"9:58","hrs":7.9,"gap":0.65,"late":false},{"date":"2026-07-01","present":true,"in":"10:41","hrs":9.13,"gap":0.08,"late":true},{"date":"2026-07-02","present":true,"in":"10:39","hrs":8.15,"gap":0,"late":true},{"date":"2026-07-03","present":true,"in":"10:41","hrs":7.3,"gap":1.03,"late":true},{"date":"2026-07-04","present":false}]},{"week":"2026-07-06","present":5,"absent":1,"late":3,"avgLate":7,"avgHrs":7.74,"avgGap":0.67,"daily":[{"date":"2026-07-06","present":true,"in":"10:30","hrs":8.42,"gap":0.65,"late":false},{"date":"2026-07-07","present":false},{"date":"2026-07-08","present":true,"in":"10:39","hrs":5.68,"gap":0.42,"late":true},{"date":"2026-07-09","present":true,"in":"10:30","hrs":8.2,"gap":1,"late":false},{"date":"2026-07-10","present":true,"in":"10:34","hrs":8.73,"gap":0.32,"late":true},{"date":"2026-07-11","present":true,"in":"10:37","hrs":7.67,"gap":0.97,"late":true}]}];
+
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const wkLabel=w=>{const d=ATT.find(x=>x.week===w);return d?shortRange(d):w;};
+function shortRange(w){const ds=w.daily.filter(x=>x);const a=w.daily[0].date,b=w.daily[w.daily.length-1].date;return mmdd(a)+'–'+dd(b);}
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const mmdd=d=>{const p=d.split('-');return +p[2]+' '+MON[+p[1]-1];};
+const dd=d=>{const p=d.split('-');return +p[2];};
+
+// ── tiny SVG vertical bar chart with optional target line(s) ──
+function bars(data, o){
+  o=o||{}; const n=data.length, bw=30, gap=22, padL=34, padB=26, padT=10, H=170;
+  const W=padL+ n*(bw+gap)+10;
+  const vals=data.map(d=>d.v); let max=o.max|| Math.max.apply(null,vals.concat(o.targets||[]).concat([1]));
+  max=max*1.12;
+  const y=v=>padT+(H-padT-padB)*(1-v/max);
+  let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
+  // gridlines / targets
+  (o.targets||[]).forEach((t,i)=>{const yy=y(t);const c=o.targetColors&&o.targetColors[i]||'var(--t3)';
+    s+=`<line x1="${padL}" y1="${yy}" x2="${W-6}" y2="${yy}" stroke="${c}" stroke-width="1" stroke-dasharray="4 3" opacity=".55"/>`;
+    s+=`<text x="${W-6}" y="${yy-3}" text-anchor="end" font-size="8" fill="${c}">${o.targetLabels?o.targetLabels[i]:t}</text>`;});
+  data.forEach((d,i)=>{const x=padL+i*(bw+gap), h=Math.max(1,(H-padT-padB)-(y(d.v)-padT)); const yy=y(d.v);
+    const col=d.c|| o.color||'var(--accent)';
+    s+=`<rect x="${x}" y="${yy}" width="${bw}" height="${h}" rx="3" fill="${col}"/>`;
+    s+=`<text x="${x+bw/2}" y="${yy-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${d.t!=null?d.t:d.v}</text>`;
+    s+=`<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="var(--t3)">${esc(d.l)}</text>`;
+    if(d.l2)s+=`<text x="${x+bw/2}" y="${H-5}" text-anchor="middle" font-size="7.5" fill="var(--t3)">${esc(d.l2)}</text>`;});
+  s+=`</svg>`; return s;
+}
+// stacked (on-time green / delayed red)
+function stacked(data,o){
+  o=o||{}; const n=data.length,bw=30,gap=22,padL=20,padB=26,padT=10,H=170; const W=padL+n*(bw+gap)+10;
+  let max=Math.max.apply(null,data.map(d=>d.a+d.b).concat([1]))*1.12;
+  const hh=v=>(H-padT-padB)*(v/max);
+  let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
+  data.forEach((d,i)=>{const x=padL+i*(bw+gap); let yb=H-padB;
+    const ah=hh(d.a), bh=hh(d.b);
+    if(d.b){s+=`<rect x="${x}" y="${yb-bh}" width="${bw}" height="${bh}" fill="var(--red)"/>`;yb-=bh;}
+    if(d.a){s+=`<rect x="${x}" y="${yb-ah}" width="${bw}" height="${ah}" rx="2" fill="var(--green)"/>`;yb-=ah;}
+    s+=`<text x="${x+bw/2}" y="${yb-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${(d.a+d.b)||''}</text>`;
+    s+=`<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="var(--t3)">${esc(d.l)}</text>`;});
+  s+=`</svg>`; return s;
+}
+
+// ── attendance aggregates (present-days basis) ──
+function attAgg(){
+  let worked=0,late=0,absent=0,gapS=0,hrS=0;
+  ATT.forEach(w=>{absent+=w.absent; w.daily.forEach(d=>{if(!d.present)return;worked++;if(d.late)late++;gapS+=d.gap;hrS+=d.hrs;});});
+  return {worked,late,absent,avgHrs:hrS/worked,avgGap:gapS/worked,latePct:Math.round(late/worked*100)};
+}
+
+function renderAttendance(){
+  const a=attAgg();
+  const lateBars=ATT.map(w=>({l:mmdd(w.daily[0].date).split(' ')[0],l2:MON[+w.week.split('-')[1]-1],v:w.late,t:w.late,c:w.late>=4?'var(--red)':w.late>=2?'var(--amber)':'var(--green)'}));
+  const hrBars=ATT.map(w=>({l:dd(w.daily[0].date)+'',v:+w.avgHrs.toFixed(1),t:w.avgHrs.toFixed(1),c:w.avgHrs>=7.9?'var(--green)':w.avgHrs>=7?'var(--amber)':'var(--red)'}));
+  const gapBars=ATT.map(w=>({l:dd(w.daily[0].date)+'',v:+w.avgGap.toFixed(1),t:w.avgGap.toFixed(1),c:w.avgGap>=1?'var(--red)':w.avgGap>=.6?'var(--amber)':'var(--green)'}));
+  // daily punctuality strip
+  let strip='';
+  ATT.forEach(w=>{w.daily.forEach(d=>{
+    if(!d.present){strip+=`<div class="cell" style="background:rgba(234,67,53,.25);color:#EA4335" title="${d.date} absent">A</div>`;return;}
+    const col=d.late?'var(--amber)':'var(--green)';
+    strip+=`<div class="cell" style="background:${col}" title="${d.date} in ${d.in} · ${d.hrs}h">${dd(d.date)}</div>`;});});
+  return `<section>
+    <h2>Attendance · Punctuality · Hours</h2>
+    <div class="h2sub">Biometric, ${WINDOW} · late threshold ${LATE_LABEL} · hours averaged over present days (absences shown separately)</div>
+    <div class="tiles" style="margin-bottom:18px">
+      <div class="tile"><div class="v">${a.worked}</div><div class="l">Worked days</div><div class="x">${a.absent} absences (excl.)</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${a.latePct}%</div><div class="l">Days late (&gt;${LATE_LABEL})</div><div class="x">${a.late} of ${a.worked} days</div></div>
+      <div class="tile"><div class="v" style="color:${a.avgHrs>=7.9?'var(--green)':'var(--amber)'}">${a.avgHrs.toFixed(2)}</div><div class="l">Avg hrs / present day</div><div class="x">vs 8:00 expected</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${a.avgGap.toFixed(2)}</div><div class="l">Out-of-office gap / day</div><div class="x">time in office not worked</div></div>
+    </div>
+    <div class="grid2">
+      <div><div class="chart-t">Late arrivals per week</div>${bars(lateBars,{color:'var(--red)'})}</div>
+      <div><div class="chart-t">Avg hours worked / present day (8h target)</div>${bars(hrBars,{targets:[8],targetLabels:['8h'],targetColors:['var(--green)']})}</div>
+    </div>
+    <div style="margin-top:14px"><div class="chart-t">Out-of-office gap per day (hrs) — lower is better</div>${bars(gapBars,{color:'var(--amber)'})}</div>
+    <div style="margin-top:16px"><div class="chart-t">Daily punctuality — green on-time · amber late · red absent</div><div class="strip">${strip}</div></div>
+    ${attInsights(a)}
+  </section>`;
+}
+function attInsights(a){
+  const worst=ATT.reduce((m,w)=>w.avgGap>m.avgGap?w:m,ATT[0]);
+  return `<div style="margin-top:16px">
+   <div class="ins">Late past the ${LATE_LABEL} accommodation on <b>${a.late} of ${a.worked} days (${a.latePct}%)</b> — punctuality is not a one-off, it is the norm.</div>
+   <div class="ins">Averages <b>${a.avgHrs.toFixed(2)} h/present day</b> against an 8-hour expectation, and loses <b>${a.avgGap.toFixed(2)} h/day</b> to out-of-office gaps (in the building but not working) — on the worst days ~2 hrs. Effective focused time is well under what a technical lead needs.</div>
+   <div class="ins">Collapse days recur: 4.0 h (12 Jun), arrivals of <b>13:19</b> (24 Jun) and <b>14:43</b> (29 Jun), plus <b>${a.absent} absences</b> in the window.</div>
+  </div>`;
+}
+
+// ── live sections from getMemberReview ──
+function renderLive(d){
+  const weeks=d.weeks||[], projects=(d.projects||[]), audit=d.visitAudit||[];
+  // index weeks by monday for aligned bars over the ATT week list
+  const wi={}; weeks.forEach(w=>wi[w.week]=w);
+  const order=ATT.map(w=>w.week);
+  const ptsBars=order.map(k=>{const w=wi[k]||{};const v=w.approvedPts||0;return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:+v.toFixed(1),t:v.toFixed(0),c:v>=WEEK_TGT?'var(--green)':v>=JUNIOR_TGT?'var(--amber)':'var(--red)'};});
+  const otBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',a:w.onTime||0,b:w.delayed||0};});
+  const totalPts=weeks.reduce((s,w)=>s+(w.approvedPts||0),0);
+  const totOn=weeks.reduce((s,w)=>s+(w.onTime||0),0), totDel=weeks.reduce((s,w)=>s+(w.delayed||0),0);
+  const onPct=(totOn+totDel)?Math.round(totOn/(totOn+totDel)*100):0;
+  const nWeeks=order.length, avgWk=totalPts/nWeeks;
+  const dprTot=weeks.reduce((s,w)=>s+(w.dprDays||0),0);
+  const relTot=weeks.reduce((s,w)=>s+(w.relLate||0)+2*(w.relWnd||0),0);
+
+  // output section
+  let out=`<section><h2>Output &amp; Task Completion</h2>
+    <div class="h2sub">Approved points per week vs the ${WEEK_TGT}-pt lead target (and the ${JUNIOR_TGT}-pt junior target) · on-time vs delayed</div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:${avgWk>=WEEK_TGT?'var(--green)':'var(--red)'}">${avgWk.toFixed(0)}</div><div class="l">Avg pts / week</div><div class="x">target ${WEEK_TGT} · junior ${JUNIOR_TGT}</div></div>
+      <div class="tile"><div class="v">${Math.round(avgWk/6)}</div><div class="l">Avg pts / day</div><div class="x">target ${DAILY_TGT}/day</div></div>
+      <div class="tile"><div class="v" style="color:${onPct>=ONTIME_TGT?'var(--green)':'var(--red)'}">${onPct}%</div><div class="l">On-time delivery</div><div class="x">target ${ONTIME_TGT}% · ${totDel} delayed</div></div>
+      <div class="tile"><div class="v">${totalPts.toFixed(0)}</div><div class="l">Total approved pts</div><div class="x">${nWeeks} weeks</div></div>
+    </div>
+    <div class="grid2">
+      <div><div class="chart-t">Approved points / week</div>${bars(ptsBars,{max:WEEK_TGT*1.2,targets:[WEEK_TGT,JUNIOR_TGT],targetLabels:['Lead '+WEEK_TGT,'Junior '+JUNIOR_TGT],targetColors:['var(--green)','var(--amber)']})}</div>
+      <div><div class="chart-t">Tasks on-time (green) vs delayed (red)</div>${stacked(otBars)}</div>
+    </div>
+    <div class="ins" style="margin-top:14px">Averages <b>${avgWk.toFixed(0)} pts/week</b> — ${avgWk<JUNIOR_TGT?`<b>below even the ${JUNIOR_TGT}-pt junior target</b>, and `:''}${Math.round((1-avgWk/WEEK_TGT)*100)}% under his ${WEEK_TGT}-pt lead target. On-time delivery ${onPct}% vs the ${ONTIME_TGT}% target${onPct<ONTIME_TGT?' — largely because work is not planned ahead, so deadlines are set loosely or missed':''}.</div>
+  </section>`;
+
+  // project-wise
+  let rows=ALL_PROJECTS.map(p=>{const pr=projects.find(x=>x.project.toLowerCase()===p.toLowerCase())||{tasks:0,pts:0,onTime:0,delayed:0,visits:[],comms:0};
+    const sched=SCHED.some(s=>s.toLowerCase()===p.toLowerCase());
+    return `<tr>
+      <td>${esc(p)}${sched?' <span class="pill warn">15-day</span>':''}</td>
+      <td class="n">${pr.tasks||0}</td><td class="n">${(pr.pts||0).toFixed(1)}</td>
+      <td class="n">${pr.onTime||0}</td><td class="n" style="color:${pr.delayed?'var(--red)':'inherit'}">${pr.delayed||0}</td>
+      <td class="n">${(pr.visits||[]).length}</td><td class="n">${pr.comms||0}</td></tr>`;}).join('');
+  let projSec=`<section><h2>Project-wise Breakdown</h2>
+    <div class="h2sub">All ${ALL_PROJECTS.length} assigned projects · tasks, points, delayed, site visits and client communication (${WINDOW})</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+
+  // site-visit audit
+  let ar=audit.map(a=>{const gaps=a.missedGaps||[];const cls=gaps.length?'bad':'ok';
+    const gapTxt=gaps.length?gaps.map(g=>`${mmdd(g.from)}→${mmdd(g.to)} (${g.days}d)`).join(', '):'on schedule';
+    return `<tr><td>${esc(a.project)}</td><td class="n">${a.count}</td><td class="n">${a.expected}</td>
+      <td class="n"><span class="pill ${cls}">${gaps.length?gaps.length+' gap'+(gaps.length>1?'s':''):'OK'}</span></td>
+      <td style="font-size:11px">${esc(gapTxt)}</td></tr>`;}).join('');
+  let auditSec=`<section><h2>Site-Visit Schedule Audit</h2>
+    <div class="h2sub">Required: a visit every 15 days to each of the 7 scheduled projects · gaps &gt; 15 days are missed visits</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Visits</th><th class="n">Expected</th><th class="n">Status</th><th>Gaps &gt; 15 days</th></tr></thead><tbody>${ar}</tbody></table></div>
+    <div class="ins" style="margin-top:12px">Site-visit dates are drawn from logged visit tasks + meeting logs where Achal is an attendee. Any project showing gaps missed its 15-day cadence.</div></section>`;
+
+  // dpr + reliability
+  const dprBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:w.dprDays||0,t:(w.dprDays||0)+'',c:(w.dprDays||0)>=5?'var(--green)':(w.dprDays||0)>=3?'var(--amber)':'var(--red)'};});
+  const relBars=order.map(k=>{const w=wi[k]||{};const v=(w.relLate||0)+2*(w.relWnd||0);return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v,t:v+'',c:v?'var(--red)':'var(--green)'};});
+  let dprSec=`<section><h2>DPR Consistency &amp; Reliability</h2>
+    <div class="h2sub">Daily reports filed per week (of 6) · reliability penalty per week (late −1, work-not-done −2)</div>
+    <div class="grid2">
+      <div><div class="chart-t">DPR days filed / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
+      <div><div class="chart-t">Reliability penalty / week (lower is better)</div>${bars(relBars,{color:'var(--red)'})}</div>
+    </div>
+    <div class="ins" style="margin-top:12px">DPR filed <b>${dprTot}</b> days across the window; reliability penalties total <b>${relTot}</b>. ${dprTot<nWeeks*4?'Planning discipline (daily reporting) is inconsistent — consistent with the pattern of not planning work ahead.':''}</div></section>`;
+
+  document.getElementById('live').innerHTML = out+projSec+auditSec+dprSec;
+}
+
+function render(){
+  document.getElementById('gate').style.display='none';
+  const app=document.getElementById('app'); app.style.display='block';
+  app.innerHTML=`
+    <div class="rh"><div><h1>Performance Review — ${esc(MEMBER)}</h1><div class="sub">${esc(ROLE)} · ${WINDOW} · Confidential</div></div><div class="badge">Under Review</div></div>
+    ${renderAttendance()}
+    <div id="live"><section><div class="loading">Loading task, project, site-visit &amp; DPR data from the sheet…</div></section></div>
+    <div class="foot">© Ideaform Design Studio · Performance Review · ${WINDOW} · Confidential — for internal HR use</div>`;
+  fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMemberReview',member:MEMBER,from:FROM,to:TO})})
+    .then(r=>r.json()).then(d=>{ if(d&&d.error){document.getElementById('live').innerHTML='<section><div class="loading">Could not load task data: '+esc(d.error)+'</div></section>';return;} renderLive(d); })
+    .catch(e=>{document.getElementById('live').innerHTML='<section><div class="loading">Could not load task data — '+esc(e.message)+'. Check sign-in.</div></section>';});
+}
+
+// auth gate — managers only (handled by auth.js verifying the email server-side too)
+window.idsOnAuth=function(u){
+  const email=String((u&&u.email)||'').toLowerCase();
+  if(['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'].indexOf(email)===-1){
+    document.getElementById('gate').innerHTML='<div style="font-size:40px">🔒</div><h2 style="color:#EA4335;margin:10px 0">Access restricted</h2><p style="color:rgba(255,255,255,.5);font-size:13px">This review is available to Siddharth &amp; Astha only.</p>';
+    return;
+  }
+  render();
+};
+</script>
