@@ -103,17 +103,29 @@ function stacked(data,o){
 }
 
 // ── attendance aggregates (present-days basis) ──
+// "Total Hrs" from the biometric = actual time IN OFFICE (it sums his in-intervals).
+// So span (Last Out − First In) − Total Hrs = time he punched out and left the
+// building = his lunch/tea breaks. Days where he never punched out record a 0
+// break — those are excluded from the break average (no break was recorded).
+const hm=h=>Math.floor(h)+'h '+String(Math.round((h%1)*60)).padStart(2,'0')+'m';
 function attAgg(){
-  let worked=0,late=0,absent=0,gapS=0,hrS=0;
-  ATT.forEach(w=>{absent+=w.absent; w.daily.forEach(d=>{if(!d.present)return;worked++;if(d.late)late++;gapS+=d.gap;hrS+=d.hrs;});});
-  return {worked,late,absent,avgHrs:hrS/worked,avgGap:gapS/worked,latePct:Math.round(late/worked*100)};
+  let worked=0,late=0,absent=0,gapS=0,hrS=0,zero=0; const brk=[];
+  ATT.forEach(w=>{absent+=w.absent; w.daily.forEach(d=>{if(!d.present)return;worked++;if(d.late)late++;
+    gapS+=d.gap; hrS+=d.hrs; if(d.gap>0.01) brk.push(d.gap); else zero++;});});
+  const brkAvg=brk.length?brk.reduce((s,v)=>s+v,0)/brk.length:0;
+  return {worked,late,absent,avgHrs:hrS/worked,avgGap:gapS/worked,latePct:Math.round(late/worked*100),
+    brkAvg,brkDays:brk.length,zeroDays:zero,totalBreak:gapS,maxBreak:brk.length?Math.max.apply(null,brk):0,
+    avgSpan:(hrS+gapS)/worked, under8:(function(){let c=0;ATT.forEach(w=>w.daily.forEach(d=>{if(d.present&&d.hrs<8)c++;}));return c;})()};
 }
 
 function renderAttendance(){
   const a=attAgg();
   const lateBars=ATT.map(w=>({l:mmdd(w.daily[0].date).split(' ')[0],l2:MON[+w.week.split('-')[1]-1],v:w.late,t:w.late,c:w.late>=4?'var(--red)':w.late>=2?'var(--amber)':'var(--green)'}));
   const hrBars=ATT.map(w=>({l:dd(w.daily[0].date)+'',v:+w.avgHrs.toFixed(1),t:w.avgHrs.toFixed(1),c:w.avgHrs>=7.9?'var(--green)':w.avgHrs>=7?'var(--amber)':'var(--red)'}));
-  const gapBars=ATT.map(w=>({l:dd(w.daily[0].date)+'',v:+w.avgGap.toFixed(1),t:w.avgGap.toFixed(1),c:w.avgGap>=1?'var(--red)':w.avgGap>=.6?'var(--amber)':'var(--green)'}));
+  // weekly lunch/tea break = average over the days he actually punched out
+  const gapBars=ATT.map(w=>{const b=w.daily.filter(d=>d.present&&d.gap>0.01).map(d=>d.gap);
+    const v=b.length?b.reduce((s,x)=>s+x,0)/b.length:0;
+    return {l:dd(w.daily[0].date)+'',v:+v.toFixed(2),t:v?v.toFixed(1):'—',c:v>=1?'var(--red)':v>=.6?'var(--amber)':'var(--green)'};});
   // daily punctuality strip
   let strip='';
   ATT.forEach(w=>{w.daily.forEach(d=>{
@@ -122,28 +134,28 @@ function renderAttendance(){
     strip+=`<div class="cell" style="background:${col}" title="${d.date} in ${d.in} · ${d.hrs}h">${dd(d.date)}</div>`;});});
   return `<section>
     <h2>Attendance · Punctuality · Hours</h2>
-    <div class="h2sub">Biometric, ${WINDOW} · late threshold ${LATE_LABEL} · hours averaged over present days (absences shown separately)</div>
+    <div class="h2sub">Biometric, ${WINDOW} · late threshold ${LATE_LABEL} · "Total Hrs" = actual time in office; averaged over present days (absences shown separately)</div>
     <div class="tiles" style="margin-bottom:18px">
-      <div class="tile"><div class="v">${a.worked}</div><div class="l">Worked days</div><div class="x">${a.absent} absences (excl.)</div></div>
+      <div class="tile"><div class="v">${a.worked}</div><div class="l">Present days</div><div class="x">${a.absent} absences (excl.)</div></div>
       <div class="tile"><div class="v" style="color:var(--red)">${a.latePct}%</div><div class="l">Days late (&gt;${LATE_LABEL})</div><div class="x">${a.late} of ${a.worked} days</div></div>
-      <div class="tile"><div class="v" style="color:${a.avgHrs>=7.9?'var(--green)':'var(--amber)'}">${a.avgHrs.toFixed(2)}</div><div class="l">Avg hrs / present day</div><div class="x">vs 8:00 expected</div></div>
-      <div class="tile"><div class="v" style="color:var(--red)">${a.avgGap.toFixed(2)}</div><div class="l">Out-of-office gap / day</div><div class="x">time in office not worked</div></div>
+      <div class="tile"><div class="v" style="color:${a.avgHrs>=7.9?'var(--green)':'var(--amber)'}">${hm(a.avgHrs)}</div><div class="l">Avg time in office / day</div><div class="x">vs 8h expected · ${a.under8}/${a.worked} days under 8h</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${hm(a.brkAvg)}</div><div class="l">Lunch / tea break / day</div><div class="x">on the ${a.brkDays} days he punched out · ${a.zeroDays} days no punch-out</div></div>
     </div>
     <div class="grid2">
       <div><div class="chart-t">Late arrivals per week</div>${bars(lateBars,{color:'var(--red)'})}</div>
-      <div><div class="chart-t">Avg hours worked / present day (8h target)</div>${bars(hrBars,{targets:[8],targetLabels:['8h'],targetColors:['var(--green)']})}</div>
+      <div><div class="chart-t">Avg time in office / present day (8h expected)</div>${bars(hrBars,{targets:[8],targetLabels:['8h'],targetColors:['var(--green)']})}</div>
     </div>
-    <div style="margin-top:14px"><div class="chart-t">Out-of-office gap per day (hrs) — lower is better</div>${bars(gapBars,{color:'var(--amber)'})}</div>
+    <div style="margin-top:14px"><div class="chart-t">Lunch / tea break per day (hrs, on days he punched out) — lower is better</div>${bars(gapBars,{color:'var(--amber)'})}</div>
     <div style="margin-top:16px"><div class="chart-t">Daily punctuality — green on-time · amber late · red absent</div><div class="strip">${strip}</div></div>
     ${attInsights(a)}
   </section>`;
 }
 function attInsights(a){
-  const worst=ATT.reduce((m,w)=>w.avgGap>m.avgGap?w:m,ATT[0]);
   return `<div style="margin-top:16px">
-   <div class="ins">Late past the ${LATE_LABEL} accommodation on <b>${a.late} of ${a.worked} days (${a.latePct}%)</b> — punctuality is not a one-off, it is the norm.</div>
-   <div class="ins">Averages <b>${a.avgHrs.toFixed(2)} h/present day</b> against an 8-hour expectation, and loses <b>${a.avgGap.toFixed(2)} h/day</b> to out-of-office gaps (in the building but not working) — on the worst days ~2 hrs. Effective focused time is well under what a technical lead needs.</div>
-   <div class="ins">Collapse days recur: 4.0 h (12 Jun), arrivals of <b>13:19</b> (24 Jun) and <b>14:43</b> (29 Jun), plus <b>${a.absent} absences</b> in the window.</div>
+   <div class="ins">Late past the ${LATE_LABEL} accommodation on <b>${a.late} of ${a.worked} days (${a.latePct}%)</b> — despite the start time having already been moved to suit him, punctuality is not an exception, it is the norm.</div>
+   <div class="ins">He is in the building about <b>${hm(a.avgSpan)}</b> a day, but only <b>${hm(a.avgHrs)}</b> of that is time in office — the rest goes to <b>lunch/tea breaks averaging ${hm(a.brkAvg)} per day</b> (longest ${hm(a.maxBreak)}). Across the period that is <b>${hm(a.totalBreak)} of break time</b>, roughly <b>${(a.totalBreak/8).toFixed(1)} full working days</b>.</div>
+   <div class="ins">Time in office falls short of the 8-hour expectation on <b>${a.under8} of ${a.worked} days</b>. Combined with a late start and breaks split across the middle of the day, the remaining stretch of uninterrupted working time is minimal — which is what a technical lead's output depends on.</div>
+   <div class="ins">Collapse days recur: 4h00 (12 Jun), arrivals of <b>13:19</b> (24 Jun) and <b>14:43</b> (29 Jun), plus <b>${a.absent} absences</b> in the window.</div>
   </div>`;
 }
 
