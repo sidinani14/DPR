@@ -37,7 +37,131 @@ td.n,th.n{text-align:center}
 .loading{color:var(--t3);font-size:13px;padding:8px 0}
 .foot{font-size:10.5px;color:var(--t3);text-align:center;padding:14px 0}
 @media(max-width:720px){.grid2{grid-template-columns:1fr}}
-@media print{body{background:#fff;color:#111}section{break-inside:avoid;border-color:#ddd;background:#fff}.badge{color:var(--red)}}
+/* ===============================
+   PROFESSIONAL PRINT LAYOUT
+   =============================== */
+
+@page{
+    size:A4;
+    margin:12mm;
+}
+
+@media print{
+
+html,
+body{
+
+    background:var(--bg) !important;
+    color:var(--t1) !important;
+
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+
+    font-size:11pt;
+    line-height:1.45;
+
+}
+
+/* Preserve all colours */
+
+*{
+
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+
+}
+
+/* Main report sections */
+
+section{
+
+    background:var(--card) !important;
+    border:1px solid var(--line) !important;
+
+    break-inside:avoid-page;
+    page-break-inside:avoid;
+
+    margin-bottom:14px;
+
+}
+
+/* KPI cards */
+
+.tile{
+
+    background:rgba(255,255,255,.03) !important;
+    border:1px solid var(--line) !important;
+
+    break-inside:avoid-page;
+}
+
+/* Keep charts together */
+
+svg{
+
+    break-inside:avoid-page;
+    page-break-inside:avoid;
+
+    width:100%;
+
+}
+
+/* Tables */
+
+table{
+
+    page-break-inside:auto;
+
+}
+
+thead{
+
+    display:table-header-group;
+
+}
+
+tr{
+
+    page-break-inside:avoid;
+
+}
+
+/* Headings never split */
+
+h1,
+h2{
+
+    page-break-after:avoid;
+
+}
+
+/* Paragraphs */
+
+p{
+
+    orphans:3;
+    widows:3;
+
+}
+
+/* Don't split grids */
+
+.grid2,
+.tiles{
+
+    break-inside:avoid-page;
+
+}
+
+/* Footer */
+
+.foot{
+
+    page-break-before:avoid;
+
+}
+
+}
 </style>
 
 <div id="gate" style="max-width:430px;margin:16vh auto;text-align:center;color:var(--t2);padding:20px">
@@ -232,14 +356,23 @@ function renderLive(d){
     <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Site visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 
   // site-visit audit
-  let ar=audit.map(a=>{const gaps=a.missedGaps||[];const cls=gaps.length?'bad':'ok';
-    const gapTxt=gaps.length?gaps.map(g=>`${mmdd(g.from)}→${mmdd(g.to)} (${g.days}d)`).join(', '):'on schedule';
-    return `<tr><td>${esc(a.project)}</td><td class="n">${a.count}</td><td class="n">${a.expected}</td>
-      <td class="n"><span class="pill ${cls}">${gaps.length?gaps.length+' gap'+(gaps.length>1?'s':''):'OK'}</span></td>
+  let totReq=0, totDone=0;
+  let ar=audit.map(a=>{const gaps=a.missedGaps||[];
+    const req=a.expected||0, done=a.count||0, missed=Math.max(0,req-done);
+    totReq+=req; totDone+=done;
+    const gapTxt=gaps.length?gaps.map(g=>`${mmdd(g.from)}→${mmdd(g.to)} (${g.days}d)`).join(', '):'—';
+    return `<tr><td>${esc(a.project)}</td><td class="n">${done}</td><td class="n">${req}</td>
+      <td class="n">${missed?`<span class="pill bad">${missed} missed</span>`:'<span class="pill ok">met</span>'}</td>
       <td style="font-size:11px">${esc(gapTxt)}</td></tr>`;}).join('');
   let auditSec=`<section><h2>Site-Visit Schedule Audit</h2>
-    <div class="h2sub">Required: a site visit every 15 days to each of the 7 scheduled projects · gaps &gt; 15 days are missed visits · <b>in-office meetings and material selections do not count</b></div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Visits</th><th class="n">Expected</th><th class="n">Status</th><th>Gaps &gt; 15 days</th></tr></thead><tbody>${ar}</tbody></table></div>
+    <div class="h2sub">Required: a site visit every 15 days to each of your ${SCHED.length} scheduled projects · <b>in-office meetings and material selections do not count</b></div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:${totDone>=totReq?'var(--green)':'var(--red)'}">${totDone}</div><div class="l">Site visits done</div><div class="x">across ${SCHED.length} scheduled projects</div></div>
+      <div class="tile"><div class="v">${totReq}</div><div class="l">Site visits required</div><div class="x">one per 15 days per project</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${Math.max(0,totReq-totDone)}</div><div class="l">Visits missed</div><div class="x">${totReq?Math.round(Math.max(0,totReq-totDone)/totReq*100):0}% of the requirement</div></div>
+      <div class="tile"><div class="v" style="color:${totReq&&totDone/totReq>=1?'var(--green)':'var(--red)'}">${totReq?Math.round(totDone/totReq*100):0}%</div><div class="l">Schedule met</div><div class="x">target 100%</div></div>
+    </div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Visits done</th><th class="n">Required</th><th class="n">Missed</th><th>Gaps &gt; 15 days</th></tr></thead><tbody>${ar}</tbody></table></div>
     <div class="ins" style="margin-top:12px">This counts <b>site visits only</b> (site-visit tasks and site-visit logs you attended). Meetings and material selections held in the office are excluded — they do not satisfy the 15-day site-visit requirement. Every project showing a gap is one where you missed the cadence you are responsible for.</div></section>`;
 
   // dpr + reliability
