@@ -115,7 +115,7 @@ tr.tot td{border-top:1px solid var(--line);font-weight:800;color:var(--t1);backg
   <h2>The 30-day scorecard</h2>
   <div class="h2sub">Scored by Siddharth at the end of each week · discussed with you the same week · no score is backdated</div>
   <div style="overflow-x:auto"><table>
-    <thead><tr><th class="n">Wt.</th><th>KPI</th><th class="n">Week 1</th><th class="n">Week 2</th><th class="n">Week 3</th><th class="n">Week 4</th></tr></thead>
+    <thead><tr><th class="n">Wt.</th><th>KPI</th><th class="n" id="wk1">Week 1</th><th class="n" id="wk2">Week 2</th><th class="n" id="wk3">Week 3</th><th class="n" id="wk4">Week 4</th></tr></thead>
     <tbody>
       <tr><td class="n">25</td><td>Task output — 72 pts</td><td class="n"><span class="blank">&nbsp;</span></td><td class="n"><span class="blank">&nbsp;</span></td><td class="n"><span class="blank">&nbsp;</span></td><td class="n"><span class="blank">&nbsp;</span></td></tr>
       <tr><td class="n">15</td><td>Planning — ≥80% planned</td><td class="n"><span class="blank">&nbsp;</span></td><td class="n"><span class="blank">&nbsp;</span></td><td class="n"><span class="blank">&nbsp;</span></td><td class="n"><span class="blank">&nbsp;</span></td></tr>
@@ -175,9 +175,9 @@ tr.tot td{border-top:1px solid var(--line);font-weight:800;color:var(--t1);backg
   <div class="h2sub">Signing confirms you have read and understood this plan — it does not mean you agree with every point</div>
   <div style="overflow-x:auto"><table>
     <tbody>
-      <tr><td style="width:38%">Plan start date</td><td><span class="blank" style="min-width:180px">&nbsp;</span></td></tr>
-      <tr><td>Plan end date (30 days)</td><td><span class="blank" style="min-width:180px">&nbsp;</span></td></tr>
-      <tr><td>Weekly review day / time</td><td><span class="blank" style="min-width:180px">&nbsp;</span></td></tr>
+      <tr><td style="width:38%">Plan start date</td><td><b id="plan-start"><span class="blank" style="min-width:180px">&nbsp;</span></b></td></tr>
+      <tr><td>Plan end date (30 days)</td><td><b id="plan-end"><span class="blank" style="min-width:180px">&nbsp;</span></b></td></tr>
+      <tr><td>Weekly review day / time</td><td><span id="review-slot"><span class="blank" style="min-width:180px">&nbsp;</span></span></td></tr>
     </tbody>
   </table></div>
   <div class="sig">
@@ -188,3 +188,36 @@ tr.tot td{border-top:1px solid var(--line);font-weight:800;color:var(--t1);backg
 
 <div class="foot">© Ideaform Design Studio · 30-Day Performance Improvement Plan · Achal Rathore · Confidential — internal HR record</div>
 </div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   SET THE PLAN START DATE HERE  →  everything else fills itself
+   Use YYYY-MM-DD. Pick a Monday. Leave '' to keep blank lines
+   for filling in by hand after printing.
+   ───────────────────────────────────────────────────────────── */
+const PLAN_START  = '';            // e.g. '2026-07-20'
+const REVIEW_SLOT = '';            // e.g. 'Every Saturday, 5:00 PM'
+
+(function(){
+  if (!PLAN_START) { if (REVIEW_SLOT) setText('review-slot', REVIEW_SLOT); return; }
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d  = s => new Date(s + 'T00:00:00');
+  const add= (dt,n) => { const x=new Date(dt); x.setDate(x.getDate()+n); return x; };
+  const fmt= dt => dt.getDate() + ' ' + MON[dt.getMonth()] + ' ' + dt.getFullYear();
+  const dm = dt => dt.getDate() + ' ' + MON[dt.getMonth()];
+
+  const start = d(PLAN_START);
+  const end   = add(start, 29);                    // 30 calendar days, inclusive
+  setText('plan-start', fmt(start));
+  setText('plan-end',   fmt(end));
+  if (REVIEW_SLOT) setText('review-slot', REVIEW_SLOT);
+
+  // Scorecard headers → "Week 1 · 20–25 Jul" (Mon–Sat working weeks)
+  for (let w=0; w<4; w++){
+    const wStart = add(start, w*7), wEnd = add(wStart, 5);
+    setText('wk'+(w+1),
+      'Week ' + (w+1) + ' · ' + dm(wStart) + '–' + dm(wEnd));
+  }
+  function setText(id, txt){ const el=document.getElementById(id); if(el) el.textContent = txt; }
+})();
+</script>
