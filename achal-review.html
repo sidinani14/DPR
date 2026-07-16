@@ -395,7 +395,10 @@ function renderLive(d){
     <div class="ins">Just as important as the count: the daily report is <b>not being filed each day as the work happens</b> — it is written up later, in one go. That defeats its purpose. The DPR exists so the studio can see <b>during</b> the week what you are working on and how loaded you are; filled in retrospectively, it becomes a record of the past instead of a live picture, and nobody can plan around you.</div>
   </section>`;
 
-  document.getElementById('live').innerHTML = out+planSec+projSec+auditSec+dprSec;
+  // Output/tasks/site-visits lead the report (the primary measure), attendance
+  // sits after them, and DPR consistency closes it out.
+  document.getElementById('live-tasks').innerHTML = out+planSec+projSec+auditSec;
+  document.getElementById('live-dpr').innerHTML   = dprSec;
 }
 
 function render(){
@@ -419,12 +422,13 @@ function render(){
         Read it carefully. The purpose is not to catalogue faults — it is to show you exactly what has to change, and by how much.
       </div>
     </section>
+    <div id="live-tasks"><section><div class="loading">Loading task, project &amp; site-visit data from the sheet…</div></section></div>
     ${renderAttendance()}
-    <div id="live"><section><div class="loading">Loading task, project, site-visit &amp; DPR data from the sheet…</div></section></div>
+    <div id="live-dpr"></div>
     <div class="foot">© Ideaform Design Studio · Performance Review · ${WINDOW} · Confidential — for internal HR use</div>`;
   fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMemberReview',member:MEMBER,from:FROM,to:TO})})
-    .then(r=>r.json()).then(d=>{ if(d&&d.error){document.getElementById('live').innerHTML='<section><div class="loading">Could not load task data: '+esc(d.error)+'</div></section>';return;} renderLive(d); })
-    .catch(e=>{document.getElementById('live').innerHTML='<section><div class="loading">Could not load task data — '+esc(e.message)+'. Check sign-in.</div></section>';});
+    .then(r=>r.json()).then(d=>{ if(d&&d.error){document.getElementById('live-tasks').innerHTML='<section><div class="loading">Could not load task data: '+esc(d.error)+'</div></section>';return;} renderLive(d); })
+    .catch(e=>{document.getElementById('live-tasks').innerHTML='<section><div class="loading">Could not load task data — '+esc(e.message)+'. Check sign-in.</div></section>';});
 }
 
 // auth gate — managers only (handled by auth.js verifying the email server-side too)
