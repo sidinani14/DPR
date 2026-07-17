@@ -306,14 +306,15 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
           <label class="radio-opt"><input type="radio" name="ontime" value="No" onchange="toggleLateReq()"><div class="rdot"></div><div class="rtxt">No — arrived late</div></label>
         </div>
         <div id="late-req-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
-          <div class="lbl" style="margin-bottom:6px">Was this pre-approved (or should it be)? <span class="opt">replaces messaging Siddharth</span></div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px">
-            <input type="checkbox" id="late-req-toggle" onchange="document.getElementById('late-req-reason-wrap').style.display=this.checked?'block':'none'" style="width:auto">
-            Request approval for today's late arrival
-          </label>
-          <div id="late-req-reason-wrap" style="display:none">
-            <textarea id="late-req-reason" placeholder="Reason (e.g. doctor's appointment, family matter, traffic)" style="min-height:44px"></textarea>
+          <div class="lbl" style="margin-bottom:6px">Did you inform us before 9 AM that you'd be late? <span class="req">*</span></div>
+          <div class="radio-group" style="margin-bottom:10px">
+            <label class="radio-opt"><input type="radio" name="late-informed" value="Yes"><div class="rdot"></div><div class="rtxt">Yes</div></label>
+            <label class="radio-opt"><input type="radio" name="late-informed" value="No"><div class="rdot"></div><div class="rtxt">No</div></label>
           </div>
+          <div class="lbl" style="margin-bottom:6px">What time did you punch in? <span class="req">*</span></div>
+          <input type="time" id="late-punch-in" style="margin-bottom:10px">
+          <div class="lbl" style="margin-bottom:6px">Reason <span class="opt">optional</span></div>
+          <textarea id="late-req-reason" placeholder="Traffic, personal, family matter…" style="min-height:44px"></textarea>
         </div>
       </div>
       <div class="divider"></div>
@@ -1312,6 +1313,10 @@ function validate(d) {
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
   if (!d['Member'])            { toast('Please select your name');              return false; }
   if (!d['Arrived on Time'])   { toast('Please mark your arrival time');        return false; }
+  if (d['Arrived on Time']==='No'){
+    if (!document.querySelector('input[name=late-informed]:checked')) { toast('Let us know if you informed us before 9 AM'); return false; }
+    if (!document.getElementById('late-punch-in')?.value) { toast('Enter the time you punched in'); return false; }
+  }
   if (!d['Deliverables List']) { toast("Fill in today's deliverables");         return false; }
   return true;
 }
@@ -1338,11 +1343,15 @@ async function submitForm() {
         body: JSON.stringify({action:'logConnections', member, connections:conns})}).catch(()=>{});
       if (bills.length) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({action:'submitBillables', member, billables:bills})}).catch(()=>{});
-      // Late-arrival permission request (replaces messaging Siddharth on WhatsApp)
-      const lateReason = document.getElementById('late-req-toggle')?.checked ? document.getElementById('late-req-reason')?.value.trim() : '';
-      if (lateReason) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      // Late-arrival context (replaces messaging Siddharth on WhatsApp) — every
+      // late day is logged; Siddharth decides excuse-vs-absent when he reviews
+      // the Paytime import, not here.
+      if (data['Arrived on Time']==='No') await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({action:'submitLateRequest', member, email:googleUser?.email||'',
-          date:new Date().toISOString().substring(0,10), reason:lateReason})}).catch(()=>{});
+          date:new Date().toISOString().substring(0,10),
+          informedBefore9: document.querySelector('input[name=late-informed]:checked')?.value||'No',
+          reportedPunchIn: document.getElementById('late-punch-in')?.value||'',
+          reason: document.getElementById('late-req-reason')?.value.trim()||''})}).catch(()=>{});
     }
     document.getElementById('sending').classList.remove('show');
     document.getElementById('fin-pts').textContent=data['Total Weighted Pts'].toFixed(1);
@@ -1361,10 +1370,6 @@ function toggleLateReq(){
   const isLate = document.querySelector('input[name=ontime]:checked')?.value === 'No';
   const wrap = document.getElementById('late-req-wrap');
   if (wrap) wrap.style.display = isLate ? 'block' : 'none';
-  if (!isLate) {
-    const t = document.getElementById('late-req-toggle'); if (t) t.checked = false;
-    const rw = document.getElementById('late-req-reason-wrap'); if (rw) rw.style.display = 'none';
-  }
 }
 function toast(msg) {
   const el=document.getElementById('toast');

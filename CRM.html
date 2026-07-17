@@ -331,12 +331,17 @@ textarea{min-height:62px;resize:vertical;}
     <div class="section-body">
       <input type="date" id="f-date">
       <div class="field" style="margin-top:12px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-          <input type="checkbox" id="late-req-toggle" onchange="document.getElementById('late-req-reason-wrap').style.display=this.checked?'block':'none'" style="width:auto">
-          Running late today? Request approval <span style="color:var(--text3);font-weight:400">(replaces messaging Siddharth)</span>
-        </label>
-        <div id="late-req-reason-wrap" style="display:none;margin-top:8px">
-          <textarea id="late-req-reason" placeholder="Reason (e.g. client meeting ran long, personal, traffic)"></textarea>
+        <div class="lbl">Arrived on time today? <span class="opt">before 9:00 AM</span></div>
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-right:16px;cursor:pointer"><input type="radio" name="ontime" value="Yes" onchange="toggleLateReq()" style="width:auto">Yes</label>
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="ontime" value="No" onchange="toggleLateReq()" style="width:auto">No — arrived late</label>
+        <div id="late-req-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--surface2,#f5f5f5);border-radius:8px">
+          <div class="lbl">Did you inform us before 9 AM that you'd be late?</div>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-right:16px;cursor:pointer"><input type="radio" name="late-informed" value="Yes" style="width:auto">Yes</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="late-informed" value="No" style="width:auto">No</label>
+          <div class="lbl" style="margin-top:8px">What time did you punch in?</div>
+          <input type="time" id="late-punch-in">
+          <div class="lbl" style="margin-top:8px">Reason <span class="opt">optional</span></div>
+          <textarea id="late-req-reason" placeholder="Traffic, personal, family matter…"></textarea>
         </div>
       </div>
     </div>
@@ -1132,6 +1137,11 @@ function setLeadStatus(id, status) {
 // attendance import (Part B) — matches dpr.html Section 4 / DPER's per-project
 // visit block.
 // ════════════════════════════════════════
+function toggleLateReq(){
+  const isLate = document.querySelector('input[name=ontime]:checked')?.value === 'No';
+  const wrap = document.getElementById('late-req-wrap');
+  if (wrap) wrap.style.display = isLate ? 'block' : 'none';
+}
 const FW_TYPES=['Site Visit','Meeting','Material Selection'];
 function fwRate(t){ return (t==='Site Visit'||t==='Material Selection')?2:1; }
 function fwHours(start,end){
@@ -1812,11 +1822,15 @@ async function submitAll() {
     if (taskStatuses.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).catch(()=>{});
 
-    // 1c. Late-arrival permission request (replaces messaging Siddharth on WhatsApp)
-    const lateReason = document.getElementById('late-req-toggle')?.checked ? document.getElementById('late-req-reason')?.value.trim() : '';
-    if (lateReason) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    // 1c. Late-arrival context (replaces messaging Siddharth on WhatsApp) —
+    // logged whenever Arrived-on-time is No; Siddharth decides excuse-vs-absent
+    // when reviewing the Paytime import, not here.
+    if (document.querySelector('input[name=ontime]:checked')?.value === 'No') await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'submitLateRequest', member:crmUser, email:googleUser?.email||'',
-        date:new Date().toISOString().substring(0,10), reason:lateReason})}).catch(()=>{});
+        date:new Date().toISOString().substring(0,10),
+        informedBefore9: document.querySelector('input[name=late-informed]:checked')?.value||'No',
+        reportedPunchIn: document.getElementById('late-punch-in')?.value||'',
+        reason: document.getElementById('late-req-reason')?.value.trim()||''})}).catch(()=>{});
 
     // 2. Main CRM submission
     const leads    = collectLeads();

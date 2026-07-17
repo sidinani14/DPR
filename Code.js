@@ -42,7 +42,8 @@ function calcVisitPts(taskType, hours) {
 // Append one or more rows to FIELD_WORK (start/end per engagement). Points
 // already flow through the Done-visit-task path; this row store feeds the
 // attendance import (Part B): first start → last end = the member's field-day
-// window. Each row is 'Pending' until Siddharth approves it in the import grid.
+// window. No approval gate — field work counts immediately (the site-visit
+// hours themselves are the evidence; nothing to approve).
 function fieldWorkSheet(){
   return getOrCreate(FIELD_WORK_TAB, function(sh){
     sh.getRange(1,1,1,12).setValues([['FW ID','Date','Member','Email','Type','Project','Start','End','Engaged Hrs','Notes','Source','Approved']]);
@@ -56,7 +57,7 @@ function appendFieldWorkRows(entries){
   var rows = entries.map(function(e, n){
     return ['FW-'+stamp+'-'+n, e.date, e.member||'', e.email||'',
       String(e.type||''), String(e.project||''), String(e.start||''), String(e.end||''),
-      parseFloat(e.hours)||0, String(e.notes||''), e.source||'self', 'Pending'];
+      parseFloat(e.hours)||0, String(e.notes||''), e.source||'self', 'Approved'];
   });
   sheet.getRange(sheet.getLastRow()+1, 1, rows.length, 12).setValues(rows);
 }
@@ -98,19 +99,25 @@ function writeFieldWork(data) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Attendance Import (Part B) — Paytime biometric import, late-arrival
-// permission (replaces WhatsApp), and the merge that turns both plus
-// FIELD_WORK into a member's real daily/weekly attendance.
+// Attendance Import (Part B) — Paytime biometric import + late-arrival
+// context (replaces WhatsApp) + Field Work, all reviewed and DECIDED in
+// attendance-import.html. ATTENDANCE is the single source of truth: every
+// row already carries its final Status/Late/LateApproved/Undertime/Overtime
+// — decided once at import time, not recomputed on every read.
 // ════════════════════════════════════════════════════════════════
+var ATTENDANCE_COLS = ['Date','Member','Email','First In','Last Out','Total Hrs',
+  'Status','Late','Late Approved','Undertime','Overtime','Field Hours','Source','Imported At'];
 
-// Client parses the Paytime .xls and sends confirmed rows here. Upserts by
-// Member+Date so re-importing (a correction, or overlapping weekly exports)
-// overwrites rather than duplicates.
+// Client (attendance-import.html) has already classified each row — computed
+// Status (Present/Half-day/Absent), Late/LateApproved, Undertime/Overtime
+// (day-unit formula), and merged in any Field Work hours. This just upserts
+// the finished row by Member+Date so re-importing a correction overwrites
+// rather than duplicates.
 function importAttendance(data) {
   var rows = data.rows;
   if (!rows || !rows.length) return {status:'error', message:'no rows'};
   var sheet = getOrCreate(ATTENDANCE_TAB, function(sh){
-    sh.getRange(1,1,1,8).setValues([['Date','Member','Email','First In','Last Out','Total Hrs','Source','Imported At']]);
+    sh.getRange(1,1,1,ATTENDANCE_COLS.length).setValues([ATTENDANCE_COLS]);
     sh.setFrozenRows(1);
   });
   var existing = sheet.getLastRow() > 1 ? sheet.getRange(2,1,sheet.getLastRow()-1,2).getValues() : [];
@@ -125,155 +132,114 @@ function importAttendance(data) {
     if (!date || !member) return;
     var key = date+'|'+member.toLowerCase();
     var vals = [date, member, String(r.email||''), String(r.firstIn||''), String(r.lastOut||''),
-      parseFloat(r.totalHrs)||0, 'Paytime', now];
-    if (keyRow[key]){ sheet.getRange(keyRow[key],1,1,8).setValues([vals]); updated++; }
+      parseFloat(r.totalHrs)||0, String(r.status||'Present'), !!r.late, !!r.lateApproved,
+      parseFloat(r.undertime)||0, parseFloat(r.overtime)||0, parseFloat(r.fieldHours)||0,
+      'Paytime', now];
+    if (keyRow[key]){ sheet.getRange(keyRow[key],1,1,vals.length).setValues([vals]); updated++; }
     else { sheet.appendRow(vals); appended++; }
   });
   return {status:'ok', appended:appended, updated:updated};
 }
 
-// Self-submitted "I'm arriving late today, approved" — from DPR/DPER/CRM.
-// Not manager-only: anyone submits their own; only a manager can decide it.
+// Self-submitted context from the "Arrived on time? → No" follow-up in
+// DPR/DPER/CRM — did they inform us before 9 AM, and what time did they say
+// they punched in. Pure log, no approval workflow of its own: the actual
+// decision (excuse the lateness, or treat the day as absent) is made once,
+// per real calendar day, when Siddharth reviews the Paytime import — see
+// importAttendance / attendance-import.html. Not manager-only: self-submit.
 function submitLateRequest(data) {
   var member = String(data.member||'').trim(), date = String(data.date||'').trim();
   if (!member || !date) return {status:'error', message:'member and date required'};
   var sheet = getOrCreate(LATE_REQ_TAB, function(sh){
-    sh.getRange(1,1,1,9).setValues([['ID','Date','Member','Email','Reason','Status','Requested At','Decided By','Decided At']]);
+    sh.getRange(1,1,1,8).setValues([['ID','Date','Member','Email','Informed Before 9','Reported Punch In','Reason','Submitted At']]);
     sh.setFrozenRows(1);
   });
   var id = 'LR-'+new Date().getTime();
-  sheet.appendRow([id, date, member, String(data.email||''), String(data.reason||''), 'Pending', new Date(), '', '']);
+  sheet.appendRow([id, date, member, String(data.email||''),
+    data.informedBefore9 === 'Yes' ? 'Yes' : 'No', String(data.reportedPunchIn||''),
+    String(data.reason||''), new Date()]);
   return {status:'ok', id:id};
 }
-function getLateRequests() {
+// Context rows for the import tool to match against real biometric days —
+// optionally scoped to a date range (import usually covers one month).
+function getLateRequests(fromStr, toStr) {
   var sheet = db().getSheetByName(LATE_REQ_TAB);
   if (!sheet || sheet.getLastRow() < 2) return {requests:[]};
   var rows = sheet.getDataRange().getValues(), out=[];
   for (var i=1; i<rows.length; i++){
-    if (String(rows[i][5]||'').trim() !== 'Pending') continue;
-    out.push({row:i+1, id:String(rows[i][0]||''), date:cellDate(rows[i][1]), member:String(rows[i][2]||''),
-      reason:String(rows[i][4]||''), requestedAt:cellDate(rows[i][6])});
+    var d = cellDate(rows[i][1]);
+    if (fromStr && d < fromStr) continue;
+    if (toStr   && d > toStr)   continue;
+    out.push({row:i+1, id:String(rows[i][0]||''), date:d, member:String(rows[i][2]||''),
+      informedBefore9:String(rows[i][4]||''), reportedPunchIn:String(rows[i][5]||''),
+      reason:String(rows[i][6]||''), submittedAt:cellDate(rows[i][7])});
   }
   return {requests:out};
 }
-function decideLateRequest(data, authEmail) {
-  var sheet = db().getSheetByName(LATE_REQ_TAB);
-  var row = parseInt(data.row,10); if (!sheet || !row) return {status:'error', message:'no row'};
-  var decision = data.decision === 'approve' ? 'Approved' : 'Rejected';
-  sheet.getRange(row,6).setValue(decision);
-  sheet.getRange(row,8).setValue(authEmail||'');
-  sheet.getRange(row,9).setValue(new Date());
-  return {status:'ok', decision:decision};
-}
 
-// FIELD_WORK entries are written 'Pending' (writeFieldWork) — these two let a
-// manager clear the queue, same pattern as late requests.
-function getFieldWorkPending() {
+// FIELD_WORK entries across all members for a date range — used by the
+// attendance import to merge site-visit/meeting/material-selection hours
+// into that day's Total Hrs (site visits especially: the biometric alone
+// rarely captures travel time or a day spent entirely off-site).
+function getFieldWorkForRange(fromStr, toStr) {
   var sheet = db().getSheetByName(FIELD_WORK_TAB);
   if (!sheet || sheet.getLastRow() < 2) return {entries:[]};
   var rows = sheet.getDataRange().getValues(), out=[];
   for (var i=1; i<rows.length; i++){
-    if (String(rows[i][11]||'').trim() !== 'Pending') continue;
-    out.push({row:i+1, id:String(rows[i][0]||''), date:cellDate(rows[i][1]), member:String(rows[i][2]||''),
-      type:String(rows[i][4]||''), project:String(rows[i][5]||''), start:String(rows[i][6]||''),
-      end:String(rows[i][7]||''), hours:parseFloat(rows[i][8])||0, notes:String(rows[i][9]||'')});
+    var d = cellDate(rows[i][1]);
+    if (fromStr && d < fromStr) continue;
+    if (toStr   && d > toStr)   continue;
+    out.push({date:d, member:String(rows[i][2]||''), type:String(rows[i][4]||''),
+      project:String(rows[i][5]||''), start:String(rows[i][6]||''), end:String(rows[i][7]||''),
+      hours:parseFloat(rows[i][8])||0, notes:String(rows[i][9]||'')});
   }
   return {entries:out};
 }
-function decideFieldWork(data) {
-  var sheet = db().getSheetByName(FIELD_WORK_TAB);
-  var row = parseInt(data.row,10); if (!sheet || !row) return {status:'error', message:'no row'};
-  sheet.getRange(row,12).setValue(data.decision === 'approve' ? 'Approved' : 'Rejected');
-  return {status:'ok'};
-}
 
-// ── The merge: biometric (ATTENDANCE) + approved late permission + approved
-// field work → one member's real daily/weekly attendance record. ──
-// Late-arrival permission excuses lateness only (hours still come from the
-// biometric). Approved field work on a day with no biometric punch makes that
-// a "field day" — present, hours = engaged sum, no punctuality applied (they
-// were not expected in the office). A day with both is an office day whose
-// punctuality/hours stand as biometric; field hours still count toward output
-// separately via the Done visit tasks (unrelated to this attendance record).
+// One member's attendance, already decided at import time — straight read
+// from ATTENDANCE plus the monthly OT/UT rollup.
+// Net OT/UT (day-units) is added to the present-day count to get adjusted
+// salary days, matching the day-unit formula Siddharth specified (undertime/
+// overtime are fractions of an 8-hour day, e.g. 15 min short = 0.03125).
 function getMemberAttendance(member, fromStr, toStr) {
   member = String(member||'').trim();
   if (!member) return {error:'no member'};
   var s = db();
   var from = fromStr || dateStr(mondayOf(new Date()));
   var to   = toStr   || dateStr();
-  var LATE_THRESHOLD = member === 'Achal Rathore' ? 640 : 550;  // 10:40 / 09:10 in minutes
-  function toMin(t){ var m=String(t||'').match(/(\d{1,2}):(\d{2})/); if(!m) return null; var v=+m[1]*60+ +m[2]; return v||null; }
 
-  var bio = {};  // date → {firstIn, lastOut, totalHrs}
+  var days = [];
   var aSheet = s.getSheetByName(ATTENDANCE_TAB);
   if (aSheet && aSheet.getLastRow() > 1){
     var ar = aSheet.getDataRange().getValues();
     for (var i=1; i<ar.length; i++){
       if (String(ar[i][1]||'').trim().toLowerCase() !== member.toLowerCase()) continue;
       var d = cellDate(ar[i][0]); if (!d || d<from || d>to) continue;
-      bio[d] = {firstIn:String(ar[i][3]||''), lastOut:String(ar[i][4]||''), totalHrs:parseFloat(ar[i][5])||0};
+      days.push({
+        date:d, firstIn:String(ar[i][3]||''), lastOut:String(ar[i][4]||''), hrs:parseFloat(ar[i][5])||0,
+        status:String(ar[i][6]||''), late:!!ar[i][7], lateApproved:!!ar[i][8],
+        undertime:parseFloat(ar[i][9])||0, overtime:parseFloat(ar[i][10])||0, fieldHours:parseFloat(ar[i][11])||0,
+      });
     }
   }
+  days.sort(function(a,b){ return a.date.localeCompare(b.date); });
 
-  var lateOk = {};  // date → true (approved late permission)
-  var lSheet = s.getSheetByName(LATE_REQ_TAB);
-  if (lSheet && lSheet.getLastRow() > 1){
-    var lr = lSheet.getDataRange().getValues();
-    for (var j=1; j<lr.length; j++){
-      if (String(lr[j][2]||'').trim().toLowerCase() !== member.toLowerCase()) continue;
-      if (String(lr[j][5]||'').trim() !== 'Approved') continue;
-      var ld = cellDate(lr[j][1]); if (ld) lateOk[ld] = true;
-    }
-  }
-
-  var field = {};  // date → {hrs, minStart, maxEnd}
-  var fSheet = s.getSheetByName(FIELD_WORK_TAB);
-  if (fSheet && fSheet.getLastRow() > 1){
-    var fr = fSheet.getDataRange().getValues();
-    for (var k=1; k<fr.length; k++){
-      if (String(fr[k][2]||'').trim().toLowerCase() !== member.toLowerCase()) continue;
-      if (String(fr[k][11]||'').trim() !== 'Approved') continue;
-      var fd = cellDate(fr[k][1]); if (!fd || fd<from || fd>to) continue;
-      if (!field[fd]) field[fd] = {hrs:0, minStart:null, maxEnd:null};
-      field[fd].hrs += parseFloat(fr[k][8])||0;
-      var st = toMin(fr[k][6]), en = toMin(fr[k][7]);
-      if (st!=null && (field[fd].minStart==null || st<field[fd].minStart)) field[fd].minStart = st;
-      if (en!=null && (field[fd].maxEnd==null   || en>field[fd].maxEnd))   field[fd].maxEnd   = en;
-    }
-  }
-
-  var days = [];
-  for (var d0=from; d0<=to; d0=addDaysToStr(d0,1)){
-    var wd = new Date(d0+'T00:00:00Z').getUTCDay();
-    if (wd === 0) continue;   // Sunday — not a working day
-    var b = bio[d0], f = field[d0];
-    var hasBio = b && toMin(b.firstIn) != null && b.totalHrs > 0;
-    var rec = {date:d0, present:false, source:'', firstIn:'', lastOut:'', hrs:0, late:false, lateExcused:false, note:''};
-    if (hasBio){
-      rec.present = true; rec.source = f ? 'office+field' : 'office';
-      rec.firstIn = b.firstIn; rec.lastOut = b.lastOut; rec.hrs = b.totalHrs;
-      var inMin = toMin(b.firstIn);
-      var isLate = inMin!=null && inMin>LATE_THRESHOLD && inMin<720;
-      if (isLate && lateOk[d0]) { rec.lateExcused = true; rec.note = 'Late — approved'; }
-      else if (isLate) { rec.late = true; rec.note = Math.round(inMin-LATE_THRESHOLD)+' min late'; }
-    } else if (f){
-      rec.present = true; rec.source = 'field'; rec.hrs = Math.round(f.hrs*10)/10;
-      if (f.minStart!=null) rec.firstIn = Math.floor(f.minStart/60)+':'+String(f.minStart%60).padStart(2,'0');
-      if (f.maxEnd!=null)   rec.lastOut = Math.floor(f.maxEnd/60)+':'+String(f.maxEnd%60).padStart(2,'0');
-      rec.note = 'Field day — no office punch';
-    } else {
-      rec.note = 'Absent';
-    }
-    days.push(rec);
-  }
-
-  var present = days.filter(function(x){return x.present;});
-  var lateCount = days.filter(function(x){return x.late;}).length;
-  var avgHrs = present.length ? present.reduce(function(s2,x){return s2+x.hrs;},0)/present.length : 0;
+  var present  = days.filter(function(x){ return x.status !== 'Absent'; });
+  var absent   = days.filter(function(x){ return x.status === 'Absent'; });
+  var halfDays = days.filter(function(x){ return x.status === 'Half-day'; });
+  var lateApproved = days.filter(function(x){ return x.late && x.lateApproved; });
+  var totalUT  = days.reduce(function(s2,x){ return s2+x.undertime; }, 0);
+  var totalOT  = days.reduce(function(s2,x){ return s2+x.overtime; }, 0);
+  var netOT    = Math.round((totalOT-totalUT)*10000)/10000;
+  var avgHrs   = present.length ? present.reduce(function(s2,x){return s2+x.hrs;},0)/present.length : 0;
 
   return {member:member, from:from, to:to, days:days,
-    summary:{present:present.length, absent:days.length-present.length, late:lateCount,
-      avgHrs:Math.round(avgHrs*100)/100}};
+    summary:{
+      present:present.length, absent:absent.length, halfDays:halfDays.length,
+      lateApproved:lateApproved.length, avgHrs:Math.round(avgHrs*100)/100,
+      totalUT:Math.round(totalUT*10000)/10000, totalOT:Math.round(totalOT*10000)/10000, netOT:netOT,
+      salaryDays:Math.round((present.length+netOT)*100)/100,
+    }};
 }
 
 // Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
@@ -323,8 +289,7 @@ function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1,
-  getMemberReview:1, importAttendance:1, getLateRequests:1, decideLateRequest:1,
-  getFieldWorkPending:1, decideFieldWork:1, getMemberAttendance:1 };
+  getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -623,8 +588,8 @@ function doGet(e) {
   if (action === 'getWeeklyStats')           return safeRespond(function() { return getWeeklyStats(p.weekStart||''); });
   if (action === 'getMemberReview')          return safeRespond(function() { return getMemberReview(p.member||'', p.from||'', p.to||''); });
   if (action === 'getMemberAttendance')      return safeRespond(function() { return getMemberAttendance(p.member||'', p.from||'', p.to||''); });
-  if (action === 'getLateRequests')          return safeRespond(getLateRequests);
-  if (action === 'getFieldWorkPending')      return safeRespond(getFieldWorkPending);
+  if (action === 'getLateRequests')          return safeRespond(function() { return getLateRequests(p.from||'', p.to||''); });
+  if (action === 'getFieldWorkForRange')     return safeRespond(function() { return getFieldWorkForRange(p.from||'', p.to||''); });
   if (action === 'getProjectStats')          return safeRespond(getProjectStats);
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
@@ -673,10 +638,8 @@ function doPost(e) {
     if (data.action === 'getMemberAttendance')    return respond(getMemberAttendance(data.member||'', data.from||'', data.to||''));
     if (data.action === 'importAttendance')       return respond(importAttendance(data));
     if (data.action === 'submitLateRequest')      return respond(submitLateRequest(data));
-    if (data.action === 'getLateRequests')        return respond(getLateRequests());
-    if (data.action === 'decideLateRequest')      return respond(decideLateRequest(data, authEmail));
-    if (data.action === 'getFieldWorkPending')    return respond(getFieldWorkPending());
-    if (data.action === 'decideFieldWork')        return respond(decideFieldWork(data));
+    if (data.action === 'getLateRequests')        return respond(getLateRequests(data.from||'', data.to||''));
+    if (data.action === 'getFieldWorkForRange')   return respond(getFieldWorkForRange(data.from||'', data.to||''));
     if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
