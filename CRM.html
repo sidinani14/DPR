@@ -8,7 +8,7 @@
 <script src="auth.js"></script>
 <script src="searchselect.js"></script>
 <style>:root{--ss-bg:#FFFFFF;--ss-fg:#1A1917;--ss-pop-bg:#FFFFFF;--ss-border:#E2DFD8;--ss-accent:#1F3A5F;--ss-muted:#9E9B94;--ss-hover:rgba(31,58,95,0.10)}</style>
-<script>SearchSelect.auto('[id^="cb-proj-"],[id^="ag-proj-"],[id^="bill-proj-"],[id^="pay-proj-"],[id^="ae-proj-"],[id^="ni-proj-"],[id^="fb-proj-"],[id^="ni-assign-"],[id^="lb-mgr-"]');</script>
+<script>SearchSelect.auto('[id^="cb-proj-"],[id^="fw-proj-"],[id^="ag-proj-"],[id^="bill-proj-"],[id^="pay-proj-"],[id^="ae-proj-"],[id^="ni-proj-"],[id^="fb-proj-"],[id^="ni-assign-"],[id^="lb-mgr-"]');</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -330,6 +330,15 @@ textarea{min-height:62px;resize:vertical;}
     </div>
     <div class="section-body">
       <input type="date" id="f-date">
+      <div class="field" style="margin-top:12px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="late-req-toggle" onchange="document.getElementById('late-req-reason-wrap').style.display=this.checked?'block':'none'" style="width:auto">
+          Running late today? Request approval <span style="color:var(--text3);font-weight:400">(replaces messaging Siddharth)</span>
+        </label>
+        <div id="late-req-reason-wrap" style="display:none;margin-top:8px">
+          <textarea id="late-req-reason" placeholder="Reason (e.g. client meeting ran long, personal, traffic)"></textarea>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -346,10 +355,23 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- ── S7: New Issues ─────────────────────────── -->
+  <!-- ── S4: Field Work Today ─────────────────── -->
   <div class="section">
     <div class="section-head">
       <span class="section-num">4</span>
+      <span class="section-title">Field Work Today</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Add each site visit, client meeting or material selection you did today with its <b>start &amp; end time</b>. This earns your visit points <b>and</b> records your attendance for a day out of office.</p>
+      <div id="fw-blocks"></div>
+      <button class="add-btn teal" id="add-fw-btn" onclick="addFieldWork()" disabled>+ Add site visit / meeting / material selection</button>
+    </div>
+  </div>
+
+  <!-- ── S7: New Issues ─────────────────────────── -->
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">5</span>
       <span class="section-title">Add Issues &amp; Design Deliverables</span>
     </div>
     <div class="section-body">
@@ -396,7 +418,7 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── S4: Tomorrow's Plans + Agenda Generator ── -->
   <div class="section">
     <div class="section-head" style="background:#1B5E20">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">5</span>
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">6</span>
       <span class="section-title">Tomorrow's Meetings &amp; Site Visits</span>
     </div>
     <div class="section-body">
@@ -421,7 +443,7 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── Finance ───────────────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">6</span>
+      <span class="section-num">7</span>
       <span class="section-title">Finance</span>
     </div>
     <div class="section-body">
@@ -477,7 +499,7 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── S6: Other Activities ──────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">7</span>
+      <span class="section-num">8</span>
       <span class="section-title">Other Activities</span>
     </div>
     <div class="section-body">
@@ -545,7 +567,7 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── S2: Lead Management ───────────────────── -->
   <div class="section">
     <div class="section-head">
-      <span class="section-num">8</span>
+      <span class="section-num">9</span>
       <span class="section-title">Lead Management</span>
     </div>
     <div class="section-body">
@@ -560,7 +582,7 @@ textarea{min-height:62px;resize:vertical;}
   <!-- ── S8: Monthly Client Feedback ──────────────── -->
   <div class="section">
     <div class="section-head" style="background:#6A1B9A">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">9</span>
+      <span class="section-num" style="background:rgba(255,255,255,0.2)">10</span>
       <span class="section-title">Monthly Client Feedback</span>
     </div>
     <div class="section-body">
@@ -650,7 +672,7 @@ function onGoogleSignIn(resp) {
   document.getElementById('user-pill').classList.remove('hidden');
   document.getElementById('user-name-display').textContent = crmUser;
   document.getElementById('submit-status').textContent = crmUser;
-  ['submit-btn','add-lead-btn','add-contact-btn','add-agenda-btn','add-iss-btn'].forEach(id=>{
+  ['submit-btn','add-lead-btn','add-contact-btn','add-fw-btn','add-agenda-btn','add-iss-btn'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.disabled=false;
   });
   loadProjects();
@@ -726,7 +748,7 @@ function projOptionsHtml(){
 
 function refreshProjectDropdowns() {
   const opts = projOptionsHtml();
-  document.querySelectorAll('[id^="cb-proj-"],[id^="ag-proj-"],[id^="ni-proj-"],[id^="ae-proj-"],[id^="pay-proj-"],[id^="bill-proj-"],[id^="fb-proj-"]').forEach(sel=>{
+  document.querySelectorAll('[id^="cb-proj-"],[id^="fw-proj-"],[id^="ag-proj-"],[id^="ni-proj-"],[id^="ae-proj-"],[id^="pay-proj-"],[id^="bill-proj-"],[id^="fb-proj-"]').forEach(sel=>{
     const cur=sel.value; sel.innerHTML=opts; if(cur) sel.value=cur;
   });
 }
@@ -1101,6 +1123,70 @@ function setLeadStatus(id, status) {
   });
   const lostWrap=document.getElementById('lb-lost-'+id);
   if(lostWrap) lostWrap.style.display=status==='Lost'?'block':'none';
+}
+
+// ════════════════════════════════════════
+// FIELD WORK TODAY — Section 4
+// Start/end time per engagement → hours drive visit points (Site Visit +
+// Material Selection ×2/hr, Meeting ×1/hr) and feed FIELD_WORK for the
+// attendance import (Part B) — matches dpr.html Section 4 / DPER's per-project
+// visit block.
+// ════════════════════════════════════════
+const FW_TYPES=['Site Visit','Meeting','Material Selection'];
+function fwRate(t){ return (t==='Site Visit'||t==='Material Selection')?2:1; }
+function fwHours(start,end){
+  if(!start||!end) return 0;
+  const s=start.split(':'), e=end.split(':');
+  if(s.length<2||e.length<2) return 0;
+  let mins=(+e[0]*60 + +e[1]) - (+s[0]*60 + +s[1]);
+  if(mins<=0) return 0;
+  return Math.round((mins/60)*100)/100;
+}
+let fwCount=0;
+function addFieldWork(){
+  fwCount++; const id=fwCount;
+  const div=document.createElement('div'); div.className='fw-block'; div.id='fw-'+id;
+  div.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span class="cb-num">Field work ${id}</span>
+      <button style="background:var(--red-bg);border:none;color:var(--red);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;margin-left:auto" onclick="document.getElementById('fw-${id}').remove()">✕</button>
+    </div>
+    <div class="field"><span class="lbl">Type</span><select id="fw-type-${id}" onchange="updateFWCalc(${id})">${FW_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+    <div class="field"><span class="lbl">Project</span><select id="fw-proj-${id}">${projOptionsHtml()}</select></div>
+    <div class="field"><span class="lbl">Start &amp; end time</span>
+      <div style="display:flex;gap:8px">
+        <input type="time" id="fw-start-${id}" onchange="updateFWCalc(${id})" style="flex:1">
+        <input type="time" id="fw-end-${id}" onchange="updateFWCalc(${id})" style="flex:1">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px"><span id="fw-dur-${id}">—</span> · <span id="fw-pts-${id}" style="color:var(--accent);font-weight:600">— pts</span></div>
+    </div>
+    <div class="field"><span class="lbl">Notes <span class="opt">optional</span></span><textarea id="fw-notes-${id}" placeholder="Key decisions, client feedback, next steps…" style="min-height:44px"></textarea></div>`;
+  document.getElementById('fw-blocks').appendChild(div);
+}
+function updateFWCalc(id){
+  const type=document.getElementById(`fw-type-${id}`)?.value||'';
+  const start=document.getElementById(`fw-start-${id}`)?.value||'';
+  const end=document.getElementById(`fw-end-${id}`)?.value||'';
+  const hrs=fwHours(start,end);
+  const pts=Math.round(hrs*fwRate(type)*10)/10;
+  const durEl=document.getElementById(`fw-dur-${id}`), ptsEl=document.getElementById(`fw-pts-${id}`);
+  if(durEl) durEl.textContent = hrs>0 ? (hrs+(hrs===1?' hr':' hrs')) : '—';
+  if(ptsEl) ptsEl.textContent = pts>0 ? (pts.toFixed(1)+' pts') : '— pts';
+}
+function collectFieldWork(){
+  const out=[];
+  document.querySelectorAll('.fw-block').forEach(fb=>{
+    const id=fb.id.replace('fw-','');
+    const type=document.getElementById(`fw-type-${id}`)?.value||'';
+    const project=document.getElementById(`fw-proj-${id}`)?.value||'';
+    const start=document.getElementById(`fw-start-${id}`)?.value||'';
+    const end=document.getElementById(`fw-end-${id}`)?.value||'';
+    const notes=document.getElementById(`fw-notes-${id}`)?.value.trim()||'';
+    const hrs=fwHours(start,end);
+    if(!project||hrs<=0) return;
+    out.push({type, project, start, end, hours:hrs, notes});
+  });
+  return out;
 }
 
 // ════════════════════════════════════════
@@ -1726,6 +1812,12 @@ async function submitAll() {
     if (taskStatuses.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).catch(()=>{});
 
+    // 1c. Late-arrival permission request (replaces messaging Siddharth on WhatsApp)
+    const lateReason = document.getElementById('late-req-toggle')?.checked ? document.getElementById('late-req-reason')?.value.trim() : '';
+    if (lateReason) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'submitLateRequest', member:crmUser, email:googleUser?.email||'',
+        date:new Date().toISOString().substring(0,10), reason:lateReason})}).catch(()=>{});
+
     // 2. Main CRM submission
     const leads    = collectLeads();
     const followups= collectLeadUpdates();
@@ -1763,6 +1855,12 @@ async function submitAll() {
       })});
     const resp = await r.json();
     if(resp.status!=='ok') throw new Error(resp.message||'Submission failed');
+
+    // Field work today (site visits/meetings/material selections) — separate
+    // batch call since it creates its own Done tasks + FIELD_WORK rows.
+    const fieldWork = collectFieldWork();
+    if (fieldWork.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'submitFieldWorkBatch', member:crmUser, email:googleUser?.email||'', date, items:fieldWork})}).catch(()=>{});
 
     // Success screen
     document.getElementById('form-body').style.display='none';

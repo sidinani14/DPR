@@ -1,0 +1,245 @@
+<meta charset="utf-8">
+<title>IDS · Attendance Import</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="auth.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#0F1923;--card:#16212E;--line:rgba(255,255,255,.08);--t1:#fff;--t2:rgba(255,255,255,.72);--t3:rgba(255,255,255,.42);--accent:#F5A623;--red:#EA4335;--amber:#FBBC04;--green:#2ED573}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',system-ui,-apple-system,sans-serif;line-height:1.5;padding:0 0 60px}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+.rh{padding:26px 0 18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.rh h1{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.rh .sub{font-size:12px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:1.4px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+h2{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.6px;margin-bottom:4px}
+.h2sub{font-size:12px;color:var(--t3);margin-bottom:16px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop input{display:none}
+.drop .ic{font-size:28px;margin-bottom:8px}
+.drop .t{font-size:13px;color:var(--t2)}
+.drop .t2{font-size:11px;color:var(--t3);margin-top:4px}
+.banner{border-radius:10px;padding:12px 14px;font-size:12.5px;margin-bottom:14px}
+.banner.warn{background:rgba(251,188,4,.1);border:1px solid rgba(251,188,4,.3);color:#FBBC04}
+.banner.bad{background:rgba(234,67,53,.1);border:1px solid rgba(234,67,53,.3);color:#EA4335}
+.banner.ok{background:rgba(46,213,115,.1);border:1px solid rgba(46,213,115,.3);color:#2ED573}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--t2)}
+td.n{text-align:center}
+.tblwrap{max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+select,input[type=checkbox]{font-family:inherit}
+.namesel{background:var(--bg);color:var(--t1);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-size:11.5px}
+.namesel.bad{border-color:var(--red);color:var(--red)}
+.btn{font-size:13px;font-weight:700;color:#0F1923;background:var(--accent);border:none;border-radius:8px;padding:11px 20px;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn2{font-size:12px;color:var(--t2);background:none;border:1px solid var(--line);border-radius:7px;padding:8px 14px;cursor:pointer}
+.zerocell{color:var(--red);font-weight:700}
+.loading{color:var(--t3);font-size:13px}
+.row-actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.stat{font-size:12px;color:var(--t3)}
+</style>
+
+<div id="gate" style="max-width:430px;margin:16vh auto;text-align:center;color:var(--t2);padding:20px">
+  <div style="font-size:40px">🔒</div>
+  <h2 style="color:var(--accent);margin:10px 0 6px;letter-spacing:1px">Attendance Import</h2>
+  <p style="font-size:13px;color:var(--t3)">Sign in with an authorised Ideaform account (Siddharth / Astha).</p>
+</div>
+
+<div id="app" class="wrap" style="display:none">
+  <div class="rh"><h1>Attendance Import</h1><div class="sub">Upload the Paytime "Working Duration Report" export — punch data only, status letters are ignored</div></div>
+
+  <section>
+    <h2>1 · Upload</h2>
+    <div class="h2sub">.xls / .xlsx from Paytime — weekly or monthly export, either works</div>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".xls,.xlsx">
+      <div class="ic">📄</div>
+      <div class="t">Click to choose the Paytime export, or drop it here</div>
+      <div class="t2">Only First In / Last Out / Total Hrs are read — Status letters (P/A/HD…) are ignored per instruction</div>
+    </label>
+    <div id="parse-msg" style="margin-top:12px"></div>
+  </section>
+
+  <div id="preview"></div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
+const MANAGER_EMAILS=['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'];
+let ROSTER=[];          // team member names from getLists
+let PARSED=null;        // {year, month, members:[{name,firstIn,lastOut,totalHrs}]}
+let ROWS=[];            // flattened, editable rows for the preview/import
+
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MONTHS={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+const MON_NAME=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function parsePaytimeDate(s){
+  const m=String(s||'').match(/(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+  if(!m) return null;
+  const mo=MONTHS[m[2]]; if(!mo) return null;
+  return {day:+m[1], month:mo, year:+m[3]};
+}
+function toMin(t){ const m=String(t||'').match(/(\d{1,2}):(\d{2})/); if(!m) return null; const v=+m[1]*60+ +m[2]; return v||null; }
+
+// The Paytime "Working Duration Report" layout, verified against three real
+// exports (June full-month, two July snapshots): row label in col A, one
+// blank spacer column, then one column per calendar day of the month in
+// order — so day D's value sits at column index D+1 (0-indexed). This holds
+// regardless of the header's own day-number row, which is not reliable to
+// auto-detect from. Employee name is the last populated cell in the
+// "Emp ID :" row (usually column index 6).
+function parsePaytimeWorkbook(wb){
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''});
+  let year=null, month=null;
+  for(const r of rows){
+    if(String(r[0]||'').trim().replace(/:$/,'')==='From'){
+      const d=parsePaytimeDate(r[1]); if(d){ year=d.year; month=d.month; } break;
+    }
+  }
+  if(!year) throw new Error("Could not find the report's date range (a 'From:' row) — is this a Paytime Working Duration Report export?");
+
+  const members=[]; let cur=null;
+  for(let i=0;i<rows.length;i++){
+    const c0=String(rows[i][0]||'').trim();
+    if(c0==='Emp ID :'){
+      let name=String(rows[i][6]||'').trim();
+      if(!name){ for(let c=rows[i].length-1;c>=1;c--){ if(String(rows[i][c]||'').trim()){ name=String(rows[i][c]).trim(); break; } } }
+      cur={name, firstIn:{}, lastOut:{}, totalHrs:{}};
+      members.push(cur);
+      continue;
+    }
+    if(!cur) continue;
+    if(c0==='First In')  for(let d=1;d<=31;d++) cur.firstIn[d]=String(rows[i][d+1]||'').trim();
+    if(c0==='Last Out')  for(let d=1;d<=31;d++) cur.lastOut[d]=String(rows[i][d+1]||'').trim();
+    if(c0==='Total Hrs') for(let d=1;d<=31;d++) cur.totalHrs[d]=String(rows[i][d+1]||'').trim();
+  }
+  if(!members.length) throw new Error("No employee blocks found ('Emp ID :' rows) — check this is the right export.");
+  return {year, month, members};
+}
+
+function bestMatch(rawName){
+  const rn=rawName.toLowerCase().replace(/\s+/g,' ').trim();
+  let hit=ROSTER.find(m=>m.toLowerCase()===rn);
+  if(hit) return hit;
+  const firstTok=rn.split(' ')[0];
+  hit=ROSTER.find(m=>m.toLowerCase().split(' ')[0]===firstTok);
+  return hit||null;
+}
+
+function buildRows(parsed){
+  const out=[];
+  const daysInMonth=new Date(parsed.year, parsed.month, 0).getDate();
+  parsed.members.forEach(m=>{
+    const matched=bestMatch(m.name);
+    for(let d=1; d<=daysInMonth; d++){
+      const fi=m.firstIn[d]||'', lo=m.lastOut[d]||'', th=m.totalHrs[d]||'';
+      const inMin=toMin(fi), hrs=parseFloat((th||'').replace(':','.'))||toHrsFromHHMM(th);
+      if(inMin==null || !hrs) continue;   // no real punch that day — skip (weekend/holiday/absent)
+      const date=parsed.year+'-'+String(parsed.month).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      out.push({date, rawName:m.name, member:matched||m.name, matched:!!matched,
+        firstIn:fi, lastOut:lo, totalHrs:Math.round(hrs*100)/100, include:true});
+    }
+  });
+  out.sort((a,b)=> a.member.localeCompare(b.member) || a.date.localeCompare(b.date));
+  return out;
+}
+function toHrsFromHHMM(t){ const m=String(t||'').match(/(\d{1,2}):(\d{2})/); if(!m) return 0; return +m[1]+ +m[2]/60; }
+
+function handleFile(file){
+  const msg=document.getElementById('parse-msg');
+  msg.innerHTML='<div class="loading">Reading file…</div>';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      PARSED=parsePaytimeWorkbook(wb);
+      ROWS=buildRows(PARSED);
+      msg.innerHTML=`<div class="banner ok">Parsed ${MON_NAME[PARSED.month]} ${PARSED.year} — ${PARSED.members.length} employees, ${ROWS.length} days with a punch found.</div>`;
+      renderPreview();
+    }catch(err){
+      msg.innerHTML='<div class="banner bad">'+esc(err.message)+'</div>';
+      document.getElementById('preview').innerHTML='';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderPreview(){
+  const host=document.getElementById('preview');
+  if(!ROWS.length){ host.innerHTML=''; return; }
+
+  // Sanity check: a date where every included row has 0 hours / everyone missing
+  // is very likely a Sunday/holiday or a column-shift bug — flag it plainly.
+  const byDate={}; ROWS.forEach(r=>{ (byDate[r.date]=byDate[r.date]||[]).push(r); });
+  const suspectDates=Object.keys(byDate).filter(d=> byDate[d].every(r=>r.totalHrs<=0.05));
+  const unmatched=[...new Set(ROWS.filter(r=>!r.matched).map(r=>r.rawName))];
+
+  let banners='';
+  if(unmatched.length) banners+=`<div class="banner warn">${unmatched.length} name(s) from the file did not match anyone on the team roster — pick the right person for each row below, or untick to skip: <b>${unmatched.map(esc).join(', ')}</b></div>`;
+  if(suspectDates.length) banners+=`<div class="banner bad">${suspectDates.length} date(s) show <b>zero hours for everyone</b> (${suspectDates.slice(0,5).join(', ')}${suspectDates.length>5?'…':''}) — this is almost always a weekend/holiday, but if you expected people in the office that day, double-check before importing.</div>`;
+
+  const included=ROWS.filter(r=>r.include).length;
+  const rows=ROWS.map((r,i)=>`<tr>
+    <td class="n"><input type="checkbox" ${r.include?'checked':''} onchange="ROWS[${i}].include=this.checked;updateCount()"></td>
+    <td>${esc(r.date)}</td>
+    <td>${r.matched?esc(r.member):`<select class="namesel bad" onchange="ROWS[${i}].member=this.value;ROWS[${i}].matched=!!this.value;renderPreview()">
+        <option value="">— pick member (raw: ${esc(r.rawName)}) —</option>${ROSTER.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('')}</select>`}</td>
+    <td class="n">${esc(r.firstIn)}</td><td class="n">${esc(r.lastOut)}</td>
+    <td class="n ${r.totalHrs<=0.05?'zerocell':''}">${r.totalHrs.toFixed(2)}</td>
+  </tr>`).join('');
+
+  host.innerHTML=`<section>
+    <h2>2 · Review before import</h2>
+    <div class="h2sub">Fix any unmatched names, untick rows you don't want, then import. Nothing is written until you click Import.</div>
+    ${banners}
+    <div class="tblwrap"><table><thead><tr><th class="n">✓</th><th>Date</th><th>Member</th><th class="n">First In</th><th class="n">Last Out</th><th class="n">Total Hrs</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <div class="row-actions">
+      <button class="btn" id="import-btn" onclick="doImport()">Import <span id="import-count">${included}</span> rows</button>
+      <button class="btn2" onclick="toggleAll(true)">Select all</button>
+      <button class="btn2" onclick="toggleAll(false)">Deselect all</button>
+      <span class="stat" id="import-status"></span>
+    </div>
+  </section>`;
+}
+function updateCount(){ document.getElementById('import-count').textContent=ROWS.filter(r=>r.include).length; }
+function toggleAll(v){ ROWS.forEach(r=>r.include=v); renderPreview(); }
+
+async function doImport(){
+  const btn=document.getElementById('import-btn'); const status=document.getElementById('import-status');
+  const rows=ROWS.filter(r=>r.include && r.matched).map(r=>({date:r.date, member:r.member, firstIn:r.firstIn, lastOut:r.lastOut, totalHrs:r.totalHrs}));
+  if(!rows.length){ status.textContent='Nothing selected to import.'; return; }
+  btn.disabled=true; status.textContent='Importing…';
+  try{
+    const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'importAttendance', rows})}).then(r=>r.json());
+    if(res.status==='ok') status.innerHTML=`<span style="color:var(--green);font-weight:700">✓ Imported — ${res.appended} new, ${res.updated} updated.</span>`;
+    else status.innerHTML='<span style="color:var(--red)">'+esc(res.message||'Import failed')+'</span>';
+  }catch(e){ status.innerHTML='<span style="color:var(--red)">Network error — '+esc(e.message)+'</span>'; }
+  btn.disabled=false;
+}
+
+function initUpload(){
+  const drop=document.getElementById('drop'), input=document.getElementById('file');
+  input.addEventListener('change', ()=>{ if(input.files[0]) handleFile(input.files[0]); });
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+}
+
+window.idsOnAuth=function(u){
+  const email=String((u&&u.email)||'').toLowerCase();
+  if(MANAGER_EMAILS.indexOf(email)===-1){
+    document.getElementById('gate').innerHTML='<div style="font-size:40px">🔒</div><h2 style="color:#EA4335;margin:10px 0">Access restricted</h2><p style="color:rgba(255,255,255,.5);font-size:13px">Attendance import is available to Siddharth &amp; Astha only.</p>';
+    return;
+  }
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').style.display='block';
+  initUpload();
+  fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})})
+    .then(r=>r.json()).then(d=>{ ROSTER=(d.allMembers||[]).filter(Boolean); })
+    .catch(()=>{});
+};
+</script>

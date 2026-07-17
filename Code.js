@@ -39,29 +39,62 @@ function calcVisitPts(taskType, hours) {
   return 0;
 }
 
-// Persist the DPR "Field work today" entries (start/end per engagement) to FIELD_WORK.
-// Points already flow through the Done-visit-task path; this row store feeds the
-// attendance import (Part B): first start → last end = the member's field-day window.
-// Each row is 'Pending' until Siddharth approves it in the import grid.
+// Append one or more rows to FIELD_WORK (start/end per engagement). Points
+// already flow through the Done-visit-task path; this row store feeds the
+// attendance import (Part B): first start → last end = the member's field-day
+// window. Each row is 'Pending' until Siddharth approves it in the import grid.
+function fieldWorkSheet(){
+  return getOrCreate(FIELD_WORK_TAB, function(sh){
+    sh.getRange(1,1,1,12).setValues([['FW ID','Date','Member','Email','Type','Project','Start','End','Engaged Hrs','Notes','Source','Approved']]);
+    sh.setFrozenRows(1);
+  });
+}
+function appendFieldWorkRows(entries){
+  if (!entries || !entries.length) return;
+  var sheet = fieldWorkSheet();
+  var stamp = new Date().getTime();
+  var rows = entries.map(function(e, n){
+    return ['FW-'+stamp+'-'+n, e.date, e.member||'', e.email||'',
+      String(e.type||''), String(e.project||''), String(e.start||''), String(e.end||''),
+      parseFloat(e.hours)||0, String(e.notes||''), e.source||'self', 'Pending'];
+  });
+  sheet.getRange(sheet.getLastRow()+1, 1, rows.length, 12).setValues(rows);
+}
+// CRM (Aman) "Field work today" — same shape as DPR's, but CRM's main payload
+// (submitAmanCRM) doesn't carry the DPR-specific Timestamp/Member fields, so
+// this takes member/email/date directly and also creates the points-bearing
+// Done tasks (DPR does this client-side via 'Done Tasks'; CRM has no
+// equivalent bulk path).
+function submitFieldWorkBatch(data) {
+  var member = data.member || '', email = data.email || '', date = data.date || dateStr();
+  var items = data.items || [];
+  if (!items.length) return {status:'ok', count:0};
+  appendFieldWorkRows(items.map(function(it){
+    return {date:date, member:member, email:email, type:it.type, project:it.project,
+      start:it.start, end:it.end, hours:it.hours, notes:it.notes, source:'self'};
+  }));
+  var created = 0;
+  items.forEach(function(it){
+    try {
+      createDoneTask({taskType:it.type, area:'', drawing:'', units:1, basePts:0,
+        project:it.project, member:member, discipline:'', date:date, visitHours:it.hours});
+      created++;
+    } catch(e) { Logger.log('field-work batch done-task error: ' + e); }
+  });
+  return {status:'ok', count:items.length, tasksCreated:created};
+}
+
+// DPR "Field work today" — a batch of engagements in one submission.
 function writeFieldWork(data) {
   var raw = data['Field Work']; if (!raw) return;
   var items; try { items = JSON.parse(raw); } catch(e) { return; }
   if (!items || !items.length) return;
-  var sheet = getOrCreate(FIELD_WORK_TAB, function(sh){
-    sh.getRange(1,1,1,12).setValues([['FW ID','Date','Member','Email','Type','Project','Start','End','Engaged Hrs','Notes','Source','Approved']]);
-    sh.setFrozenRows(1);
-  });
   var date = dateStr(data['Timestamp']);
-  var member = data['Member'] || '';
-  var email  = data['Member Email'] || '';
-  var stamp  = new Date().getTime();
-  var rows = items.map(function(it, n){
-    return ['FW-'+stamp+'-'+n, date, member, email,
-      String(it.type||''), String(it.project||''),
-      String(it.start||''), String(it.end||''),
-      parseFloat(it.hours)||0, String(it.notes||''), 'self', 'Pending'];
-  });
-  sheet.getRange(sheet.getLastRow()+1, 1, rows.length, 12).setValues(rows);
+  var member = data['Member'] || '', email = data['Member Email'] || '';
+  appendFieldWorkRows(items.map(function(it){
+    return {date:date, member:member, email:email, type:it.type, project:it.project,
+      start:it.start, end:it.end, hours:it.hours, notes:it.notes, source:'self'};
+  }));
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -644,6 +677,7 @@ function doPost(e) {
     if (data.action === 'decideLateRequest')      return respond(decideLateRequest(data, authEmail));
     if (data.action === 'getFieldWorkPending')    return respond(getFieldWorkPending());
     if (data.action === 'decideFieldWork')        return respond(decideFieldWork(data));
+    if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
@@ -5314,18 +5348,25 @@ function handleDPERSubmission(data) {
       ]);
     }
 
-    // Site Visit / Meeting → a completed, points-bearing task for the lead (Deepak).
-    // Points use the SAME rule as DPR visit scoring: Site Visit ×2/hr, Meeting ×1/hr.
+    // Site Visit / Meeting / Material Selection → a completed, points-bearing
+    // task for the lead (Deepak). Points use the SAME rule as DPR visit scoring:
+    // Site Visit + Material Selection ×2/hr, Meeting ×1/hr.
     // (No client Site Visit Log is created here — that is handled separately.)
     var visitTaskId  = null;
     var visitPts     = 0;
     try {
       var vtype = String(data.visitType || '').trim();
       var vhrs  = parseFloat(data.visitHours || 0) || 0;
-      if ((vtype === 'Site Visit' || vtype === 'Meeting') && vhrs > 0) {
+      if ((vtype === 'Site Visit' || vtype === 'Meeting' || vtype === 'Material Selection') && vhrs > 0) {
         visitPts = calcVisitPts(vtype, vhrs);
         var vt = createDperVisitTask(data, vtype, vhrs, visitPts);
         visitTaskId = vt.taskId;
+        // Start/end also feeds FIELD_WORK → attendance import (Part B).
+        if (data.visitStart && data.visitEnd) {
+          try { appendFieldWorkRows([{date:data.date||dateStr(), member:data.lead||'', email:'',
+            type:vtype, project:data.project||'', start:data.visitStart, end:data.visitEnd, hours:vhrs,
+            notes:'', source:'self'}]); } catch(fwErr) { Logger.log('DPER field-work error: ' + fwErr); }
+        }
       }
     } catch (vErr) { Logger.log('DPER visit-task error: ' + vErr); }
 

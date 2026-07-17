@@ -243,6 +243,15 @@ textarea{min-height:62px;resize:vertical;}
     <div class="section-head"><span class="section-num">1</span><span class="section-title">Report Date</span></div>
     <div class="section-body">
       <input type="date" id="f-date">
+      <div class="field" style="margin-top:12px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="late-req-toggle" onchange="document.getElementById('late-req-reason-wrap').style.display=this.checked?'block':'none'" style="width:auto">
+          Running late today? Request approval <span style="color:var(--text3);font-weight:400">(replaces messaging Siddharth)</span>
+        </label>
+        <div id="late-req-reason-wrap" style="display:none;margin-top:8px">
+          <textarea id="late-req-reason" placeholder="Reason (e.g. site visit ran long, personal, traffic)"></textarea>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -660,13 +669,36 @@ function toggleMore(id){
   if(btn) btn.innerHTML = open ? '− Less details' : '＋ More details <span style="opacity:.6">(% progress · materials)</span>';
 }
 
+// Start/end → hours, matching fwHours in dpr.html (Site Visit + Material
+// Selection ×2/hr, Meeting ×1/hr) — feeds visit points AND the FIELD_WORK
+// attendance record (first start → last end = a day out of office).
+function fwRate(t){ return (t==='Site Visit'||t==='Material Selection')?2:1; }
+function fwHours(start,end){
+  if(!start||!end) return 0;
+  const s=start.split(':'), e=end.split(':');
+  if(s.length<2||e.length<2) return 0;
+  let mins=(+e[0]*60 + +e[1]) - (+s[0]*60 + +s[1]);
+  if(mins<=0) return 0;
+  return Math.round((mins/60)*100)/100;
+}
+function updatePBVisitCalc(id){
+  const type=document.getElementById(`pb-vtype-${id}`)?.value||'';
+  const start=document.getElementById(`pb-vstart-${id}`)?.value||'';
+  const end=document.getElementById(`pb-vend-${id}`)?.value||'';
+  const hrs=fwHours(start,end);
+  const pts=Math.round(hrs*fwRate(type)*10)/10;
+  const durEl=document.getElementById(`pb-vdur-${id}`), ptsEl=document.getElementById(`pb-vpts-${id}`);
+  if(durEl) durEl.textContent = hrs>0 ? (hrs+(hrs===1?' hr':' hrs')) : '—';
+  if(ptsEl) ptsEl.textContent = pts>0 ? (pts.toFixed(1)+' pts') : '— pts';
+  saveDraft(); generateAllWA();
+}
 function toggleVisit(id){
   const sel=document.getElementById(`pb-vtype-${id}`);
   const wrap=document.getElementById(`pb-visit-${id}`);
   const type=sel?sel.value:'';
   if(wrap) wrap.classList.toggle('hidden', !type);
   const rate=document.getElementById(`pb-vrate-${id}`);
-  if(rate) rate.textContent = type==='Meeting' ? 'Meeting ×1 pt/hr' : 'Site Visit ×2 pts/hr';
+  if(rate) rate.textContent = type==='Meeting' ? 'Meeting ×1 pt/hr' : (type==='Material Selection' ? 'Material Selection ×2 pts/hr' : 'Site Visit ×2 pts/hr');
   saveDraft(); generateAllWA();
 }
 
@@ -817,7 +849,9 @@ function collectProjects(){
       id,proj,
       siteVisit   :(document.getElementById(`pb-vtype-${id}`)?.value==='Site Visit')?'Yes':'No',
       visitType   :(document.getElementById(`pb-vtype-${id}`)?.value||''),
-      visitHours  :parseFloat(document.getElementById(`pb-vhrs-${id}`)?.value)||0,
+      visitStart  :document.getElementById(`pb-vstart-${id}`)?.value||'',
+      visitEnd    :document.getElementById(`pb-vend-${id}`)?.value||'',
+      visitHours  :fwHours(document.getElementById(`pb-vstart-${id}`)?.value||'', document.getElementById(`pb-vend-${id}`)?.value||''),
       tasks,
       stage       :stages,
       worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
@@ -929,6 +963,7 @@ async function submitAll(){
           time:new Date().toTimeString().substring(0,5),
           project:p.proj, lead:leadName,
           siteVisit:p.siteVisit, visitType:p.visitType, visitHours:p.visitHours,
+          visitStart:p.visitStart||'', visitEnd:p.visitEnd||'',
           stage:p.stage,
           worksToday:p.worksToday, pctPlan:p.pctPlan, pctOverall:p.pctOverall,
           workTomorrow:p.workTomorrow, onTrack:p.onTrack, delayReason:p.delayReason,
@@ -969,6 +1004,12 @@ async function submitAll(){
     const conns = collectConnections();
     if (conns.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'logConnections', member:leadName, connections:conns})}).catch(()=>{});
+
+    // Late-arrival permission request (replaces messaging Siddharth on WhatsApp)
+    const lateReason = document.getElementById('late-req-toggle')?.checked ? document.getElementById('late-req-reason')?.value.trim() : '';
+    if (lateReason) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'submitLateRequest', member:leadName, email:googleUser?.email||'',
+        date:new Date().toISOString().substring(0,10), reason:lateReason})}).catch(()=>{});
 
     // Unplanned work today → self-logged Done tasks (same as DPR)
     for(const u of collectUnplanned()){
@@ -1060,7 +1101,8 @@ function collectDraftData() {
       id,
       proj        : document.getElementById('pb-proj-'+id)?.value||'',
       vtype       : document.getElementById('pb-vtype-'+id)?.value||'',
-      vhrs        : document.getElementById('pb-vhrs-'+id)?.value||'',
+      vstart      : document.getElementById('pb-vstart-'+id)?.value||'',
+      vend        : document.getElementById('pb-vend-'+id)?.value||'',
       stageChips,
       works       : document.getElementById('pb-works-'+id)?.value||'',
       pctPlan     : document.getElementById('pb-pctplan-'+id)?.value||'0',
@@ -1139,8 +1181,9 @@ function resumeDraft() {
 
     // Set values
     { const vt=document.getElementById('pb-vtype-'+id); if(vt) vt.value=b.vtype||''; }
-    { const vh=document.getElementById('pb-vhrs-'+id); if(vh) vh.value=b.vhrs||''; }
-    if (b.vtype) toggleVisit(id);
+    { const vs=document.getElementById('pb-vstart-'+id); if(vs) vs.value=b.vstart||''; }
+    { const ve=document.getElementById('pb-vend-'+id);   if(ve) ve.value=b.vend||''; }
+    if (b.vtype) { toggleVisit(id); updatePBVisitCalc(id); }
     document.getElementById('pb-works-'+id).value    = b.works||'';
     document.getElementById('pb-pctplan-'+id).value  = b.pctPlan||0;
     document.getElementById('pb-pctover-'+id).value  = b.pctOver||0;
@@ -1225,12 +1268,17 @@ function buildPBInnerHTML(id, projOpts) {
         <option value="">— No visit —</option>
         <option>Site Visit</option>
         <option>Meeting</option>
+        <option>Material Selection</option>
       </select>
       <button class="remove-pb" onclick="removePB(${id})">✕</button>
     </div>
     <div class="field hidden" id="pb-visit-${id}" style="background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.25);border-radius:8px;padding:10px 12px">
-      <div class="lbl">Hours on site / in meeting <span class="opt" id="pb-vrate-${id}">Site Visit ×2 pts/hr</span></div>
-      <input type="number" id="pb-vhrs-${id}" min="0.5" step="0.5" placeholder="e.g. 2.5" oninput="saveDraft();generateAllWA()">
+      <div class="lbl">Start &amp; end time <span class="opt" id="pb-vrate-${id}">Site Visit ×2 pts/hr</span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="time" id="pb-vstart-${id}" onchange="updatePBVisitCalc(${id})" style="flex:1">
+        <input type="time" id="pb-vend-${id}" onchange="updatePBVisitCalc(${id})" style="flex:1">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px"><span id="pb-vdur-${id}">—</span> · <span id="pb-vpts-${id}" style="color:var(--accent);font-weight:600">— pts</span></div>
     </div>
     <div class="field">
       <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>

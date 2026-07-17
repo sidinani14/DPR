@@ -126,6 +126,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
 .success-stats{font-size:13px;font-family:'DM Mono',monospace;color:var(--accent);margin-top:12px}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
 .toast.show{opacity:1}
+.bd{padding:5px 9px;border:none;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;color:#fff}
 </style>
 </head>
 <body>
@@ -185,6 +186,8 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
 
   <!-- Block requests (assignees waiting on a lead decision) -->
   <div id="block-section"></div>
+  <div id="late-section"></div>
+  <div id="fieldwork-section"></div>
   <div id="bill-section"></div>
   <div id="meeting-section"></div>
 
@@ -260,13 +263,15 @@ async function fetchAll() {
         {row:7, subId:'G7H8I9', date:'2026-05-01', member:'Bhavesh Bhagwat',project:'Narmada Township',   discipline:'Township / Plotted',   taskType:'Coordination / Approvals',         units:3, pts:10.8, visit:false},
       ];
     } else {
-      const [taskRes, configRes, blockRes, listRes, billRes, meetRes] = await Promise.all([
+      const [taskRes, configRes, blockRes, listRes, billRes, meetRes, lateRes, fwRes] = await Promise.all([
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getPendingTasks'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBlockRequests'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBillRequests'})}),
-        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getMeetingApprovals'})})
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getMeetingApprovals'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLateRequests'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getFieldWorkPending'})})
       ]);
       const taskData   = await taskRes.json();
       const configData = await configRes.json();
@@ -274,6 +279,8 @@ async function fetchAll() {
       try { window.billRequests = (await billRes.json()).requests || []; } catch(e){ window.billRequests = []; }
       try { window.meetingApprovals = (await meetRes.json()).logs || []; } catch(e){ window.meetingApprovals = []; }
       try { window.ALL_MEMBERS = (await listRes.json()).allMembers || []; } catch(e){ window.ALL_MEMBERS = []; }
+      try { window.lateRequests = (await lateRes.json()).requests || []; } catch(e){ window.lateRequests = []; }
+      try { window.fieldWorkPending = (await fwRes.json()).entries || []; } catch(e){ window.fieldWorkPending = []; }
       if (taskData.error)   throw new Error(taskData.error);
       if (configData.error) throw new Error(configData.error);
       tasks = taskData.tasks || [];
@@ -303,6 +310,8 @@ async function fetchAll() {
 
     renderTasks();
     renderBlockRequests();
+    renderLateRequests();
+    renderFieldWorkPending();
     renderBillRequests();
     renderMeetingApprovals();
 
@@ -356,6 +365,76 @@ async function disposeBlockAction(row, disposition){
     const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
     const j=await r.json();
     if(j.status==='ok'){ const card=document.getElementById('blk-'+row); if(card){ card.style.opacity=.55; card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.disposition+'</div>'; } }
+    else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
+  }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
+}
+
+// ── Late-arrival permission requests — self-reported in DPR/DPER/CRM,
+// replaces the WhatsApp "running late, ok?" message. Approving excuses that
+// day's lateness in attendance scoring; the biometric hours are unaffected. ──
+function renderLateRequests(){
+  const host=document.getElementById('late-section');
+  const reqs=window.lateRequests||[];
+  if(!host) return;
+  if(!reqs.length){ host.innerHTML=''; return; }
+  host.innerHTML=`
+   <div class="card" style="border:1px solid rgba(251,188,4,.45)">
+    <div class="card-head"><div class="card-title" style="color:#B8860B">⏰ Late-arrival requests (${reqs.length})</div><div class="card-sub">approve → excused from punctuality that day</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">`
+    + reqs.map(r=>`
+      <div id="late-${r.row}" style="border:1px solid var(--border);border-radius:8px;padding:11px 12px">
+        <div style="font-weight:600;font-size:13px">${r.member} · ${r.date}</div>
+        <div style="font-size:12px;color:var(--text2);font-style:italic;margin-top:4px">“${r.reason||'no reason given'}”</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace">requested ${r.requestedAt||'—'}</div>
+        <div style="display:flex;gap:6px;margin-top:9px">
+          <button class="bd" style="background:#2E7D32" onclick="decideLateReq(${r.row},'approve')">Approve</button>
+          <button class="bd" style="background:#C0392B" onclick="decideLateReq(${r.row},'reject')">Reject</button>
+        </div>
+        <div id="late-msg-${r.row}" style="font-size:11px;margin-top:6px"></div>
+      </div>`).join('')
+    + `</div></div>`;
+}
+async function decideLateReq(row, decision){
+  const msg=document.getElementById('late-msg-'+row); if(msg){ msg.textContent='Saving…'; msg.style.color='var(--text3)'; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'decideLateRequest', row, decision})});
+    const j=await r.json();
+    if(j.status==='ok'){ const card=document.getElementById('late-'+row); if(card){ card.style.opacity=.55; card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.decision+'</div>'; } }
+    else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
+  }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
+}
+
+// ── Field work pending (Part A/B) — site visits/meetings/material selections
+// self-logged with start/end. Approving lets them count in the attendance
+// merge (getMemberAttendance); points already flow via the Done visit task. ──
+function renderFieldWorkPending(){
+  const host=document.getElementById('fieldwork-section');
+  const reqs=window.fieldWorkPending||[];
+  if(!host) return;
+  if(!reqs.length){ host.innerHTML=''; return; }
+  host.innerHTML=`
+   <div class="card" style="border:1px solid rgba(79,157,247,.45)">
+    <div class="card-head"><div class="card-title" style="color:#1565C0">🏗️ Field work pending (${reqs.length})</div><div class="card-sub">site visits · meetings · material selections</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">`
+    + reqs.map(f=>`
+      <div id="fw-appr-${f.row}" style="border:1px solid var(--border);border-radius:8px;padding:11px 12px">
+        <div style="font-weight:600;font-size:13px">${f.member} · ${f.project}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${f.type} · ${f.date} · ${f.start||'—'}–${f.end||'—'} (${f.hours}h)</div>
+        ${f.notes?`<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:4px">“${f.notes}”</div>`:''}
+        <div style="display:flex;gap:6px;margin-top:9px">
+          <button class="bd" style="background:#2E7D32" onclick="decideFieldWorkAction(${f.row},'approve')">Approve</button>
+          <button class="bd" style="background:#C0392B" onclick="decideFieldWorkAction(${f.row},'reject')">Reject</button>
+        </div>
+        <div id="fw-appr-msg-${f.row}" style="font-size:11px;margin-top:6px"></div>
+      </div>`).join('')
+    + `</div></div>`;
+}
+async function decideFieldWorkAction(row, decision){
+  const msg=document.getElementById('fw-appr-msg-'+row); if(msg){ msg.textContent='Saving…'; msg.style.color='var(--text3)'; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'decideFieldWork', row, decision})});
+    const j=await r.json();
+    if(j.status==='ok'){ const card=document.getElementById('fw-appr-'+row); if(card){ card.style.opacity=.55; card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+decision+'d</div>'; } }
     else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
   }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
 }
