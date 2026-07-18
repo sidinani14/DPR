@@ -71,6 +71,8 @@ const MANAGER_EMAILS=['siddharth@ideaform.in','sidinani14@gmail.com','astha@idea
 let ROSTER=[];          // team member names from getLists
 let PARSED=null;        // {year, month, members:[{name,firstIn,lastOut,totalHrs}]}
 let ROWS=[];            // flattened, editable rows for the preview/import
+let HOLIDAYS=[];        // 'YYYY-MM-DD' — shared company holiday list for the parsed month
+let APPROVED_LEAVES={}; // member name -> number, manual (tied to Siddharth's own leave ledger)
 
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const MONTHS={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
@@ -136,12 +138,22 @@ function toHrsFromHHMM(t){ const m=String(t||'').match(/(\d{1,2}):(\d{2})/); if(
 // (e.g. 15 min short of 8h = 15/60/8 = 0.03125). A late day with no explicit
 // Approve becomes Absent — zero hours, zero UT/OT, full-day deduction. ──
 function lateThreshold(member){ return member==='Achal Rathore' ? 640 : 550; }  // 10:40 / 09:10 in minutes
+function isHoliday(date){ return HOLIDAYS.indexOf(date) > -1; }
 // row.finalHrs always holds the actual worked hours (bio+field, editable) —
 // it is NEVER zeroed here, so toggling Approve/Deny back and forth never
 // loses data. An Absent day's hours are zeroed only at export time
 // (exportRow below), for the payroll record — the review table keeps
 // showing what they actually worked so Siddharth can see what he's denying.
+// A Holiday takes priority over everything else, matching the live payroll
+// spreadsheet: no late/absent check, no undertime — but overtime still
+// applies if someone worked a holiday (verified against its formula).
 function recompute(row){
+  const totalMin=(parseFloat(row.finalHrs)||0)*60;
+  if(isHoliday(row.date)){
+    row.status='Holiday'; row.late=false; row.undertime=0;
+    row.overtime = totalMin>480 ? Math.round(((totalMin-480)/60/8)*100000)/100000 : 0;
+    return;
+  }
   const thr=lateThreshold(row.member);
   const inMin=toMin(row.firstIn);
   row.late = inMin!=null && inMin>thr && inMin<720;
@@ -149,7 +161,6 @@ function recompute(row){
     row.status='Absent'; row.undertime=0; row.overtime=0;
     return;
   }
-  const totalMin=(parseFloat(row.finalHrs)||0)*60;
   row.status = (parseFloat(row.finalHrs)||0) < 6 ? 'Half-day' : 'Present';
   if(totalMin < 480){ row.undertime=Math.round(((480-totalMin)/60/8)*100000)/100000; row.overtime=0; }
   else               { row.overtime=Math.round(((totalMin-480)/60/8)*100000)/100000; row.undertime=0; }
@@ -233,11 +244,17 @@ function handleFile(file){
       const daysInMonth=new Date(PARSED.year, PARSED.month, 0).getDate();
       const from=PARSED.year+'-'+String(PARSED.month).padStart(2,'0')+'-01';
       const to=PARSED.year+'-'+String(PARSED.month).padStart(2,'0')+'-'+String(daysInMonth).padStart(2,'0');
-      msg.innerHTML=`<div class="loading">Parsed ${MON_NAME[PARSED.month]} ${PARSED.year} — ${PARSED.members.length} employees. Loading late-arrival &amp; field-work context…</div>`;
-      let lateReqs=[], fieldWork=[];
+      msg.innerHTML=`<div class="loading">Parsed ${MON_NAME[PARSED.month]} ${PARSED.year} — ${PARSED.members.length} employees. Loading late-arrival, field-work, holiday &amp; leave context…</div>`;
+      const monthKey=PARSED.year+'-'+String(PARSED.month).padStart(2,'0');
+      let lateReqs=[], fieldWork=[], holidayDates=[], adjustments=[];
       try{ lateReqs=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLateRequests', from, to})}).then(r=>r.json())).requests||[]; }catch(e2){}
       try{ fieldWork=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getFieldWorkForRange', from, to})}).then(r=>r.json())).entries||[]; }catch(e2){}
+      try{ holidayDates=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getHolidays', from, to})}).then(r=>r.json())).dates||[]; }catch(e2){}
+      try{ adjustments=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMonthlyAdjustments', month:monthKey})}).then(r=>r.json())).adjustments||[]; }catch(e2){}
+      HOLIDAYS=holidayDates.slice();
+      APPROVED_LEAVES={}; adjustments.forEach(a=>{ APPROVED_LEAVES[a.member]=a.approvedLeaves; });
       mergeContext(ROWS, lateReqs, fieldWork);
+      ROWS.forEach(recompute);   // re-classify now that HOLIDAYS is loaded
       msg.innerHTML=`<div class="banner ok">Parsed ${MON_NAME[PARSED.month]} ${PARSED.year} — ${PARSED.members.length} employees, ${ROWS.length} days found (incl. field-only days).</div>`;
       renderPreview();
     }catch(err){
@@ -248,16 +265,37 @@ function handleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
-const STATUS_COLOR={Present:'var(--green)', 'Half-day':'var(--amber)', Absent:'var(--red)'};
-function memberSummary(rows){
-  const present=rows.filter(r=>r.status!=='Absent');
+const STATUS_COLOR={Present:'var(--green)', 'Half-day':'var(--amber)', Absent:'var(--red)', Holiday:'#8B7CF6'};
+// Exact formula from the live payroll spreadsheet (verified byte-for-byte
+// against real month-end totals for two employees):
+//   Total Working Days = ROUND((PresentDays + NetOT) × 2) / 2
+//   Absentism = MAX(0, CalendarDays − Sundays − Holidays − ApprovedLeaves − TotalWorkingDays)
+//   Total Salary Days = ROUND((CalendarDays − Absentism) × 2) / 2
+// PresentDays excludes both Absent AND Holiday rows (a holiday is paid time
+// off, not a day "present" — matches COUNTIF(Full Day)+COUNTIF(Overtime)+
+// COUNTIF(Half Day), none of which include the Holiday status bucket).
+function memberSummary(rows, member){
+  const present=rows.filter(r=>r.status!=='Absent' && r.status!=='Holiday');
   const half=rows.filter(r=>r.status==='Half-day');
   const absent=rows.filter(r=>r.status==='Absent');
+  const holiday=rows.filter(r=>r.status==='Holiday');
   const totalUT=Math.round(rows.reduce((s,r)=>s+r.undertime,0)*10000)/10000;
   const totalOT=Math.round(rows.reduce((s,r)=>s+r.overtime,0)*10000)/10000;
   const netOT=Math.round((totalOT-totalUT)*10000)/10000;
-  const salaryDays=Math.round((present.length+netOT)*100)/100;
-  return {present:present.length, half:half.length, absent:absent.length, totalUT, totalOT, netOT, salaryDays};
+  const totalWorkingDays=Math.round((present.length+netOT)*2)/2;
+
+  const daysInMonth=PARSED ? new Date(PARSED.year, PARSED.month, 0).getDate() : 0;
+  let sundayCount=0;
+  if(PARSED) for(let d=1; d<=daysInMonth; d++){ if(new Date(PARSED.year, PARSED.month-1, d).getDay()===0) sundayCount++; }
+  const monthPrefix=PARSED ? (PARSED.year+'-'+String(PARSED.month).padStart(2,'0')) : '';
+  const holidaysInMonth=HOLIDAYS.filter(d=>d.startsWith(monthPrefix)).length;
+  const approvedLeaves=parseFloat(APPROVED_LEAVES[member])||0;
+  const absentism=Math.max(0, daysInMonth - sundayCount - holidaysInMonth - approvedLeaves - totalWorkingDays);
+  const salaryDays=Math.round((daysInMonth-absentism)*2)/2;
+
+  return {present:present.length, half:half.length, absent:absent.length, holiday:holiday.length,
+    totalUT, totalOT, netOT, totalWorkingDays, daysInMonth, sundayCount, holidaysInMonth, approvedLeaves,
+    absentism:Math.round(absentism*100)/100, salaryDays};
 }
 
 function renderPreview(){
@@ -274,10 +312,22 @@ function renderPreview(){
   if(suspectDates.length) banners+=`<div class="banner bad">${suspectDates.length} date(s) show <b>zero hours for everyone</b> (${suspectDates.slice(0,5).join(', ')}${suspectDates.length>5?'…':''}) — likely a weekend/holiday, but double-check if you expected people in.</div>`;
   if(undecidedLate) banners+=`<div class="banner warn">${undecidedLate} late arrival(s) still <b>undecided</b> — they will import as <b>Absent</b> unless you click Approve. Suggestions are pre-checked where someone said they informed you in advance; review every one.</div>`;
 
+  const monthPrefix=PARSED ? (PARSED.year+'-'+String(PARSED.month).padStart(2,'0')) : '';
+  const holidaysThisMonth=HOLIDAYS.filter(d=>d.startsWith(monthPrefix)).sort();
+  const holidaysHtml=`<section style="margin-bottom:14px">
+    <h2>Holidays this month</h2>
+    <div class="h2sub">Shared company holiday list for ${MON_NAME[PARSED.month]} ${PARSED.year} — a holiday day is excluded from late/absent/undertime for everyone (matches the payroll sheet)</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:${holidaysThisMonth.length?'10px':'0'}">
+      <input type="date" id="holiday-date-input" min="${monthPrefix}-01" max="${monthPrefix}-31" style="background:var(--bg);color:var(--t1);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font-size:12px">
+      <button class="btn2" onclick="addHoliday()">+ Add holiday</button>
+    </div>
+    ${holidaysThisMonth.length?`<div style="display:flex;gap:6px;flex-wrap:wrap">${holidaysThisMonth.map(d=>`<span style="font-size:11px;background:rgba(139,124,246,.15);color:#8B7CF6;padding:3px 9px;border-radius:12px;display:inline-flex;align-items:center;gap:6px">${esc(d)}<span onclick="removeHoliday('${esc(d)}')" style="cursor:pointer;font-weight:700">×</span></span>`).join('')}</div>`:''}
+  </section>`;
+
   const included=ROWS.filter(r=>r.include).length;
   const byMember={}; ROWS.forEach(r=>{ (byMember[r.member]=byMember[r.member]||[]).push(r); });
   const memberBlocks=Object.keys(byMember).sort().map(mem=>{
-    const rows=byMember[mem], sum=memberSummary(rows);
+    const rows=byMember[mem], sum=memberSummary(rows, mem);
     const rowsHtml=rows.map(r=>{
       const i=ROWS.indexOf(r);
       const lateBadge = r.late ? `<span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(234,67,53,.15);color:var(--red)">LATE</span>` : '';
@@ -305,8 +355,14 @@ function renderPreview(){
         <span style="font-size:11px;color:var(--t2)">Present ${sum.present}</span>
         <span style="font-size:11px;color:var(--amber)">Half-day ${sum.half}</span>
         <span style="font-size:11px;color:var(--red)">Absent ${sum.absent}</span>
+        <span style="font-size:11px;color:#8B7CF6">Holiday ${sum.holiday}</span>
         <span style="font-size:11px;color:var(--t2)">UT ${sum.totalUT.toFixed(4)} · OT ${sum.totalOT.toFixed(4)}</span>
         <span style="font-size:11px;font-weight:700;color:${sum.netOT<0?'var(--red)':'var(--green)'}">Net ${sum.netOT>=0?'+':''}${sum.netOT.toFixed(4)}</span>
+        <span style="font-size:11px;font-weight:700">Working days: ${sum.totalWorkingDays.toFixed(2)}</span>
+        <label style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:5px">Approved leaves
+          <input type="number" step="0.5" value="${sum.approvedLeaves}" onchange="APPROVED_LEAVES['${esc(mem).replace(/'/g,"\\'")}']=parseFloat(this.value)||0;renderPreview()" style="width:48px;font-size:11px;background:var(--bg);color:var(--t1);border:1px solid var(--line);border-radius:4px;padding:2px 4px">
+        </label>
+        <span style="font-size:11px;color:var(--t2)">Absentism: ${sum.absentism.toFixed(2)}</span>
         <span style="font-size:11px;font-weight:700;margin-left:auto">Salary days: ${sum.salaryDays.toFixed(2)}</span>
       </div>
       <div class="tblwrap" style="border:none;border-radius:0;max-height:none">
@@ -316,7 +372,8 @@ function renderPreview(){
     </div>`;
   }).join('');
 
-  host.innerHTML=`<section>
+  host.innerHTML=`${holidaysHtml}
+  <section>
     <h2>2 · Review before import</h2>
     <div class="h2sub">Edit any punch/hours, decide every late arrival, then import. Nothing is written until you click Import.</div>
     ${banners}
@@ -329,6 +386,20 @@ function renderPreview(){
     </div>
   </section>`;
 }
+function addHoliday(){
+  const input=document.getElementById('holiday-date-input');
+  const d=input.value;
+  if(!d) return;
+  if(HOLIDAYS.indexOf(d)===-1){ HOLIDAYS.push(d); HOLIDAYS.sort(); }
+  input.value='';
+  ROWS.forEach(recompute);
+  renderPreview();
+}
+function removeHoliday(d){
+  HOLIDAYS=HOLIDAYS.filter(x=>x!==d);
+  ROWS.forEach(recompute);
+  renderPreview();
+}
 function updateCount(){ document.getElementById('import-count').textContent=ROWS.filter(r=>r.include).length; }
 function toggleAll(v){ ROWS.forEach(r=>r.include=v); renderPreview(); }
 
@@ -336,9 +407,13 @@ async function doImport(){
   const btn=document.getElementById('import-btn'); const status=document.getElementById('import-status');
   const rows=ROWS.filter(r=>r.include && r.matched).map(exportRow);
   if(!rows.length){ status.textContent='Nothing selected to import.'; return; }
+  const monthKey=PARSED.year+'-'+String(PARSED.month).padStart(2,'0');
+  const adjustments=Object.keys(APPROVED_LEAVES).map(m=>({member:m, approvedLeaves:parseFloat(APPROVED_LEAVES[m])||0}));
   btn.disabled=true; status.textContent='Importing…';
   try{
     const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'importAttendance', rows})}).then(r=>r.json());
+    try{ await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveHolidays', dates:HOLIDAYS})}); }catch(e2){}
+    try{ await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveMonthlyAdjustments', month:monthKey, adjustments})}); }catch(e2){}
     if(res.status==='ok') status.innerHTML=`<span style="color:var(--green);font-weight:700">✓ Imported — ${res.appended} new, ${res.updated} updated.</span>`;
     else status.innerHTML='<span style="color:var(--red)">'+esc(res.message||'Import failed')+'</span>';
   }catch(e){ status.innerHTML='<span style="color:var(--red)">Network error — '+esc(e.message)+'</span>'; }

@@ -196,11 +196,88 @@ function getFieldWorkForRange(fromStr, toStr) {
   return {entries:out};
 }
 
+// ── Approved Paid Leaves (manual, per member per month — tied to Siddharth's
+// own leave-balance ledger, not derivable from any attendance data) and the
+// shared company Holiday date list. Both feed the real Total Salary Days
+// formula (verified against the live payroll spreadsheet):
+//   Total Working Days = ROUND((PresentDays + NetOT) × 2) / 2
+//   Absentism = MAX(0, CalendarDays − Sundays − Holidays − Leaves − WorkingDays)
+//   Total Salary Days = ROUND((CalendarDays − Absentism) × 2) / 2
+function saveMonthlyAdjustments(month, adjustments) {
+  if (!month || !adjustments || !adjustments.length) return {status:'error', message:'month and adjustments required'};
+  var sheet = getOrCreate(MONTHLY_ADJ_TAB, function(sh){
+    sh.getRange(1,1,1,4).setValues([['Month','Member','Approved Leaves','Imported At']]);
+    sh.setFrozenRows(1);
+  });
+  var existing = sheet.getLastRow() > 1 ? sheet.getRange(2,1,sheet.getLastRow()-1,2).getValues() : [];
+  var keyRow = {};
+  for (var i=0; i<existing.length; i++){
+    keyRow[String(existing[i][0]).trim()+'|'+String(existing[i][1]).trim().toLowerCase()] = i+2;
+  }
+  var now = new Date();
+  adjustments.forEach(function(a){
+    var member = String(a.member||'').trim(); if (!member) return;
+    var key = month+'|'+member.toLowerCase();
+    var vals = [month, member, parseFloat(a.approvedLeaves)||0, now];
+    if (keyRow[key]) sheet.getRange(keyRow[key],1,1,4).setValues([vals]);
+    else sheet.appendRow(vals);
+  });
+  return {status:'ok'};
+}
+function getMonthlyAdjustments(month) {
+  var sheet = db().getSheetByName(MONTHLY_ADJ_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {adjustments:[]};
+  var rows = sheet.getDataRange().getValues(), out=[];
+  for (var i=1; i<rows.length; i++){
+    if (month && String(rows[i][0]||'').trim() !== month) continue;
+    out.push({month:String(rows[i][0]||''), member:String(rows[i][1]||''), approvedLeaves:parseFloat(rows[i][2])||0});
+  }
+  return {adjustments:out};
+}
+function saveHolidays(dates) {
+  if (!dates || !dates.length) return {status:'ok', added:0};
+  var sheet = getOrCreate(HOLIDAYS_TAB, function(sh){
+    sh.getRange(1,1,1,2).setValues([['Date','Note']]);
+    sh.setFrozenRows(1);
+  });
+  var existing = sheet.getLastRow() > 1 ? sheet.getRange(2,1,sheet.getLastRow()-1,1).getValues().map(function(r){ return String(r[0]).trim(); }) : [];
+  var added = 0;
+  dates.forEach(function(d){
+    var date = typeof d === 'string' ? d : String(d.date||'');
+    if (!date || existing.indexOf(date) > -1) return;
+    sheet.appendRow([date, typeof d === 'object' ? String(d.note||'') : '']);
+    existing.push(date); added++;
+  });
+  return {status:'ok', added:added};
+}
+function getHolidays(fromStr, toStr) {
+  var sheet = db().getSheetByName(HOLIDAYS_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {dates:[]};
+  var rows = sheet.getDataRange().getValues(), out=[];
+  for (var i=1; i<rows.length; i++){
+    var d = cellDate(rows[i][0]); if (!d) continue;
+    if (fromStr && d < fromStr) continue;
+    if (toStr   && d > toStr)   continue;
+    out.push(d);
+  }
+  return {dates:out};
+}
+
 // One member's attendance, already decided at import time — straight read
-// from ATTENDANCE plus the monthly OT/UT rollup.
-// Net OT/UT (day-units) is added to the present-day count to get adjusted
-// salary days, matching the day-unit formula Siddharth specified (undertime/
-// overtime are fractions of an 8-hour day, e.g. 15 min short = 0.03125).
+// from ATTENDANCE plus the monthly OT/UT rollup. Undertime/overtime are
+// fractions of an 8-hour day (e.g. 15 min short = 0.03125), matching the
+// live payroll spreadsheet's own formula (verified byte-exact against real
+// month-end totals for two employees before this was built).
+//
+// "Total Working Days" (present + net OT, rounded to the nearest half-day) is
+// a different number from "Total Salary Days" (calendar days in the month
+// minus Absentism, where Absentism itself is a residual: calendar days minus
+// Sundays minus Holidays minus Approved Leaves minus Total Working Days).
+// Salary Days only makes sense for a FULL calendar month — this function
+// computes it in addition to the simple range summary when from/to exactly
+// spans one month (the normal case: attendance-import.html always imports a
+// month at a time). For any other range (e.g. a multi-week performance
+// review window) only the simple present/absent/UT/OT rollup applies.
 function getMemberAttendance(member, fromStr, toStr) {
   member = String(member||'').trim();
   if (!member) return {error:'no member'};
@@ -224,7 +301,7 @@ function getMemberAttendance(member, fromStr, toStr) {
   }
   days.sort(function(a,b){ return a.date.localeCompare(b.date); });
 
-  var present  = days.filter(function(x){ return x.status !== 'Absent'; });
+  var present  = days.filter(function(x){ return x.status !== 'Absent' && x.status !== 'Holiday'; });
   var absent   = days.filter(function(x){ return x.status === 'Absent'; });
   var halfDays = days.filter(function(x){ return x.status === 'Half-day'; });
   var lateApproved = days.filter(function(x){ return x.late && x.lateApproved; });
@@ -232,14 +309,37 @@ function getMemberAttendance(member, fromStr, toStr) {
   var totalOT  = days.reduce(function(s2,x){ return s2+x.overtime; }, 0);
   var netOT    = Math.round((totalOT-totalUT)*10000)/10000;
   var avgHrs   = present.length ? present.reduce(function(s2,x){return s2+x.hrs;},0)/present.length : 0;
+  var totalWorkingDays = Math.round((present.length+netOT)*2)/2;
 
-  return {member:member, from:from, to:to, days:days,
-    summary:{
-      present:present.length, absent:absent.length, halfDays:halfDays.length,
-      lateApproved:lateApproved.length, avgHrs:Math.round(avgHrs*100)/100,
-      totalUT:Math.round(totalUT*10000)/10000, totalOT:Math.round(totalOT*10000)/10000, netOT:netOT,
-      salaryDays:Math.round((present.length+netOT)*100)/100,
-    }};
+  var summary = {
+    present:present.length, absent:absent.length, halfDays:halfDays.length,
+    lateApproved:lateApproved.length, avgHrs:Math.round(avgHrs*100)/100,
+    totalUT:Math.round(totalUT*10000)/10000, totalOT:Math.round(totalOT*10000)/10000, netOT:netOT,
+    totalWorkingDays:totalWorkingDays,
+  };
+
+  // Exact Total Salary Days — only when [from,to] is exactly one calendar month.
+  var mMatch = from.match(/^(\d{4})-(\d{2})-01$/);
+  if (mMatch){
+    var year=+mMatch[1], mon=+mMatch[2];
+    var daysInMonth = new Date(year, mon, 0).getDate();
+    var lastDay = year+'-'+String(mon).padStart(2,'0')+'-'+String(daysInMonth).padStart(2,'0');
+    if (to === lastDay){
+      var sundayCount=0;
+      for (var dd=1; dd<=daysInMonth; dd++){ if (new Date(year, mon-1, dd).getDay()===0) sundayCount++; }
+      var monthKey = mMatch[1]+'-'+mMatch[2];
+      var adjRows = getMonthlyAdjustments(monthKey).adjustments || [];
+      var adj = adjRows.find(function(a){ return a.member.toLowerCase()===member.toLowerCase(); });
+      var approvedLeaves = adj ? adj.approvedLeaves : 0;
+      var holidayDates = (getHolidays(from, to).dates || []).length;
+      var absentism = Math.max(0, daysInMonth - sundayCount - holidayDates - approvedLeaves - totalWorkingDays);
+      var salaryDays = Math.round((daysInMonth - absentism)*2)/2;
+      summary.calendarDays=daysInMonth; summary.sundays=sundayCount; summary.holidays=holidayDates;
+      summary.approvedLeaves=approvedLeaves; summary.absentism=Math.round(absentism*100)/100; summary.salaryDays=salaryDays;
+    }
+  }
+
+  return {member:member, from:from, to:to, days:days, summary:summary};
 }
 
 // Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
@@ -289,13 +389,16 @@ function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1,
-  getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1 };
+  getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
+  saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
 var FIELD_WORK_TAB   = 'FIELD_WORK';    // one row per field engagement (visit/meeting/material selection) with start/end → feeds attendance (Part B)
 var ATTENDANCE_TAB   = 'ATTENDANCE';    // biometric (Paytime) import — one row per member+date, upserted on re-import
 var LATE_REQ_TAB      = 'LATE_REQUESTS'; // self-reported "running late, approved" — replaces the WhatsApp workflow
+var MONTHLY_ADJ_TAB   = 'MONTHLY_ADJUSTMENTS'; // per member per month: Approved Paid Leaves (manual, tied to Siddharth's own leave ledger)
+var HOLIDAYS_TAB      = 'HOLIDAYS';      // shared company holiday date list
 var LOGS_ROOT_FOLDER = 'IDS Logs';      // Drive root for per-project report folders
 function ensureCols(sheet, n){ var m=sheet.getMaxColumns(); if (m < n) sheet.insertColumnsAfter(m, n-m); }
 // Insert a new data row at the TOP (row 2, just under the header) so the latest
@@ -590,6 +693,8 @@ function doGet(e) {
   if (action === 'getMemberAttendance')      return safeRespond(function() { return getMemberAttendance(p.member||'', p.from||'', p.to||''); });
   if (action === 'getLateRequests')          return safeRespond(function() { return getLateRequests(p.from||'', p.to||''); });
   if (action === 'getFieldWorkForRange')     return safeRespond(function() { return getFieldWorkForRange(p.from||'', p.to||''); });
+  if (action === 'getMonthlyAdjustments')    return safeRespond(function() { return getMonthlyAdjustments(p.month||''); });
+  if (action === 'getHolidays')              return safeRespond(function() { return getHolidays(p.from||'', p.to||''); });
   if (action === 'getProjectStats')          return safeRespond(getProjectStats);
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
@@ -640,6 +745,10 @@ function doPost(e) {
     if (data.action === 'submitLateRequest')      return respond(submitLateRequest(data));
     if (data.action === 'getLateRequests')        return respond(getLateRequests(data.from||'', data.to||''));
     if (data.action === 'getFieldWorkForRange')   return respond(getFieldWorkForRange(data.from||'', data.to||''));
+    if (data.action === 'saveMonthlyAdjustments') return respond(saveMonthlyAdjustments(data.month||'', data.adjustments||[]));
+    if (data.action === 'getMonthlyAdjustments')  return respond(getMonthlyAdjustments(data.month||''));
+    if (data.action === 'saveHolidays')           return respond(saveHolidays(data.dates||[]));
+    if (data.action === 'getHolidays')            return respond(getHolidays(data.from||'', data.to||''));
     if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
