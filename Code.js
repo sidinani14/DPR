@@ -344,7 +344,9 @@ function getMemberAttendance(member, fromStr, toStr) {
 
 // Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
 // lead (Deepak), so the visit carries points and feeds Task Completion. Points use
-// the DPR rule (Site Visit ×2/hr, Meeting ×1/hr). Auto Done + LeadApproved=Yes.
+// the DPR rule (Site Visit ×2/hr, Meeting ×1/hr). Done, but LeadApproved is left
+// Pending like every other self-logged task — it must clear approval.html same
+// as tasks/issues, not skip review just because it came from DPER.
 function createDperVisitTask(data, taskType, hours, pts) {
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
   var day    = data.date || dateStr();
@@ -358,7 +360,7 @@ function createDperVisitTask(data, taskType, hours, pts) {
     desc,                        // L Description
     '',                          // M Drawing
     'Done', day, day,            // N SelfStatus, O SelfStatusDate, P ActualCompletion
-    'Yes', 'Auto (DPER)', day,   // Q LeadApproved, R ApprovedBy, S ApprovalDate
+    'Pending', '', '',           // Q LeadApproved, R ApprovedBy, S ApprovalDate
     '',                          // T RevisionTag
     '[DPER ' + taskType + ' · ' + h + 'h]',  // U Notes
     lead, 'Medium'               // V AssignedBy, W Priority
