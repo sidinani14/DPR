@@ -1228,8 +1228,10 @@ function getAllTasks() {
       else                                  status = 'Approval Pending'; // Pending
     }
     else if (revTag && selfStatus !== 'Done') status = 'Revision Required';
-    else if (selfStatus === 'In Progress')    status = 'Ongoing';
+    // Overdue wins over "In Progress" — a task the member marked Ongoing past
+    // its deadline is still Delayed, not hidden as merely in-progress.
     else if (target && target < today)        status = 'Delayed';
+    else if (selfStatus === 'In Progress')    status = 'Ongoing';
 
     if (status === 'Hidden') continue; // last week's completed tasks
 
@@ -6257,11 +6259,16 @@ function resolveIssue(issueId) {
 
 // Run this ONCE manually to set up the Monday 8AM trigger
 function setupMondayTrigger() {
-  // Delete existing visit scheduling triggers
+  // Delete existing visit scheduling triggers, including the stale
+  // 'runVisitScheduler' name from a pre-rename version of this project —
+  // that trigger was never removed and has been firing weekly against a
+  // function that no longer exists (mail: "Script function not found:
+  // runVisitScheduler", every Monday ~8:15 AM).
   var triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(function(t) {
     if (t.getHandlerFunction() === 'syncVisitSchedule' ||
-        t.getHandlerFunction() === 'pushVisitTasks') {
+        t.getHandlerFunction() === 'pushVisitTasks' ||
+        t.getHandlerFunction() === 'runVisitScheduler') {
       ScriptApp.deleteTrigger(t);
       Logger.log('Deleted trigger: ' + t.getHandlerFunction());
     }
