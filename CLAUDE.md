@@ -122,9 +122,12 @@
 - Week = Monday to Saturday (6 days)
 - Punctuality threshold: 09:10 for all, 10:40 for Achal Rathore only
 - Absent day deduction: −2.0 pts from Punctuality, −1.5 pts from Hours.
-  DPR/Punctuality/Hours all scored on the fixed 6-day week (not present days
-  only) — briefly changed to a present-days basis 2026-07-20, reverted same
-  day for all team members including Deepak and Aman.
+  DPR/Punctuality/Hours are scored on the fixed 6-day week for everyone
+  (briefly changed to present-days-only 2026-07-20, reverted same day) —
+  EXCEPT a day marked approved leave (BIO att status 'L', via `leaveCount()`
+  in weeklyreport.html) is excluded from both the absence penalty and the
+  DPR denominator; unexplained absence still costs the full penalty. First
+  applied to Aman's 4-day pre-approved leave, 13-18 Jul week.
 - Done pts source of truth: SelfStatusDate (col O) only
 - LeadApproved = Yes required for task to count as done
 - Tasks Assigned column in weekly report shows 0 (assigned pts not tracked)
