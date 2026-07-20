@@ -206,14 +206,14 @@ const TARGETS = {
 //    Malviya") — Last Out corrected to 20:30 to match. This is inferred from
 //    Sahil's report, not a message from Himanshu himself — flag if wrong.
 const BIO = {
-  'Aaditya Koshti': { days:5, lateCount:2, avgHrs:'05:47', hrsScore:4, punctScore:9, att:[
-    {d:'Mon 13',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 14',t:'08:59',s:'P',l:false},{d:'Wed 15',t:'09:04',s:'P',l:false,n:'Short day (01:23)'},{d:'Thu 16',t:'08:44',s:'P',l:false},{d:'Fri 17',t:'12:59',s:'P',l:true,n:'3h49m late — short day (04:27)'},{d:'Sat 18',t:'09:11',s:'P',l:true,n:'1 min late'} ]},
+  'Aaditya Koshti': { days:5, lateCount:1, avgHrs:'05:47', hrsScore:4, punctScore:12, att:[
+    {d:'Mon 13',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 14',t:'08:59',s:'P',l:false},{d:'Wed 15',t:'09:04',s:'P',l:false,n:'Short day (01:23)'},{d:'Thu 16',t:'08:44',s:'P',l:false},{d:'Fri 17',t:'12:59',s:'P',l:false,n:'Informed sick (cold/cough/fever) — joined second half, short day (04:27)'},{d:'Sat 18',t:'09:11',s:'P',l:true,n:'1 min late'} ]},
   'Aashi Agrawal': { days:4, lateCount:0, avgHrs:'08:29', hrsScore:10, punctScore:15, att:[
     {d:'Mon 13',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 14',t:'09:09',s:'P',l:false},{d:'Wed 15',t:'09:08',s:'P',l:false},{d:'Thu 16',t:'09:06',s:'P',l:false},{d:'Fri 17',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 18',t:'09:09',s:'P',l:false} ]},
   'Achal Rathore': { days:5, lateCount:2, avgHrs:'07:25', hrsScore:7, punctScore:9, att:[
     {d:'Mon 13',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 14',t:'10:40',s:'P',l:false},{d:'Wed 15',t:'10:39',s:'P',l:false,n:'Short day (05:34)'},{d:'Thu 16',t:'10:42',s:'P',l:true,n:'2 min late'},{d:'Fri 17',t:'10:36',s:'P',l:false},{d:'Sat 18',t:'11:55',s:'P',l:true,n:'1h15m late'} ]},
-  'Bhavesh Bhagwat': { days:6, lateCount:5, avgHrs:'07:57', hrsScore:10, punctScore:6, att:[
-    {d:'Mon 13',t:'09:18',s:'P',l:true,n:'8 min late'},{d:'Tue 14',t:'09:18',s:'P',l:true,n:'8 min late'},{d:'Wed 15',t:'09:38',s:'P',l:true,n:'28 min late'},{d:'Thu 16',t:'10:55',s:'P',l:true,n:'1h45m late'},{d:'Fri 17',t:'09:06',s:'P',l:false,n:'Short day (06:32)'},{d:'Sat 18',t:'09:40',s:'P',l:true,n:'30 min late'} ]},
+  'Bhavesh Bhagwat': { days:6, lateCount:3, avgHrs:'07:57', hrsScore:10, punctScore:6, att:[
+    {d:'Mon 13',t:'09:18',s:'P',l:true,n:'8 min late'},{d:'Tue 14',t:'09:18',s:'P',l:true,n:'8 min late'},{d:'Wed 15',t:'09:38',s:'P',l:false,n:'Informed in advance — approved late, 28 min'},{d:'Thu 16',t:'10:55',s:'P',l:false,n:'Approved late — 1h45m'},{d:'Fri 17',t:'09:06',s:'P',l:false,n:'Short day (06:32)'},{d:'Sat 18',t:'09:40',s:'P',l:true,n:'30 min late'} ]},
   'Himanshu Malviya': { days:5, lateCount:0, avgHrs:'08:36', hrsScore:10, punctScore:15, att:[
     {d:'Mon 13',t:'09:05',s:'P',l:false},{d:'Tue 14',t:'—',s:'A',l:false,n:'Absent'},{d:'Wed 15',t:'09:10',s:'P',l:false},{d:'Thu 16',t:'09:10',s:'P',l:false},{d:'Fri 17',t:'09:04',s:'P',l:false},{d:'Sat 18',t:'09:07',s:'P',l:false,n:'Site visit (Aaditya Jhawar, with Sahil) 9:30am–8:30pm — punch-out corrected via WhatsApp'} ]},
   'Poorvi Goyal': { days:5, lateCount:0, avgHrs:'08:41', hrsScore:10, punctScore:15, att:[
@@ -223,15 +223,15 @@ const BIO = {
   'Deepak Soni': { days:4, lateCount:1, avgHrs:'07:17', hrsScore:7, punctScore:12, att:[
     {d:'Mon 13',t:'09:13',s:'P',l:true,n:'3 min late — short day (03:46)'},{d:'Tue 14',t:'09:02',s:'P',l:false},{d:'Wed 15',t:'09:00',s:'P',l:false,n:'Site meeting 9am–12pm (Multani Jewellers), office 12:09–17:40 — corrected via WhatsApp'},{d:'Thu 16',t:'09:10',s:'P',l:false},{d:'Fri 17',t:'—',s:'A',l:false,n:'Absent'},{d:'Sat 18',t:'—',s:'A',l:false,n:'Absent'} ]},
   'Aman Raghuwanshi': { days:2, lateCount:0, avgHrs:'04:42', hrsScore:4, punctScore:15, att:[
-    {d:'Mon 13',t:'—',s:'A',l:false,n:'Absent'},{d:'Tue 14',t:'—',s:'A',l:false,n:'Absent'},{d:'Wed 15',t:'—',s:'A',l:false,n:'Absent'},{d:'Thu 16',t:'—',s:'A',l:false,n:'Absent'},{d:'Fri 17',t:'08:59',s:'P',l:false,n:'Short day (00:35)'},{d:'Sat 18',t:'08:59',s:'P',l:false} ]},
+    {d:'Mon 13',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Tue 14',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Wed 15',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Thu 16',t:'—',s:'L',l:false,n:'Approved leave'},{d:'Fri 17',t:'08:59',s:'P',l:false,n:'Short day (00:35)'},{d:'Sat 18',t:'08:59',s:'P',l:false} ]},
 };
 
 // ── IMPROVE suggestions (contenteditable in report) ────────
 const IMPROVE = {
-  'Aaditya Koshti': ['Weak week — absent Monday, then a 12:59 arrival Friday (3h49m late, only 04:27 worked) pulled hours down to a 05:47 average. Needs a clear explanation for Friday and a return to full days.'],
+  'Aaditya Koshti': ['Absent Monday, then a short Friday (joined second half, informed sick with cold/cough/fever) pulled hours down to a 05:47 average. Only one unexplained late (Sat, 1 min) otherwise — get back to full attendance and recover the hours.'],
   'Aashi Agrawal': ['Zero late across the 4 days present, but two absences (Mon, Fri) cut the week short. Strong hours (8.5 h avg) when in — close the attendance gap.'],
   'Achal Rathore': ['Absent Monday, then late twice (Thu 2 min, Sat 1h15m) and a short Wednesday (05:34). Tighten the 10:40 shift and cover the missed day.'],
-  'Bhavesh Bhagwat': ['Late 5 of 6 days (up to 1h45m Thursday) — punctuality remains the recurring issue despite strong hours (7.9 h avg). Needs a firm fix, not a one-off.'],
+  'Bhavesh Bhagwat': ['Wed and Thu lates were informed in advance and approved — but Mon, Tue and Sat (8–30 min) were not, still 3 unapproved in the week despite strong hours (7.9 h avg). Mornings need to tighten on the days without a heads-up.'],
   'Himanshu Malviya': ['Zero late in 5/6 days, 8.6 h average — Saturday was a full-day site visit (Aaditya Jhawar, with Sahil) running past 8 PM. Cover the Tuesday absence next week.'],
   'Poorvi Goyal': ['Zero late again and the best hours of the team (8.7 h avg) — only the Monday absence keeps this from a full week. Model consistency otherwise.'],
   'Sahil Maurya': ['Full 6/6 attendance, including a full-day Saturday site visit (Aaditya Jhawar) running to 8:30 PM, but 3 late arrivals through the week (up to 4 min) — tighten mornings.'],
