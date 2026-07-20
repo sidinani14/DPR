@@ -121,7 +121,11 @@
 - Always run: node --check filename.js or node --check filename.html after edits
 - Week = Monday to Saturday (6 days)
 - Punctuality threshold: 09:10 for all, 10:40 for Achal Rathore only
-- Absent day deduction: −2.0 pts from Punctuality, −1.5 pts from Hours
+- DPR Consistency, Punctuality, and Hours are scored on PRESENT DAYS ONLY
+  (2026-07-20) — no separate deduction for days a member wasn't there
+  (leave or absence). DPR = daysFiled/presentDays×15; punctuality/hours use
+  the late-count/avg-hours bucket score as-is, no absence penalty subtracted.
+  (Superseded the old flat −2.0 punctuality / −1.5 hours per absent-day rule.)
 - Done pts source of truth: SelfStatusDate (col O) only
 - LeadApproved = Yes required for task to count as done
 - Tasks Assigned column in weekly report shows 0 (assigned pts not tracked)
