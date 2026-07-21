@@ -2226,14 +2226,28 @@ function generateProjectReportPDF(project, callerEmail){
   var index = entries.map(function(e){ return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.type)+'</td><td>'
       +esc([e.team,e.clients].filter(Boolean).join(', ')||'—')+'</td><td class="pg">'+e.startPage+'</td></tr>'; }).join('');
 
+  // Full-resolution phone photos (often several MB each, no client-side resize
+  // yet) blow up the embedded base64 HTML enough that Apps Script's
+  // getAs('application/pdf') just fails outright with a generic "Conversion
+  // ... failed" error — no size/row it points to, just a hard stop. A photo
+  // over this raw-byte ceiling is skipped from the inline embed and linked to
+  // its Drive file instead, so the report always generates. (2026-07-21)
+  var MAX_INLINE_IMAGE_BYTES = 3.5 * 1024 * 1024;
   var sections = entries.map(function(e,idx){
     var d=decsFor(e.logId);
     var imgPages='';
     for (var k=0;k<e.imgIds.length;k+=2){
       var pair='';
       [e.imgIds[k], e.imgIds[k+1]].forEach(function(id){ if(!id) return;
-        try{ var f=DriveApp.getFileById(id); var b=f.getBlob();
-          pair += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(b.getBytes())+'">'; }catch(er){} });
+        try{
+          var f=DriveApp.getFileById(id); var b=f.getBlob();
+          var bytes=b.getBytes();
+          if (bytes.length > MAX_INLINE_IMAGE_BYTES) {
+            pair += '<div class="imgtoolarge">Photo too large to embed &mdash; <a href="'+f.getUrl()+'">view full size in Drive</a></div>';
+          } else {
+            pair += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(bytes)+'">';
+          }
+        }catch(er){} });
       if (pair) imgPages += '<div class="imgpage">'+pair+'</div>';
     }
     // Frozen snapshot = the entry's immutable text (built at finalize). Older
@@ -2277,6 +2291,7 @@ function generateProjectReportPDF(project, callerEmail){
     + '.ap ol{margin:4px 0 0;padding-left:24px;font-size:13px;line-height:1.6}.ap li{margin-bottom:3px}.st{color:#3B6D11;font-size:11px}'
     + '.imgpage{page-break-before:always;text-align:center}'
     + '.imgpage img{display:block;width:100%;max-height:430px;object-fit:contain;margin:0 auto 16px;border:1px solid #E2DFD8}'
+    + '.imgtoolarge{padding:60px 20px;color:#9E9B94;font-size:13px;font-style:italic}.imgtoolarge a{color:#E08A1E}'
     + '.vids{font-size:12px;margin-top:8px}'
     + '.foot{margin-top:22px;border-top:1px solid #E7E3DA;padding-top:7px;font-size:10px;color:#9E9B94;text-align:center}'
     + '</style></head><body>'
@@ -2303,14 +2318,21 @@ function generateProjectReportPDF(project, callerEmail){
   // Point EVERY shareable entry of this project at the freshly-generated PDF, so
   // an older entry's saved link never opens a stale copy (e.g. one that still
   // contains logs deleted since). createFile makes a new fileId each time.
-  try {
-    var fid = saved.getId();
-    for (var pi = 1; pi < rows.length; pi++) {
-      if (String(rows[pi][4]||'').toLowerCase() !== pl) continue;
-      var pst = String(rows[pi][15]||'').trim();
-      if (pst === 'Final' || pst === 'Approved') sheet.getRange(pi+1, 20).setValue(fid);
-    }
-  } catch(e) {}
+  // Re-read the sheet fresh here rather than reusing the `rows` snapshot from
+  // the top of this function — MEETING_LOG uses prependRow, so any submission
+  // elsewhere WHILE this ran (photo fetch + PDF conversion can take a while)
+  // shifts every existing row down by one; writing back by the original row
+  // INDEX would then silently land on the wrong row. Match by Log ID instead.
+  var fid = saved.getId();
+  var wroteBack = 0;
+  var wantIds = {}; entries.forEach(function(e){ wantIds[e.logId] = true; });
+  var freshRows = sheet.getDataRange().getValues();
+  for (var pi = 1; pi < freshRows.length; pi++) {
+    if (!wantIds[String(freshRows[pi][0]||'')]) continue;
+    try { sheet.getRange(pi+1, 20).setValue(fid); wroteBack++; }
+    catch(e) { Logger.log('PDF write-back failed for row '+(pi+1)+' ('+project+'): '+e); }
+  }
+  if (!wroteBack) Logger.log('PDF generated for "'+project+'" (file '+fid+') but no MEETING_LOG row was updated with it — the shareable entries may have moved/been deleted mid-generation.');
   return { fileId:saved.getId(), url:saved.getUrl() };
 }
 

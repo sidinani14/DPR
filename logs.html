@@ -57,18 +57,30 @@ async function load(){
     document.getElementById('status').textContent=LOGS.length+' logs';
   }catch(e){ document.getElementById('status').textContent='Error: '+e.message; }
 }
+function pdfCell(l){
+  if (l.pdfId) return `<a class="pdf" href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank">open</a>`;
+  // Draft = submitted but never reached the final "publish" step in meetlog.html
+  // (closed the tab, lost connection, etc.) — it was never added to the
+  // project's shareable report, so there's nothing to generate yet. Only
+  // Final/Approved entries without a pdfId are a real "Generate PDF" case.
+  if (l.status === 'Draft') return `<span style="color:var(--ink3);font-style:italic" title="Submitted but never published — the author needs to reopen meetlog.html and finish the review step">Draft — not published</span>`;
+  if (l.status === 'Pending') return `<span style="color:var(--amber)">awaiting approval</span>`;
+  if (l.status === 'Rejected') return `<span style="color:var(--red)">rejected</span>`;
+  return `<button class="del" style="color:var(--navy)" onclick="regen('${l.logId}','${esc(l.project)}')">Generate PDF</button>`;
+}
 function render(){
   const q=(document.getElementById('q').value||'').toLowerCase();
   const rows=LOGS.filter(l=>!q||[l.project,l.loggedBy,l.type,l.clients].join(' ').toLowerCase().includes(q));
   if(!rows.length){ document.getElementById('out').innerHTML='<div class="empty">No logs.</div>'; return; }
-  document.getElementById('out').innerHTML='<table><tr><th>Date</th><th>Project</th><th>Type</th><th>Logged by</th><th>Clients</th><th>PDF</th><th></th></tr>'+
+  document.getElementById('out').innerHTML='<table><tr><th>Date</th><th>Project</th><th>Type</th><th>Logged by</th><th>Clients</th><th>Status</th><th>PDF</th><th></th></tr>'+
     rows.map(l=>`<tr class="${l._dup?'dup':''}">
       <td>${shortD(l.date)}</td>
       <td><b>${esc(l.project)}</b>${l._dup?'<span class="tag">possible repeat</span>':''}</td>
       <td>${esc(l.type)}</td>
       <td>${esc(l.loggedBy)}</td>
       <td>${esc(l.clients||'—')}</td>
-      <td id="pdf-${l.logId}">${l.pdfId?`<a class="pdf" href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank">open</a>`:`<button class="del" style="color:var(--navy)" onclick="regen('${l.logId}','${esc(l.project)}')">Generate PDF</button>`}</td>
+      <td>${esc(l.status||'—')}</td>
+      <td id="pdf-${l.logId}">${pdfCell(l)}</td>
       <td><button class="del" onclick="del('${l.logId}','${esc(l.project)}')">Delete</button></td>
     </tr>`).join('')+'</table>';
 }
