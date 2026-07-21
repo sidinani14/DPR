@@ -1883,6 +1883,8 @@ async function submitAll() {
         action      : 'submitAmanCRM',
         date, time  : new Date().toTimeString().substring(0,5),
         member      : crmUser,
+        email       : googleUser?.email||'',
+        arrivedOnTime: document.querySelector('input[name=ontime]:checked')?.value||'',
         newLeads    : JSON.stringify(leads),
         leadFollowups: JSON.stringify(followups),
         contacts    : JSON.stringify(contacts),

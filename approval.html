@@ -478,7 +478,9 @@ async function approveMeeting(row){
       body:JSON.stringify({action:'approveMeetingLog', row, disposition:'approve', reviewedBy:lead, bodyPolished})});
     const j=await r.json();
     if(j.status==='ok'){ const card=document.getElementById('ml-'+row); if(card){ card.style.opacity=.6;
-      card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ Approved — client PDF generated'+(j.pdfUrl?' · <a href="'+j.pdfUrl+'" target="_blank">open</a>':'')+'</div>'; } }
+      card.innerHTML = j.pdfError
+        ? '<div style="color:#C0392B;font-weight:600;font-size:12px">⚠ Approved, but '+j.pdfError+'</div>'
+        : '<div style="color:var(--green);font-weight:600;font-size:12px">✓ Approved — client PDF generated'+(j.pdfUrl?' · <a href="'+j.pdfUrl+'" target="_blank">open</a>':'')+'</div>'; } }
     else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
   }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
 }

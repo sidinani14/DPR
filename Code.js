@@ -762,6 +762,7 @@ function doPost(e) {
     if (data.action === 'getDirectorPendingItems') return respond(getDirectorPendingItems());
     if (data.action === 'completeDirectorItem')   return respond(completeDirectorItem(data, authEmail));
     if (data.action === 'submitDelayReason')      return respond(submitDelayReason(data));
+    if (data.action === 'submitDailySummary')     { writeDailySummary(data); return respond({status:'ok'}); }
     if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
@@ -2034,6 +2035,22 @@ function submitMeetingLog(data, authEmail){
 // Finalize an entry after the author has reviewed/edited the polished text:
 // apply edits, freeze the immutable snapshot, mark Final, regenerate the
 // cumulative PDF, and return its link so the team can share immediately.
+// The cumulative PDF is rebuilt from EVERY finalized entry for the project
+// (all past text + all embedded photos) on every finalize/approve/delete —
+// as a project accumulates logs and photos over time this HTML can get large
+// enough that Utilities.Blob.getAs('application/pdf') throws (a known Apps
+// Script limit, not something we control). Wrapped so that failure never
+// blocks the actual finalize/approve/delete — the log itself still saves —
+// it just comes back without a fresh PDF, with the real error logged.
+function safeGenerateProjectReportPDF(project, callerEmail){
+  try {
+    return generateProjectReportPDF(project, callerEmail);
+  } catch(err) {
+    Logger.log('PDF generation failed for project "' + project + '": ' + err);
+    return { fileId:null, url:null, error: String(err) };
+  }
+}
+
 function finalizeMeetingLog(data, authEmail){
   var s = db();
   var logSheet = s.getSheetByName(MEETING_LOG_TAB);
@@ -2073,9 +2090,10 @@ function finalizeMeetingLog(data, authEmail){
   logSheet.getRange(rowNum,17).setValue(authEmail||''); logSheet.getRange(rowNum,18).setValue(dateStr());
 
   var project = String(rows[rIdx][4]||'').trim();
-  var pdf = generateProjectReportPDF(project, authEmail);
+  var pdf = safeGenerateProjectReportPDF(project, authEmail);
   if (pdf && pdf.fileId) logSheet.getRange(rowNum,20).setValue(pdf.fileId);
-  return { status:'ok', logId:logId, pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
+  return { status:'ok', logId:logId, pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId,
+           pdfError: pdf && pdf.error ? 'Log saved, but the PDF could not be regenerated — tell Siddharth so he can check the project\'s log history.' : null };
 }
 
 // Current decision items for a log (id/cat/owner/text), applying any pending edits.
@@ -2133,9 +2151,10 @@ function approveMeetingLog(data, authEmail){
   if (typeof data.bodyPolished === 'string' && data.bodyPolished.trim()) sheet.getRange(row,11).setValue(data.bodyPolished);
   sheet.getRange(row,16).setValue('Approved'); sheet.getRange(row,17).setValue(data.reviewedBy||authEmail||''); sheet.getRange(row,18).setValue(today);
   var project = String(sheet.getRange(row,5).getValue()||'').trim();
-  var pdf = generateProjectReportPDF(project, authEmail);
+  var pdf = safeGenerateProjectReportPDF(project, authEmail);
   if (pdf && pdf.fileId) sheet.getRange(row,20).setValue(pdf.fileId);
-  return {status:'ok', disposition:'Approved', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
+  return {status:'ok', disposition:'Approved', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId,
+          pdfError: pdf && pdf.error ? 'Log approved, but the PDF could not be regenerated — check the project\'s log history.' : null };
 }
 
 // ── Frozen-snapshot helpers (shared by finalize + report) ────────────────────
@@ -2531,8 +2550,9 @@ function deleteMeetingLog(data, authEmail){
   var crm=s.getSheetByName(CRM_LOG_TAB);
   if(crm && crm.getLastRow()>1){ var cr=crm.getDataRange().getValues();
     for(var k=cr.length-1;k>=1;k--){ if(String(cr[k][1]||'').trim()===logId) crm.deleteRow(k+1); } }
-  var pdf=generateProjectReportPDF(project, authEmail);
-  return {status:'ok', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId };
+  var pdf=safeGenerateProjectReportPDF(project, authEmail);
+  return {status:'ok', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId,
+          pdfError: pdf && pdf.error ? 'Log deleted, but the PDF could not be regenerated — check the project\'s log history.' : null };
 }
 
 // All non-deleted meeting/site-visit logs (managers only) — for the Logs Manager.
@@ -6759,7 +6779,7 @@ function getDeepakWeeklyStats(weekStart) {
 //     Client Connection Coverage /20 — ongoing projects connected ÷ total
 //     Lead Management            /15 — leads 24hr-contacted ÷ new leads
 //     Revenue Collection         /15 — min(collected÷billsRaised, 70%)/70%
-//   DPR Consistency  /15 — AMAN_DAILY submission days ÷ 6
+//   DPR Consistency  /15 — distinct CRM_LOG submission days ÷ 6
 //   Punctuality      /20 — biometric (same base as team)
 //   Hours            /15 — biometric (same base as team)
 // ════════════════════════════════════════════════════════════════
@@ -7022,16 +7042,18 @@ function getWeeklyDiag(weekStart){
       erows.push({date:d, project:String(er[j][3]||''), lead:String(er[j][4]||''), visit:String(er[j][5]||''), client:String(er[j][17]||'')}); } }
   out.deepak.execRowsThisWeek = erows;
 
-  // Aman — show ALL CRM_LOG rows this week (raw member values), AMAN_DAILY rows, and project stages
+  // Aman — show ALL CRM_LOG rows this week (raw member values), plus his daily
+  // check-in rows from DAILY_SUMMARY (AMAN_DAILY merged in here, 2026-07-21).
   var lg = s.getSheetByName(CRM_LOG_TAB), conns = [];
   if (lg){ var lr=lg.getDataRange().getValues();
     for (var m=1;m<lr.length;m++){ var dt=cellDate(lr[m][2]); if(!dt||dt<mon||dt>sat) continue;
       conns.push({date:dt, member:String(lr[m][3]||''), category:String(lr[m][4]||''), project:String(lr[m][6]||'')}); } }
   out.aman.crmLogThisWeek = conns;
-  var ad = s.getSheetByName(AMAN_DAILY_TAB), adr = [];
+  var ad = s.getSheetByName(SUMMARY_TAB), adr = [];
   if (ad){ var arr=ad.getDataRange().getValues();
-    for (var a=1;a<arr.length;a++){ var dd=cellDate(arr[a][1]); if(!dd||dd<mon||dd>sat) continue;
-      adr.push({date:dd, member:String(arr[a][3]||'')}); } }
+    for (var a=1;a<arr.length;a++){ var dd=cellDate(arr[a][0]); if(!dd||dd<mon||dd>sat) continue;
+      if (String(arr[a][2]||'').trim() !== 'Aman Raghuwanshi') continue;
+      adr.push({date:dd, member:String(arr[a][2]||'')}); } }
   out.aman.amanDailyThisWeek = adr;
   var pj = s.getSheetByName(PROJECTS_TAB), proj = [];
   if (pj){ var pr=pj.getDataRange().getValues();
@@ -7049,22 +7071,6 @@ var LEADS_TAB      = 'LEADS';
 var FEEDBACK_TAB   = 'FEEDBACK';
 var BILLING_TAB    = 'BILLING';
 var CRM_LOG_TAB    = 'CRM_LOG';   // client connections + other activities (one row each)
-
-function writeAmanDailyHeaders(sheet) {
-  // Daily index/summary only. Detail rows now live in dedicated tabs:
-  //   Client connections → CLIENT_CONNECTIONS (one row each)
-  //   Other activities   → ACTIVITIES (one row each)
-  //   Leads→LEADS, Finance→BILLING, Issues→SITE_ISSUES, Feedback→FEEDBACK,
-  //   Agendas→TASK_ASSIGNMENTS.
-  var h = [
-    'Submission ID','Date','Time','Member',
-    'Vendor Coordination','Site Issues Addressed','TnCP Coordination','BNI Activity',
-  ];
-  sheet.getRange(1,1,1,h.length).setValues([h])
-    .setBackground('#005F73').setFontColor('#FFFFFF')
-    .setFontWeight('bold').setFontSize(10);
-  sheet.setFrozenRows(1);
-}
 
 function writeCrmLogHeaders(sheet) {
   // Combined client connections + other activities, one row per entry.
@@ -7445,14 +7451,15 @@ function submitAmanCRM(data) {
     var tncp      = activities.tncp       || {on:'No', entries:[]};
     var bni       = activities.bni        || {on:'No', entries:[]};
 
-    // ── 1. Write AMAN_DAILY index row (summary only) ──────────
-    var dailySheet = getOrCreate(AMAN_DAILY_TAB, writeAmanDailyHeaders);
-    var subId      = nextId(dailySheet, 'CRM-');
-    prependRow(dailySheet, [
-      subId, today, now, member,
-      vendor.on || 'No', siteIss.on || 'No', tncp.on || 'No', bni.on || 'No',
-    ]);
-    Logger.log('AMAN_DAILY written: ' + subId);
+    // ── 1. Daily check-in — AMAN_DAILY merged into DAILY_SUMMARY (2026-07-21),
+    // same shape DPR writes. The old Vendor/SiteIssues/TnCP/BNI Yes/No flags
+    // aren't reproduced here — they're already fully captured as real entries
+    // in CRM_LOG below (Category='Other Activity'), so nothing is lost, just
+    // no longer duplicated as a redundant boolean index. ──
+    var subId = 'CRM-' + Utilities.getUuid().substring(0,8).toUpperCase();
+    var summarySheet = getOrCreate(SUMMARY_TAB, writeSummaryHeaders);
+    prependRow(summarySheet, [ today, now, member, data.email || '', data.arrivedOnTime || '', '', '', '' ]);
+    Logger.log('DAILY_SUMMARY written for Aman: ' + subId);
 
     // ── 1a. Client connections + activities → CRM_LOG (one row each) ──
     var logSheet = getOrCreate(CRM_LOG_TAB, writeCrmLogHeaders);

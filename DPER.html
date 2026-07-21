@@ -1041,6 +1041,14 @@ async function submitAll(){
     if (conns.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'logConnections', member:leadName, connections:conns})}).catch(()=>{});
 
+    // Daily check-in, once per submission (not per project) — same brief shape
+    // DPR writes to DAILY_SUMMARY. SITE_EXECUTION keeps the full per-project
+    // detail unchanged; this is just so "did they check in today" is visible
+    // in one shared place across DPR/DPER/CRM.
+    await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'submitDailySummary', 'Member':leadName, 'Member Email':googleUser?.email||'',
+        'Arrived on Time': document.querySelector('input[name=ontime]:checked')?.value||''})}).catch(()=>{});
+
     // Late-arrival context (replaces messaging Siddharth on WhatsApp) — logged
     // whenever Arrived-on-time is No; Siddharth decides excuse-vs-absent when
     // reviewing the Paytime import, not here.

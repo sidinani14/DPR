@@ -265,7 +265,9 @@ async function finalizeLog(){
   try{
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'finalizeMeetingLog',logId:REVIEW.logId,bodyPolished:REVIEW.body,items,teamAttendees:REVIEW.teamAttendees,clientAttendees:REVIEW.clientAttendees,purpose:REVIEW.purpose,photoIds:REVIEW.photoIds})}).then(x=>x.json());
     if(res.status==='ok'){
-      const link=res.pdfUrl?`<a href="${res.pdfUrl}" target="_blank" style="color:#1F3A5F;font-weight:600">Open / share the PDF ↗</a>`:'PDF generated.';
+      const link=res.pdfError
+        ? `<span style="color:#C0392B">⚠ ${esc(res.pdfError)}</span>`
+        : (res.pdfUrl?`<a href="${res.pdfUrl}" target="_blank" style="color:#1F3A5F;font-weight:600">Open / share the PDF ↗</a>`:'PDF generated.');
       document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#2E7D32">✓ Report ready</h1>
         <div class="sub">The report for <b>${esc(REVIEW.project)}</b> is updated with this ${LOG_TYPE.toLowerCase()} at the front.<br><br>${link}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px">
