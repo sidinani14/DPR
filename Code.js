@@ -400,7 +400,7 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1,
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
-  getDirectorPendingItems:1, completeDirectorItem:1 };
+  getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -772,6 +772,14 @@ function doPost(e) {
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
     if (data.action === 'getWeeklyProjectDigest') return respond(getWeeklyProjectDigest(data.weekStart||''));
     if (data.action === 'getAllMeetingLogs')      return respond(getAllMeetingLogs());
+    if (data.action === 'regenerateProjectPDF') {
+      var rgProject = String(data.project||'').trim();
+      if (!rgProject) return respond({status:'error', message:'No project given'});
+      var rgPdf = safeGenerateProjectReportPDF(rgProject, authEmail);
+      if (rgPdf && rgPdf.fileId) return respond({status:'ok', pdfUrl:rgPdf.url, pdfId:rgPdf.fileId});
+      var rgMsg = (rgPdf && rgPdf.error) ? String(rgPdf.error) : 'No shareable (Final/Approved) logs found for this project';
+      return respond({status:'error', message: rgMsg});
+    }
     if (data.action === 'getProjectDetail')       return respond(getProjectDetail(data.project||''));
     if (data.action === 'disposeBlock')           return respond(disposeBlock(data));
     if (data.action === 'parkTask')               return respond(parkTask(data, authEmail));

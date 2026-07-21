@@ -68,9 +68,18 @@ function render(){
       <td>${esc(l.type)}</td>
       <td>${esc(l.loggedBy)}</td>
       <td>${esc(l.clients||'—')}</td>
-      <td>${l.pdfId?`<a class="pdf" href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank">open</a>`:'—'}</td>
+      <td id="pdf-${l.logId}">${l.pdfId?`<a class="pdf" href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank">open</a>`:`<button class="del" style="color:var(--navy)" onclick="regen('${l.logId}','${esc(l.project)}')">Generate PDF</button>`}</td>
       <td><button class="del" onclick="del('${l.logId}','${esc(l.project)}')">Delete</button></td>
     </tr>`).join('')+'</table>';
+}
+async function regen(logId, project){
+  const cell=document.getElementById('pdf-'+logId);
+  if(cell) cell.textContent='Generating…';
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'regenerateProjectPDF',project})}).then(x=>x.json());
+    if(r.status==='ok'){ load(); }
+    else { alert('Could not generate PDF: '+(r.message||'failed')); if(cell) cell.innerHTML=`<button class="del" style="color:var(--navy)" onclick="regen('${logId}','${esc(project)}')">Generate PDF</button>`; }
+  }catch(e){ alert('Network error'); if(cell) cell.innerHTML=`<button class="del" style="color:var(--navy)" onclick="regen('${logId}','${esc(project)}')">Generate PDF</button>`; }
 }
 async function del(logId, project){
   if(!confirm('Delete this log for '+project+'? It will be removed from the report and cannot be undone.')) return;
