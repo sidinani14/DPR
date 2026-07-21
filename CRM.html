@@ -854,6 +854,14 @@ function renderMyTasks(){
         <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''}><span class="mt-btn ip">In progress</span></label>
         <label><input type="radio" name="mt-r-${i}" value="Done"><span class="mt-btn done">Done</span></label>
       </div>
+      ${overdue ? (t.delayReason ? `
+      <div style="margin-top:6px;font-size:11px;color:var(--text3)"><b style="color:#C0392B">Delay reason:</b> ${esc(t.delayReason)}</div>` : `
+      <div id="delay-reason-${i}" style="margin-top:6px">
+        <div style="font-size:10.5px;color:#C0392B;margin-bottom:3px">WHY IS THIS OVERDUE? *</div>
+        <textarea id="mt-delay-${i}" placeholder="Brief reason — captured once, won't ask again tomorrow" style="font-size:12px;padding:6px 8px;width:100%;min-height:34px;border-radius:6px"></textarea>
+        <button type="button" onclick="saveDelayReason(${i})" style="margin-top:4px;font-size:11px;font-weight:700;color:#C0392B;background:none;border:1px solid #C0392B;border-radius:6px;padding:4px 9px;cursor:pointer">Save reason</button>
+        <span id="delay-reason-msg-${i}" style="font-size:11px;margin-left:6px"></span>
+      </div>`) : ''}
     </div>`;
   }).join('');
   const pendHtml=pending.map(t=>`<div class="mt-card" style="opacity:.7;border-left:3px solid #C8863A">
@@ -868,6 +876,24 @@ function collectTaskStatuses(){
     status:document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started',
     actualCompletionDate:today
   })).filter(s=>s.status!=='Not Started');
+}
+async function saveDelayReason(i){
+  const ta=document.getElementById('mt-delay-'+i);
+  const reason=(ta?.value||'').trim();
+  const msg=document.getElementById('delay-reason-msg-'+i);
+  if(!reason){ if(msg){ msg.textContent='Enter a reason first'; msg.style.color='#C0392B'; } return; }
+  const t=myTasks[i];
+  if(msg){ msg.textContent='Saving…'; msg.style.color='var(--text3)'; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'submitDelayReason', taskId:t.taskId, reason})});
+    const j=await r.json();
+    if(j.status==='ok'){
+      t.delayReason=reason;
+      const host=document.getElementById('delay-reason-'+i);
+      if(host) host.outerHTML=`<div style="margin-top:6px;font-size:11px;color:var(--text3)"><b style="color:#C0392B">Delay reason:</b> ${esc(reason)}</div>`;
+    } else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
+  }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
 }
 
 // ════════════════════════════════════════

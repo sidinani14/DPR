@@ -380,11 +380,18 @@ var TEAM_TAB      = 'TEAM';
 // AA=27 park reason (free text for manual parks; auto-set for stalled). Added beyond the 23
 // core cols, so existing index reads are unaffected. Review date lives in BLOCK_LOG.
 var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26, COL_PARK_REASON=27;  // X,Y,Z,AA
+var COL_DELAY_REASON=28;  // AB — why an overdue task is late (captured once, not re-prompted)
 var BILL_REQ_TAB  = 'BILL_REQUESTS';  // billables raised on DPR → approved → CRM raise-bill task
 // Only Siddharth may park tasks directly from the dashboard (EPIC I).
 var DIRECTOR_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1 };
 // Approval form + weekly report are restricted to Siddharth & Astha only.
 var MANAGER_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1, 'astha@ideaform.in':1, 'astha.uch@gmail.com':1 };
+// Siddharth & Astha don't fill DPR/DPER/CRM and aren't scored team members —
+// excluded from the dashboard/heatmap and weekly scoring (2026-07-21). Any
+// task assigned to them (e.g. createSiddharthTask's "Pending Discussion"
+// items) surfaces instead on approval.html via getDirectorPendingItems,
+// with no approval gate — see completeDirectorItem.
+var DIRECTOR_NAMES = { 'Siddharth Inani':1, 'Astha Inani':1 };
 function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase()]; }
 // Actions used ONLY by the approval form / weekly report (verified not shared
 // with the dashboard) — callable by managers only.
@@ -392,7 +399,8 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1,
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
-  saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1 };
+  saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
+  getDirectorPendingItems:1, completeDirectorItem:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -751,6 +759,9 @@ function doPost(e) {
     if (data.action === 'getMonthlyAdjustments')  return respond(getMonthlyAdjustments(data.month||''));
     if (data.action === 'saveHolidays')           return respond(saveHolidays(data.dates||[]));
     if (data.action === 'getHolidays')            return respond(getHolidays(data.from||'', data.to||''));
+    if (data.action === 'getDirectorPendingItems') return respond(getDirectorPendingItems());
+    if (data.action === 'completeDirectorItem')   return respond(completeDirectorItem(data, authEmail));
+    if (data.action === 'submitDelayReason')      return respond(submitDelayReason(data));
     if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
@@ -1186,6 +1197,9 @@ function getAllTasks() {
 
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
+    // Siddharth/Astha aren't scored team members — their items (e.g. Pending
+    // Discussion) surface on approval.html instead, not the dashboard.
+    if (DIRECTOR_NAMES[String(r[3]||'').trim()]) continue;
     var selfStatus   = String(r[COL_SELFSTATUS] || 'Not Started').trim();
     var leadApproved = String(r[COL_LEADAPPR]   || 'Pending').trim();
     var target       = cellDate(r[COL_TARGET]);
@@ -1268,6 +1282,7 @@ function getAllTasks() {
       blockDisposition : blockDispo,                  // ''|Pending|Cancelled|Parked|Parked (Stalled)|…
       parkReason       : String(r[COL_PARK_REASON-1] || ''),   // AA — why parked
       blockedDate      : (status === 'Blocked' || status === 'Parked') ? cellDate(r[COL_STATUSDATE]) : '',
+      delayReason      : String(r[COL_DELAY_REASON-1] || ''),  // AB — captured once, frontend stops prompting once set
     });
   }
   return {tasks:tasks};
@@ -1325,6 +1340,27 @@ function getOpenTasksForMember(member) {
       sampleAssignees: allTasks.slice(0,5).map(function(t){return t.assignedTo;}),
     }
   };
+}
+
+// Capture why an overdue task is late — keyed by taskId (unique) rather than
+// the fuzzy member+project+type match used for status updates, so it works
+// regardless of whether the status itself changed this submission. Written
+// once; getAllTasks returns it back so the form stops prompting for it.
+function submitDelayReason(data) {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var taskId = String(data.taskId||'').trim();
+  var reason = String(data.reason||'').trim();
+  if (!taskId || !reason) return {status:'error', message:'Missing taskId or reason'};
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]||'').trim() === taskId) {
+      ensureCols(sheet, COL_DELAY_REASON);
+      sheet.getRange(i+1, COL_DELAY_REASON).setValue(reason);
+      return {status:'ok'};
+    }
+  }
+  return {status:'error', message:'Task not found'};
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2724,7 +2760,7 @@ function calculateWeeklyScorecard() {
     var role   = String(tRows[ti][1] || '').trim();
     var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
-    if (!name || active === 'no') continue;
+    if (!name || active === 'no' || DIRECTOR_NAMES[name]) continue;
 
     var approvedPts = 0;
 
@@ -3477,7 +3513,7 @@ function calculateCurrentWeekScorecard() {
     var role   = String(tRows[ti][1] || '').trim();
     var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
-    if (!name || active === 'no') continue;
+    if (!name || active === 'no' || DIRECTOR_NAMES[name]) continue;
 
     // Approved pts this week — TASK_LOG + TASK_ASSIGNMENTS
     // Filter by SelfStatusDate (when work was done) so weekend approvals
@@ -4802,6 +4838,62 @@ function createSiddharthTask(data) {
   return {status:'ok', taskId:newId};
 }
 
+// Open items assigned to Siddharth/Astha (e.g. "Pending Discussion" from
+// createSiddharthTask) — surfaced on approval.html since they don't fill a
+// daily form themselves and would otherwise never see these. Manager-only.
+function getDirectorPendingItems() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {items: []};
+  var rows = sheet.getDataRange().getValues();
+  var items = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var who = String(r[3] || '').trim();
+    if (!DIRECTOR_NAMES[who]) continue;
+    var status = String(r[13] || '').trim();
+    if (status === 'Done' || status === 'Parked' || status === 'Reassigned') continue;
+    items.push({
+      row         : i + 1,
+      taskId      : String(r[0]  || ''),
+      member      : who,
+      project     : String(r[2]  || ''),
+      taskType    : String(r[4]  || ''),
+      description : String(r[11] || ''),
+      assignedDate: cellDate(r[9]),
+      deadline    : cellDate(r[10]),
+      notes       : String(r[20] || ''),
+    });
+  }
+  items.sort(function(a,b){ return (a.deadline||'').localeCompare(b.deadline||''); });
+  return {items: items};
+}
+
+// Mark a director pending item complete — no approval workflow (they ARE
+// the approvers); LeadApproved is set straight to 'Yes' so it doesn't sit
+// in anyone's queue. Optional remarks appended to the Notes column.
+function completeDirectorItem(data, authEmail) {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var row = parseInt(data.row, 10);
+  if (!row || row < 2) return {status:'error', message:'Invalid row'};
+  var who = String(sheet.getRange(row, 4).getValue() || '').trim();
+  if (!DIRECTOR_NAMES[who]) return {status:'error', message:'Not a director item'};
+  var today = dateStr();
+  var remarks = String(data.remarks || '').trim();
+  sheet.getRange(row, 14).setValue('Done');   // N SelfStatus
+  sheet.getRange(row, 15).setValue(today);    // O SelfStatusDate
+  sheet.getRange(row, 16).setValue(today);    // P ActualCompletionDate
+  sheet.getRange(row, 17).setValue('Yes');    // Q LeadApproved — no approval needed
+  sheet.getRange(row, 18).setValue(who);      // R ApprovedBy (self)
+  sheet.getRange(row, 19).setValue(today);    // S ApprovalDate
+  if (remarks) {
+    var existing = String(sheet.getRange(row, 21).getValue() || '').trim(); // U Notes
+    sheet.getRange(row, 21).setValue(existing ? existing + ' | ' + remarks : remarks);
+  }
+  Logger.log('Director item completed: row ' + row + ' (' + who + ') by ' + authEmail);
+  return {status:'ok'};
+}
+
 // ════════════════════════════════════════════════════════════════
 // getWeeklyStatsForReport — called by weekly report HTML
 // Returns per-member stats for a given week (Mon-Sat)
@@ -4843,7 +4935,7 @@ function getWeeklyStats(weekStart) {
     var role   = String(tRows[ti][1] || '').trim();
     var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
-    if (!name || active === 'no') continue;
+    if (!name || active === 'no' || DIRECTOR_NAMES[name]) continue;
 
     // Tasks assigned this week (AssignedDate in Mon-Sat)
     var tasksAssigned = 0, assignedPts = 0;
@@ -5567,9 +5659,11 @@ function writeSiteIssues(subId, date, project, issues, onTrack, reportedBy) {
     var issId  = nextId(sheet, 'ISS-');
     var taskId = '';
     var issProject = iss.project || project;  // each issue carries its own project (CRM); DPER uses shared param
+    iss.reportedBy = iss.reportedBy || reporter;  // so createIssueTask can self-assign when unassigned
 
-    // Auto-create task in TASK_ASSIGNMENTS for all issue types
-    if (asSheet && iss.assignedTo && iss.description) {
+    // Auto-create task in TASK_ASSIGNMENTS — createIssueTask decides whether
+    // an unassigned/non-Design issue actually qualifies (self-assign case).
+    if (asSheet && iss.description) {
       taskId = createIssueTask(iss, issProject, date, onTrack);
     }
 
@@ -5622,8 +5716,15 @@ function resolveAssignee(assignedTo, projectName) {
 }
 
 function createIssueTask(iss, project, date, onTrack) {
-  // Create tasks for Design issues AND CRM design deliverables
-  if ((iss.issueType||'') !== 'Design' && (iss.kind||'') !== 'Deliverable') {
+  var explicit = String(iss.assignedTo||'').trim();
+  // Nothing named, or a generic external-party placeholder ('Vendor','PMC',...)
+  // — self-assign to whoever reported it (Deepak on DPER, Aman on CRM) rather
+  // than falling back to the project lead, so nothing they flag on their own
+  // form silently disappears unassigned. Design issues/deliverables always
+  // get a task regardless of assignee; any other issue type only becomes a
+  // task in this self-assigned case (2026-07-21).
+  var selfAssign = !explicit || GENERIC_ROLES.indexOf(explicit) > -1;
+  if (!selfAssign && (iss.issueType||'') !== 'Design' && (iss.kind||'') !== 'Deliverable') {
     Logger.log('Skipping non-design issue task: ' + iss.issueType);
     return '';
   }
@@ -5633,8 +5734,7 @@ function createIssueTask(iss, project, date, onTrack) {
   var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
   var today = dateStr();
 
-  // Resolve assignee — use manual selection if valid, else project lead from col F
-  var assignee = resolveAssignee(iss.assignedTo, project);
+  var assignee = selfAssign ? (iss.reportedBy || 'Deepak Soni') : explicit;
   if (!assignee) {
     Logger.log('No assignee found for issue in project: ' + project);
     return '';
@@ -5644,7 +5744,9 @@ function createIssueTask(iss, project, date, onTrack) {
   if (onTrack === 'At Risk' || onTrack === 'Delayed') priority = 'High';
 
   var srcLabel = (iss.reportedBy === 'Aman Raghuwanshi') ? 'CRM' : 'DPER';
-  var taskType = (iss.kind === 'Deliverable') ? 'Design Deliverable — CRM' : 'Site Issue — Design';
+  var taskType = (iss.kind === 'Deliverable') ? 'Design Deliverable — CRM'
+               : selfAssign ? 'Site Issue — ' + (iss.issueType || 'General')
+               : 'Site Issue — Design';
   var description = iss.description || '';
   var metaNotes   = '[' + srcLabel + ': ' + project + ', ' + date + ']';
 
@@ -5675,7 +5777,7 @@ function createIssueTask(iss, project, date, onTrack) {
   ]);
   parkRowIfStalled(sheet, project || '');  // stalled project → auto-park
 
-  Logger.log('Issue task created: ' + newId + ' → ' + iss.assignedTo + ' / ' + taskType);
+  Logger.log('Issue task created: ' + newId + ' → ' + assignee + ' / ' + taskType);
   return newId;
 }
 

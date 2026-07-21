@@ -857,9 +857,37 @@ function renderAssignedTasks() {
         <textarea class="atc-note-${i}" placeholder="e.g. waiting on structural drawings / client hasn't approved layout / need direction from lead…"
           style="font-size:12px;padding:7px 10px;width:100%;min-height:44px;background:var(--surface2);border:1px solid rgba(192,80,80,.4);border-radius:var(--radius-sm);color:var(--text)"></textarea>
       </div>
+      ${isOverdue ? (t.delayReason ? `
+      <div style="padding:0 13px 10px;font-size:11.5px;color:var(--text3)"><b style="color:var(--red)">Delay reason:</b> ${t.delayReason}</div>` : `
+      <div id="delay-reason-${i}" style="padding:0 13px 10px">
+        <div style="font-size:11px;color:var(--red);margin-bottom:4px;font-family:'DM Mono',monospace">WHY IS THIS OVERDUE? <span style="color:var(--red)">*</span></div>
+        <textarea id="atc-delay-${i}" placeholder="Brief reason — captured once, won't ask again tomorrow"
+          style="font-size:12px;padding:7px 10px;width:100%;min-height:38px;background:var(--surface2);border:1px solid rgba(192,80,80,.4);border-radius:var(--radius-sm);color:var(--text)"></textarea>
+        <button type="button" onclick="saveDelayReason(${i})" style="margin-top:5px;font-size:11px;font-weight:700;color:var(--red);background:none;border:1px solid rgba(192,80,80,.4);border-radius:var(--radius-sm);padding:5px 10px;cursor:pointer">Save reason</button>
+        <span id="delay-reason-msg-${i}" style="font-size:11px;margin-left:8px"></span>
+      </div>`) : ''}
     </div>`;
   }).join('');
   document.getElementById('assigned-tasks-list').innerHTML += taskCards;
+}
+
+async function saveDelayReason(i){
+  const ta = document.getElementById('atc-delay-'+i);
+  const reason = (ta?.value||'').trim();
+  const msg = document.getElementById('delay-reason-msg-'+i);
+  if (!reason) { if(msg){ msg.textContent='Enter a reason first'; msg.style.color='var(--red)'; } return; }
+  const t = assignedTasks[i];
+  if (msg){ msg.textContent='Saving…'; msg.style.color='var(--text3)'; }
+  try {
+    const r = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'submitDelayReason', taskId:t.taskId, reason})});
+    const j = await r.json();
+    if (j.status==='ok') {
+      t.delayReason = reason; // stop prompting for this task in this session too
+      const host = document.getElementById('delay-reason-'+i);
+      if (host) host.outerHTML = `<div style="padding:0 13px 10px;font-size:11.5px;color:var(--text3)"><b style="color:var(--red)">Delay reason:</b> ${reason}</div>`;
+    } else if (msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='var(--red)'; }
+  } catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='var(--red)'; } }
 }
 
 // ── Project blocks (unplanned work) ──────────────────────────
