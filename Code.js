@@ -397,10 +397,10 @@ function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase
 // with the dashboard) — callable by managers only.
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
-  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1,
+  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1, getMeetingLogForEdit:1,
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
-  getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1 };
+  getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -771,7 +771,9 @@ function doPost(e) {
     if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
     if (data.action === 'getWeeklyProjectDigest') return respond(getWeeklyProjectDigest(data.weekStart||''));
-    if (data.action === 'getAllMeetingLogs')      return respond(getAllMeetingLogs());
+    if (data.action === 'getAllMeetingLogs')      return respond(getAllMeetingLogs(!!data.includeDeleted));
+    if (data.action === 'getMeetingLogForEdit')   return respond(getMeetingLogForEdit(data.logId||''));
+    if (data.action === 'undeleteMeetingLog')     return respond(undeleteMeetingLog(data, authEmail));
     if (data.action === 'regenerateProjectPDF') {
       var rgProject = String(data.project||'').trim();
       if (!rgProject) return respond({status:'error', message:'No project given'});
@@ -2602,17 +2604,98 @@ function deleteMeetingLog(data, authEmail){
           pdfError: pdf && pdf.error ? 'Log deleted, but the PDF could not be regenerated — check the project\'s log history.' : null };
 }
 
-// All non-deleted meeting/site-visit logs (managers only) — for the Logs Manager.
-function getAllMeetingLogs(){
+// Meeting/site-visit logs (managers only) — for the Logs Manager. Deleted
+// ones are hidden by default; pass includeDeleted to also see them (so a
+// mistaken delete can be found and restored via undeleteMeetingLog).
+function getAllMeetingLogs(includeDeleted){
   var sheet=db().getSheetByName(MEETING_LOG_TAB);
   if(!sheet || sheet.getLastRow()<2) return {logs:[]};
   var rows=sheet.getDataRange().getValues(), out=[];
-  for(var i=1;i<rows.length;i++){ if(String(rows[i][15]||'').trim()==='Deleted') continue;
+  for(var i=1;i<rows.length;i++){
+    var st=String(rows[i][15]||'').trim();
+    if(st==='Deleted' && !includeDeleted) continue;
     out.push({ logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
       project:String(rows[i][4]||''), loggedBy:String(rows[i][5]||''), clients:String(rows[i][7]||''),
-      status:String(rows[i][15]||''), pdfId:String(rows[i][19]||'') }); }
+      status:st, pdfId:String(rows[i][19]||'') }); }
   out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   return {logs:out};
+}
+
+// Undo a deleteMeetingLog. The row itself is only ever soft-deleted (status
+// flipped to 'Deleted', nothing erased) so the log/action-items are always
+// recoverable — except its CRM_LOG connection row, which delete DOES hard-
+// remove, so this re-creates that one from the log's own data. Restores to
+// 'Draft' rather than whatever it was before (that prior status isn't kept
+// anywhere) — safe default that forces a review via the Edit flow rather
+// than silently reappearing as an already-shared client PDF.
+function undeleteMeetingLog(data, authEmail){
+  var s = db(), sheet = s.getSheetByName(MEETING_LOG_TAB);
+  if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
+  var logId = String(data.logId||'').trim();
+  if (!logId) return {status:'error', message:'No logId given'};
+  var rows = sheet.getDataRange().getValues(), rIdx = -1;
+  for (var i=1; i<rows.length; i++){ if (String(rows[i][0]||'').trim()===logId){ rIdx=i; break; } }
+  if (rIdx<0) return {status:'error', message:'Log not found'};
+  if (String(rows[rIdx][15]||'').trim() !== 'Deleted') return {status:'error', message:'This log is not deleted'};
+  sheet.getRange(rIdx+1, 16).setValue('Draft');
+  var project = String(rows[rIdx][4]||'').trim();
+  var loggedBy = String(rows[rIdx][5]||'').trim();
+  var type = String(rows[rIdx][3]||'').trim();
+  var day = cellDate(rows[rIdx][1]);
+  var clientAttendees = String(rows[rIdx][7]||'').trim();
+  var dec = s.getSheetByName(DECISION_LOG_TAB);
+  if (dec && dec.getLastRow() > 1) {
+    var dr = dec.getDataRange().getValues();
+    for (var j=1; j<dr.length; j++){
+      if (String(dr[j][1]||'').trim()===logId && String(dr[j][8]||'').trim()==='Deleted') dec.getRange(j+1,9).setValue('Open');
+    }
+  }
+  try {
+    appendConnections(loggedBy, day, [{ project:project, type:type,
+      notes:'Logged '+type+(clientAttendees?(' with '+clientAttendees):'') }], logId);
+  } catch(e) { Logger.log('undeleteMeetingLog: could not recreate CRM_LOG row for '+logId+': '+e); }
+  return {status:'ok'};
+}
+
+// Full data for one log, to resume editing it in meetlog.html (e.g. a Draft
+// that never got finalized, or any log needing a photo/text fix) instead of
+// re-filling the whole form from scratch. Manager-only, matches Logs Manager.
+function getMeetingLogForEdit(logId){
+  logId = String(logId||'').trim();
+  if (!logId) return {status:'error', message:'No logId given'};
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]||'').trim() !== logId) continue;
+    if (String(rows[i][15]||'').trim() === 'Deleted') return {status:'error', message:'This log was deleted'};
+    var items = [];
+    var decSheet = db().getSheetByName(DECISION_LOG_TAB);
+    if (decSheet && decSheet.getLastRow() > 1) {
+      var dr = decSheet.getDataRange().getValues();
+      for (var j = 1; j < dr.length; j++) {
+        if (String(dr[j][1]||'').trim() !== logId) continue;
+        if (String(dr[j][8]||'').trim() === 'Deleted') continue;
+        items.push({ id:String(dr[j][0]||''), cat:String(dr[j][4]||''), owner:String(dr[j][5]||''), text:String(dr[j][6]||'') });
+      }
+    }
+    var splitCsv = function(s){ return String(s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); };
+    return {
+      status: 'ok',
+      logId: logId,
+      project: String(rows[i][4]||''),
+      date: cellDate(rows[i][1]),
+      type: String(rows[i][3]||''),
+      body: String(rows[i][10]||'') || String(rows[i][9]||''),  // polished, fallback to raw
+      items: items,
+      teamAttendees: splitCsv(rows[i][6]),
+      clientAttendees: String(rows[i][7]||''),
+      purpose: splitCsv(rows[i][8]),
+      photoIds: splitCsv(rows[i][13]),
+      folderId: String(rows[i][12]||''),
+    };
+  }
+  return {status:'error', message:'Log not found'};
 }
 
 // ════════════════════════════════════════════════════════════════

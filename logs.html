@@ -30,6 +30,7 @@ tr:last-child td{border-bottom:none}
   <div class="tools">
     <input id="q" placeholder="Filter by project, person, type…" oninput="render()">
     <button onclick="load()">↻ Refresh</button>
+    <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="showDel" onchange="load()">Show deleted</label>
     <span id="status" style="font-size:12px;color:var(--ink3)"></span>
   </div>
   <div id="out"><div class="empty">Sign in…</div></div>
@@ -47,8 +48,9 @@ window.idsOnAuth=function(u){
 };
 async function load(){
   document.getElementById('status').textContent='Loading…';
+  const includeDeleted=document.getElementById('showDel').checked;
   try{
-    const d=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getAllMeetingLogs'})}).then(r=>r.json());
+    const d=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getAllMeetingLogs',includeDeleted})}).then(r=>r.json());
     LOGS=(d&&d.logs)||[];
     // flag duplicates: same project + date + type appearing more than once
     const seen={}; LOGS.forEach(l=>{const k=(l.project+'|'+l.date+'|'+l.type).toLowerCase(); seen[k]=(seen[k]||0)+1;});
@@ -80,9 +82,19 @@ function render(){
       <td>${esc(l.loggedBy)}</td>
       <td>${esc(l.clients||'—')}</td>
       <td>${esc(l.status||'—')}</td>
-      <td id="pdf-${l.logId}">${pdfCell(l)}</td>
-      <td><button class="del" onclick="del('${l.logId}','${esc(l.project)}')">Delete</button></td>
+      <td id="pdf-${l.logId}">${l.status==='Deleted'?'—':pdfCell(l)}</td>
+      <td style="white-space:nowrap">${l.status==='Deleted'
+          ? `<button class="del" style="color:var(--navy)" onclick="restore('${l.logId}','${esc(l.project)}')">Restore</button>`
+          : `<a class="del" style="text-decoration:none;color:var(--navy);display:inline-block;margin-right:6px" href="meetlog.html?edit=${encodeURIComponent(l.logId)}">Edit</a><button class="del" onclick="del('${l.logId}','${esc(l.project)}')">Delete</button>`}</td>
     </tr>`).join('')+'</table>';
+}
+async function restore(logId, project){
+  if(!confirm('Restore this log for '+project+'? It will come back as a Draft — reopen it via Edit to review and regenerate its PDF.')) return;
+  document.getElementById('status').textContent='Restoring…';
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'undeleteMeetingLog',logId})}).then(x=>x.json());
+    if(r.status==='ok') load(); else { alert('Could not restore: '+(r.message||'failed')); document.getElementById('status').textContent=''; }
+  }catch(e){ alert('Network error'); }
 }
 async function regen(logId, project){
   const cell=document.getElementById('pdf-'+logId);

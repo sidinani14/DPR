@@ -49,6 +49,30 @@ window.idsOnAuth = async function(){
     const r = await fetch(API+'?action=getLists').then(x=>x.json());
     TEAM=r.team||[]; PROJECTS=r.projects||[];
   }catch(e){}
+  // Resuming an existing log from the Logs Manager (?edit=<logId>) — e.g. a
+  // Draft that was submitted but never finished, or any log that needs a
+  // photo/text fix. Jumps straight to the review/edit screen instead of a
+  // blank form. (2026-07-23)
+  const editId = new URLSearchParams(location.search).get('edit');
+  if (editId){
+    document.getElementById('app').innerHTML = '<div class="card"><div class="sub">Loading log…</div></div>';
+    try{
+      const d = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMeetingLogForEdit', logId:editId})}).then(x=>x.json());
+      if (d.status==='ok'){
+        REVIEW = {logId:d.logId, project:d.project, date:d.date, type:d.type,
+          body:d.body||'', items:d.items||[], teamAttendees:d.teamAttendees||[],
+          clientAttendees:d.clientAttendees||'', purpose:d.purpose||[],
+          photoIds:d.photoIds||[], folderId:d.folderId||''};
+        renderReview();
+        return;
+      }
+      document.getElementById('app').innerHTML = `<div class="card"><h1 style="color:#C0392B">Could not load this log</h1><div class="sub">${esc(d.message||'Unknown error')}</div><a href="logs.html" style="color:#1F3A5F">← Back to Logs Manager</a></div>`;
+      return;
+    }catch(e){
+      document.getElementById('app').innerHTML = `<div class="card"><h1 style="color:#C0392B">Network error</h1><a href="logs.html" style="color:#1F3A5F">← Back to Logs Manager</a></div>`;
+      return;
+    }
+  }
   render();
 };
 function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
@@ -258,17 +282,22 @@ function captureReview(){
   const cl=document.getElementById('rv-clients'); if(cl) REVIEW.clientAttendees=cl.value;
 }
 // Thumbnail gallery for the review screen — each photo has an × to remove it.
+// The remove button is a real 34px tap target (was 19px, in a 2px corner —
+// too small to hit reliably on a phone, which is how these are usually
+// submitted from a site visit) with a bit of thumbnail padding around it so
+// a slightly-off tap still lands on the button, not the photo. (2026-07-23)
 function photoGalleryHtml(){
   if(REVIEW.type!=='Site Visit') return '';
   const thumbs=(REVIEW.photoIds||[]).map((id,i)=>{
     const src=PHOTO_THUMBS[id];
-    const inner = src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover">`
-                      : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;color:#6E6E70">Photo ${i+1}</div>`;
-    return `<div style="position:relative;width:74px;height:74px;border-radius:6px;overflow:hidden;border:1px solid #E3E3E5;background:#F4F4F5">${inner}
-      <button type="button" title="Remove this photo" onclick="removeReviewPhoto('${qattr(id)}')" style="position:absolute;top:2px;right:2px;width:19px;height:19px;border:none;border-radius:50%;background:rgba(192,57,43,.92);color:#fff;font-size:13px;line-height:1;cursor:pointer;padding:0">×</button></div>`;
+    const inner = src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`
+                      : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;color:#6E6E70;border-radius:6px">Photo ${i+1}</div>`;
+    return `<div style="position:relative;width:88px;height:88px;padding-top:6px;padding-right:6px">
+      <div style="width:100%;height:100%;border-radius:6px;overflow:hidden;border:1px solid #E3E3E5;background:#F4F4F5">${inner}</div>
+      <button type="button" title="Remove this photo" onclick="removeReviewPhoto('${qattr(id)}')" style="position:absolute;top:0;right:0;width:34px;height:34px;border:2px solid #fff;border-radius:50%;background:#C0392B;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center">×</button></div>`;
   }).join('');
   return `<div class="field"><div class="lbl">Photos <span class="opt">tap × to remove · add more below</span></div>
-    ${REVIEW.photoIds.length?`<div id="rv-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">${thumbs}</div>`:''}
+    ${REVIEW.photoIds.length?`<div id="rv-thumbs" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px">${thumbs}</div>`:''}
     <input type="file" accept="image/*" multiple onchange="onReviewPhotos(this)">
     <div id="rv-ph" class="sub" style="margin-top:4px">${REVIEW.photoIds.length} photo(s) attached</div></div>`;
 }
