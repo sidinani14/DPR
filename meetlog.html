@@ -130,12 +130,44 @@ function numKey(e){
   ta.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function numFocus(e){ const ta=e.target; if(!ta.value.trim()){ ta.value='1. '; ta.setSelectionRange(3,3); } }
-function onPhotos(input){
-  for(const f of input.files){
+// Phone camera photos are routinely several MB — uncompressed, a handful of
+// them embedded inline in the cumulative PDF report is enough to make Apps
+// Script's HTML→PDF conversion fail outright. Downscale + re-encode as JPEG
+// client-side before upload, so every photo that reaches Drive is already
+// small enough to embed directly (2026-07-21).
+function compressImage(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    if (!file.type || file.type.indexOf('image/')!==0){ resolve(null); return; } // non-images (rare) pass through untouched
     const reader=new FileReader();
-    reader.onload=e=>{ photoFiles.push({name:f.name,mime:f.type,dataUrl:e.target.result});
-      document.getElementById('ph-list').innerHTML=photoFiles.map(p=>`<span class="t">${esc(p.name)}</span>`).join(''); };
-    reader.readAsDataURL(f);
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width, h=img.height;
+        if (w>maxDim || h>maxDim){
+          if (w>h){ h=Math.round(h*maxDim/w); w=maxDim; } else { w=Math.round(w*maxDim/h); h=maxDim; }
+        }
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve({dataUrl:canvas.toDataURL('image/jpeg',quality), mime:'image/jpeg'});
+      };
+      img.onerror=()=>resolve(null); // fall back to the original file if it won't decode
+      img.src=e.target.result;
+    };
+    reader.onerror=()=>resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+async function onPhotos(input){
+  for(const f of input.files){
+    const compressed=await compressImage(f, 1600, 0.78);
+    if (compressed){
+      photoFiles.push({name:f.name, mime:compressed.mime, dataUrl:compressed.dataUrl});
+    } else {
+      const dataUrl=await new Promise(r=>{const rd=new FileReader(); rd.onload=e=>r(e.target.result); rd.readAsDataURL(f);});
+      photoFiles.push({name:f.name, mime:f.type, dataUrl});
+    }
+    document.getElementById('ph-list').innerHTML=photoFiles.map(p=>`<span class="t">${esc(p.name)}</span>`).join('');
   }
   input.value='';
 }
@@ -249,8 +281,11 @@ async function onReviewPhotos(input){
   const ph=document.getElementById('rv-ph'); const failed=[];
   for(const f of input.files){
     if(ph) ph.textContent='Uploading…';
-    const dataUrl=await new Promise(r=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(f);});
-    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project:REVIEW.project,date:REVIEW.date,name:f.name,mime:f.type,dataUrl})}).then(x=>x.json()).catch(()=>({}));
+    const compressed=await compressImage(f, 1600, 0.78);
+    const dataUrl=compressed ? compressed.dataUrl
+      : await new Promise(r=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(f);});
+    const mime=compressed ? compressed.mime : f.type;
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project:REVIEW.project,date:REVIEW.date,name:f.name,mime,dataUrl})}).then(x=>x.json()).catch(()=>({}));
     if(r&&r.fileId){ REVIEW.photoIds.push(r.fileId); REVIEW.folderId=r.folderId||REVIEW.folderId; PHOTO_THUMBS[r.fileId]=dataUrl; }
     else failed.push((r&&r.message)||'');
   }

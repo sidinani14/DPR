@@ -2226,13 +2226,25 @@ function generateProjectReportPDF(project, callerEmail){
   var index = entries.map(function(e){ return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.type)+'</td><td>'
       +esc([e.team,e.clients].filter(Boolean).join(', ')||'—')+'</td><td class="pg">'+e.startPage+'</td></tr>'; }).join('');
 
-  // Full-resolution phone photos (often several MB each, no client-side resize
-  // yet) blow up the embedded base64 HTML enough that Apps Script's
-  // getAs('application/pdf') just fails outright with a generic "Conversion
-  // ... failed" error — no size/row it points to, just a hard stop. A photo
-  // over this raw-byte ceiling is skipped from the inline embed and linked to
-  // its Drive file instead, so the report always generates. (2026-07-21)
+  // Full-resolution phone photos (often several MB each) blow up the embedded
+  // base64 HTML enough that Apps Script's getAs('application/pdf') fails
+  // outright with a generic "Conversion ... failed" — no size/row it points
+  // to, just a hard stop. meetlog.html now compresses new uploads before they
+  // ever reach Drive, but older photos already stored at full size still need
+  // handling here: for anything over this raw-byte ceiling, try Drive's
+  // thumbnail endpoint (a real compressed re-encode, not a guess) and embed
+  // that instead; only fall back to a plain Drive link if even the thumbnail
+  // fetch fails, so the report always generates either way. (2026-07-21)
   var MAX_INLINE_IMAGE_BYTES = 3.5 * 1024 * 1024;
+  function fetchDriveThumbnail(fileId){
+    try {
+      var resp = UrlFetchApp.fetch('https://drive.google.com/thumbnail?id='+fileId+'&sz=w1600', {muteHttpExceptions:true});
+      if (resp.getResponseCode() !== 200) return null;
+      var blob = resp.getBlob();
+      if (String(blob.getContentType()||'').indexOf('image/') !== 0) return null;
+      return blob;
+    } catch(te) { return null; }
+  }
   var sections = entries.map(function(e,idx){
     var d=decsFor(e.logId);
     var imgPages='';
@@ -2243,7 +2255,12 @@ function generateProjectReportPDF(project, callerEmail){
           var f=DriveApp.getFileById(id); var b=f.getBlob();
           var bytes=b.getBytes();
           if (bytes.length > MAX_INLINE_IMAGE_BYTES) {
-            pair += '<div class="imgtoolarge">Photo too large to embed &mdash; <a href="'+f.getUrl()+'">view full size in Drive</a></div>';
+            var thumb = fetchDriveThumbnail(id);
+            if (thumb) {
+              pair += '<img src="data:'+thumb.getContentType()+';base64,'+Utilities.base64Encode(thumb.getBytes())+'">';
+            } else {
+              pair += '<div class="imgtoolarge">Photo too large to embed &mdash; <a href="'+f.getUrl()+'">view full size in Drive</a></div>';
+            }
           } else {
             pair += '<img src="data:'+b.getContentType()+';base64,'+Utilities.base64Encode(bytes)+'">';
           }
