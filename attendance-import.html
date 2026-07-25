@@ -154,6 +154,12 @@ function recompute(row){
     row.overtime = totalMin>480 ? Math.round(((totalMin-480)/60/8)*100000)/100000 : 0;
     return;
   }
+  // No punch at all and no field-work hours -> a genuine no-show, not a
+  // late-arrival case (which needs a firstIn to check against the threshold).
+  if (!row.firstIn && totalMin<=0){
+    row.status='Absent'; row.late=false; row.undertime=0; row.overtime=0;
+    return;
+  }
   const thr=lateThreshold(row.member);
   const inMin=toMin(row.firstIn);
   row.late = inMin!=null && inMin>thr && inMin<720;
@@ -184,10 +190,13 @@ function buildRows(parsed){
     for(let d=1; d<=daysInMonth; d++){
       const fi=m.firstIn[d]||'', lo=m.lastOut[d]||'', th=m.totalHrs[d]||'';
       const inMin=toMin(fi), hrs=toHrsFromHHMM(th)||parseFloat(th)||0;
-      // A real work day needs BOTH a punch time and non-zero hours — either
-      // alone can be a stray artifact (e.g. a single evening badge swipe with
-      // First In set but Total Hrs 0, which is not an actual half-day worked).
-      if(inMin==null || !hrs) continue;
+      const isSunday = new Date(parsed.year, parsed.month-1, d).getDay()===0;
+      // Skip an empty Sunday (non-working day, no punch) so the table isn't
+      // cluttered with 4-5 "Absent" Sundays a month — keep it if someone
+      // genuinely punched in on a Sunday. Every other day always gets a row,
+      // even with no punch, so real absences are visible and reviewable
+      // (previously such days were silently dropped from the table entirely).
+      if (isSunday && (inMin==null || !hrs)) continue;
       const date=parsed.year+'-'+String(parsed.month).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const row={date, rawName:m.name, member:matched||m.name, matched:!!matched, include:true,
         firstIn:fi, lastOut:lo, bioHrs:Math.round(hrs*100)/100, fieldHrs:0, fieldEntries:[], finalHrs:Math.round(hrs*100)/100,
