@@ -190,7 +190,7 @@ function getFieldWorkForRange(fromStr, toStr) {
     if (fromStr && d < fromStr) continue;
     if (toStr   && d > toStr)   continue;
     out.push({date:d, member:String(rows[i][2]||''), type:String(rows[i][4]||''),
-      project:String(rows[i][5]||''), start:String(rows[i][6]||''), end:String(rows[i][7]||''),
+      project:String(rows[i][5]||''), start:cellTime(rows[i][6]), end:cellTime(rows[i][7]),
       hours:parseFloat(rows[i][8])||0, notes:String(rows[i][9]||'')});
   }
   return {entries:out};
@@ -293,7 +293,7 @@ function getMemberAttendance(member, fromStr, toStr) {
       if (String(ar[i][1]||'').trim().toLowerCase() !== member.toLowerCase()) continue;
       var d = cellDate(ar[i][0]); if (!d || d<from || d>to) continue;
       days.push({
-        date:d, firstIn:String(ar[i][3]||''), lastOut:String(ar[i][4]||''), hrs:parseFloat(ar[i][5])||0,
+        date:d, firstIn:cellTime(ar[i][3]), lastOut:cellTime(ar[i][4]), hrs:parseFloat(ar[i][5])||0,
         status:String(ar[i][6]||''), late:!!ar[i][7], lateApproved:!!ar[i][8],
         undertime:parseFloat(ar[i][9])||0, overtime:parseFloat(ar[i][10])||0, fieldHours:parseFloat(ar[i][11])||0,
       });
@@ -525,6 +525,20 @@ function cellDate(v) {
   }
   // Already a string - take first 10 chars
   return String(v).substring(0,10);
+}
+// A plain "HH:MM" string written into a cell (e.g. FIELD_WORK Start/End,
+// ATTENDANCE First In/Last Out) gets silently auto-detected by Sheets as a
+// TIME value — getValues() then hands it back as a JS Date on the 1899-12-30
+// serial epoch. Naively String()'ing that Date produces its full toString()
+// ("Sat Dec 30 1899 20:21:10 GMT+0521 ...") instead of a time. Format it back.
+function cellTime(v) {
+  if (!v) return '';
+  if (v instanceof Date) {
+    var h = String(v.getHours()).padStart(2,'0');
+    var mi = String(v.getMinutes()).padStart(2,'0');
+    return h+':'+mi;
+  }
+  return String(v);
 }
 
 function nowStr() {
