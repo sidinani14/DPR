@@ -251,7 +251,10 @@ const DPR_DEN     = Math.max(1, WEEK_DAYS - OUTAGE_DAYS);   // DPR scored out of
 function leaveCount(bio){ return ((bio&&bio.att)||[]).filter(function(x){ return x.s==='L' || x.s==='H'; }).length; }
 function adjPunct(bio){ const ab=Math.max(0,WEEK_DAYS-((bio&&bio.days)!=null?bio.days:WEEK_DAYS)-leaveCount(bio)); return Math.max(0,((bio&&bio.punctScore)!=null?bio.punctScore:15)-2*ab); }
 function adjHrs(bio){   const ab=Math.max(0,WEEK_DAYS-((bio&&bio.days)!=null?bio.days:WEEK_DAYS)-leaveCount(bio)); return Math.max(0,((bio&&bio.hrsScore)!=null?bio.hrsScore:7)-1.5*ab); }
-function dprScore(daysFiled, bio){ const den=Math.max(1, WEEK_DAYS-leaveCount(bio)); return Math.min(15, Math.round(Math.min(daysFiled||0, den)/den*15*10)/10); }
+// DPR Consistency is scored against PRESENT days only (not the fixed 6-day
+// week Punctuality/Hours use) — a day you weren't there for isn't a day you
+// failed to file DPR on. bio.days already excludes Absent/Holiday/Leave.
+function dprScore(daysFiled, bio){ const den=Math.max(1, (bio&&bio.days!=null)?bio.days:WEEK_DAYS); return Math.min(15, Math.round(Math.min(daysFiled||0, den)/den*15*10)/10); }
 
 // ── Team ─────────────────────────────────────────────────
 const ROLES = {
@@ -350,12 +353,13 @@ function scoreCalc(m, taskData) {
   // Output /50
   const s_output = Math.min(50, Math.round(approvedPts / tgt * 50 * 10) / 10);
 
-  // DPR /15 — out of the working days that had a working form (Jul 1 excused,
-  // approved leave excused), NOT out of present days (so a 2-day week can't
-  // score full for 2 filings unless those absent days were approved leave).
+  // DPR /15 — out of PRESENT days only (2026-07-27: switched from the fixed
+  // 6-day-minus-leave denominator — a day you weren't there for isn't a day
+  // you failed to file DPR on). Punctuality/Hours stay on the fixed 6-day
+  // basis below; only DPR consistency uses present days as its denominator.
   const effectiveDprDays = dprDays || 0;
   const presentDays = (bio.days != null ? bio.days : WEEK_DAYS);
-  const dprDen = Math.max(1, WEEK_DAYS - leaveCount(bio));
+  const dprDen = Math.max(1, presentDays);
   const s_dpr = dprScore(effectiveDprDays, bio);
 
   // Punctuality /15 base — with the absent-day penalty applied.
@@ -854,7 +858,7 @@ async function loadAndRender(){
       ds.s_dper = dprScore(deepakStats.dperDaysCount, bd);   // Jul 1 + approved leave excused
       deepakStats.daysPresent = bd.days; deepakStats.lateCount = bd.lateCount;
       deepakStats.leaveDays = leaveCount(bd); deepakStats.absentDays = WEEK_DAYS - bd.days - deepakStats.leaveDays;
-      deepakStats.dprDen = Math.max(1, WEEK_DAYS - leaveCount(bd));
+      deepakStats.dprDen = Math.max(1, bd.days!=null?bd.days:WEEK_DAYS);
       ds.total = Math.round((ds.s_visit + ds.s_client + ds.s_tasks + ds.s_dper + ds.s_punct + ds.s_hrs + ds.s_reliability) * 10) / 10;
     }
     team.push({
@@ -881,7 +885,7 @@ async function loadAndRender(){
       as.s_dpr = dprScore(amanStats.dprDaysCount, ba);   // Jul 1 + approved leave excused
       amanStats.daysPresent = ba.days; amanStats.lateCount = ba.lateCount;
       amanStats.leaveDays = leaveCount(ba); amanStats.absentDays = WEEK_DAYS - ba.days - amanStats.leaveDays;
-      amanStats.dprDen = Math.max(1, WEEK_DAYS - leaveCount(ba));
+      amanStats.dprDen = Math.max(1, ba.days!=null?ba.days:WEEK_DAYS);
       as.total = Math.round((as.output + as.s_dpr + as.s_punct + as.s_hrs + as.s_reliability) * 10) / 10;
     }
     team.push({
