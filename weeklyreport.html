@@ -126,40 +126,40 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
 .edit-btn:hover{background:#F5A623;}
 
 /* ── Topbar (screen-only controls: week nav + import toggle) ── */
-.topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#2B2620;color:#fff;font-family:'Inter',sans-serif;flex-wrap:wrap}
-.topbar button{font:inherit;font-size:12.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:7px;padding:7px 13px;cursor:pointer}
-.topbar button:hover{background:rgba(255,255,255,.18)}
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#FFFFFF;color:#2B2620;font-family:'Inter',sans-serif;flex-wrap:wrap;border-bottom:1px solid rgba(43,38,32,.1)}
+.topbar button{font:inherit;font-size:12.5px;font-weight:700;color:#2B2620;background:rgba(43,38,32,.05);border:1px solid rgba(43,38,32,.15);border-radius:7px;padding:7px 13px;cursor:pointer}
+.topbar button:hover{background:rgba(43,38,32,.1)}
 .topbar button.primary{background:#F5A623;color:#000;border-color:#F5A623}
 .topbar button.primary:hover{background:#ffb733}
 .topbar .wk-lbl{font-size:13.5px;font-weight:700;margin:0 4px}
 
-/* ── Import panel (namespaced dark card, borrowed from attendance-import.html) ── */
-#import-panel{background:#0F1923;color:#fff;font-family:'DM Sans',system-ui,-apple-system,sans-serif;padding:18px 20px 26px}
+/* ── Import panel (namespaced, light theme matching the report itself) ── */
+#import-panel{background:#FFFFFF;color:#2B2620;font-family:'DM Sans',system-ui,-apple-system,sans-serif;padding:18px 20px 26px;border-bottom:1px solid rgba(43,38,32,.1)}
 #import-panel .wrap{max-width:980px;margin:0 auto}
-#import-panel section{background:#16212E;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px 22px;margin-bottom:18px}
-#import-panel h2{font-size:12px;font-weight:800;color:#F5A623;text-transform:uppercase;letter-spacing:1.6px;margin-bottom:4px}
-#import-panel .h2sub{font-size:12px;color:rgba(255,255,255,.42);margin-bottom:16px}
-#import-panel .drop{border:2px dashed rgba(255,255,255,.08);border-radius:10px;padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s}
+#import-panel section{background:#FBFAF8;border:1px solid rgba(43,38,32,.1);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+#import-panel h2{font-size:12px;font-weight:800;color:#A8540C;text-transform:uppercase;letter-spacing:1.6px;margin-bottom:4px}
+#import-panel .h2sub{font-size:12px;color:rgba(43,38,32,.6);margin-bottom:16px}
+#import-panel .drop{border:2px dashed rgba(43,38,32,.15);border-radius:10px;padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s}
 #import-panel .drop:hover,#import-panel .drop.over{border-color:#F5A623}
 #import-panel .drop input{display:none}
 #import-panel .drop .ic{font-size:28px;margin-bottom:8px}
-#import-panel .drop .t{font-size:13px;color:rgba(255,255,255,.72)}
-#import-panel .drop .t2{font-size:11px;color:rgba(255,255,255,.42);margin-top:4px}
+#import-panel .drop .t{font-size:13px;color:rgba(43,38,32,.75)}
+#import-panel .drop .t2{font-size:11px;color:rgba(43,38,32,.5);margin-top:4px}
 #import-panel .banner{border-radius:10px;padding:12px 14px;font-size:12.5px;margin-bottom:14px}
-#import-panel .banner.warn{background:rgba(251,188,4,.1);border:1px solid rgba(251,188,4,.3);color:#FBBC04}
-#import-panel .banner.bad{background:rgba(234,67,53,.1);border:1px solid rgba(234,67,53,.3);color:#EA4335}
-#import-panel .banner.ok{background:rgba(46,213,115,.1);border:1px solid rgba(46,213,115,.3);color:#2ED573}
+#import-panel .banner.warn{background:rgba(251,188,4,.12);border:1px solid rgba(251,188,4,.35);color:#8A6408}
+#import-panel .banner.bad{background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.3);color:#C0392B}
+#import-panel .banner.ok{background:rgba(27,94,32,.08);border:1px solid rgba(27,94,32,.25);color:#1B5E20}
 #import-panel table{width:100%;border-collapse:collapse;font-size:12px}
-#import-panel th{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.42);text-align:left;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:#16212E}
-#import-panel td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.72)}
+#import-panel th{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:rgba(43,38,32,.5);text-align:left;padding:7px 8px;border-bottom:1px solid rgba(43,38,32,.1);position:sticky;top:0;background:#FBFAF8}
+#import-panel td{padding:6px 8px;border-bottom:1px solid rgba(43,38,32,.05);color:rgba(43,38,32,.85)}
 #import-panel td.n{text-align:center}
-#import-panel .tblwrap{max-height:480px;overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:8px}
-#import-panel .btn{font-size:13px;font-weight:700;color:#0F1923;background:#F5A623;border:none;border-radius:8px;padding:11px 20px;cursor:pointer}
+#import-panel .tblwrap{max-height:480px;overflow:auto;border:1px solid rgba(43,38,32,.1);border-radius:8px}
+#import-panel .btn{font-size:13px;font-weight:700;color:#000;background:#F5A623;border:none;border-radius:8px;padding:11px 20px;cursor:pointer}
 #import-panel .btn:disabled{opacity:.4;cursor:not-allowed}
-#import-panel .btn2{font-size:12px;color:rgba(255,255,255,.72);background:none;border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:8px 14px;cursor:pointer}
-#import-panel .loading{color:rgba(255,255,255,.42);font-size:13px;text-align:left;padding:0}
+#import-panel .btn2{font-size:12px;color:rgba(43,38,32,.75);background:#fff;border:1px solid rgba(43,38,32,.15);border-radius:7px;padding:8px 14px;cursor:pointer}
+#import-panel .loading{color:rgba(43,38,32,.6);font-size:13px;text-align:left;padding:0}
 #import-panel .row-actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
-#import-panel .stat{font-size:12px;color:rgba(255,255,255,.42)}
+#import-panel .stat{font-size:12px;color:rgba(43,38,32,.6)}
 @media print{
   .edit-btn,.topbar,#import-panel{display:none!important;}
   @page{size:297mm 210mm;margin:0;}
@@ -451,14 +451,35 @@ function buildOverviewPage(team){
 }
 
 // ── Individual page ────────────────────────────────────────
+// Deterministic, data-driven recommendation(s) for the "How to Improve" box
+// — every claim traces back to a number already shown on this same page, so
+// it can't drift out of sync or overstate something the data doesn't show.
+function buildRecommendation(m, s, bio){
+  const notes=[];
+  const lateCount = bio.lateCount||0;
+  const presentDays = bio.days!=null ? bio.days : WEEK_DAYS;
+  const excused = leaveCount(bio);
+  const unexplainedAbsences = Math.max(0, WEEK_DAYS - presentDays - excused);
+  const avgHrsDecimal = bio.avgHrs ? (function(){ const p=bio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null;
+  const threshold = m.name==='Achal Rathore' ? '10:40' : '09:10';
+
+  if (unexplainedAbsences>0) notes.push(`${unexplainedAbsences} unexplained absence${unexplainedAbsences>1?'s':''} this week — full attendance is the first fix.`);
+  if (lateCount>0) notes.push(`${lateCount} late arrival${lateCount>1?'s':''} — tighten mornings against the ${threshold} threshold.`);
+  if (avgHrsDecimal!=null && avgHrsDecimal < 475/60) notes.push(`Average ${bio.avgHrs}/day is below the 7:55 target — extend site/office hours.`);
+  if (s.dprDays < s.dprDen) notes.push(`DPR filed ${s.dprDays} of ${s.dprDen} working days — file daily without fail.`);
+  if (s.approvedPts < s.tgt) notes.push(`Approved output is ${s.approvedPts} of the ${s.tgt} pt weekly target — prioritize closing pending tasks.`);
+  if (!notes.length) notes.push(`Strong week — full attendance, on time, ${s.dprDays}/${s.dprDen} DPR filed, output at or above target. Keep it up.`);
+  return notes;
+}
 function buildIndividualPage(m, taskData){
   const s=m._sc, bio=BIO[m.name]||{}, tgt=TARGETS[m.name]||48;
   const col=sc(s.total,100);
   const bs=(taskData&&taskData.blockStats)||{};
   const blkLine = bs.raised ? `<br><b>Blocks:</b> ${bs.raised} raised · ${bs.approved||0} approved · ${bs.rejected||0} rejected${bs.pending?' · '+bs.pending+' pending':''}` : '';
 
-  // Editable IMPROVE suggestions
-  const improve=(IMPROVE[m.name]||['Keep up the good work','Aim to file DPR consistently','Target full weekly points'])
+  // Editable recommendation(s) — computed from this week's actual numbers,
+  // not hand-typed or AI-generated, so they stay accurate as data changes.
+  const improve=buildRecommendation(m, s, bio)
     .map(t=>`<div class="ib-item" contenteditable="true">→ ${t}</div>`).join('');
 
   // Tasks table
@@ -892,7 +913,7 @@ function toggleImportPanel(force){
 // manager can upload the Paytime export, review/edit classification, and
 // approve the import right here, then immediately see the week's report
 // refresh with the new data (no separate page). ──────────────────────────
-let WR_ROSTER=[], WR_PARSED=null, WR_ROWS=[], WR_HOLIDAYS=[], WR_APPROVED_LEAVES={};
+let WR_ROSTER=[], WR_PARSED=null, WR_ROWS=[], WR_HOLIDAYS=[];
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const WR_MONTHS={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
 const WR_MON_NAME=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -975,27 +996,30 @@ function wrExportRow(row){
     fieldHours: absent?0:row.fieldHrs};
 }
 function wrRecomputeFinalHrs(row){ row.finalHrs = Math.round(((parseFloat(row.bioHrs)||0)+(parseFloat(row.fieldHrs)||0))*100)/100; wrRecompute(row); }
+// Week-scoped, not month-scoped: only the report's own 6 week dates
+// (Mon-Sat) are turned into rows, whatever else the uploaded file covers.
+// A week date outside the file's own month (e.g. the file is for July but
+// the selected week straddles into August) simply has no data available
+// from this file and is skipped — every day always gets a row otherwise,
+// defaulting to Absent when there's no punch, so real absences are visible
+// and reviewable (not silently dropped).
 function wrBuildRows(parsed){
   const out=[];
-  const daysInMonth=new Date(parsed.year, parsed.month, 0).getDate();
+  const dates=weekDates(WEEK_START);
   parsed.members.forEach(m=>{
     const matched=wrBestMatch(m.name);
-    for(let d=1; d<=daysInMonth; d++){
+    dates.forEach(dateStr2=>{
+      const dt=new Date(dateStr2+'T00:00:00');
+      if (dt.getFullYear()!==parsed.year || (dt.getMonth()+1)!==parsed.month) return;
+      const d=dt.getDate();
       const fi=m.firstIn[d]||'', lo=m.lastOut[d]||'', th=m.totalHrs[d]||'';
-      const inMin=wrToMin(fi), hrs=wrToHrsFromHHMM(th)||parseFloat(th)||0;
-      const isSunday = new Date(parsed.year, parsed.month-1, d).getDay()===0;
-      // Skip an empty Sunday (non-working day, no punch) so the table isn't
-      // cluttered with 4-5 "Absent" Sundays a month — keep it if someone
-      // genuinely punched in on a Sunday. Every other day always gets a row,
-      // even with no punch, so real absences are visible and reviewable.
-      if (isSunday && (inMin==null || !hrs)) continue;
-      const date=parsed.year+'-'+String(parsed.month).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-      const row={date, rawName:m.name, member:matched||m.name, matched:!!matched, include:true,
+      const hrs=wrToHrsFromHHMM(th)||parseFloat(th)||0;
+      const row={date:dateStr2, rawName:m.name, member:matched||m.name, matched:!!matched, include:true,
         firstIn:fi, lastOut:lo, bioHrs:Math.round(hrs*100)/100, fieldHrs:0, fieldEntries:[], finalHrs:Math.round(hrs*100)/100,
         late:false, lateApproved:null, status:'Present', undertime:0, overtime:0, lateContext:null};
       wrRecompute(row);
       out.push(row);
-    }
+    });
   });
   return out;
 }
@@ -1035,21 +1059,21 @@ function wrHandleFile(file){
       const wb=XLSX.read(new Uint8Array(e.target.result), {type:'array'});
       WR_PARSED=wrParsePaytimeWorkbook(wb);
       WR_ROWS=wrBuildRows(WR_PARSED);
-      const daysInMonth=new Date(WR_PARSED.year, WR_PARSED.month, 0).getDate();
-      const from=WR_PARSED.year+'-'+String(WR_PARSED.month).padStart(2,'0')+'-01';
-      const to=WR_PARSED.year+'-'+String(WR_PARSED.month).padStart(2,'0')+'-'+String(daysInMonth).padStart(2,'0');
-      msg.innerHTML=`<div class="loading">Parsed ${WR_MON_NAME[WR_PARSED.month]} ${WR_PARSED.year} — ${WR_PARSED.members.length} employees. Loading late-arrival, field-work, holiday &amp; leave context…</div>`;
-      const monthKey=WR_PARSED.year+'-'+String(WR_PARSED.month).padStart(2,'0');
-      let lateReqs=[], fieldWork=[], holidayDates=[], adjustments=[];
+      const from=WEEK_START, to=WEEK_END;
+      msg.innerHTML=`<div class="loading">Parsed ${WR_MON_NAME[WR_PARSED.month]} ${WR_PARSED.year} — loading this week's late-arrival, site-visit &amp; holiday context…</div>`;
+      let lateReqs=[], fieldWork=[], holidayDates=[];
       try{ lateReqs=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLateRequests', from, to})}).then(r=>r.json())).requests||[]; }catch(e2){}
       try{ fieldWork=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getFieldWorkForRange', from, to})}).then(r=>r.json())).entries||[]; }catch(e2){}
       try{ holidayDates=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getHolidays', from, to})}).then(r=>r.json())).dates||[]; }catch(e2){}
-      try{ adjustments=(await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMonthlyAdjustments', month:monthKey})}).then(r=>r.json())).adjustments||[]; }catch(e2){}
       WR_HOLIDAYS=holidayDates.slice();
-      WR_APPROVED_LEAVES={}; adjustments.forEach(a=>{ WR_APPROVED_LEAVES[a.member]=a.approvedLeaves; });
       wrMergeContext(WR_ROWS, lateReqs, fieldWork);
       WR_ROWS.forEach(wrRecompute);
-      msg.innerHTML=`<div class="banner ok">Parsed ${WR_MON_NAME[WR_PARSED.month]} ${WR_PARSED.year} — ${WR_PARSED.members.length} employees, ${WR_ROWS.length} days found (incl. field-only days).</div>`;
+      if (!WR_ROWS.length){
+        msg.innerHTML=`<div class="banner bad">No data for ${WEEK_LABEL} was found in this file — check it covers the right month, or use the week nav above to switch weeks.</div>`;
+        document.getElementById('wr-preview').innerHTML='';
+        return;
+      }
+      msg.innerHTML=`<div class="banner ok">Parsed ${WR_MON_NAME[WR_PARSED.month]} ${WR_PARSED.year} — ${WR_PARSED.members.length} employees, week of ${WEEK_LABEL}.</div>`;
       wrRenderPreview();
     }catch(err){
       msg.innerHTML='<div class="banner bad">'+esc(err.message)+'</div>';
@@ -1058,27 +1082,33 @@ function wrHandleFile(file){
   };
   reader.readAsArrayBuffer(file);
 }
-const WR_STATUS_COLOR={Present:'#2ED573', 'Half-day':'#FBBC04', Absent:'#EA4335', Holiday:'#8B7CF6'};
-function wrMemberSummary(rows, member){
+const WR_STATUS_COLOR={Present:'#1B5E20', 'Half-day':'#8A6408', Absent:'#C0392B', Holiday:'#6C5CE0'};
+function wrMemberSummary(rows){
   const present=rows.filter(r=>r.status!=='Absent' && r.status!=='Holiday');
   const half=rows.filter(r=>r.status==='Half-day');
   const absent=rows.filter(r=>r.status==='Absent');
   const holiday=rows.filter(r=>r.status==='Holiday');
+  const late=rows.filter(r=>r.late);
   const totalUT=Math.round(rows.reduce((s,r)=>s+r.undertime,0)*10000)/10000;
   const totalOT=Math.round(rows.reduce((s,r)=>s+r.overtime,0)*10000)/10000;
-  const netOT=Math.round((totalOT-totalUT)*10000)/10000;
-  const totalWorkingDays=Math.round((present.length+netOT)*2)/2;
-  const daysInMonth=WR_PARSED ? new Date(WR_PARSED.year, WR_PARSED.month, 0).getDate() : 0;
-  let sundayCount=0;
-  if(WR_PARSED) for(let d=1; d<=daysInMonth; d++){ if(new Date(WR_PARSED.year, WR_PARSED.month-1, d).getDay()===0) sundayCount++; }
-  const monthPrefix=WR_PARSED ? (WR_PARSED.year+'-'+String(WR_PARSED.month).padStart(2,'0')) : '';
-  const holidaysInMonth=WR_HOLIDAYS.filter(d=>d.startsWith(monthPrefix)).length;
-  const approvedLeaves=parseFloat(WR_APPROVED_LEAVES[member])||0;
-  const absentism=Math.max(0, daysInMonth - sundayCount - holidaysInMonth - approvedLeaves - totalWorkingDays);
-  const salaryDays=Math.round((daysInMonth-absentism)*2)/2;
   return {present:present.length, half:half.length, absent:absent.length, holiday:holiday.length,
-    totalUT, totalOT, netOT, totalWorkingDays, daysInMonth, sundayCount, holidaysInMonth, approvedLeaves,
-    absentism:Math.round(absentism*100)/100, salaryDays};
+    late:late.length, totalUT, totalOT};
+}
+// Flags only members with something to review — the point is to surface
+// issues, not restate the whole table.
+function wrIssuesSummaryHtml(){
+  const byMember={}; WR_ROWS.forEach(r=>{ (byMember[r.member]=byMember[r.member]||[]).push(r); });
+  const items=[];
+  Object.keys(byMember).sort().forEach(mem=>{
+    const sum=wrMemberSummary(byMember[mem]);
+    const flags=[];
+    if (sum.absent) flags.push(`<span style="color:#C0392B;font-weight:700">${sum.absent} absence${sum.absent>1?'s':''}</span>`);
+    if (sum.late) flags.push(`<span style="color:#8A6408;font-weight:700">${sum.late} late arrival${sum.late>1?'s':''}</span>`);
+    if (sum.half) flags.push(`<span style="color:#8A6408;font-weight:700">${sum.half} half-day${sum.half>1?'s':''}</span>`);
+    if (flags.length) items.push(`<div style="padding:6px 0;border-bottom:1px solid rgba(43,38,32,.08);font-size:12.5px"><b>${esc(mem)}</b> — ${flags.join(' · ')}</div>`);
+  });
+  if (!items.length) return `<div class="banner ok">No attendance issues this week — everyone present, on time, full days.</div>`;
+  return `<section style="margin-bottom:14px"><h2>Issues this week</h2><div class="h2sub">Flagged from the data below — review and correct if needed.</div>${items.join('')}</section>`;
 }
 function wrRenderPreview(){
   const host=document.getElementById('wr-preview');
@@ -1088,57 +1118,50 @@ function wrRenderPreview(){
   let banners='';
   if(unmatched.length) banners+=`<div class="banner warn">${unmatched.length} name(s) from the file did not match anyone on the team roster — pick the right person for each row below, or untick to skip: <b>${unmatched.map(esc).join(', ')}</b></div>`;
   if(undecidedLate) banners+=`<div class="banner warn">${undecidedLate} late arrival(s) still <b>undecided</b> — they will import as <b>Absent</b> unless you click Approve. Suggestions are pre-checked where someone said they informed you in advance; review every one.</div>`;
-  const monthPrefix=WR_PARSED ? (WR_PARSED.year+'-'+String(WR_PARSED.month).padStart(2,'0')) : '';
-  const holidaysThisMonth=WR_HOLIDAYS.filter(d=>d.startsWith(monthPrefix)).sort();
+  const holidaysThisWeek=WR_HOLIDAYS.slice().sort();
   const holidaysHtml=`<section style="margin-bottom:14px">
-    <h2>Holidays this month</h2>
-    <div class="h2sub">Shared company holiday list for ${WR_MON_NAME[WR_PARSED.month]} ${WR_PARSED.year} — a holiday day is excluded from late/absent/undertime for everyone</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:${holidaysThisMonth.length?'10px':'0'}">
-      <input type="date" id="wr-holiday-date-input" min="${monthPrefix}-01" max="${monthPrefix}-31" style="background:#0F1923;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:5px;padding:5px 8px;font-size:12px">
+    <h2>Holidays this week</h2>
+    <div class="h2sub">A holiday day is excluded from late/absent/undertime for everyone this week</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:${holidaysThisWeek.length?'10px':'0'}">
+      <input type="date" id="wr-holiday-date-input" min="${WEEK_START}" max="${WEEK_END}" style="background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:5px;padding:5px 8px;font-size:12px">
       <button class="btn2" onclick="wrAddHoliday()">+ Add holiday</button>
     </div>
-    ${holidaysThisMonth.length?`<div style="display:flex;gap:6px;flex-wrap:wrap">${holidaysThisMonth.map(d=>`<span style="font-size:11px;background:rgba(139,124,246,.15);color:#8B7CF6;padding:3px 9px;border-radius:12px;display:inline-flex;align-items:center;gap:6px">${esc(d)}<span onclick="wrRemoveHoliday('${esc(d)}')" style="cursor:pointer;font-weight:700">×</span></span>`).join('')}</div>`:''}
+    ${holidaysThisWeek.length?`<div style="display:flex;gap:6px;flex-wrap:wrap">${holidaysThisWeek.map(d=>`<span style="font-size:11px;background:rgba(108,92,224,.1);color:#6C5CE0;padding:3px 9px;border-radius:12px;display:inline-flex;align-items:center;gap:6px">${esc(d)}<span onclick="wrRemoveHoliday('${esc(d)}')" style="cursor:pointer;font-weight:700">×</span></span>`).join('')}</div>`:''}
   </section>`;
   const included=WR_ROWS.filter(r=>r.include).length;
   const byMember={}; WR_ROWS.forEach(r=>{ (byMember[r.member]=byMember[r.member]||[]).push(r); });
   const memberBlocks=Object.keys(byMember).sort().map(mem=>{
-    const rows=byMember[mem], sum=wrMemberSummary(rows, mem);
+    const rows=byMember[mem], sum=wrMemberSummary(rows);
     const rowsHtml=rows.map(r=>{
       const i=WR_ROWS.indexOf(r);
-      const lateBadge = r.late ? `<span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(234,67,53,.15);color:#EA4335">LATE</span>` : '';
-      const ctx = r.lateContext ? `<div style="font-size:10px;color:rgba(255,255,255,.42);margin-top:2px">informed before 9: <b>${esc(r.lateContext.informedBefore9)}</b>${r.lateContext.reportedPunchIn?' · said '+esc(r.lateContext.reportedPunchIn):''}${r.lateContext.reason?' · "'+esc(r.lateContext.reason)+'"':''}</div>` : '';
+      const lateBadge = r.late ? `<span style="font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(192,57,43,.1);color:#C0392B">LATE</span>` : '';
+      const ctx = r.lateContext ? `<div style="font-size:10px;color:rgba(43,38,32,.6);margin-top:2px">informed before 9: <b>${esc(r.lateContext.informedBefore9)}</b>${r.lateContext.reportedPunchIn?' · said '+esc(r.lateContext.reportedPunchIn):''}${r.lateContext.reason?' · "'+esc(r.lateContext.reason)+'"':''}</div>` : '';
       const decide = r.late ? `<div style="display:flex;gap:4px;margin-top:4px">
-          <button onclick="WR_ROWS[${i}].lateApproved=true;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="font-size:9.5px;padding:2px 7px;border-radius:5px;border:1px solid #2ED573;background:${r.lateApproved===true?'#2ED573':'transparent'};color:${r.lateApproved===true?'#0F1923':'#2ED573'};cursor:pointer;font-weight:700">Approve</button>
-          <button onclick="WR_ROWS[${i}].lateApproved=false;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="font-size:9.5px;padding:2px 7px;border-radius:5px;border:1px solid #EA4335;background:${r.lateApproved===false?'#EA4335':'transparent'};color:${r.lateApproved===false?'#fff':'#EA4335'};cursor:pointer;font-weight:700">Deny → Absent</button>
+          <button onclick="WR_ROWS[${i}].lateApproved=true;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="font-size:9.5px;padding:2px 7px;border-radius:5px;border:1px solid #1B5E20;background:${r.lateApproved===true?'#1B5E20':'transparent'};color:${r.lateApproved===true?'#fff':'#1B5E20'};cursor:pointer;font-weight:700">Approve</button>
+          <button onclick="WR_ROWS[${i}].lateApproved=false;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="font-size:9.5px;padding:2px 7px;border-radius:5px;border:1px solid #C0392B;background:${r.lateApproved===false?'#C0392B':'transparent'};color:${r.lateApproved===false?'#fff':'#C0392B'};cursor:pointer;font-weight:700">Deny → Absent</button>
         </div>` : '';
-      const fieldDetail = r.fieldEntries.length ? `<div style="font-size:10px;color:rgba(255,255,255,.42);margin-top:2px">${r.fieldEntries.map(f=>esc(f.type)+' '+esc(f.project)+' '+esc(f.start)+'–'+esc(f.end)).join('<br>')}</div>` : '';
+      const fieldDetail = r.fieldEntries.length ? `<div style="font-size:10px;color:rgba(43,38,32,.6);margin-top:2px">${r.fieldEntries.map(f=>esc(f.type)+' '+esc(f.project)+' '+esc(f.start)+'–'+esc(f.end)).join('<br>')}</div>` : '';
       return `<tr>
         <td class="n"><input type="checkbox" ${r.include?'checked':''} onchange="WR_ROWS[${i}].include=this.checked;wrUpdateCount()"></td>
         <td>${esc(r.date)} ${lateBadge}${ctx}${decide}</td>
-        <td class="n"><input type="time" value="${esc(r.firstIn)}" onchange="WR_ROWS[${i}].firstIn=this.value;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="width:88px;font-size:11px;background:#0F1923;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:2px 4px"></td>
-        <td class="n"><input type="time" value="${esc(r.lastOut)}" onchange="WR_ROWS[${i}].lastOut=this.value;wrRenderPreview()" style="width:88px;font-size:11px;background:#0F1923;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:2px 4px"></td>
-        <td class="n"><input type="number" step="0.01" value="${r.bioHrs}" onchange="WR_ROWS[${i}].bioHrs=parseFloat(this.value)||0;wrRecomputeFinalHrs(WR_ROWS[${i}]);wrRenderPreview()" style="width:60px;font-size:11px;background:#0F1923;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:2px 4px"></td>
+        <td class="n"><input type="time" value="${esc(r.firstIn)}" onchange="WR_ROWS[${i}].firstIn=this.value;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="width:88px;font-size:11px;background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:4px;padding:2px 4px"></td>
+        <td class="n"><input type="time" value="${esc(r.lastOut)}" onchange="WR_ROWS[${i}].lastOut=this.value;wrRenderPreview()" style="width:88px;font-size:11px;background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:4px;padding:2px 4px"></td>
+        <td class="n"><input type="number" step="0.01" value="${r.bioHrs}" onchange="WR_ROWS[${i}].bioHrs=parseFloat(this.value)||0;wrRecomputeFinalHrs(WR_ROWS[${i}]);wrRenderPreview()" style="width:60px;font-size:11px;background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:4px;padding:2px 4px"></td>
         <td class="n">${r.fieldHrs>0?('+'+r.fieldHrs.toFixed(2)):'—'}${fieldDetail}</td>
-        <td class="n"><input type="number" step="0.01" value="${r.finalHrs}" onchange="WR_ROWS[${i}].finalHrs=parseFloat(this.value)||0;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="width:60px;font-size:11px;font-weight:700;background:#0F1923;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:2px 4px"></td>
+        <td class="n"><input type="number" step="0.01" value="${r.finalHrs}" onchange="WR_ROWS[${i}].finalHrs=parseFloat(this.value)||0;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="width:60px;font-size:11px;font-weight:700;background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:4px;padding:2px 4px"></td>
         <td class="n"><span style="font-size:10.5px;font-weight:700;color:${WR_STATUS_COLOR[r.status]}">${r.status}</span></td>
         <td class="n" style="font-size:10.5px">${r.undertime?('−'+r.undertime.toFixed(4)):(r.overtime?('+'+r.overtime.toFixed(4)):'—')}</td>
       </tr>`;
     }).join('');
-    return `<div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;margin-bottom:14px;overflow:hidden">
-      <div style="padding:10px 14px;background:rgba(255,255,255,.03);display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+    return `<div style="border:1px solid rgba(43,38,32,.1);border-radius:10px;margin-bottom:14px;overflow:hidden">
+      <div style="padding:10px 14px;background:rgba(43,38,32,.03);display:flex;flex-wrap:wrap;gap:12px;align-items:center">
         <b style="font-size:13px">${esc(mem)}</b>
-        <span style="font-size:11px;color:rgba(255,255,255,.72)">Present ${sum.present}</span>
-        <span style="font-size:11px;color:#FBBC04">Half-day ${sum.half}</span>
-        <span style="font-size:11px;color:#EA4335">Absent ${sum.absent}</span>
-        <span style="font-size:11px;color:#8B7CF6">Holiday ${sum.holiday}</span>
-        <span style="font-size:11px;color:rgba(255,255,255,.72)">UT ${sum.totalUT.toFixed(4)} · OT ${sum.totalOT.toFixed(4)}</span>
-        <span style="font-size:11px;font-weight:700;color:${sum.netOT<0?'#EA4335':'#2ED573'}">Net ${sum.netOT>=0?'+':''}${sum.netOT.toFixed(4)}</span>
-        <span style="font-size:11px;font-weight:700">Working days: ${sum.totalWorkingDays.toFixed(2)}</span>
-        <label style="font-size:11px;color:rgba(255,255,255,.72);display:flex;align-items:center;gap:5px">Approved leaves
-          <input type="number" step="0.5" value="${sum.approvedLeaves}" onchange="WR_APPROVED_LEAVES['${esc(mem).replace(/'/g,"\\'")}']=parseFloat(this.value)||0;wrRenderPreview()" style="width:48px;font-size:11px;background:#0F1923;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:4px;padding:2px 4px">
-        </label>
-        <span style="font-size:11px;color:rgba(255,255,255,.72)">Absentism: ${sum.absentism.toFixed(2)}</span>
-        <span style="font-size:11px;font-weight:700;margin-left:auto">Salary days: ${sum.salaryDays.toFixed(2)}</span>
+        <span style="font-size:11px;color:rgba(43,38,32,.72)">Present ${sum.present}/6</span>
+        <span style="font-size:11px;color:#8A6408">Half-day ${sum.half}</span>
+        <span style="font-size:11px;color:#C0392B">Absent ${sum.absent}</span>
+        <span style="font-size:11px;color:#6C5CE0">Holiday ${sum.holiday}</span>
+        <span style="font-size:11px;color:#8A6408">Late ${sum.late}</span>
+        <span style="font-size:11px;color:rgba(43,38,32,.72);margin-left:auto">UT ${sum.totalUT.toFixed(4)} · OT ${sum.totalOT.toFixed(4)}</span>
       </div>
       <div class="tblwrap" style="border:none;border-radius:0;max-height:none">
         <table><thead><tr><th class="n">✓</th><th>Date</th><th class="n">First In</th><th class="n">Last Out</th><th class="n">Bio Hrs</th><th class="n">Field</th><th class="n">Final Hrs</th><th class="n">Status</th><th class="n">UT/OT</th></tr></thead>
@@ -1146,10 +1169,11 @@ function wrRenderPreview(){
       </div>
     </div>`;
   }).join('');
-  host.innerHTML=`${holidaysHtml}
+  host.innerHTML=`${wrIssuesSummaryHtml()}
+  ${holidaysHtml}
   <section>
     <h2>2 · Review before import</h2>
-    <div class="h2sub">Edit any punch/hours, decide every late arrival, then import. Nothing is written until you click Import.</div>
+    <div class="h2sub">Week of ${WEEK_LABEL} — edit any punch/hours, decide every late arrival, then import. Nothing is written until you click Import.</div>
     ${banners}
     ${memberBlocks}
     <div class="row-actions">
@@ -1180,20 +1204,17 @@ async function wrDoImport(){
   const btn=document.getElementById('wr-import-btn'); const status=document.getElementById('wr-import-status');
   const rows=WR_ROWS.filter(r=>r.include && r.matched).map(wrExportRow);
   if(!rows.length){ status.textContent='Nothing selected to import.'; return; }
-  const monthKey=WR_PARSED.year+'-'+String(WR_PARSED.month).padStart(2,'0');
-  const adjustments=Object.keys(WR_APPROVED_LEAVES).map(m=>({member:m, approvedLeaves:parseFloat(WR_APPROVED_LEAVES[m])||0}));
   btn.disabled=true; status.textContent='Importing…';
   try{
     const res=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'importAttendance', rows})}).then(r=>r.json());
     try{ await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveHolidays', dates:WR_HOLIDAYS})}); }catch(e2){}
-    try{ await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveMonthlyAdjustments', month:monthKey, adjustments})}); }catch(e2){}
     if(res.status==='ok'){
-      status.innerHTML=`<span style="color:#2ED573;font-weight:700">✓ Imported — ${res.appended} new, ${res.updated} updated. Refreshing report…</span>`;
+      status.innerHTML=`<span style="color:#1B5E20;font-weight:700">✓ Imported — ${res.appended} new, ${res.updated} updated. Refreshing report…</span>`;
       await loadBioForWeek();
       await loadAndRender();
-      status.innerHTML=`<span style="color:#2ED573;font-weight:700">✓ Imported — ${res.appended} new, ${res.updated} updated. Report refreshed.</span>`;
-    } else status.innerHTML='<span style="color:#EA4335">'+esc(res.message||'Import failed')+'</span>';
-  }catch(e){ status.innerHTML='<span style="color:#EA4335">Network error — '+esc(e.message)+'</span>'; }
+      status.innerHTML=`<span style="color:#1B5E20;font-weight:700">✓ Imported — ${res.appended} new, ${res.updated} updated. Report refreshed.</span>`;
+    } else status.innerHTML='<span style="color:#C0392B">'+esc(res.message||'Import failed')+'</span>';
+  }catch(e){ status.innerHTML='<span style="color:#C0392B">Network error — '+esc(e.message)+'</span>'; }
   btn.disabled=false;
 }
 function wrInitUpload(){
