@@ -534,9 +534,14 @@ function cellDate(v) {
 function cellTime(v) {
   if (!v) return '';
   if (v instanceof Date) {
-    var h = String(v.getHours()).padStart(2,'0');
-    var mi = String(v.getMinutes()).padStart(2,'0');
-    return h+':'+mi;
+    // NOT v.getHours()/getMinutes(): those apply the JS engine's local
+    // timezone using ITS OWN historical tzdata for the cell's underlying
+    // 1899-12-30 epoch date — for Asia/Kolkata that's the pre-1906 LMT
+    // offset (+5:21:10), not modern IST (+5:30), silently shifting every
+    // time by ~9 minutes (e.g. an intended 16:30 read back as 16:21).
+    // Utilities.formatDate asks Sheets/Apps Script itself to format the
+    // value, which uses the modern offset correctly.
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
   }
   return String(v);
 }
