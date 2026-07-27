@@ -674,7 +674,7 @@ function buildDeepakPage(d){
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of ${d.dprDen} working days · ≥1 submission/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
-      ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done. <b>To improve:</b> set realistic target dates and close site tasks on time.`)}
+      ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done, −5 per unexplained absence. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done${d.unexplainedAbsences?', '+d.unexplainedAbsences+' unexplained absence'+(d.unexplainedAbsences>1?'s':''):''}. <b>To improve:</b> set realistic target dates, close site tasks on time, and inform in advance if you'll be absent.`)}
     </div>
 
     <div style="margin-top:4mm">
@@ -859,6 +859,14 @@ async function loadAndRender(){
       deepakStats.daysPresent = bd.days; deepakStats.lateCount = bd.lateCount;
       deepakStats.leaveDays = leaveCount(bd); deepakStats.absentDays = WEEK_DAYS - bd.days - deepakStats.leaveDays;
       deepakStats.dprDen = Math.max(1, bd.days!=null?bd.days:WEEK_DAYS);
+      // Reliability also deducts for unexplained personal absences (days
+      // marked Absent, not Leave/Holiday) — 5 pts each, on top of the
+      // existing task-lateness/reassignment penalty. 2026-07-27: was a
+      // one-off manual print-edit for a 2-absence week; made a real rule
+      // so it doesn't need re-applying by hand every time the report loads.
+      deepakStats.unexplainedAbsences = (bd.att||[]).filter(x=>x.s==='A').length;
+      ds.reliabilityPenalty = (ds.reliabilityPenalty||0) + deepakStats.unexplainedAbsences*5;
+      ds.s_reliability = Math.max(0, Math.round((10 - ds.reliabilityPenalty)*10)/10);
       ds.total = Math.round((ds.s_visit + ds.s_client + ds.s_tasks + ds.s_dper + ds.s_punct + ds.s_hrs + ds.s_reliability) * 10) / 10;
     }
     team.push({
