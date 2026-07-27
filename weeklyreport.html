@@ -470,22 +470,98 @@ function buildOverviewPage(team){
 // Deterministic, data-driven recommendation(s) for the "How to Improve" box
 // — every claim traces back to a number already shown on this same page, so
 // it can't drift out of sync or overstate something the data doesn't show.
-function buildRecommendation(m, s, bio){
-  const notes=[];
-  const lateCount = bio.lateCount||0;
-  const presentDays = bio.days!=null ? bio.days : WEEK_DAYS;
-  const excused = leaveCount(bio);
-  const unexplainedAbsences = Math.max(0, WEEK_DAYS - presentDays - excused);
-  const avgHrsDecimal = bio.avgHrs ? (function(){ const p=bio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null;
-  const threshold = m.name==='Achal Rathore' ? '10:40' : '09:10';
+function pickVariant(seed, arr){
+  let h=0; for (let i=0;i<seed.length;i++) h=(h*31+seed.charCodeAt(i))>>>0;
+  return arr[h % arr.length];
+}
+// Builds 1-2 tailored sentences from whichever `facts` fields are present —
+// each issue has several differently-worded variants (picked per-person via
+// a name hash) so two people with the same issue don't read as copy-pasted,
+// and only the highest-severity issue(s) are surfaced instead of listing
+// every metric that's off. `facts` is deliberately loose so team members,
+// Deepak, and Aman can each populate only the fields relevant to them.
+function buildRecommendation(name, facts){
+  const issues=[];
+  const v=(k,arr)=>pickVariant(name+k,arr);
 
-  if (unexplainedAbsences>0) notes.push(`${unexplainedAbsences} unexplained absence${unexplainedAbsences>1?'s':''} this week — full attendance is the first fix.`);
-  if (lateCount>0) notes.push(`${lateCount} late arrival${lateCount>1?'s':''} — tighten mornings against the ${threshold} threshold.`);
-  if (avgHrsDecimal!=null && avgHrsDecimal < 475/60) notes.push(`Average ${bio.avgHrs}/day is below the 7:55 target — extend site/office hours.`);
-  if (s.dprDays < s.dprDen) notes.push(`DPR filed ${s.dprDays} of ${s.dprDen} working days — file daily without fail.`);
-  if (s.approvedPts < s.tgt) notes.push(`Approved output is ${s.approvedPts} of the ${s.tgt} pt weekly target — prioritize closing pending tasks.`);
-  if (!notes.length) notes.push(`Strong week — full attendance, on time, ${s.dprDays}/${s.dprDen} DPR filed, output at or above target. Keep it up.`);
-  return notes;
+  if (facts.absences>0){ const n=facts.absences;
+    issues.push({sev:50+n*10, text: v('abs',[
+      `${n} day${n>1?'s':''} absent with no advance notice this week — a heads-up beforehand keeps this from tripping punctuality, hours and DPR all together.`,
+      `Missed ${n} day${n>1?'s':''} unannounced — that's the single biggest drag on this week's score; flag time off ahead of the day next time.`,
+      `${n} unexplained absence${n>1?'s':''} logged this week — even a same-morning message avoids the automatic penalty.`,
+    ])});
+  }
+  if (facts.lateCount>0){ const n=facts.lateCount, thr=facts.threshold||'09:10';
+    issues.push({sev:20+n*3, text: v('late',[
+      `${n} late arrival${n>1?'s':''} past ${thr} this week — worth tightening the morning routine.`,
+      `Punctuality took a hit from ${n} late clock-in${n>1?'s':''} (cutoff ${thr}) — a small buffer in the commute would fix it.`,
+      `Came in after ${thr} on ${n} day${n>1?'s':''} this week — that's the easiest points to recover next week.`,
+    ])});
+  }
+  if (facts.avgHrsDecimal!=null && facts.avgHrsDecimal < 475/60){
+    issues.push({sev:15, text: v('hrs',[
+      `Average day landed at ${facts.avgHrsLabel}, short of the 7:55 target — a bit more time on-site or in office closes the gap.`,
+      `${facts.avgHrsLabel}/day on average this week — under the 7:55 mark, worth watching next week.`,
+      `Hours came in light at ${facts.avgHrsLabel}/day (target 7:55) — the shortfall is dragging the Hours score down.`,
+    ])});
+  }
+  if (facts.dprDays!=null && facts.dprDen!=null && facts.dprDays < facts.dprDen){ const gap=facts.dprDen-facts.dprDays;
+    issues.push({sev:18+gap*3, text: v('dpr',[
+      `DPR filed on ${facts.dprDays} of ${facts.dprDen} present days — filing daily is the quickest score recovery available.`,
+      `${gap} present day${gap>1?'s':''} went by without a DPR entry — worth building into the end-of-day routine.`,
+      `Only ${facts.dprDays}/${facts.dprDen} DPR entries filed this week despite being present — consistency here is a free 15 points.`,
+    ])});
+  }
+  if (facts.output){ const {pts,tgt}=facts.output;
+    if (pts < tgt) issues.push({sev:30+(tgt-pts)/2, text: v('out',[
+      `Approved output sits at ${pts} of the ${tgt} pt target — closing out pending tasks is the biggest lever for next week's score.`,
+      `${Math.round((tgt-pts)*10)/10} points short of target this week (${pts}/${tgt}) — prioritizing tasks closest to done would help most.`,
+      `Output landed at ${pts}/${tgt} pts — worth getting a couple of in-progress tasks over the line before the week closes.`,
+    ])});
+  }
+  if (facts.siteVisits){ const {visited,total}=facts.siteVisits;
+    if (total>0 && visited<total) issues.push({sev:25+(total-visited)*5, text: v('visit',[
+      `Visited ${visited} of ${total} active sites this week — the ${total-visited} untouched one${total-visited>1?'s':''} are the fastest way to lift this score.`,
+      `${total-visited} active site${total-visited>1?'s':''} went unvisited this week (${visited}/${total} covered) — worth prioritizing next week.`,
+    ])});
+  }
+  if (facts.clientComm){ const {updated,total}=facts.clientComm;
+    if (total>0 && updated<total) issues.push({sev:15+(total-updated)*3, text: v('cc',[
+      `Client updates went out for ${updated} of ${total} sites — the rest are overdue for a status message.`,
+      `${total-updated} site${total-updated>1?'s':''} missing a client update this week (${updated}/${total} done) — a quick note closes the gap.`,
+    ])});
+  }
+  if (facts.taskCompletion){ const {completed,assigned}=facts.taskCompletion;
+    if (assigned>0 && completed<assigned) issues.push({sev:20+(assigned-completed)*3, text: v('task',[
+      `${completed} of ${assigned} assigned tasks completed this week — the open ones are the direct path to a higher score.`,
+    ])});
+  }
+  if (facts.connections){ const {connected,total}=facts.connections;
+    if (total>0 && connected<total) issues.push({sev:25+(total-connected)*4, text: v('conn',[
+      `${connected} of ${total} ongoing projects had a client touchpoint this week — the rest are due a call or visit.`,
+      `${total-connected} ongoing project${total-connected>1?'s':''} went without contact this week (${connected}/${total} covered).`,
+    ])});
+  }
+  if (facts.leadMgmt){ const {worked,base}=facts.leadMgmt;
+    if (base>0 && worked<base) issues.push({sev:15+(base-worked)*3, text: v('lead',[
+      `${worked} of ${base} leads needing attention were worked this week — the rest are sitting untouched.`,
+    ])});
+  }
+  if (facts.revenue){ const {pct,target}=facts.revenue;
+    if (pct!=null && pct<target) issues.push({sev:12, text: v('rev',[
+      `Collections are at ${pct}% against the ${target}% target — following up on outstanding bills is the fastest lever here.`,
+    ])});
+  }
+
+  if (!issues.length){
+    return [v('clean',[
+      `Clean week — full attendance, on time, DPR filed every present day, output on target. Keep this up.`,
+      `Nothing to flag this week: attendance, punctuality and output all landed where they should.`,
+      `Strong all-round week — no attendance or output gaps to correct.`,
+    ])];
+  }
+  issues.sort((a,b)=>b.sev-a.sev);
+  return issues.slice(0,2).map(i=>i.text);
 }
 function buildIndividualPage(m, taskData){
   const s=m._sc, bio=BIO[m.name]||{}, tgt=TARGETS[m.name]||48;
@@ -495,7 +571,16 @@ function buildIndividualPage(m, taskData){
 
   // Editable recommendation(s) — computed from this week's actual numbers,
   // not hand-typed or AI-generated, so they stay accurate as data changes.
-  const improve=buildRecommendation(m, s, bio)
+  const teamFacts = {
+    absences: Math.max(0, WEEK_DAYS - (bio.days!=null?bio.days:WEEK_DAYS) - leaveCount(bio)),
+    lateCount: bio.lateCount||0,
+    threshold: m.name==='Achal Rathore' ? '10:40' : '09:10',
+    avgHrsDecimal: bio.avgHrs ? (function(){ const p=bio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null,
+    avgHrsLabel: bio.avgHrs,
+    dprDays: s.dprDays, dprDen: s.dprDen,
+    output: {pts: s.approvedPts, tgt: s.tgt},
+  };
+  const improve=buildRecommendation(m.name, teamFacts)
     .map(t=>`<div class="ib-item" contenteditable="true">→ ${t}</div>`).join('');
 
   // Tasks table
@@ -709,6 +794,21 @@ function buildDeepakPage(d){
         </table>
       </div>
     </div>
+
+    <div class="ib" style="margin-top:4mm">
+      <div class="ib-title">How to improve</div>
+      ${buildRecommendation('Deepak Soni', {
+        absences: d.unexplainedAbsences||0,
+        lateCount: d.lateCount||0,
+        threshold: '09:10',
+        avgHrsDecimal: dBio.avgHrs ? (function(){ const p=dBio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null,
+        avgHrsLabel: dBio.avgHrs,
+        dprDays: d.dperDaysCount, dprDen: d.dprDen,
+        siteVisits: {visited: d.visitedCount, total: d.totalSites},
+        clientComm: {updated: d.clientCount, total: d.totalSites},
+        taskCompletion: d.tasksActive ? {completed: d.tasksCompleted, assigned: d.tasksAssigned} : null,
+      }).map(t=>`<div class="ib-item" contenteditable="true">→ ${t}</div>`).join('')}
+    </div>
   </div>`;
 }
 
@@ -811,6 +911,21 @@ function buildAmanPage(d){
           <tr><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">New Leads</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
         </table>
       </div>
+    </div>
+
+    <div class="ib" style="margin-top:4mm">
+      <div class="ib-title">How to improve</div>
+      ${buildRecommendation('Aman Raghuwanshi', {
+        absences: Math.max(0, WEEK_DAYS - (aBio.days!=null?aBio.days:WEEK_DAYS) - leaveCount(aBio)),
+        lateCount: d.lateCount||0,
+        threshold: '09:10',
+        avgHrsDecimal: aBio.avgHrs ? (function(){ const p=aBio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null,
+        avgHrsLabel: aBio.avgHrs,
+        dprDays: d.dprDaysCount, dprDen: d.dprDen,
+        connections: d.clientActive ? {connected: d.connectedCount, total: d.totalOngoing} : null,
+        leadMgmt: d.leadActive ? {worked: d.leadWorked, base: d.leadBase} : null,
+        revenue: d.revActive ? {pct: d.collectionPct, target: d.collectionTarget} : null,
+      }).map(t=>`<div class="ib-item" contenteditable="true">→ ${t}</div>`).join('')}
     </div>
   </div>`;
 }

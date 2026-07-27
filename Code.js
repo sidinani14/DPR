@@ -308,13 +308,18 @@ function getMemberAttendance(member, fromStr, toStr) {
   days.sort(function(a,b){ return a.date.localeCompare(b.date); });
 
   var present  = days.filter(function(x){ return x.status !== 'Absent' && x.status !== 'Holiday'; });
+  // Separate from `present` above (which still feeds totalWorkingDays / the
+  // verified monthly salary-days formula, untouched here) — avgHrs should
+  // reflect only days actually worked, so an approved-Leave day (0 hrs)
+  // doesn't drag the average down like an extra short day would.
+  var presentForAvg = present.filter(function(x){ return x.status !== 'Leave'; });
   var absent   = days.filter(function(x){ return x.status === 'Absent'; });
   var halfDays = days.filter(function(x){ return x.status === 'Half-day'; });
   var lateApproved = days.filter(function(x){ return x.late && x.lateApproved; });
   var totalUT  = days.reduce(function(s2,x){ return s2+x.undertime; }, 0);
   var totalOT  = days.reduce(function(s2,x){ return s2+x.overtime; }, 0);
   var netOT    = Math.round((totalOT-totalUT)*10000)/10000;
-  var avgHrs   = present.length ? present.reduce(function(s2,x){return s2+x.hrs;},0)/present.length : 0;
+  var avgHrs   = presentForAvg.length ? presentForAvg.reduce(function(s2,x){return s2+x.hrs;},0)/presentForAvg.length : 0;
   var totalWorkingDays = Math.round((present.length+netOT)*2)/2;
 
   var summary = {
