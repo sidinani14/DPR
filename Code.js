@@ -6860,11 +6860,17 @@ function getDeepakWeeklyStats(weekStart) {
   var s_client = totalSites > 0
     ? Math.round(clientCount / totalSites * 10 * 10) / 10 : 0;
 
-  // Task Completion /20 — completed same week / assigned this week
-  // 0 assigned → full marks (nothing to complete)
-  var s_tasks  = tasksAssignedThisWeek > 0
-    ? Math.round(tasksCompletedThisWeek / tasksAssignedThisWeek * 20 * 10) / 10
-    : 20;
+  // Task Completion /20 — completed same week / assigned this week.
+  // 0 assigned is N/A, not an automatic 20: extrapolate from his other
+  // Output metrics this week (Site Visits/20 + Client Comm/10, out of 30)
+  // instead, so an empty week doesn't inflate the total for free.
+  var s_tasks;
+  if (tasksAssignedThisWeek > 0) {
+    s_tasks = Math.round(tasksCompletedThisWeek / tasksAssignedThisWeek * 20 * 10) / 10;
+  } else {
+    var otherOutMax = 30; // Site Visits/20 + Client Comm/10
+    s_tasks = Math.round((s_visit + s_client) / otherOutMax * 20 * 10) / 10;
+  }
 
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
   var s_dper   = Math.min(15, Math.round(dperDaysCount / 6 * 15 * 10) / 10);
@@ -6904,6 +6910,7 @@ function getDeepakWeeklyStats(weekStart) {
     absentDays     : absentDays,
     tasksAssigned  : tasksAssignedThisWeek,
     tasksCompleted : tasksCompletedThisWeek,
+    tasksActive    : tasksAssignedThisWeek > 0,
     taskDetails    : taskDetails,
     perProject     : perProject,
     lateTaskCount  : dLate,

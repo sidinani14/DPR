@@ -632,7 +632,7 @@ function buildDeepakPage(d){
         <td style="text-align:center;padding:5px 8px;font-size:11px">${t.assignedDt}</td>
         <td style="text-align:center;padding:5px 8px;font-size:11px;color:#1B5E20">✓ Done ${t.doneDate}</td>
       </tr>`).join('')
-    : `<tr><td colspan="5" style="padding:10px 8px;font-size:11.5px;color:rgba(43,38,32,0.72);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week — full marks awarded':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
+    : `<tr><td colspan="5" style="padding:10px 8px;font-size:11.5px;color:rgba(43,38,32,0.72);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week — Task Completion scored from this week\'s Site Visits/Client Comm instead':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
 
   return `<div class="page">
     ${hdr()}
@@ -661,7 +661,7 @@ function buildDeepakPage(d){
     <div class="pg">
       ${pCard('Site Visits',s.s_visit,20,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
       ${pCard('Client Comm',s.s_client,10,`${d.clientCount} of ${d.totalSites} projects updated`)}
-      ${pCard('Task<br>Completion',s.s_tasks,20,`${d.tasksCompleted} of ${d.tasksAssigned} assigned this week completed`)}
+      ${pCard('Task<br>Completion',s.s_tasks,20,d.tasksActive?`${d.tasksCompleted} of ${d.tasksAssigned} assigned this week completed`:`N/A — 0 assigned this week; scored from Site Visits/Client Comm instead`)}
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of ${d.dprDen} working days · ≥1 submission/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
