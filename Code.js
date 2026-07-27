@@ -123,7 +123,13 @@ function importAttendance(data) {
   var existing = sheet.getLastRow() > 1 ? sheet.getRange(2,1,sheet.getLastRow()-1,2).getValues() : [];
   var keyRow = {};   // 'date|member' → sheet row number
   for (var i=0; i<existing.length; i++){
-    keyRow[String(existing[i][0]).trim()+'|'+String(existing[i][1]).trim().toLowerCase()] = i+2;
+    // cellDate(), not String(): the Date col is plain-string-written but
+    // Sheets can auto-convert a "YYYY-MM-DD"-looking string into a real
+    // Date-typed cell, same as the time-cell issue elsewhere in this file —
+    // String()'ing that back produces a full date string that never
+    // matches the freshly-computed key, so every re-import silently
+    // appends a duplicate row instead of updating the existing one.
+    keyRow[cellDate(existing[i][0])+'|'+String(existing[i][1]).trim().toLowerCase()] = i+2;
   }
   var now = new Date();
   var appended = 0, updated = 0;
@@ -534,14 +540,18 @@ function cellDate(v) {
 function cellTime(v) {
   if (!v) return '';
   if (v instanceof Date) {
-    // NOT v.getHours()/getMinutes(): those apply the JS engine's local
-    // timezone using ITS OWN historical tzdata for the cell's underlying
-    // 1899-12-30 epoch date — for Asia/Kolkata that's the pre-1906 LMT
-    // offset (+5:21:10), not modern IST (+5:30), silently shifting every
-    // time by ~9 minutes (e.g. an intended 16:30 read back as 16:21).
-    // Utilities.formatDate asks Sheets/Apps Script itself to format the
-    // value, which uses the modern offset correctly.
-    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+    // NOT v.getHours()/getMinutes() (local): those apply Asia/Kolkata's
+    // historical tzdata for the cell's underlying 1899-12-30 epoch date
+    // (pre-1906 LMT, +5:21:10, not modern IST), shifting every time by
+    // ~9 minutes. A TIME-only Sheets cell carries no timezone of its own —
+    // it's a bare fraction of a day — so Apps Script's serial-to-Date
+    // conversion just maps that fraction directly onto UTC, with NO offset
+    // applied at all. Confirmed via a live debug read: writing "09:04"
+    // produces a Date whose UTC instant is exactly 1899-12-30T09:04:00Z —
+    // so the UTC fields ARE the intended wall-clock time already, verbatim.
+    var h = String(v.getUTCHours()).padStart(2,'0');
+    var mi = String(v.getUTCMinutes()).padStart(2,'0');
+    return h+':'+mi;
   }
   return String(v);
 }
