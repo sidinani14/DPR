@@ -156,7 +156,12 @@ function recompute(row){
   }
   // No punch at all and no field-work hours -> a genuine no-show, not a
   // late-arrival case (which needs a firstIn to check against the threshold).
-  if (!row.firstIn && totalMin<=0){
+  // Paytime represents "no punch" as the literal string "00:00", not an
+  // empty string — toMin('00:00') is 0, so check the PARSED minute value
+  // (null or 0), not row.firstIn's truthiness, or a "00:00" row silently
+  // falls through to the Half-day/Present branch below instead of Absent.
+  const inMinCheck = toMin(row.firstIn);
+  if ((inMinCheck==null || inMinCheck===0) && totalMin<=0){
     row.status='Absent'; row.late=false; row.undertime=0; row.overtime=0;
     return;
   }

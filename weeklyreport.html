@@ -311,13 +311,18 @@ function buildBioFromAttendance(resp){
   const att = weekDates(WEEK_START).map(dt=>{
     const row=byDate[dt];
     if (!row) return {d:shortDayLabel(dt), t:'—', s:'A', l:false, n:'Absent'};
-    const s = row.status==='Holiday' ? 'H' : row.status==='Half-day' ? 'HD' : 'P';
+    // Every status the import can write must map to a letter here — Absent
+    // was previously falling through to the 'P' default (any status that
+    // wasn't literally 'Holiday' or 'Half-day' silently became Present).
+    const s = row.status==='Holiday' ? 'H' : row.status==='Leave' ? 'L'
+            : row.status==='Absent' ? 'A' : row.status==='Half-day' ? 'HD' : 'P';
     let n='';
     if (row.status==='Half-day') n='Short day ('+fmtHM(row.hrs)+')';
+    if (row.status==='Absent' && row.late) n='Late arrival, not approved';
     if (row.late && row.lateApproved) n=(n?n+' — ':'')+'Approved late';
     return {d:shortDayLabel(dt), t:row.firstIn||'—', s, l:!!row.late, n};
   });
-  const presentCount=att.filter(x=>x.s!=='A' && x.s!=='H').length;
+  const presentCount=att.filter(x=>x.s!=='A' && x.s!=='H' && x.s!=='L').length;
   const lateCount=att.filter(x=>x.l).length;
   const avgHrs=(resp.summary && resp.summary.avgHrs) || 0;
   return {days:presentCount, lateCount, avgHrs:fmtHM(avgHrs), hrsScore:computeHrsScore(avgHrs), punctScore:computePunctScore(lateCount), att};
@@ -978,9 +983,19 @@ function wrRecompute(row){
     row.overtime = totalMin>480 ? Math.round(((totalMin-480)/60/8)*100000)/100000 : 0;
     return;
   }
+  // Manager-marked approved leave takes priority over everything else.
+  if (row.leaveOverride){
+    row.status='Leave'; row.late=false; row.undertime=0; row.overtime=0;
+    return;
+  }
   // No punch at all and no field-work hours -> a genuine no-show, not a
   // late-arrival case (which needs a firstIn to check against the threshold).
-  if (!row.firstIn && totalMin<=0){
+  // Paytime represents "no punch" as the literal string "00:00", not an
+  // empty string — wrToMin('00:00') is 0, so check the PARSED minute value
+  // (null or 0), not row.firstIn's truthiness, or a "00:00" row silently
+  // falls through to the Half-day/Present branch below instead of Absent.
+  const inMinCheck = wrToMin(row.firstIn);
+  if ((inMinCheck==null || inMinCheck===0) && totalMin<=0){
     row.status='Absent'; row.late=false; row.undertime=0; row.overtime=0;
     return;
   }
@@ -1089,17 +1104,18 @@ function wrHandleFile(file){
   };
   reader.readAsArrayBuffer(file);
 }
-const WR_STATUS_COLOR={Present:'#1B5E20', 'Half-day':'#8A6408', Absent:'#C0392B', Holiday:'#6C5CE0'};
+const WR_STATUS_COLOR={Present:'#1B5E20', 'Half-day':'#8A6408', Absent:'#C0392B', Holiday:'#6C5CE0', Leave:'#5A6067'};
 function wrMemberSummary(rows){
-  const present=rows.filter(r=>r.status!=='Absent' && r.status!=='Holiday');
+  const present=rows.filter(r=>r.status!=='Absent' && r.status!=='Holiday' && r.status!=='Leave');
   const half=rows.filter(r=>r.status==='Half-day');
   const absent=rows.filter(r=>r.status==='Absent');
   const holiday=rows.filter(r=>r.status==='Holiday');
+  const leave=rows.filter(r=>r.status==='Leave');
   const late=rows.filter(r=>r.late);
   const totalUT=Math.round(rows.reduce((s,r)=>s+r.undertime,0)*10000)/10000;
   const totalOT=Math.round(rows.reduce((s,r)=>s+r.overtime,0)*10000)/10000;
   return {present:present.length, half:half.length, absent:absent.length, holiday:holiday.length,
-    late:late.length, totalUT, totalOT};
+    leave:leave.length, late:late.length, totalUT, totalOT};
 }
 // Flags only members with something to review — the point is to surface
 // issues, not restate the whole table.
@@ -1156,7 +1172,9 @@ function wrRenderPreview(){
         <td class="n"><input type="number" step="0.01" value="${r.bioHrs}" onchange="WR_ROWS[${i}].bioHrs=parseFloat(this.value)||0;wrRecomputeFinalHrs(WR_ROWS[${i}]);wrRenderPreview()" style="width:60px;font-size:11px;background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:4px;padding:2px 4px"></td>
         <td class="n">${r.fieldHrs>0?('+'+r.fieldHrs.toFixed(2)):'—'}${fieldDetail}</td>
         <td class="n"><input type="number" step="0.01" value="${r.finalHrs}" onchange="WR_ROWS[${i}].finalHrs=parseFloat(this.value)||0;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="width:60px;font-size:11px;font-weight:700;background:#fff;color:#2B2620;border:1px solid rgba(43,38,32,.15);border-radius:4px;padding:2px 4px"></td>
-        <td class="n"><span style="font-size:10.5px;font-weight:700;color:${WR_STATUS_COLOR[r.status]}">${r.status}</span></td>
+        <td class="n"><span style="font-size:10.5px;font-weight:700;color:${WR_STATUS_COLOR[r.status]||'#2B2620'}">${r.status}</span>
+          <div><button onclick="WR_ROWS[${i}].leaveOverride=!WR_ROWS[${i}].leaveOverride;wrRecompute(WR_ROWS[${i}]);wrRenderPreview()" style="font-size:9px;margin-top:3px;padding:1px 6px;border-radius:5px;border:1px solid #5A6067;background:${r.leaveOverride?'#5A6067':'transparent'};color:${r.leaveOverride?'#fff':'#5A6067'};cursor:pointer;font-weight:700">${r.leaveOverride?'✓ Leave':'Mark Leave'}</button></div>
+        </td>
         <td class="n" style="font-size:10.5px">${r.undertime?('−'+r.undertime.toFixed(4)):(r.overtime?('+'+r.overtime.toFixed(4)):'—')}</td>
       </tr>`;
     }).join('');
@@ -1167,6 +1185,7 @@ function wrRenderPreview(){
         <span style="font-size:11px;color:#8A6408">Half-day ${sum.half}</span>
         <span style="font-size:11px;color:#C0392B">Absent ${sum.absent}</span>
         <span style="font-size:11px;color:#6C5CE0">Holiday ${sum.holiday}</span>
+        <span style="font-size:11px;color:#5A6067">Leave ${sum.leave}</span>
         <span style="font-size:11px;color:#8A6408">Late ${sum.late}</span>
         <span style="font-size:11px;color:rgba(43,38,32,.72);margin-left:auto">UT ${sum.totalUT.toFixed(4)} · OT ${sum.totalOT.toFixed(4)}</span>
       </div>
