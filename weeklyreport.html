@@ -1017,7 +1017,11 @@ function wrExportRow(row){
     undertime: absent?0:row.undertime, overtime: absent?0:row.overtime,
     fieldHours: absent?0:row.fieldHrs};
 }
-function wrRecomputeFinalHrs(row){ row.finalHrs = Math.round(((parseFloat(row.bioHrs)||0)+(parseFloat(row.fieldHrs)||0))*100)/100; wrRecompute(row); }
+// Field-work hours (DPR/DPER site-visit logs) are NOT added here — the
+// Paytime biometric Total Hrs already covers the full worked day, site
+// visits included. fieldHrs/fieldEntries are kept only for display context
+// (e.g. explaining a late arrival or long day), never summed into hours.
+function wrRecomputeFinalHrs(row){ row.finalHrs = Math.round((parseFloat(row.bioHrs)||0)*100)/100; wrRecompute(row); }
 // Week-scoped, not month-scoped: only the report's own 6 week dates
 // (Mon-Sat) are turned into rows, whatever else the uploaded file covers.
 // A week date outside the file's own month (e.g. the file is for July but
