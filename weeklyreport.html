@@ -9,7 +9,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Inter',sans-serif;background:#FFFFFF;color:#2B2620;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.page{width:210mm;min-height:297mm;padding:9mm 10mm;page-break-after:always;background:#FFFFFF;position:relative;overflow:hidden;}
+.page{width:210mm;min-height:297mm;padding:9mm 10mm;page-break-after:always;background:#FFFFFF;position:relative;overflow:hidden;display:flex;flex-direction:column;}
 .page:last-child{page-break-after:auto;}
 .page::before{content:'';position:absolute;top:-80px;right:-80px;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,rgba(245,166,35,0.07) 0%,transparent 70%);pointer-events:none;}
 
@@ -85,13 +85,17 @@ table.tt tbody td:first-child,table.tt tbody td:nth-child(2){text-align:left;}
 .pb-o{background:linear-gradient(90deg,#F5A623,#FF8C00);}
 .pb-gr{background:rgba(43,38,32,0.15);}
 
-/* 5-WEEK TREND (small multiples) */
-.trend-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(24mm,1fr));gap:2.2mm;margin-bottom:2.5mm;}
+/* 5-WEEK TREND (small multiples) — pinned to the bottom of the page as a
+   footer strip via margin-top:auto on .page's flex column. */
+.trend-foot{margin-top:auto;padding-top:2.5mm;border-top:1px solid rgba(43,38,32,0.1);}
+.trend-foot-hdr{display:flex;align-items:baseline;gap:6px;margin-bottom:1.3mm;}
+.trend-foot-hdr span:first-child{font-size:9.5px;font-weight:700;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:1.2px;}
+.trend-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(24mm,1fr));gap:2.2mm;}
 .tc{background:rgba(43,38,32,0.03);border:1px solid rgba(43,38,32,0.07);border-radius:8px;padding:5px 6px 4px;}
 .tc-lbl{font-size:7.3px;color:rgba(43,38,32,0.68);text-transform:uppercase;letter-spacing:.4px;margin-bottom:1px;}
 .tc-val{font-size:12.5px;font-weight:800;line-height:1;}
 .tc-max{font-size:8px;color:rgba(43,38,32,0.55);font-weight:400;}
-.trend-sub{font-size:9px;color:rgba(43,38,32,0.6);margin:-1mm 0 1.5mm;font-weight:400;}
+.trend-sub{font-size:9px;color:rgba(43,38,32,0.6);font-weight:400;}
 
 /* ATTENDANCE */
 .ag{display:grid;grid-template-columns:repeat(6,1fr);gap:2.2mm;margin-bottom:2.5mm;}
@@ -810,10 +814,6 @@ function buildIndividualPage(m, taskData){
       ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 
-    <div class="section-title" style="margin-bottom:0.5mm">5-Week Trend</div>
-    <div class="trend-sub">${trendRangeLabel()}</div>
-    <div class="trend-wrap" id="${trendId(m.name)}">${trendPlaceholder()}</div>
-
     <div style="display:grid;grid-template-columns:1fr 145px;gap:3.5mm;margin-bottom:2mm;">
       <div>
         <div class="section-title">Daily Attendance — Biometric</div>
@@ -839,6 +839,11 @@ function buildIndividualPage(m, taskData){
         </tr></thead>
         <tbody>${taskRows}</tbody>
       </table>
+    </div>
+
+    <div class="trend-foot">
+      <div class="trend-foot-hdr"><span>5-Week Trend</span><span class="trend-sub">${trendRangeLabel()}</span></div>
+      <div class="trend-wrap" id="${trendId(m.name)}">${trendPlaceholder()}</div>
     </div>
   </div>`;
 }
@@ -923,10 +928,6 @@ function buildDeepakPage(d){
       ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done, −5 per unexplained absence. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done${d.unexplainedAbsences?', '+d.unexplainedAbsences+' unexplained absence'+(d.unexplainedAbsences>1?'s':''):''}. <b>To improve:</b> set realistic target dates, close site tasks on time, and inform in advance if you'll be absent.`)}
     </div>
 
-    <div class="section-title" style="margin-bottom:0.5mm">5-Week Trend</div>
-    <div class="trend-sub">${trendRangeLabel()}</div>
-    <div class="trend-wrap" id="${trendId('Deepak Soni')}">${trendPlaceholder()}</div>
-
     <div style="margin-top:2mm">
       <div class="section-title" style="margin-bottom:1.5mm">Daily Attendance — Biometric</div>
       <div class="ag">${dAttGrid}</div>
@@ -973,6 +974,11 @@ function buildDeepakPage(d){
         clientComm: {updated: d.clientCount, total: d.totalSites},
         taskCompletion: d.tasksActive ? {completed: d.tasksCompleted, assigned: d.tasksAssigned} : null,
       }).map(t=>`<div class="ib-item" contenteditable="true">→ ${t}</div>`).join('')}
+    </div>
+
+    <div class="trend-foot">
+      <div class="trend-foot-hdr"><span>5-Week Trend</span><span class="trend-sub">${trendRangeLabel()}</span></div>
+      <div class="trend-wrap" id="${trendId('Deepak Soni')}">${trendPlaceholder()}</div>
     </div>
   </div>`;
 }
@@ -1052,10 +1058,6 @@ function buildAmanPage(d){
       ${pCard('Reliability<br>Lead SLA',s.s_reliability,10,`Starts at 10 → −1 per new lead not contacted within 24 h. This week: ${d.leadSlaMissed||0} of ${d.leadsThisWeek||0} missed. <b>To improve:</b> contact every new lead within 24 hours.`)}
     </div>
 
-    <div class="section-title" style="margin-bottom:0.5mm">5-Week Trend</div>
-    <div class="trend-sub">${trendRangeLabel()}</div>
-    <div class="trend-wrap" id="${trendId('Aman Raghuwanshi')}">${trendPlaceholder()}</div>
-
     <div style="margin-top:2mm">
       <div class="section-title" style="margin-bottom:1.5mm">Daily Attendance — Biometric</div>
       <div class="ag">${aAttGrid}</div>
@@ -1095,6 +1097,11 @@ function buildAmanPage(d){
         leadMgmt: d.leadActive ? {worked: d.leadWorked, base: d.leadBase} : null,
         revenue: d.revActive ? {pct: d.collectionPct, target: d.collectionTarget} : null,
       }).map(t=>`<div class="ib-item" contenteditable="true">→ ${t}</div>`).join('')}
+    </div>
+
+    <div class="trend-foot">
+      <div class="trend-foot-hdr"><span>5-Week Trend</span><span class="trend-sub">${trendRangeLabel()}</span></div>
+      <div class="trend-wrap" id="${trendId('Aman Raghuwanshi')}">${trendPlaceholder()}</div>
     </div>
   </div>`;
 }
