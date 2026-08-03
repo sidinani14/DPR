@@ -5204,8 +5204,13 @@ function getWeeklyStats(weekStart) {
 
     // Reliability — delays this week. Late (deadline in week, passed, not done
     // on time) = −1; "Work Not Done" (reassigned by a lead) = −2.
+    // "Passed" is judged as of the week's own Saturday for a historical
+    // week, not today — otherwise a task whose deadline fell in some old
+    // week keeps getting freshly judged "still not done" every time that
+    // week's report is looked up later, drifting Reliability down over
+    // time for a week that's long since closed out.
     var lateCount = 0, wndCount = 0;
-    var nowD = dateStr();
+    var lateRefDate = (mon === currentMon) ? today : sat;
     asRows.forEach(function(r, i) {
       if (i === 0) return;
       if (String(r[3]||'').trim() !== name) return;
@@ -5213,7 +5218,7 @@ function getWeeklyStats(weekStart) {
       if (!dl || dl < mon || dl > sat) return;       // deadline must fall in this week
       var selfStat = String(r[13]||'').trim();         // N SelfStatus
       if (selfStat === 'Work Not Done') { wndCount++; return; }
-      if (dl >= nowD) return;                          // not due yet — not late
+      if (dl >= lateRefDate) return;                    // not due yet (as of this week's own end) — not late
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       var onTime   = String(r[COL_LEADAPPR]||'').trim() === 'Yes' && doneDate && doneDate <= dl;
       if (!onTime) lateCount++;
