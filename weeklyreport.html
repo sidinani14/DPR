@@ -329,9 +329,17 @@ function weekDates(startStr){
 // into BIO's {days,lateCount,avgHrs,hrsScore,punctScore,att[]} shape. A weekday
 // with no ATTENDANCE row at all (never punched, nothing imported) is treated
 // as Absent — matching how a no-show day has always been represented here.
-function buildBioFromAttendance(resp){
+function buildBioFromAttendance(resp, weekStartOverride){
+  // weekStartOverride lets the 5-week trend build a historical week's bio
+  // without it silently defaulting to the CURRENTLY VIEWED week — resp's
+  // dates belong to whatever [from,to] was actually queried, which for a
+  // trend week is NOT the global WEEK_START. Getting this wrong makes every
+  // day fail to match (real data present, but keyed to the wrong dates) and
+  // fall through to the "no row → Absent" branch below, silently turning a
+  // normal week into a fabricated 6-day absence.
+  const ws = weekStartOverride || WEEK_START;
   const byDate={}; (resp.days||[]).forEach(d=>{ byDate[d.date]=d; });
-  const att = weekDates(WEEK_START).map(dt=>{
+  const att = weekDates(ws).map(dt=>{
     const row=byDate[dt];
     if (!row) return {d:shortDayLabel(dt), t:'—', s:'A', l:false, n:'Absent'};
     // Every status the import can write must map to a letter here — Absent
@@ -443,7 +451,11 @@ async function computeWeekScores(weekStart){
     post({action:'getAmanWeeklyStats', weekStart}),
     Promise.all(allNames.map(name=>
       post({action:'getMemberAttendance', member:name, from:weekStart, to:weekEnd})
-        .then(r=>[name, r && r.days ? buildBioFromAttendance(r) : null])
+        // r.days is always an array — an EMPTY one (no ATTENDANCE rows at all
+        // for this week, e.g. a week that predates attendance tracking) must
+        // resolve to null, not to buildBioFromAttendance's "no row → Absent"
+        // fallback, or a genuine data gap gets fabricated into a 6-day absence.
+        .then(r=>[name, r && r.days && r.days.length ? buildBioFromAttendance(r, weekStart) : null])
     )),
   ]);
   const bioMap = Object.fromEntries(bioEntries);
@@ -451,7 +463,9 @@ async function computeWeekScores(weekStart){
 
   const out = {};
   Object.keys(ROLES).forEach(name=>{
-    out[name] = scoreCalc({name}, statsMap[name]||{}, bioMap[name]);
+    // No attendance data at all for this member this week — mark the whole
+    // week unavailable rather than scoring it off a fabricated empty bio.
+    out[name] = bioMap[name] ? scoreCalc({name}, statsMap[name]||{}, bioMap[name]) : null;
   });
 
   if (dData && dData.scores){

@@ -5087,11 +5087,16 @@ function getWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
-  // Completed/approved work counts through TODAY when the week has already ended,
-  // so tasks done in the week but approved a day or two later (after Saturday)
-  // are still included. Punctuality/hours stay on the Mon–Sat window.
-  var today = dateStr();
-  var doneUpper = (today > sat) ? today : sat;
+  // Completed/approved work counts a few days past Saturday, so tasks done
+  // in the week but approved a day or two later (after Saturday) still
+  // count — but capped at a small grace window, NOT open-ended to "today".
+  // Extending all the way to today broke any WEEKS-old historical query
+  // (e.g. the weekly report's 5-week trend): a week from a month ago would
+  // sum every approval between then and now into that one week's Output,
+  // inflating it far past reality. Punctuality/hours stay on the Mon–Sat window.
+  var today    = dateStr();
+  var graceEnd = addDaysToStr(sat, 3);
+  var doneUpper = (today <= sat) ? sat : (today < graceEnd ? today : graceEnd);
 
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
@@ -6698,6 +6703,12 @@ function getDeepakWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
+  // Same bounded grace-period fix as getWeeklyStats — a couple of days past
+  // Saturday for late approvals, never open-ended to "today" (which would
+  // pull weeks of later completions into an old historical week's total).
+  var today0    = dateStr();
+  var graceEnd0 = addDaysToStr(sat, 3);
+  var doneUpper0 = (today0 <= sat) ? sat : (today0 < graceEnd0 ? today0 : graceEnd0);
 
   // ── 1. Read active projects from CONFIG tab ───────────────
   // Scans ALL columns for the "DEEPAK ACTIVE PROJECTS" header (it lives in
@@ -6817,7 +6828,7 @@ function getDeepakWeeklyStats(weekStart) {
       }
 
       // Completed within the same week
-      if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= (dateStr() > sat ? dateStr() : sat)) {
+      if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= doneUpper0) {
         tasksCompletedThisWeek++;
         taskDetails.push({
           project   : String(ar[2] || '').trim(),
