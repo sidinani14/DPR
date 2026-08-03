@@ -499,10 +499,14 @@ function sparkline(vals, max){
   </svg>`;
 }
 function trendCard(label, vals, max){
-  const cur = vals[vals.length-1];
+  // Headline number is the 5-week AVERAGE, not the current week's score —
+  // the per-week detail (including this week) is still visible in the
+  // sparkline bars below; the number just summarizes the trend as a whole.
+  const valid = vals.filter(v=>v!=null);
+  const avg = valid.length ? Math.round((valid.reduce((s,v)=>s+v,0)/valid.length)*10)/10 : null;
   return `<div class="tc">
-    <div class="tc-lbl">${label}</div>
-    <div class="tc-val">${cur==null?'<span style="color:#8A8378;font-weight:700">N/A</span>':cur+`<span class="tc-max">/${max}</span>`}</div>
+    <div class="tc-lbl">${label} <span style="opacity:.6">· avg</span></div>
+    <div class="tc-val">${avg==null?'<span style="color:#8A8378;font-weight:700">N/A</span>':avg+`<span class="tc-max">/${max}</span>`}</div>
     ${sparkline(vals, max)}
   </div>`;
 }
