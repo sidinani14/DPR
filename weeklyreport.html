@@ -9,17 +9,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Inter',sans-serif;background:#FFFFFF;color:#2B2620;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.page{width:297mm;min-height:210mm;padding:10mm 12mm;page-break-after:always;background:#FFFFFF;position:relative;overflow:hidden;}
+.page{width:210mm;min-height:297mm;padding:9mm 10mm;page-break-after:always;background:#FFFFFF;position:relative;overflow:hidden;}
 .page:last-child{page-break-after:auto;}
 .page::before{content:'';position:absolute;top:-80px;right:-80px;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,rgba(245,166,35,0.07) 0%,transparent 70%);pointer-events:none;}
 
 /* HEADER */
-.rh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8mm;padding-bottom:4mm;border-bottom:1px solid rgba(43,38,32,0.08);}
-.rh-logo img{height:64px;}
+.rh{display:flex;align-items:center;justify-content:space-between;margin-bottom:4mm;padding-bottom:2.5mm;border-bottom:1px solid rgba(43,38,32,0.08);}
+.rh-logo img{height:42px;}
 .rh-meta{text-align:right;}
-.rh-title{font-size:13px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:1.5px;}
-.rh-week{font-size:18.5px;font-weight:800;color:#2B2620;margin-top:2px;}
-.rh-gen{font-size:11px;color:rgba(43,38,32,0.72);margin-top:3px;}
+.rh-title{font-size:11px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:1.2px;}
+.rh-week{font-size:15px;font-weight:800;color:#2B2620;margin-top:2px;}
+.rh-gen{font-size:9px;color:rgba(43,38,32,0.72);margin-top:2px;}
 
 /* OVERVIEW PAGE */
 .ov-title{font-size:24px;font-weight:900;margin-bottom:1mm;}
@@ -27,57 +27,57 @@ body{font-family:'Inter',sans-serif;background:#FFFFFF;color:#2B2620;-webkit-pri
 .ov-sub{font-size:12px;color:rgba(43,38,32,0.75);margin-bottom:6mm;letter-spacing:.5px;}
 table.tt{width:100%;border-collapse:collapse;}
 table.tt thead tr{background:rgba(245,166,35,0.12);}
-table.tt thead th{padding:7px 8px;font-size:10.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center;}
+table.tt thead th{padding:6px 5px;font-size:9px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center;}
 table.tt thead th:first-child,table.tt thead th:nth-child(2){text-align:left;}
 table.tt tbody tr{border-bottom:1px solid rgba(43,38,32,0.04);}
-table.tt tbody td{padding:8px 8px;font-size:12.5px;vertical-align:middle;text-align:center;}
+table.tt tbody td{padding:5px 5px;font-size:10.5px;vertical-align:middle;text-align:center;}
 table.tt tbody td:first-child,table.tt tbody td:nth-child(2){text-align:left;}
-.rk{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.rk{width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;}
 .rk1{background:linear-gradient(135deg,#FFD700,#FFA500);color:#000;}
 .rk2{background:linear-gradient(135deg,#C0C0C0,#A0A0A0);color:#000;}
 .rk3{background:linear-gradient(135deg,#CD7F32,#9A5A1A);color:#fff;}
 .rkx{background:rgba(43,38,32,0.1);color:rgba(43,38,32,0.8);}
-.mn{font-weight:700;font-size:13px;}
-.mr{font-size:10.5px;color:rgba(43,38,32,0.75);margin-top:1px;}
-.sv{font-size:18.5px;font-weight:900;}
+.mn{font-weight:700;font-size:11px;}
+.mr{font-size:9px;color:rgba(43,38,32,0.75);margin-top:1px;}
+.sv{font-size:14.5px;font-weight:900;}
 .chip{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
 .c-ex{background:rgba(46,213,115,0.15);color:#1B5E20;border:1px solid rgba(46,213,115,0.3);}
 .c-go{background:rgba(52,168,83,0.12);color:#2E7D32;border:1px solid rgba(52,168,83,0.25);}
 .c-av{background:rgba(251,188,4,0.12);color:#8A6408;border:1px solid rgba(251,188,4,0.25);}
 .c-lo{background:rgba(234,67,53,0.12);color:#C0392B;border:1px solid rgba(234,67,53,0.25);}
-.mb{width:55px;height:5px;background:rgba(43,38,32,0.08);border-radius:3px;overflow:hidden;display:inline-block;}
+.mb{width:38px;height:4px;background:rgba(43,38,32,0.08);border-radius:3px;overflow:hidden;display:inline-block;}
 .mb-i{height:100%;border-radius:3px;}
 .legend{display:flex;gap:16px;margin-top:5mm;align-items:center;}
 .lk{font-size:10.5px;color:rgba(43,38,32,0.7);text-transform:uppercase;letter-spacing:1px;}
 
 /* INDIVIDUAL PAGE */
-.ind-top{display:grid;grid-template-columns:1fr 180px;gap:6mm;margin-bottom:6mm;}
-.ind-name{font-size:30px;font-weight:900;line-height:1;}
-.ind-role{font-size:13px;color:rgba(43,38,32,0.8);margin-top:3px;}
-.ind-week-lbl{font-size:11px;color:rgba(43,38,32,0.68);margin-top:6px;text-transform:uppercase;letter-spacing:1px;}
-.stats-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
-.stat-chip{background:rgba(43,38,32,0.05);border:1px solid rgba(43,38,32,0.08);border-radius:8px;padding:6px 10px;text-align:center;}
-.stat-val{font-size:19.5px;font-weight:800;line-height:1;}
-.stat-lbl{font-size:9.5px;color:rgba(43,38,32,0.75);margin-top:2px;text-transform:uppercase;letter-spacing:.6px;line-height:1.3;}
-.score-box{background:linear-gradient(135deg,rgba(245,166,35,0.12),rgba(245,166,35,0.04));border:1px solid rgba(245,166,35,0.25);border-radius:14px;padding:14px 18px;text-align:center;}
-.sc-lbl{font-size:10.5px;color:rgba(43,38,32,0.78);text-transform:uppercase;letter-spacing:1.5px;}
-.sc-num{font-size:52px;font-weight:900;line-height:1;margin:3px 0;}
-.sc-den{font-size:16.5px;color:rgba(43,38,32,0.7);font-weight:400;}
+.ind-top{display:grid;grid-template-columns:1fr 145px;gap:5mm;margin-bottom:4mm;}
+.ind-name{font-size:24px;font-weight:900;line-height:1;}
+.ind-role{font-size:11.5px;color:rgba(43,38,32,0.8);margin-top:3px;}
+.ind-week-lbl{font-size:9.5px;color:rgba(43,38,32,0.68);margin-top:5px;text-transform:uppercase;letter-spacing:1px;}
+.stats-row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.stat-chip{background:rgba(43,38,32,0.05);border:1px solid rgba(43,38,32,0.08);border-radius:7px;padding:5px 8px;text-align:center;}
+.stat-val{font-size:15.5px;font-weight:800;line-height:1;}
+.stat-lbl{font-size:8px;color:rgba(43,38,32,0.75);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;line-height:1.25;}
+.score-box{background:linear-gradient(135deg,rgba(245,166,35,0.12),rgba(245,166,35,0.04));border:1px solid rgba(245,166,35,0.25);border-radius:12px;padding:9px 12px;text-align:center;}
+.sc-lbl{font-size:9px;color:rgba(43,38,32,0.78);text-transform:uppercase;letter-spacing:1.2px;}
+.sc-num{font-size:36px;font-weight:900;line-height:1;margin:2px 0;}
+.sc-den{font-size:13px;color:rgba(43,38,32,0.7);font-weight:400;}
 
 /* PARAM CARDS */
-.pg{display:grid;grid-template-columns:repeat(6,1fr);gap:3mm;margin-bottom:4mm;}
-.pc{background:rgba(43,38,32,0.04);border:1px solid rgba(43,38,32,0.07);border-radius:10px;padding:10px;position:relative;overflow:hidden;}
-.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0;}
+.pg{display:grid;grid-template-columns:repeat(auto-fit,minmax(24mm,1fr));gap:2.2mm;margin-bottom:2.5mm;}
+.pc{background:rgba(43,38,32,0.04);border:1px solid rgba(43,38,32,0.07);border-radius:9px;padding:7px 8px;position:relative;overflow:hidden;}
+.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:9px 9px 0 0;}
 .pc.g::before{background:linear-gradient(90deg,#2ED573,#00B894);}
 .pc.a::before{background:linear-gradient(90deg,#B8860B,#F5A623);}
 .pc.r::before{background:linear-gradient(90deg,#EA4335,#FF6B6B);}
 .pc.o::before{background:linear-gradient(90deg,#F5A623,#FF8C00);}
 .pc.gr::before{background:rgba(43,38,32,0.1);}
-.pc-lbl{font-size:9.5px;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;line-height:1.4;}
-.pc-val{font-size:26px;font-weight:900;line-height:1;}
-.pc-max{font-size:12px;color:rgba(43,38,32,0.68);font-weight:400;}
-.pc-det{font-size:10px;color:rgba(43,38,32,0.72);margin-top:5px;line-height:1.5;}
-.pw{height:4px;background:rgba(43,38,32,0.07);border-radius:2px;margin-top:7px;overflow:hidden;}
+.pc-lbl{font-size:8px;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;line-height:1.3;}
+.pc-val{font-size:19px;font-weight:900;line-height:1;}
+.pc-max{font-size:10px;color:rgba(43,38,32,0.68);font-weight:400;}
+.pc-det{font-size:8.3px;color:rgba(43,38,32,0.72);margin-top:3px;line-height:1.35;}
+.pw{height:3px;background:rgba(43,38,32,0.07);border-radius:2px;margin-top:5px;overflow:hidden;}
 .pb{height:100%;border-radius:2px;}
 .pb-g{background:linear-gradient(90deg,#2ED573,#00B894);}
 .pb-a{background:linear-gradient(90deg,#B8860B,#F5A623);}
@@ -85,42 +85,50 @@ table.tt tbody td:first-child,table.tt tbody td:nth-child(2){text-align:left;}
 .pb-o{background:linear-gradient(90deg,#F5A623,#FF8C00);}
 .pb-gr{background:rgba(43,38,32,0.15);}
 
+/* 5-WEEK TREND (small multiples) */
+.trend-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(24mm,1fr));gap:2.2mm;margin-bottom:2.5mm;}
+.tc{background:rgba(43,38,32,0.03);border:1px solid rgba(43,38,32,0.07);border-radius:8px;padding:5px 6px 4px;}
+.tc-lbl{font-size:7.3px;color:rgba(43,38,32,0.68);text-transform:uppercase;letter-spacing:.4px;margin-bottom:1px;}
+.tc-val{font-size:12.5px;font-weight:800;line-height:1;}
+.tc-max{font-size:8px;color:rgba(43,38,32,0.55);font-weight:400;}
+.trend-sub{font-size:9px;color:rgba(43,38,32,0.6);margin:-1mm 0 1.5mm;font-weight:400;}
+
 /* ATTENDANCE */
-.ag{display:grid;grid-template-columns:repeat(6,1fr);gap:3mm;margin-bottom:4mm;}
-.ad{background:rgba(43,38,32,0.03);border:1px solid rgba(43,38,32,0.06);border-radius:8px;padding:7px 5px;text-align:center;}
+.ag{display:grid;grid-template-columns:repeat(6,1fr);gap:2.2mm;margin-bottom:2.5mm;}
+.ad{background:rgba(43,38,32,0.03);border:1px solid rgba(43,38,32,0.06);border-radius:7px;padding:5px 4px;text-align:center;}
 .ad.ap{border-color:rgba(46,213,115,0.15);}
 .ad.al{border-color:rgba(251,188,4,0.25);background:rgba(251,188,4,0.04);}
 .ad.aa{border-color:rgba(234,67,53,0.15);background:rgba(234,67,53,0.03);}
 .ad.ah{border-color:rgba(245,166,35,0.15);}
-.ad-day{font-size:9.5px;color:rgba(43,38,32,0.72);margin-bottom:3px;text-transform:uppercase;}
-.ad-time{font-size:13px;font-weight:700;}
-.ad-st{font-size:9.5px;margin-top:2px;}
+.ad-day{font-size:8px;color:rgba(43,38,32,0.72);margin-bottom:2px;text-transform:uppercase;}
+.ad-time{font-size:10.5px;font-weight:700;}
+.ad-st{font-size:8px;margin-top:1px;}
 
 /* TASKS TABLE */
-.tt-sec{margin-top:3mm;}
-.tt-sec-title{font-size:11px;font-weight:700;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3mm;}
+.tt-sec{margin-top:2mm;}
+.tt-sec-title{font-size:9.5px;font-weight:700;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:1.8mm;}
 table.tasks{width:100%;border-collapse:collapse;}
-table.tasks thead th{background:rgba(43,38,32,0.06);padding:5px 8px;font-size:10.5px;font-weight:700;color:rgba(43,38,32,0.8);text-transform:uppercase;letter-spacing:.7px;text-align:left;}
+table.tasks thead th{background:rgba(43,38,32,0.06);padding:3.5px 6px;font-size:9px;font-weight:700;color:rgba(43,38,32,0.8);text-transform:uppercase;letter-spacing:.5px;text-align:left;}
 table.tasks thead th:last-child,table.tasks thead th:nth-last-child(2){text-align:center;}
 table.tasks tbody tr{border-bottom:1px solid rgba(43,38,32,0.04);}
-table.tasks tbody td{padding:5px 8px;font-size:11.5px;vertical-align:middle;}
+table.tasks tbody td{padding:3.5px 6px;font-size:9.8px;vertical-align:middle;}
 table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-align:center;}
-.t-proj{font-weight:600;color:#A8540C;font-size:11px;}
+.t-proj{font-weight:600;color:#A8540C;font-size:9.5px;}
 .t-task{color:rgba(43,38,32,0.94);}
-.t-date{font-size:11px;color:rgba(43,38,32,0.8);font-family:monospace;}
-.t-pts{font-weight:700;font-size:13px;}
+.t-date{font-size:9.5px;color:rgba(43,38,32,0.8);font-family:monospace;}
+.t-pts{font-weight:700;font-size:11px;}
 .ot-yes{color:#1B5E20;}
 .ot-no{color:#C0392B;}
 .no-tasks{font-size:12px;color:rgba(43,38,32,0.7);font-style:italic;padding:8px;}
 
 /* IMPROVE BOX */
-.ib{background:linear-gradient(135deg,rgba(245,166,35,0.08),rgba(234,67,53,0.04));border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:10px 12px;}
-.ib-title{font-size:11px;font-weight:800;color:#A8540C;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.ib{background:linear-gradient(135deg,rgba(245,166,35,0.08),rgba(234,67,53,0.04));border:1px solid rgba(245,166,35,0.2);border-radius:9px;padding:7px 9px;}
+.ib-title{font-size:9.5px;font-weight:800;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
 .ib-title::before{content:"💡 ";}
-.ib-item{font-size:11px;color:rgba(43,38,32,0.87);padding:3px 0;border-bottom:1px solid rgba(43,38,32,0.04);line-height:1.4;}
+.ib-item{font-size:9.3px;color:rgba(43,38,32,0.87);padding:2px 0;border-bottom:1px solid rgba(43,38,32,0.04);line-height:1.32;}
 .ib-item:last-child{border-bottom:none;padding-bottom:0;}
 
-.section-title{font-size:11px;font-weight:700;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3mm;}
+.section-title{font-size:9.5px;font-weight:700;color:rgba(43,38,32,0.75);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:1.8mm;}
 .loading{text-align:center;padding:40px;color:rgba(43,38,32,0.75);font-size:17.5px;}
 .edit-btn{position:fixed;bottom:20px;right:20px;background:rgba(245,166,35,0.9);color:#000;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;z-index:1000;border:none;font-family:inherit;}
 .edit-btn:hover{background:#F5A623;}
@@ -167,12 +175,14 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
 #import-panel .stat{font-size:12px;color:rgba(43,38,32,.6)}
 @media print{
   .edit-btn,.topbar,#import-panel,#wr-sticky{display:none!important;}
-  @page{size:297mm 210mm;margin:0;}
-  html,body{width:297mm;background:#FFFFFF;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  /* Each page fills at least one landscape sheet; a page with more content than
-     fits (e.g. a long completed-tasks table) flows onto extra sheets instead of
-     being clipped, so no rows are ever lost when exporting. */
-  .page{width:297mm;min-height:210mm;height:auto;max-height:none;margin:0;overflow:visible;page-break-after:always;break-after:page;}
+  @page{size:210mm 297mm;margin:0;}
+  html,body{width:210mm;background:#FFFFFF;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  /* Each page targets exactly one A4 portrait sheet (sizing throughout is
+     tuned to fit one person's full report on a single page); a page with
+     unusually more content than fits (e.g. a very long completed-tasks
+     table) still flows onto extra sheets instead of being clipped, so no
+     rows are ever lost when exporting. */
+  .page{width:210mm;min-height:297mm;height:auto;max-height:none;margin:0;overflow:visible;page-break-after:always;break-after:page;}
   .page:last-child{page-break-after:auto;break-after:auto;}
   /* keep each task row intact across a sheet break and repeat the table header */
   table.tasks tr{page-break-inside:avoid;break-inside:avoid;}
@@ -274,6 +284,11 @@ const TARGETS = {
   'Poorvi Goyal':48, 'Sahil Maurya':48, 'Kritika Kaushik':30,
 };
 
+// Members exempt from DPR Consistency scoring (e.g. too new to have started
+// filing yet) — their DPR shows N/A and total is rescaled across the
+// remaining active components instead of penalizing them for it.
+const DPR_NA_MEMBERS = ['Kritika Kaushik'];
+
 // ── Biometric — live, built from ATTENDANCE via getMemberAttendance ────────
 // hrs score: ≥7:55 (475min) avg→10 · 7:00–7:54→7 · <7:00→4
 // punct score: 0 late→15, 1→12, 2→9, 3+→6
@@ -345,11 +360,16 @@ async function loadBioForWeek(){
 }
 
 // ── Score calculation ─────────────────────────────────────
-function scoreCalc(m, taskData) {
-  const bio         = BIO[m.name] || {};
+function scoreCalc(m, taskData, bioOverride) {
+  // bioOverride lets the 5-week trend computer score a historical week
+  // without touching the global BIO (which always holds the *currently
+  // selected* week). undefined (the normal call shape) falls back to BIO;
+  // an explicit null/object (trend path) is used as-is, even if empty.
+  const bio         = bioOverride !== undefined ? (bioOverride || {}) : (BIO[m.name] || {});
   const tgt         = TARGETS[m.name] || 48;
   const approvedPts = taskData.approvedPts || 0;
   const dprDays     = taskData.dprDays     || 0;
+  const dprNA       = DPR_NA_MEMBERS.indexOf(m.name) > -1;
 
   // Output /50
   const s_output = Math.min(50, Math.round(approvedPts / tgt * 50 * 10) / 10);
@@ -361,7 +381,7 @@ function scoreCalc(m, taskData) {
   const effectiveDprDays = dprDays || 0;
   const presentDays = (bio.days != null ? bio.days : WEEK_DAYS);
   const dprDen = Math.max(1, presentDays);
-  const s_dpr = dprScore(effectiveDprDays, bio);
+  const s_dpr = dprNA ? null : dprScore(effectiveDprDays, bio);
 
   // Punctuality /15 base — with the absent-day penalty applied.
   const s_punct = Math.round(adjPunct(bio) * 10) / 10;
@@ -371,15 +391,143 @@ function scoreCalc(m, taskData) {
 
   // Reliability /10 — 10 minus delay penalties (−1 late, −2 reassigned)
   const s_reliability = Math.max(0, Math.round((10 - (taskData.reliabilityPenalty || 0)) * 10) / 10);
-  const total = Math.round((s_output + s_dpr + s_punct + s_hrs + s_reliability) * 10) / 10;
 
-  return {s_output, s_dpr, s_punct, s_hrs, s_reliability,
+  // When DPR is N/A, drop it from both the sum and the max, then rescale
+  // back to /100 so an unfileable metric doesn't cap the total at 85.
+  const rawSum = s_output + (dprNA?0:s_dpr) + s_punct + s_hrs + s_reliability;
+  const activeMax = 100 - (dprNA?15:0);
+  const total = Math.round((rawSum / activeMax * 100) * 10) / 10;
+
+  return {s_output, s_dpr, s_punct, s_hrs, s_reliability, dprNA,
           reliabilityPenalty: taskData.reliabilityPenalty||0, lateCount: taskData.lateCount||0, workNotDone: taskData.workNotDone||0,
           total, tgt, approvedPts,
           dprDays: effectiveDprDays, presentDays, dprDen,
           completedOT: taskData.completedOnTime || 0,
           completedL : taskData.completedLate   || 0,
           totalDone  : (taskData.completedOnTime||0) + (taskData.completedLate||0)};
+}
+
+// ── 5-Week Trend (small multiples on individual pages) ──────────────────
+const TREND_WEEKS = 5;
+function trendDateStr(d){ return d.toISOString().slice(0,10); }
+function trendWeekStarts(){
+  // Ascending oldest→current; "current" is always the page's selected week
+  // (WEEK_START), so this naturally shows "the 5 weeks touching July" when
+  // July's last week is selected, without hardcoding any month.
+  const out=[]; let d=new Date(WEEK_START+'T00:00:00');
+  for(let i=0;i<TREND_WEEKS;i++){ out.unshift(trendDateStr(d)); d=new Date(d.getTime()-7*86400000); }
+  return out;
+}
+function trendId(name){ return 'trend-'+name.replace(/\s+/g,'-'); }
+function trendPlaceholder(){ return `<div class="loading" style="padding:4px;font-size:8.5px;grid-column:1/-1">Loading trend…</div>`; }
+function trendRangeLabel(){
+  const weeks=trendWeekStarts();
+  const fmt=s=>{ const d=new Date(s+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); };
+  return `Weeks of ${fmt(weeks[0])} – ${fmt(weeks[weeks.length-1])} (current)`;
+}
+
+// Fetches + scores one historical week for every team member + Deepak + Aman,
+// mirroring the same bio-adjustment logic loadAndRender applies for the
+// current week, so trend values stay directly comparable week-to-week.
+async function computeWeekScores(weekStart){
+  const weekEnd = trendDateStr(new Date(new Date(weekStart+'T00:00:00').getTime()+5*86400000));
+  const allNames = Object.keys(ROLES).concat(['Deepak Soni','Aman Raghuwanshi']);
+  const post = (body)=>fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
+  const [statsData, dData, aData, bioEntries] = await Promise.all([
+    post({action:'getWeeklyStats', weekStart}),
+    post({action:'getDeepakWeeklyStats', weekStart}),
+    post({action:'getAmanWeeklyStats', weekStart}),
+    Promise.all(allNames.map(name=>
+      post({action:'getMemberAttendance', member:name, from:weekStart, to:weekEnd})
+        .then(r=>[name, r && r.days ? buildBioFromAttendance(r) : null])
+    )),
+  ]);
+  const bioMap = Object.fromEntries(bioEntries);
+  const statsMap = {}; (statsData.stats||[]).forEach(s=>{ statsMap[s.name]=s; });
+
+  const out = {};
+  Object.keys(ROLES).forEach(name=>{
+    out[name] = scoreCalc({name}, statsMap[name]||{}, bioMap[name]);
+  });
+
+  if (dData && dData.scores){
+    const ds=dData.scores, bd=bioMap['Deepak Soni'];
+    if (bd){
+      const s_punct=Math.round(adjPunct(bd)*10)/10, s_hrs=Math.round(adjHrs(bd)*10)/10;
+      const s_dper=dprScore(dData.dperDaysCount, bd);
+      const unexplainedAbsences=(bd.att||[]).filter(x=>x.s==='A').length;
+      const reliabilityPenalty=(ds.reliabilityPenalty||0)+unexplainedAbsences*5;
+      const s_reliability=Math.max(0,Math.round((10-reliabilityPenalty)*10)/10);
+      const s_output=Math.round((ds.s_visit+ds.s_client+ds.s_tasks)*10)/10;
+      const total=Math.round((s_output+s_dper+s_punct+s_hrs+s_reliability)*10)/10;
+      out['Deepak Soni']={s_output, s_dpr:s_dper, s_punct, s_hrs, s_reliability, total};
+    }
+  }
+  if (aData && aData.scores){
+    const as=aData.scores, ba=bioMap['Aman Raghuwanshi'];
+    if (ba){
+      const s_punct=Math.round(adjPunct(ba)*10)/10, s_hrs=Math.round(adjHrs(ba)*10)/10;
+      const s_dpr=dprScore(aData.dprDaysCount, ba);
+      const total=Math.round((as.output+s_dpr+s_punct+s_hrs+as.s_reliability)*10)/10;
+      out['Aman Raghuwanshi']={s_output:as.output, s_dpr, s_punct, s_hrs, s_reliability:as.s_reliability, total};
+    }
+  }
+  return out;
+}
+
+// One tiny bar-per-week sparkline, colored by the same band the report uses
+// everywhere else (sc()) so the color alone already reads good/average/poor
+// — no separate legend needed for what is always a single series per card.
+function sparkline(vals, max){
+  const bw=13, gap=3.5, base=30;
+  const bars = vals.map((v,i)=>{
+    const x = i*(bw+gap)+1;
+    if (v==null) return `<rect x="${x}" y="${base-2}" width="${bw}" height="2" rx="1" fill="#D8D2C6"/>`;
+    const h = Math.max(2, Math.round(Math.min(1,v/max)*base));
+    const y = base-h;
+    const isLast = i===vals.length-1;
+    return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="2" fill="${sc(v,max)}" opacity="${isLast?1:0.5}"/>`;
+  }).join('');
+  const w = vals.length*(bw+gap)-gap+2;
+  return `<svg viewBox="0 0 ${w} ${base+2}" width="100%" height="24" preserveAspectRatio="none">
+    <line x1="0" y1="${base}" x2="${w}" y2="${base}" stroke="rgba(43,38,32,0.15)" stroke-width="1"/>
+    ${bars}
+  </svg>`;
+}
+function trendCard(label, vals, max){
+  const cur = vals[vals.length-1];
+  return `<div class="tc">
+    <div class="tc-lbl">${label}</div>
+    <div class="tc-val">${cur==null?'<span style="color:#8A8378;font-weight:700">N/A</span>':cur+`<span class="tc-max">/${max}</span>`}</div>
+    ${sparkline(vals, max)}
+  </div>`;
+}
+function buildTrendSection(name, series){
+  // series: TREND_WEEKS entries (oldest→current), each a scores object or null
+  const pick=(k)=>series.map(s=>s ? s[k] : null);
+  const dprNA = DPR_NA_MEMBERS.indexOf(name) > -1;
+  return trendCard('Output',pick('s_output'),50)
+    + (dprNA ? trendCard('DPR',series.map(()=>null),15) : trendCard('DPR',pick('s_dpr'),15))
+    + trendCard('Punctuality',pick('s_punct'),15)
+    + trendCard('Hours',pick('s_hrs'),10)
+    + trendCard('Reliability',pick('s_reliability'),10)
+    + trendCard('Total',pick('total'),100);
+}
+
+// Fills in every page's placeholder trend-wrap once historical weeks are
+// fetched — runs after the main report is already visible so a slow trend
+// fetch (4 historical weeks × whole team, over the network) never blocks
+// the base report, which is already fully correct and printable on its own.
+async function loadTrends(currentScMap){
+  const weeks = trendWeekStarts();          // 5 asc, last = WEEK_START (current)
+  const priorWeeks = weeks.slice(0, -1);    // 4 historical weeks to fetch
+  const priorScores = await Promise.all(priorWeeks.map(computeWeekScores));
+  const allNames = Object.keys(ROLES).concat(['Deepak Soni','Aman Raghuwanshi']);
+  allNames.forEach(name=>{
+    const series = priorScores.map(w=>w[name]||null).concat([currentScMap[name]||null]);
+    const el = document.getElementById(trendId(name));
+    if (el) el.innerHTML = buildTrendSection(name, series);
+  });
 }
 
 // ── Colour helpers ────────────────────────────────────────
@@ -398,7 +546,15 @@ function attLabel(d){if(d.s==='L')return'Leave';if(d.s==='A')return'Absent';if(d
 function hdr(){return `<div class="rh"><div class="rh-logo"><img src="data:image/jpeg;base64,${LOGO_B64}" alt="Ideaform Design Studio"></div><div class="rh-meta"><div class="rh-title">Weekly Performance Report</div><div class="rh-week">${WEEK_LABEL}</div><div class="rh-gen">Week of ${WEEK_LABEL} · Ideaform Design Studio · Confidential</div></div></div>`;}
 
 // ── Score card ─────────────────────────────────────────────
-function paramCard(label,val,max,detail){
+function paramCard(label,val,max,detail,na){
+  if (na) {
+    return `<div class="pc">
+      <div class="pc-lbl">${label}</div>
+      <div class="pc-val" style="color:#8A8378">N/A</div>
+      <div class="pc-det">${detail}</div>
+      <div class="pw"><div class="pb" style="width:0%;background:#B8B2A6"></div></div>
+    </div>`;
+  }
   const cl=gc(val,max), pc=gpc(val,max), col=sc(val,max);
   const pct=Math.round(val/max*100);
   return `<div class="pc ${cl}">
@@ -421,7 +577,7 @@ function buildOverviewPage(team){
       <td><span class="rk ${rkc}">${i+1}</span></td>
       <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div></td>
+      <td>${s.dprNA ? `<div class="sv" style="color:#8A8378">N/A</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div>`}</td>
       <td><div class="sv" style="color:${sc(s.s_punct,15)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/15*100))}%;background:${sc(s.s_punct,15)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_hrs,10)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/10*100))}%;background:${sc(s.s_hrs,10)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_reliability,10)}">${s.s_reliability}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_reliability/10*100))}%;background:${sc(s.s_reliability,10)}"></div></div></td>
@@ -578,7 +734,7 @@ function buildIndividualPage(m, taskData){
     threshold: m.name==='Achal Rathore' ? '10:40' : '09:10',
     avgHrsDecimal: bio.avgHrs ? (function(){ const p=bio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null,
     avgHrsLabel: bio.avgHrs,
-    dprDays: s.dprDays, dprDen: s.dprDen,
+    dprDays: s.dprNA ? null : s.dprDays, dprDen: s.dprNA ? null : s.dprDen,
     output: {pts: s.approvedPts, tgt: s.tgt},
   };
   const improve=buildRecommendation(m.name, teamFacts)
@@ -615,7 +771,7 @@ function buildIndividualPage(m, taskData){
     {v:`${taskData.assignedPts||0}`,      lbl:'Assigned<br>Points'},
     {v:`${s.completedOT}`,               lbl:'Done<br>On Time',   c:'#1B5E20'},
     {v:`${s.completedL}`,                lbl:'Done<br>Late',      c:'#8A6408'},
-    {v:`${s.dprDays}/${WEEK_DAYS}`,      lbl:'DPR<br>Days Filed'},
+    {v: s.dprNA ? 'N/A' : `${s.dprDays}/${WEEK_DAYS}`, lbl:'DPR<br>Days Filed'},
     {v:`${bio.days||0}/${WEEK_DAYS}`,    lbl:'Days<br>Present'},
     {v:`${bio.lateCount||0}`,            lbl:'Late<br>Arrivals',  c:(bio.lateCount||0)>0?'#8A6408':'#1B5E20'},
   ].map(x=>`<div class="stat-chip"><div class="stat-val" style="color:${x.c||'#2B2620'}">${x.v}</div><div class="stat-lbl">${x.lbl}</div></div>`).join('');
@@ -645,16 +801,20 @@ function buildIndividualPage(m, taskData){
       </div>
     </div>
 
-    <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
+    <div class="section-title" style="margin-bottom:1.5mm">Score Breakdown</div>
     <div class="pg">
       ${paramCard('Output<br>Approved Pts',s.s_output,50,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
-      ${paramCard('DPR<br>Consistency',s.s_dpr,15,`${s.dprDays} of ${s.dprDen} working days filed`)}
+      ${paramCard('DPR<br>Consistency',s.s_dpr,15,s.dprNA?'Newly joined — not yet onboarded to DPR filing':`${s.dprDays} of ${s.dprDen} working days filed`,s.dprNA)}
       ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
       ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
       ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 170px;gap:4mm;margin-bottom:3mm;">
+    <div class="section-title" style="margin-bottom:0.5mm">5-Week Trend</div>
+    <div class="trend-sub">${trendRangeLabel()}</div>
+    <div class="trend-wrap" id="${trendId(m.name)}">${trendPlaceholder()}</div>
+
+    <div style="display:grid;grid-template-columns:1fr 145px;gap:3.5mm;margin-bottom:2mm;">
       <div>
         <div class="section-title">Daily Attendance — Biometric</div>
         <div class="ag">${attGrid}</div>
@@ -712,22 +872,22 @@ function buildDeepakPage(d){
 
   // Per-project table rows
   const projRows=d.perProject.map(p=>`<tr style="border-bottom:1px solid rgba(43,38,32,0.04)">
-    <td style="font-size:12px;font-weight:600;padding:6px 8px">${p.project}</td>
-    <td style="text-align:center;padding:6px 8px"><span style="color:${p.visited?'#1B5E20':'#C0392B'};font-weight:700;font-size:14px">${p.visited?'✓':'✗'}</span></td>
-    <td style="text-align:center;padding:6px 8px"><span style="color:${p.clientUpdated?'#1B5E20':'#C0392B'};font-weight:700;font-size:14px">${p.clientUpdated?'✓':'✗'}</span></td>
-    <td style="text-align:center;padding:6px 8px;font-size:12px;color:rgba(43,38,32,0.85)">${p.dperDays}/6</td>
+    <td style="font-size:9.5px;font-weight:600;padding:3.5px 6px">${p.project}</td>
+    <td style="text-align:center;padding:3.5px 6px"><span style="color:${p.visited?'#1B5E20':'#C0392B'};font-weight:700;font-size:11px">${p.visited?'✓':'✗'}</span></td>
+    <td style="text-align:center;padding:3.5px 6px"><span style="color:${p.clientUpdated?'#1B5E20':'#C0392B'};font-weight:700;font-size:11px">${p.clientUpdated?'✓':'✗'}</span></td>
+    <td style="text-align:center;padding:3.5px 6px;font-size:9.5px;color:rgba(43,38,32,0.85)">${p.dperDays}/6</td>
   </tr>`).join('');
 
   // Task completion table rows
   const taskRows=d.taskDetails&&d.taskDetails.length
     ? d.taskDetails.map(t=>`<tr style="border-bottom:1px solid rgba(43,38,32,0.04)">
-        <td style="font-size:11.5px;padding:5px 8px;font-weight:600">${t.project}</td>
-        <td style="font-size:11px;padding:5px 8px;color:rgba(43,38,32,0.9)">${t.taskType}</td>
-        <td style="font-size:11px;padding:5px 8px;color:rgba(43,38,32,0.8)">${t.assignedTo==='Deepak Soni'?'Self':'→ '+t.assignedTo}</td>
-        <td style="text-align:center;padding:5px 8px;font-size:11px">${t.assignedDt}</td>
-        <td style="text-align:center;padding:5px 8px;font-size:11px;color:#1B5E20">✓ Done ${t.doneDate}</td>
+        <td style="font-size:9.3px;padding:3.5px 6px;font-weight:600">${t.project}</td>
+        <td style="font-size:9px;padding:3.5px 6px;color:rgba(43,38,32,0.9)">${t.taskType}</td>
+        <td style="font-size:9px;padding:3.5px 6px;color:rgba(43,38,32,0.8)">${t.assignedTo==='Deepak Soni'?'Self':'→ '+t.assignedTo}</td>
+        <td style="text-align:center;padding:3.5px 6px;font-size:9px">${t.assignedDt}</td>
+        <td style="text-align:center;padding:3.5px 6px;font-size:9px;color:#1B5E20">✓ Done ${t.doneDate}</td>
       </tr>`).join('')
-    : `<tr><td colspan="5" style="padding:10px 8px;font-size:11.5px;color:rgba(43,38,32,0.72);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week — Task Completion scored from this week\'s Site Visits/Client Comm instead':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
+    : `<tr><td colspan="5" style="padding:7px 6px;font-size:9.5px;color:rgba(43,38,32,0.72);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week — Task Completion scored from this week\'s Site Visits/Client Comm instead':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
 
   return `<div class="page">
     ${hdr()}
@@ -752,7 +912,7 @@ function buildDeepakPage(d){
       </div>
     </div>
 
-    <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
+    <div class="section-title" style="margin-bottom:1.5mm">Score Breakdown</div>
     <div class="pg">
       ${pCard('Site Visits',s.s_visit,20,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
       ${pCard('Client Comm',s.s_client,10,`${d.clientCount} of ${d.totalSites} projects updated`)}
@@ -763,40 +923,44 @@ function buildDeepakPage(d){
       ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done, −5 per unexplained absence. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done${d.unexplainedAbsences?', '+d.unexplainedAbsences+' unexplained absence'+(d.unexplainedAbsences>1?'s':''):''}. <b>To improve:</b> set realistic target dates, close site tasks on time, and inform in advance if you'll be absent.`)}
     </div>
 
-    <div style="margin-top:4mm">
-      <div class="section-title" style="margin-bottom:2mm">Daily Attendance — Biometric</div>
+    <div class="section-title" style="margin-bottom:0.5mm">5-Week Trend</div>
+    <div class="trend-sub">${trendRangeLabel()}</div>
+    <div class="trend-wrap" id="${trendId('Deepak Soni')}">${trendPlaceholder()}</div>
+
+    <div style="margin-top:2mm">
+      <div class="section-title" style="margin-bottom:1.5mm">Daily Attendance — Biometric</div>
       <div class="ag">${dAttGrid}</div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3.5mm;margin-top:2.5mm">
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Site Visit & Client Update — Per Project</div>
+        <div class="section-title" style="margin-bottom:1.5mm">Site Visit & Client Update — Per Project</div>
         <table style="width:100%;border-collapse:collapse">
           <thead><tr style="background:rgba(245,166,35,0.12)">
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Visited</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Client</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">DPER</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Visited</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Client</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">DPER</th>
           </tr></thead>
           <tbody>${projRows}</tbody>
         </table>
       </div>
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Task Completion — Due This Week</div>
+        <div class="section-title" style="margin-bottom:1.5mm">Task Completion — Due This Week</div>
         <table style="width:100%;border-collapse:collapse">
           <thead><tr style="background:rgba(245,166,35,0.12)">
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Task</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Who</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Assigned</th>
-            <th style="padding:5px 8px;font-size:10px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Completed</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Project</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:left">Task</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Who</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Assigned</th>
+            <th style="padding:3.5px 6px;font-size:8.5px;font-weight:700;color:#A8540C;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid rgba(245,166,35,0.25);text-align:center">Completed</th>
           </tr></thead>
           <tbody>${taskRows}</tbody>
         </table>
       </div>
     </div>
 
-    <div class="ib" style="margin-top:4mm">
+    <div class="ib" style="margin-top:2.5mm">
       <div class="ib-title">How to improve</div>
       ${buildRecommendation('Deepak Soni', {
         absences: d.unexplainedAbsences||0,
@@ -879,7 +1043,7 @@ function buildAmanPage(d){
       </div>
     </div>
 
-    <div class="section-title" style="margin-bottom:2mm">Score Breakdown</div>
+    <div class="section-title" style="margin-bottom:1.5mm">Score Breakdown</div>
     <div class="pg">
       ${pCard('Client Connections<br>(ongoing projects)',s.output,50,`${d.connectedCount} of ${d.totalOngoing} ongoing projects connected this week`)}
       ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of ${d.dprDen} working days · ≥1 CRM report/day`)}
@@ -888,33 +1052,37 @@ function buildAmanPage(d){
       ${pCard('Reliability<br>Lead SLA',s.s_reliability,10,`Starts at 10 → −1 per new lead not contacted within 24 h. This week: ${d.leadSlaMissed||0} of ${d.leadsThisWeek||0} missed. <b>To improve:</b> contact every new lead within 24 hours.`)}
     </div>
 
-    <div style="margin-top:4mm">
-      <div class="section-title" style="margin-bottom:2mm">Daily Attendance — Biometric</div>
+    <div class="section-title" style="margin-bottom:0.5mm">5-Week Trend</div>
+    <div class="trend-sub">${trendRangeLabel()}</div>
+    <div class="trend-wrap" id="${trendId('Aman Raghuwanshi')}">${trendPlaceholder()}</div>
+
+    <div style="margin-top:2mm">
+      <div class="section-title" style="margin-bottom:1.5mm">Daily Attendance — Biometric</div>
       <div class="ag">${aAttGrid}</div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:4mm;margin-top:4mm">
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:3.5mm;margin-top:2.5mm">
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Client Connections — Ongoing Projects (${d.connectedCount}/${d.totalOngoing})</div>
-        <div style="font-size:13px;line-height:1.7;color:rgba(43,38,32,0.94)">
-          <b style="color:#1B5E20">Connected (${connList.length}):</b> ${connList.length ? connList.join(', ') : '—'}<br><br>
+        <div class="section-title" style="margin-bottom:1.5mm">Client Connections — Ongoing Projects (${d.connectedCount}/${d.totalOngoing})</div>
+        <div style="font-size:10px;line-height:1.5;color:rgba(43,38,32,0.94)">
+          <b style="color:#1B5E20">Connected (${connList.length}):</b> ${connList.length ? connList.join(', ') : '—'}<br>
           <b style="color:#C0392B">Not connected (${notConnList.length}):</b> ${notConnList.length ? notConnList.join(', ') : 'all ongoing projects connected ✓'}
         </div>
       </div>
       <div>
-        <div class="section-title" style="margin-bottom:2mm">Weekly Activity</div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">🏗️ Site Visits Done</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.visitsDone||0}</td></tr>
-          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">👥 Meetings Done</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.meetingsDone||0}</td></tr>
-          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">Clients Connected</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.connectedCount} / ${d.totalOngoing}</td></tr>
-          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">Open Leads Worked</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadWorked} / ${d.leadBase}</td></tr>
-          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">Collection Rate</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#1B5E20">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(43,38,32,0.75);font-weight:400"> · of all billed</span></td></tr>
-          <tr><td style="padding:7px 8px;color:rgba(43,38,32,0.9)">New Leads</td><td style="padding:7px 8px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
+        <div class="section-title" style="margin-bottom:1.5mm">Weekly Activity</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:4px 6px;color:rgba(43,38,32,0.9)">🏗️ Site Visits Done</td><td style="padding:4px 6px;text-align:right;font-weight:700">${d.visitsDone||0}</td></tr>
+          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:4px 6px;color:rgba(43,38,32,0.9)">👥 Meetings Done</td><td style="padding:4px 6px;text-align:right;font-weight:700">${d.meetingsDone||0}</td></tr>
+          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:4px 6px;color:rgba(43,38,32,0.9)">Clients Connected</td><td style="padding:4px 6px;text-align:right;font-weight:700">${d.connectedCount} / ${d.totalOngoing}</td></tr>
+          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:4px 6px;color:rgba(43,38,32,0.9)">Open Leads Worked</td><td style="padding:4px 6px;text-align:right;font-weight:700">${d.leadWorked} / ${d.leadBase}</td></tr>
+          <tr style="border-bottom:1px solid rgba(43,38,32,0.06)"><td style="padding:4px 6px;color:rgba(43,38,32,0.9)">Collection Rate</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:#1B5E20">${d.collectionPct===null?'—':d.collectionPct+'%'}<span style="color:rgba(43,38,32,0.75);font-weight:400"> · of all billed</span></td></tr>
+          <tr><td style="padding:4px 6px;color:rgba(43,38,32,0.9)">New Leads</td><td style="padding:4px 6px;text-align:right;font-weight:700">${d.leadsThisWeek} (${d.leads24} in 24h)</td></tr>
         </table>
       </div>
     </div>
 
-    <div class="ib" style="margin-top:4mm">
+    <div class="ib" style="margin-top:2.5mm">
       <div class="ib-title">How to improve</div>
       ${buildRecommendation('Aman Raghuwanshi', {
         absences: Math.max(0, WEEK_DAYS - (aBio.days!=null?aBio.days:WEEK_DAYS) - leaveCount(aBio)),
@@ -1029,12 +1197,18 @@ async function loadAndRender(){
 
   const sorted = [...team].sort((a,b)=>b._sc.total-a._sc.total);
   let outHtml = buildOverviewPage(sorted);
+  const currentScMap = {};
   sorted.forEach(m => {
+    currentScMap[m.name] = m._sc;
     outHtml += m._isDeepak ? buildDeepakPage(m._deepakData)
              : m._isAman   ? buildAmanPage(m._amanData)
              : buildIndividualPage(m, m._taskData);
   });
   app.innerHTML = outHtml;
+
+  // Trend charts fetch 4 historical weeks in the background — never block
+  // the base report (which is already fully correct and printable) on them.
+  loadTrends(currentScMap).catch(e => console.warn('Trend load failed:', e));
 }
 
 // ── Week nav (topbar) ────────────────────────────────────────
