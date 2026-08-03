@@ -404,11 +404,10 @@ function scoreCalc(m, taskData, bioOverride) {
   // Reliability /10 — 10 minus delay penalties (−1 late, −2 reassigned)
   const s_reliability = Math.max(0, Math.round((10 - (taskData.reliabilityPenalty || 0)) * 10) / 10);
 
-  // When DPR is N/A, drop it from both the sum and the max, then rescale
-  // back to /100 so an unfileable metric doesn't cap the total at 85.
-  const rawSum = s_output + (dprNA?0:s_dpr) + s_punct + s_hrs + s_reliability;
-  const activeMax = 100 - (dprNA?15:0);
-  const total = Math.round((rawSum / activeMax * 100) * 10) / 10;
+  // A just-joined member (dprNA) gets no Total at all — not a rescaled
+  // number, not a ranked score. There isn't enough of a track record yet
+  // to fold into one figure, so it's left blank rather than guessed at.
+  const total = dprNA ? null : Math.round((s_output + s_dpr + s_punct + s_hrs + s_reliability) * 10) / 10;
 
   return {s_output, s_dpr, s_punct, s_hrs, s_reliability, dprNA,
           reliabilityPenalty: taskData.reliabilityPenalty||0, lateCount: taskData.lateCount||0, workNotDone: taskData.workNotDone||0,
@@ -558,7 +557,11 @@ function gc(v,m){const p=v/m;return p>=.85?'g':p>=.70?'a':p>=.50?'o':'r';}
 function gpc(v,m){const p=v/m;return p>=.85?'pb-g':p>=.70?'pb-a':p>=.50?'pb-o':'pb-r';}
 function chip(t){return t>=85?'c-ex':t>=70?'c-go':t>=50?'c-av':'c-lo';}
 function chipLabel(t){return t>=85?'Excellent':t>=70?'Good':t>=50?'Average':'Needs Work';}
-function statusChip(s){ if(s && s.presentDays===0) return '<span class="chip" style="background:rgba(43,38,32,0.12);color:rgba(43,38,32,0.85)">Absent</span>'; return '<span class="chip '+chip(s.total)+'">'+chipLabel(s.total)+'</span>'; }
+function statusChip(s){
+  if (s && s.total==null) return '<span class="chip" style="background:rgba(245,166,35,0.15);color:#A8540C">New</span>';
+  if (s && s.presentDays===0) return '<span class="chip" style="background:rgba(43,38,32,0.12);color:rgba(43,38,32,0.85)">Absent</span>';
+  return '<span class="chip '+chip(s.total)+'">'+chipLabel(s.total)+'</span>';
+}
 
 function attClass(d){if(d.s==='L'||d.s==='A')return'aa';if(d.s==='H')return'ah';if(d.l)return'al';if(d.s==='HD')return'ah';return'ap';}
 function attColor(d){if(d.s==='L')return'#5A6067';if(d.s==='A')return'#C0392B';if(d.s==='H')return'#A8540C';if(d.l)return'#8A6408';if(d.s==='HD')return'#A8540C';return'#1B5E20';}
@@ -589,11 +592,17 @@ function paramCard(label,val,max,detail,na){
 
 // ── Overview page ──────────────────────────────────────────
 function buildOverviewPage(team){
-  const sorted = [...team].sort((a,b)=>b._sc.total-a._sc.total);
+  // A member with no Total (just joined, dprNA) always sorts to the bottom
+  // rather than being compared numerically against a real score.
+  const sorted = [...team].sort((a,b)=>{
+    if (a._sc.total==null) return 1;
+    if (b._sc.total==null) return -1;
+    return b._sc.total-a._sc.total;
+  });
   let rows='';
   sorted.forEach((m,i)=>{
     const s=m._sc;
-    const col=sc(s.total,100);
+    const col=s.total==null?'#A8540C':sc(s.total,100);
     const rkc=i===0?'rk1':i===1?'rk2':i===2?'rk3':'rkx';
     rows+=`<tr>
       <td><span class="rk ${rkc}">${i+1}</span></td>
@@ -603,7 +612,7 @@ function buildOverviewPage(team){
       <td><div class="sv" style="color:${sc(s.s_punct,15)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/15*100))}%;background:${sc(s.s_punct,15)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_hrs,10)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/10*100))}%;background:${sc(s.s_hrs,10)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_reliability,10)}">${s.s_reliability}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_reliability/10*100))}%;background:${sc(s.s_reliability,10)}"></div></div></td>
-      <td><div class="sv" style="color:${col};font-size:23px;" contenteditable="true">${s.total}</div></td>
+      <td>${s.total==null ? `<div class="sv" style="color:#A8540C;font-size:16px;">N/A</div>` : `<div class="sv" style="color:${col};font-size:23px;" contenteditable="true">${s.total}</div>`}</td>
       <td>${statusChip(s)}</td>
     </tr>`;
   });
@@ -744,7 +753,7 @@ function buildRecommendation(name, facts){
 }
 function buildIndividualPage(m, taskData){
   const s=m._sc, bio=BIO[m.name]||{}, tgt=TARGETS[m.name]||48;
-  const col=sc(s.total,100);
+  const col=s.total==null?'#A8540C':sc(s.total,100);
   const bs=(taskData&&taskData.blockStats)||{};
   const blkLine = bs.raised ? `<br><b>Blocks:</b> ${bs.raised} raised · ${bs.approved||0} approved · ${bs.rejected||0} rejected${bs.pending?' · '+bs.pending+' pending':''}` : '';
 
@@ -818,7 +827,7 @@ function buildIndividualPage(m, taskData){
       </div>
       <div class="score-box">
         <div class="sc-lbl">Overall Score</div>
-        <div class="sc-num" style="color:${col}" contenteditable="true">${s.total}<span class="sc-den">/100</span></div>
+        <div class="sc-num" style="color:${col}" contenteditable="true">${s.total==null?'N/A':s.total}${s.total==null?'':'<span class="sc-den">/100</span>'}</div>
         <div style="margin-top:6px">${statusChip(s)}</div>
       </div>
     </div>
@@ -859,10 +868,10 @@ function buildIndividualPage(m, taskData){
       </table>
     </div>
 
-    <div class="trend-foot">
+    ${s.dprNA ? '' : `<div class="trend-foot">
       <div class="trend-foot-hdr"><span>5-Week Trend</span><span class="trend-sub">${trendRangeLabel()}</span></div>
       <div class="trend-wrap" id="${trendId(m.name)}">${trendPlaceholder()}</div>
-    </div>
+    </div>`}
   </div>`;
 }
 
