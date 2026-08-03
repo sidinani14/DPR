@@ -409,7 +409,7 @@ function scoreCalc(m, taskData, bioOverride) {
 
 // ── 5-Week Trend (small multiples on individual pages) ──────────────────
 const TREND_WEEKS = 5;
-function trendDateStr(d){ return d.toISOString().slice(0,10); }
+function trendDateStr(d){ return dateStr(d); }
 function trendWeekStarts(){
   // Ascending oldest→current; "current" is always the page's selected week
   // (WEEK_START), so this naturally shows "the 5 weeks touching July" when
