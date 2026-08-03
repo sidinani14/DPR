@@ -5087,16 +5087,19 @@ function getWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
-  // Completed/approved work counts a few days past Saturday, so tasks done
-  // in the week but approved a day or two later (after Saturday) still
-  // count — but capped at a small grace window, NOT open-ended to "today".
-  // Extending all the way to today broke any WEEKS-old historical query
-  // (e.g. the weekly report's 5-week trend): a week from a month ago would
-  // sum every approval between then and now into that one week's Output,
-  // inflating it far past reality. Punctuality/hours stay on the Mon–Sat window.
-  var today    = dateStr();
-  var graceEnd = addDaysToStr(sat, 3);
-  var doneUpper = (today <= sat) ? sat : (today < graceEnd ? today : graceEnd);
+  // doneUpper only extends past Saturday for the CURRENTLY live week (so a
+  // task actually done Fri/Sat but not marked LeadApproved until the
+  // following Monday still counts while you're looking at this week live).
+  // A genuinely historical week (mon !== this week's Monday) stays strictly
+  // bounded to its own Saturday — extending it, even by a couple of days,
+  // pulls doneDates that actually belong to the FOLLOWING week (Sun/Mon/Tue)
+  // into this one, since done-date is what's filtered here, not an approval
+  // timestamp. This broke the weekly report's 5-week trend, which queries
+  // weeks that ended a month ago: without this bound, every later approval
+  // right up through today was miscounted into that old week's Output.
+  var today      = dateStr();
+  var currentMon = dateStr(mondayOf(new Date()));
+  var doneUpper  = (mon === currentMon && today > sat) ? today : sat;
 
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
@@ -6703,12 +6706,12 @@ function getDeepakWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
-  // Same bounded grace-period fix as getWeeklyStats — a couple of days past
-  // Saturday for late approvals, never open-ended to "today" (which would
-  // pull weeks of later completions into an old historical week's total).
-  var today0    = dateStr();
-  var graceEnd0 = addDaysToStr(sat, 3);
-  var doneUpper0 = (today0 <= sat) ? sat : (today0 < graceEnd0 ? today0 : graceEnd0);
+  // Same fix as getWeeklyStats: only extend past Saturday for the
+  // currently-live week; a historical week stays strictly bounded to its
+  // own Saturday, or its done-dates bleed into the following week's.
+  var today0     = dateStr();
+  var currentMon0 = dateStr(mondayOf(new Date()));
+  var doneUpper0  = (mon === currentMon0 && today0 > sat) ? today0 : sat;
 
   // ── 1. Read active projects from CONFIG tab ───────────────
   // Scans ALL columns for the "DEEPAK ACTIVE PROJECTS" header (it lives in
