@@ -848,7 +848,26 @@ function renderMyTasks(){
     return `<div class="mt-card" id="mt-${i}">
       <div class="mt-type">${esc(t.taskType)}${t.revisionTag?' 🔴 '+esc(t.revisionTag):''}</div>
       <div class="mt-sub">${esc(t.project)}${desc(t)?' · '+esc(desc(t)):''}</div>
-      <div class="mt-meta"><span class="${overdue?'mt-overdue':''}">Due ${t.targetDate||'—'}${overdue?' ⚠':''}</span> · ${t.weightedPts||0} pts</div>
+      <div class="mt-meta"><span class="${overdue?'mt-overdue':''}">Due ${t.targetDate||'—'}${overdue?' ⚠':''}</span> · Units: ${t.units||1} · ${t.weightedPts||0} pts</div>
+      <div style="margin:6px 0">
+        <a href="javascript:void(0)" onclick="toggleMtEdit(${i},this)" style="font-size:11px;color:var(--accent);text-decoration:none">✎ Task changed? Edit units / drawing / notes</a>
+      </div>
+      <div id="mt-edit-${i}" style="display:none;margin-bottom:8px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="field" style="margin-bottom:0">
+            <div class="lbl">Units</div>
+            <input type="number" class="mt-units-${i}" value="${t.units||1}" min="0.5" step="0.5">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <div class="lbl">Drawing / Type</div>
+            <input type="text" class="mt-drawing-${i}" value="${esc(t.drawing||'')}" placeholder="e.g. Floor Plan v2">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <div class="lbl">Notes (optional)</div>
+          <textarea class="mt-gnote-${i}" placeholder="What changed and why, if relevant" style="min-height:38px"></textarea>
+        </div>
+      </div>
       <div class="mt-status">
         <label><input type="radio" name="mt-r-${i}" value="Not Started" ${cur==='Not Started'?'checked':''}><span class="mt-btn">Not started</span></label>
         <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''}><span class="mt-btn ip">In progress</span></label>
@@ -869,13 +888,28 @@ function renderMyTasks(){
     <div style="font-size:11px;color:#C8863A;font-weight:600;margin-top:4px">⏳ Awaiting approval — no action needed</div></div>`).join('');
   panel.innerHTML = openHtml + pendHtml;
 }
+function toggleMtEdit(i, link){
+  const box = document.getElementById('mt-edit-'+i);
+  if (!box) return;
+  const open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : 'block';
+  if (link) link.textContent = open ? '✎ Task changed? Edit units / drawing / notes' : '✎ Hide edit fields';
+}
 function collectTaskStatuses(){
   const today=new Date().toISOString().substring(0,10);
-  return myTasks.map((t,i)=>({
-    member:crmUser, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
-    status:document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started',
-    actualCompletionDate:today
-  })).filter(s=>s.status!=='Not Started');
+  return myTasks.map((t,i)=>{
+    const units = parseFloat(document.querySelector(`.mt-units-${i}`)?.value) || null;
+    const newDrawing = document.querySelector(`.mt-drawing-${i}`)?.value.trim() || '';
+    const note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
+    return {
+      member:crmUser, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
+      status:document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started',
+      actualCompletionDate:today,
+      units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
+      newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',
+      note
+    };
+  }).filter(s=>s.status!=='Not Started' || s.units || s.newDrawing || s.note);
 }
 async function saveDelayReason(i){
   const ta=document.getElementById('mt-delay-'+i);
