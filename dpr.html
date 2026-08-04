@@ -831,6 +831,28 @@ function renderAssignedTasks() {
           <div class="atc-m">Pts: <span>${t.weightedPts}</span></div>
           <div class="atc-m">Priority: <span>${t.priority}</span></div>
         </div>
+        <div style="margin-top:6px">
+          <a href="javascript:void(0)" onclick="toggleTaskEdit(${i},this)" style="font-size:11px;color:var(--accent);text-decoration:none">✎ Task changed? Edit units / drawing / notes</a>
+        </div>
+        <div id="task-edit-${i}" style="display:none;margin-top:8px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div class="row2" style="margin-bottom:8px">
+            <div class="field" style="margin-bottom:0">
+              <div class="lbl">Units</div>
+              <input type="number" class="atc-units-${i}" value="${t.units||1}" min="0.5" step="0.5"
+                style="font-size:13px;padding:7px 10px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <div class="lbl">Drawing / Type</div>
+              <input type="text" class="atc-drawing-${i}" value="${(t.drawing||'').replace(/"/g,'&quot;')}" placeholder="e.g. Floor Plan v2"
+                style="font-size:13px;padding:7px 10px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <div class="lbl">Notes (optional)</div>
+            <textarea class="atc-gnote-${i}" placeholder="What changed and why, if relevant"
+              style="font-size:12px;padding:7px 10px;width:100%;min-height:38px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)"></textarea>
+          </div>
+        </div>
       </div>
       <div class="atc-status-row">
         <label class="atc-opt"><input type="radio" name="atc-${i}" value="Not Started" ${defaultStatus==='Not Started'?'checked':''} onchange="toggleDoneDate(${i},this)"><span class="atc-btn ns">Not Started</span></label>
@@ -869,6 +891,14 @@ function renderAssignedTasks() {
     </div>`;
   }).join('');
   document.getElementById('assigned-tasks-list').innerHTML += taskCards;
+}
+
+function toggleTaskEdit(i, link){
+  const box = document.getElementById('task-edit-'+i);
+  if (!box) return;
+  const open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : 'block';
+  if (link) link.textContent = open ? '✎ Task changed? Edit units / drawing / notes' : '✎ Hide edit fields';
 }
 
 async function saveDelayReason(i){
@@ -1236,14 +1266,21 @@ function updateSubmitBar() {
 
 function collectData() {
   const member=googleUser?googleUser.name:(document.getElementById('member-name')?.value||'');
-  const assignedStatuses=assignedTasks.map((t,i)=>({
-    row:t.row, member:member, taskType:t.taskType, project:t.project,
-    area:t.area||'', drawing:t.drawing||'',
-    status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
-    note:document.querySelector(`.atc-note-${i}`)?.value.trim()||'',
-    actualCompletionDate:document.querySelector(`.atc-done-date-${i}`)?.value||'',
-    visitHours:parseFloat(document.querySelector(`.atc-visit-hrs-${i}`)?.value)||null,
-  }));
+  const assignedStatuses=assignedTasks.map((t,i)=>{
+    const blockNote = document.querySelector(`.atc-note-${i}`)?.value.trim()||'';
+    const genNote   = document.querySelector(`.atc-gnote-${i}`)?.value.trim()||'';
+    return {
+      row:t.row, member:member, taskType:t.taskType, project:t.project,
+      area:t.area||'', drawing:t.drawing||'',   // original values — used to match the row, unchanged
+      status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
+      note: blockNote || genNote,
+      actualCompletionDate:document.querySelector(`.atc-done-date-${i}`)?.value||'',
+      visitHours:parseFloat(document.querySelector(`.atc-visit-hrs-${i}`)?.value)||null,
+      // Corrections — only sent if the task's actual scope changed from what was assigned
+      units: parseFloat(document.querySelector(`.atc-units-${i}`)?.value) || null,
+      newDrawing: document.querySelector(`.atc-drawing-${i}`)?.value.trim() || '',
+    };
+  });
 
   const data={
     'Timestamp'         : new Date().toISOString(),

@@ -1425,7 +1425,11 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
     if      (a.status === 'Done')    newStatus = 'Done';
     else if (a.status === 'Ongoing') newStatus = 'In Progress';
     else if (a.status === 'Blocked') newStatus = 'Blocked';
-    else return; // Not Started — no change needed
+    // 'Not Started' (or unrecognized) leaves newStatus blank — a corrected
+    // units/drawing/note can still be saved even when the status itself
+    // hasn't changed: the assigned scope was wrong, not the progress.
+    var hasCorrection = (a.units && a.units > 0) || (a.newDrawing && a.newDrawing.trim()) || (a.note && a.note.trim());
+    if (!newStatus && !hasCorrection) return;
 
     for (var i = 1; i < rows.length; i++) {
       var rM = String(rows[i][3]  || '').trim(); // D AssignedTo
@@ -1441,6 +1445,29 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
                   rS !== 'Done';
 
       if (match) {
+        var taskType = rT; // E
+
+        // ── Corrections: the assigned scope was slightly off (unit count,
+        // drawing/type) — editable independent of status, since catching
+        // this shouldn't require re-marking progress. Units recompute
+        // WeightedPts the same way assignment does (basePts × mult × units);
+        // skipped for visit tasks, whose points come from hours × rate instead.
+        if (a.units && a.units > 0 && !isVisitTask(taskType)) {
+          var curUnits = parseFloat(rows[i][7]) || 1; // H
+          if (Math.abs(a.units - curUnits) > 0.001) {
+            var basePts     = parseFloat(rows[i][6]) || 0; // G
+            var mult        = parseFloat(rows[i][5]) || 1; // F
+            var newWeighted = Math.round(basePts * mult * a.units * 10) / 10;
+            sheet.getRange(i+1, 8).setValue(a.units);     // H Units
+            sheet.getRange(i+1, 9).setValue(newWeighted); // I WeightedPts
+            Logger.log('Units corrected: '+a.member+' / '+a.taskType+' '+curUnits+' -> '+a.units+' ('+newWeighted+'pts)');
+          }
+        }
+        if (a.newDrawing && a.newDrawing.trim() && a.newDrawing.trim() !== rD) {
+          sheet.getRange(i+1, 13).setValue(a.newDrawing.trim()); // M DrawingName
+          Logger.log('Drawing corrected: '+a.member+' / '+a.taskType+' -> '+a.newDrawing.trim());
+        }
+
         // ── Block raised: snapshot prior state + log it (don't re-snapshot if already pending) ──
         if (newStatus === 'Blocked' && String(rows[i][COL_BLK_DISPO-1]||'').trim() !== 'Pending') {
           ensureCols(sheet, COL_BLK_DISPO);
@@ -1451,25 +1478,27 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
           sheet.getRange(i+1, COL_BLK_DISPO ).setValue('Pending');
           logBlockRaised(String(rows[i][0]||''), i+1, a.member, a.project, a.taskType, now, a.note||'', priorStatus, origDeadline);
         }
-        sheet.getRange(i+1, 14).setValue(newStatus); // N SelfStatus
-        sheet.getRange(i+1, 15).setValue(now);       // O SelfStatusDate always
 
-        if (newStatus === 'Done') {
-          // P ActualCompletionDate
-          var actualDate = a.actualCompletionDate || now;
-          sheet.getRange(i+1, 16).setValue(actualDate);
-          // Re-enter the approval queue (clears a prior rejection so redone work
-          // returns to 'Approval Pending' instead of staying rejected)
-          sheet.getRange(i+1, 17).setValue('Pending'); // Q LeadApproved
+        if (newStatus) {
+          sheet.getRange(i+1, 14).setValue(newStatus); // N SelfStatus
+          sheet.getRange(i+1, 15).setValue(now);       // O SelfStatusDate always
 
-          // If visit/meeting task — overwrite WeightedPoints (col I) with hours-based pts
-          var taskType = String(rows[i][4]||'').trim(); // E
-          if (isVisitTask(taskType) && a.visitHours) {
-            var visitPts = calcVisitPts(taskType, a.visitHours);
-            if (visitPts > 0) {
-              sheet.getRange(i+1, 9).setValue(visitPts);  // I WeightedPoints
-              sheet.getRange(i+1, 7).setValue(a.visitHours); // G StageBasePts = hours
-              Logger.log('Visit pts updated: ' + taskType + ' ' + a.visitHours + 'h = ' + visitPts + 'pts');
+          if (newStatus === 'Done') {
+            // P ActualCompletionDate
+            var actualDate = a.actualCompletionDate || now;
+            sheet.getRange(i+1, 16).setValue(actualDate);
+            // Re-enter the approval queue (clears a prior rejection so redone work
+            // returns to 'Approval Pending' instead of staying rejected)
+            sheet.getRange(i+1, 17).setValue('Pending'); // Q LeadApproved
+
+            // If visit/meeting task — overwrite WeightedPoints (col I) with hours-based pts
+            if (isVisitTask(taskType) && a.visitHours) {
+              var visitPts = calcVisitPts(taskType, a.visitHours);
+              if (visitPts > 0) {
+                sheet.getRange(i+1, 9).setValue(visitPts);  // I WeightedPoints
+                sheet.getRange(i+1, 7).setValue(a.visitHours); // G StageBasePts = hours
+                Logger.log('Visit pts updated: ' + taskType + ' ' + a.visitHours + 'h = ' + visitPts + 'pts');
+              }
             }
           }
         }
@@ -1480,7 +1509,7 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
           var newNote   = now + ': ' + a.note;
           sheet.getRange(i+1, 21).setValue(existNote ? existNote + ' | ' + newNote : newNote);
         }
-        Logger.log('Status updated: ' + a.member + ' / ' + a.taskType + ' → ' + newStatus);
+        Logger.log('Task updated: ' + a.member + ' / ' + a.taskType + (newStatus ? (' -> ' + newStatus) : ' (correction only)'));
         break;
       }
     }
