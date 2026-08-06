@@ -745,6 +745,7 @@ function doGet(e) {
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
+  if (action === 'getFeedbackAnalytics')     return safeRespond(function(){ return getFeedbackAnalytics(p.month||''); });
   if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
   if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
   if (action === 'getBillRequests')          return safeRespond(getBillRequests);
@@ -801,6 +802,7 @@ function doPost(e) {
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
+    if (data.action === 'getFeedbackAnalytics')   return respond(getFeedbackAnalytics(data.month||''));
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
     if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
@@ -1278,9 +1280,15 @@ function getAllTasks() {
         // When was it done? Prefer actual completion, then self-done date, then
         // approval date. If NONE is recorded, treat it as an old task (Hidden) —
         // never default to today, or every dateless approved task shows forever.
-        var doneOn = (COL_ACTUALDATE > -1 ? cellDate(r[COL_ACTUALDATE]) : '') ||
-                     cellDate(r[COL_STATUSDATE]) ||
-                     cellDate(r[is23col ? 18 : 17]);   // S — approval date
+        // Some old rows have a non-ISO ActualCompletionDate (e.g. "Wed May 13" —
+        // a stringified JS Date from a since-removed code path). String-compared
+        // against "YYYY-MM-DD", that garbage sorts AFTER any real recent date
+        // (letters > digits), so those tasks looked freshly completed forever.
+        // Only trust a value that's actually YYYY-MM-DD; otherwise fall through.
+        var validIso = function(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+        var doneOn = validIso(COL_ACTUALDATE > -1 ? cellDate(r[COL_ACTUALDATE]) : '') ||
+                     validIso(cellDate(r[COL_STATUSDATE])) ||
+                     validIso(cellDate(r[is23col ? 18 : 17]));   // S — approval date
         status = (doneOn && doneOn >= monOfWeek) ? 'Completed' : 'Hidden';
       }
       else if (leadApproved === 'No')      status = 'Rejected';
@@ -7047,8 +7055,12 @@ function getAmanWeeklyStats(weekStart, member) {
   }
 
   // ── 2b. Client connections this week — CRM_LOG (Category = Client Connection) ──
+  // Also tallies 'Other Activity' rows (Vendor/TnCP/Site Issues/BNI coordination)
+  // this same week — logged just as often as client connections but previously
+  // scored nowhere at all.
   var connected = {};      // project lower → true
   var visitsDone = 0, meetingsDone = 0;  // derived from contact type
+  var otherActivityCount = 0;
   var logSheet = s.getSheetByName(CRM_LOG_TAB);
   if (logSheet && logSheet.getLastRow() > 1) {
     var cRows = logSheet.getDataRange().getValues();
@@ -7056,13 +7068,30 @@ function getAmanWeeklyStats(weekStart, member) {
       var cDate = cellDate(cRows[ci][2]);          // C Date
       var cMem  = String(cRows[ci][3]||'').trim().toLowerCase(); // D Member
       var cCat  = String(cRows[ci][4]||'').trim(); // E Category
-      if (cMem !== whoLC || cCat !== 'Client Connection') continue;
+      if (cMem !== whoLC) continue;
       if (!cDate || cDate < mon || cDate > sat) continue;
+      if (cCat === 'Other Activity') { otherActivityCount++; continue; }
+      if (cCat !== 'Client Connection') continue;
       var pr = String(cRows[ci][6]||'').trim();    // G Project
       if (pr) connected[pr.toLowerCase()] = true;
       var ty = String(cRows[ci][5]||'');           // F Type / Activity
       if (ty.indexOf('Site Visit') > -1)   visitsDone++;
       else if (ty.indexOf('Meeting') > -1) meetingsDone++;
+    }
+  }
+
+  // Design issues/deliverables Aman wrote up for the team this week — the other
+  // half of "coordination overhead" alongside Other Activity above.
+  var issuesAuthoredCount = 0;
+  var siSheet = s.getSheetByName(SITE_ISSUES_TAB);
+  if (siSheet && siSheet.getLastRow() > 1) {
+    var siRows = siSheet.getDataRange().getValues();
+    for (var sii = 1; sii < siRows.length; sii++) {
+      var siDate = cellDate(siRows[sii][2]);         // C Date
+      var siBy   = String(siRows[sii][14]||'').trim().toLowerCase(); // O Reported By
+      if (siBy !== whoLC) continue;
+      if (!siDate || siDate < mon || siDate > sat) continue;
+      issuesAuthoredCount++;
     }
   }
 
@@ -7083,6 +7112,9 @@ function getAmanWeeklyStats(weekStart, member) {
   }
 
   // A monthly client feedback collected this week also counts as a connection
+  // (and separately earns its own Feedback Collected score below — a full
+  // 19-field questionnaire is real work, not just "one more touch").
+  var feedbackCount = 0;
   var fbSheet = s.getSheetByName(FEEDBACK_TAB);
   if (fbSheet && fbSheet.getLastRow() > 1) {
     var fRows = fbSheet.getDataRange().getValues();
@@ -7091,6 +7123,7 @@ function getAmanWeeklyStats(weekStart, member) {
       var fProj = String(fRows[fi][4] || '').trim();    // E Project
       if (String(fRows[fi][3]||'').trim().toLowerCase() !== whoLC) continue; // D Recorded By
       if (!fDate || fDate < mon || fDate > sat) continue;
+      feedbackCount++;
       if (fProj) connected[fProj.toLowerCase()] = true;
     }
   }
@@ -7167,21 +7200,44 @@ function getAmanWeeklyStats(weekStart, member) {
   // ── 6. Scores ──
   function r1(n){ return Math.round(n*10)/10; }
 
-  // Output components — each is "active" only if there's something to measure.
-  // N/A components are excluded and the output is rescaled across active ones.
+  // Output /50 components. Client Coverage/Lead Mgmt/Revenue Collection were
+  // already computed pre-2026-08 but Lead+Revenue were silently discarded —
+  // Output was 100% client-coverage over a 47-project denominator, so a lot
+  // of Aman's real weekly work (lead follow-up, billing collection, vendor/
+  // TnCP/BNI coordination, feedback collection) scored zero regardless of
+  // volume. Rebalanced across 5 components, rescaled over whichever are
+  // "active" this week (mirrors the existing N/A-exclusion pattern below).
+  var CLIENT_MAX = 20, LEAD_MAX = 10, REV_MAX = 8, COORD_MAX = 7, FEEDBACK_MAX = 5; // sums to 50
+  var COORD_TARGET_COUNT    = 6;  // Other Activity + issues authored, /week, for full marks
+  var FEEDBACK_TARGET_COUNT = 3;  // feedback forms collected /week, for full marks
+
   var clientActive = totalOngoing > 0;
   var leadActive   = leadBase > 0;
   var revActive    = totalBilled > 0;
 
-  var s_client = clientActive ? r1(connectedCount/totalOngoing*20) : 0;
-  var s_lead   = leadActive   ? r1(leadWorked/leadBase*15) : 0;
+  var s_client = clientActive ? r1(connectedCount/totalOngoing*CLIENT_MAX) : 0;
+  var s_lead   = leadActive   ? r1(leadWorked/leadBase*LEAD_MAX) : 0;
   var collRatio= revActive    ? totalCollected/totalBilled : null;
   var s_rev    = revActive
-                 ? r1(Math.min(collRatio, COLLECTION_TARGET)/COLLECTION_TARGET*15) : 0;
+                 ? r1(Math.min(collRatio, COLLECTION_TARGET)/COLLECTION_TARGET*REV_MAX) : 0;
+  var coordCount = otherActivityCount + issuesAuthoredCount;
+  var s_coord  = r1(Math.min(COORD_MAX, coordCount/COORD_TARGET_COUNT*COORD_MAX));
+  var s_feedback = r1(Math.min(FEEDBACK_MAX, feedbackCount/FEEDBACK_TARGET_COUNT*FEEDBACK_MAX));
 
-  // Output /50 = client-connection coverage of ONGOING projects only (lead-mgmt &
-  // collection are shown for context but do not drive output this week — per spec).
-  var output      = totalOngoing > 0 ? r1(connectedCount/totalOngoing*50) : 50;
+  // Coordination Activity and Feedback Collected are always "active" (there's
+  // always an opportunity to log them, unlike leads/billing which can be
+  // genuinely absent some weeks) — a quiet week on either naturally scores low
+  // rather than being excluded from the rescale.
+  var outParts = [
+    {max:CLIENT_MAX,   val:s_client,   active:clientActive},
+    {max:LEAD_MAX,     val:s_lead,     active:leadActive},
+    {max:REV_MAX,      val:s_rev,      active:revActive},
+    {max:COORD_MAX,    val:s_coord,    active:true},
+    {max:FEEDBACK_MAX, val:s_feedback, active:true},
+  ];
+  var activeMax = outParts.reduce(function(s2,p){ return s2 + (p.active?p.max:0); }, 0);
+  var activeVal = outParts.reduce(function(s2,p){ return s2 + (p.active?p.val:0); }, 0);
+  var output = activeMax > 0 ? r1(activeVal/activeMax*50) : 50;
   var missedProjects = perProject.filter(function(p){ return !p.connected; }).map(function(p){ return p.project; });
 
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
@@ -7214,6 +7270,12 @@ function getAmanWeeklyStats(weekStart, member) {
     clientActive  : clientActive,
     leadActive    : leadActive,
     revActive     : revActive,
+    otherActivityCount : otherActivityCount,
+    issuesAuthoredCount: issuesAuthoredCount,
+    coordCount    : coordCount,
+    coordTarget   : COORD_TARGET_COUNT,
+    feedbackCount : feedbackCount,
+    feedbackTarget: FEEDBACK_TARGET_COUNT,
     dprDaysCount  : dprDaysCount,
     daysPresent   : daysPresent,
     lateCount     : lateCount,
@@ -7225,6 +7287,8 @@ function getAmanWeeklyStats(weekStart, member) {
       s_client : s_client,
       s_lead   : s_lead,
       s_rev    : s_rev,
+      s_coord  : s_coord,
+      s_feedback : s_feedback,
       output   : output,
       s_dpr    : s_dpr,
       s_punct  : s_punct,
@@ -7267,8 +7331,33 @@ function getWeeklyDiag(weekStart){
   var lg = s.getSheetByName(CRM_LOG_TAB), conns = [];
   if (lg){ var lr=lg.getDataRange().getValues();
     for (var m=1;m<lr.length;m++){ var dt=cellDate(lr[m][2]); if(!dt||dt<mon||dt>sat) continue;
-      conns.push({date:dt, member:String(lr[m][3]||''), category:String(lr[m][4]||''), project:String(lr[m][6]||'')}); } }
+      conns.push({date:dt, member:String(lr[m][3]||''), category:String(lr[m][4]||''),
+        type:String(lr[m][5]||''), project:String(lr[m][6]||''), notes:String(lr[m][7]||'')}); } }
   out.aman.crmLogThisWeek = conns;
+
+  // Feedback, billing activity, and issues authored — same week, Aman only (assessment aid).
+  var fb = s.getSheetByName(FEEDBACK_TAB), fbRows = [];
+  if (fb && fb.getLastRow()>1){ var frr=fb.getDataRange().getValues();
+    for (var f=1;f<frr.length;f++){ var fd=cellDate(frr[f][2]); if(!fd||fd<mon||fd>sat) continue;
+      if (String(frr[f][3]||'').trim() !== 'Aman Raghuwanshi') continue;
+      fbRows.push({date:fd, project:String(frr[f][4]||''), satisfaction:frr[f][6]}); } }
+  out.aman.feedbackThisWeek = fbRows;
+
+  var bl = s.getSheetByName(BILLING_TAB), blRows = [];
+  if (bl && bl.getLastRow()>1){ var brr=bl.getDataRange().getValues();
+    for (var b=1;b<brr.length;b++){
+      var billDate=cellDate(brr[b][3]), recvDate=cellDate(brr[b][6]), fuDate=cellDate(brr[b][7]);
+      var touched = (billDate&&billDate>=mon&&billDate<=sat) || (recvDate&&recvDate>=mon&&recvDate<=sat) || (fuDate&&fuDate>=mon&&fuDate<=sat);
+      if (!touched) continue;
+      blRows.push({project:String(brr[b][2]||''), billDate:billDate, recvDate:recvDate, fuDate:fuDate, amount:brr[b][4], received:brr[b][5]}); }}
+  out.aman.billingActivityThisWeek = blRows;
+
+  var si = s.getSheetByName(SITE_ISSUES_TAB), siRows = [];
+  if (si && si.getLastRow()>1){ var srr=si.getDataRange().getValues();
+    for (var si_i=1; si_i<srr.length; si_i++){ var sd=cellDate(srr[si_i][2]); if(!sd||sd<mon||sd>sat) continue;
+      if (String(srr[si_i][14]||'').trim() !== 'Aman Raghuwanshi') continue;
+      siRows.push({date:sd, project:String(srr[si_i][3]||''), kind:String(srr[si_i][5]||'')}); }}
+  out.aman.issuesAuthoredThisWeek = siRows;
   var ad = s.getSheetByName(SUMMARY_TAB), adr = [];
   if (ad){ var arr=ad.getDataRange().getValues();
     for (var a=1;a<arr.length;a++){ var dd=cellDate(arr[a][0]); if(!dd||dd<mon||dd>sat) continue;
@@ -7502,6 +7591,139 @@ function getLeadsAnalytics(month) {
     needsAttention: needsAttention,
     needsAttentionCount: needsAttention.length,
     trend: trendArr,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════
+// getFeedbackAnalytics — client satisfaction / NPS dashboard
+// action=getFeedbackAnalytics&month=2026-06  (month=''/'all' → all-time)
+// FEEDBACK cols (0-idx): C(2) DateRecorded, E(4) Project, G(6) Satisfaction
+// 1-10, H(7) AgendaCommunicated, I-N(8-13) per-metric /5, O(14) OnTime,
+// P(15) Recommend/NPS 1-10, Q(16) Comments, R(17) Appraisal, S(18) Referrals
+// ════════════════════════════════════════════════════════════════
+function getFeedbackAnalytics(month) {
+  var sheet = db().getSheetByName(FEEDBACK_TAB);   // may not exist yet — no feedback submitted = empty state, not an error
+
+  var allTime = !month || month === 'all';
+  var curMonth = !allTime && /^\d{4}-\d{2}$/.test(month) ? month : '';
+  var monthLabel = allTime ? 'All Time' : (function(){
+    var yy = parseInt(curMonth.substring(0,4),10), mm = parseInt(curMonth.substring(5,7),10);
+    return MONTH_NAMES[mm-1] + ' ' + yy;
+  })();
+
+  var rows = (sheet && sheet.getLastRow() > 1) ? sheet.getDataRange().getValues() : [];
+  var METRIC_COLS = [
+    {key:'design',          label:'Design & Functionality', col:8},
+    {key:'communication',   label:'Communication',          col:9},
+    {key:'problemRes',      label:'Problem Resolution',     col:10},
+    {key:'responsiveness',  label:'Responsiveness',         col:11},
+    {key:'qualityOfWork',   label:'Quality of Work',        col:12},
+    {key:'professionalism', label:'Professionalism',        col:13},
+  ];
+
+  var inScope = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var date = cellDate(r[2]);
+    var project = String(r[4]||'').trim();
+    if (!date && !project) continue;
+    if (curMonth && date.substring(0,7) !== curMonth) continue;
+    inScope.push({
+      date: date, recordedBy: String(r[3]||'').trim(), project: project || '(no project)',
+      satisfaction: parseFloat(r[6]) || null,
+      agenda: String(r[7]||'').trim(),
+      metrics: METRIC_COLS.reduce(function(o,m){ o[m.key] = parseFloat(r[m.col])||null; return o; }, {}),
+      onTime: String(r[14]||'').trim(),
+      recommend: parseFloat(r[15]) || null,
+      comments: String(r[16]||'').trim(),
+      appraisal: String(r[17]||'').trim(),
+      referrals: String(r[18]||'').trim(),
+    });
+  }
+
+  function avg(vals){ var v=vals.filter(function(x){return x!=null;}); return v.length? Math.round(v.reduce(function(s,x){return s+x;},0)/v.length*10)/10 : null; }
+  function pctYes(vals){ var v=vals.filter(function(x){return x==='Yes'||x==='No';}); var y=v.filter(function(x){return x==='Yes';}).length; return v.length? Math.round(y/v.length*1000)/10 : null; }
+
+  var satisfactionVals = inScope.map(function(f){return f.satisfaction;});
+  var recommendVals    = inScope.map(function(f){return f.recommend;});
+  var promoters  = inScope.filter(function(f){ return f.recommend!=null && f.recommend>=9; }).length;
+  var passives   = inScope.filter(function(f){ return f.recommend!=null && f.recommend>=7 && f.recommend<9; }).length;
+  var detractors = inScope.filter(function(f){ return f.recommend!=null && f.recommend<7; }).length;
+  var npsBase = promoters+passives+detractors;
+  var nps = npsBase>0 ? Math.round((promoters-detractors)/npsBase*1000)/10 : null;
+
+  var metricAvgs = METRIC_COLS.map(function(m){
+    return {key:m.key, label:m.label, avg: avg(inScope.map(function(f){return f.metrics[m.key];}))};
+  });
+
+  // ── By project (lowest satisfaction first — needs attention) ──
+  var byProjectMap = {};
+  inScope.forEach(function(f){
+    if (!byProjectMap[f.project]) byProjectMap[f.project] = {project:f.project, entries:[]};
+    byProjectMap[f.project].entries.push(f);
+  });
+  var byProject = Object.keys(byProjectMap).map(function(p){
+    var g = byProjectMap[p];
+    return {
+      project: p, count: g.entries.length,
+      avgSatisfaction: avg(g.entries.map(function(f){return f.satisfaction;})),
+      avgRecommend: avg(g.entries.map(function(f){return f.recommend;})),
+      lastDate: g.entries.reduce(function(m,f){return f.date>m?f.date:m;}, ''),
+    };
+  }).sort(function(a,b){
+    var av=a.avgSatisfaction==null?99:a.avgSatisfaction, bv=b.avgSatisfaction==null?99:b.avgSatisfaction;
+    return av-bv;
+  });
+
+  // ── 6-month trend (independent of month filter — always recent 6 real months) ──
+  var today = dateStr();
+  var trend = {}, trendKeys = [];
+  var tYY = parseInt(today.substring(0,4),10), tMM = parseInt(today.substring(5,7),10);
+  for (var k = 5; k >= 0; k--) {
+    var d = new Date(tYY, tMM-1-k, 1);
+    var key = d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2);
+    trendKeys.push(key);
+    trend[key] = {label: MONTH_NAMES[d.getMonth()].substring(0,3)+' '+String(d.getFullYear()).substring(2), month:key, count:0, satisfactionSum:0, satisfactionN:0};
+  }
+  for (var j = 1; j < rows.length; j++) {
+    var tr = rows[j];
+    var tDate = cellDate(tr[2]);
+    if (!tDate) continue;
+    var tKey = tDate.substring(0,7);
+    if (!trend[tKey]) continue;
+    trend[tKey].count++;
+    var tSat = parseFloat(tr[6]);
+    if (tSat) { trend[tKey].satisfactionSum += tSat; trend[tKey].satisfactionN++; }
+  }
+  var trendArr = trendKeys.map(function(key){
+    var t = trend[key];
+    return {label:t.label, month:t.month, count:t.count,
+      avgSatisfaction: t.satisfactionN>0 ? Math.round(t.satisfactionSum/t.satisfactionN*10)/10 : null};
+  });
+
+  // ── Needs follow-up: detractors (recommend<=6) or low satisfaction (<=6) ──
+  var needsFollowUp = inScope.filter(function(f){
+    return (f.recommend!=null && f.recommend<=6) || (f.satisfaction!=null && f.satisfaction<=6);
+  }).sort(function(a,b){ return (a.date<b.date)?1:-1; });
+
+  // ── Recent comments feed (has actual text) ──
+  var recent = inScope.filter(function(f){ return f.comments || f.appraisal || f.referrals; })
+    .sort(function(a,b){ return (a.date<b.date)?1:-1; }).slice(0,15);
+
+  return {
+    month: allTime?'all':curMonth, monthLabel: monthLabel, allTime: allTime,
+    responses: inScope.length,
+    avgSatisfaction: avg(satisfactionVals),
+    avgRecommend: avg(recommendVals),
+    nps: nps, promoters: promoters, passives: passives, detractors: detractors,
+    agendaRate: pctYes(inScope.map(function(f){return f.agenda;})),
+    onTimeRate: pctYes(inScope.map(function(f){return f.onTime;})),
+    metrics: metricAvgs,
+    byProject: byProject,
+    trend: trendArr,
+    needsFollowUp: needsFollowUp,
+    needsFollowUpCount: needsFollowUp.length,
+    recent: recent,
   };
 }
 
