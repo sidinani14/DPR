@@ -625,10 +625,14 @@ async function loadTasks() {
     // Only THIS WEEK's completed+approved tasks stay on the board; older ones drop off.
     // (Mirrors the backend rule — safety net for approved rows whose completion date
     // wasn't stamped, which the backend can otherwise mis-date as "this week".)
+    // Some old rows carry a non-ISO actualCompletion (e.g. "Wed May 13" from a
+    // since-removed code path) — string-compared against "YYYY-MM-DD" that sorts
+    // AFTER any real date, so a 3-month-old task looked freshly completed forever.
+    const _isoDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s||'') ? s : '';
     const _mon = mondayStr();
     allTasks = allTasks.filter(t => {
       if (t.status !== 'Completed') return true;               // upcoming/ongoing/delayed/pending always show
-      const doneOn = t.actualCompletion || t.selfStatusDate || t.approvalDate || '';
+      const doneOn = _isoDate(t.actualCompletion) || _isoDate(t.selfStatusDate) || _isoDate(t.approvalDate);
       return doneOn && doneOn >= _mon;                          // completed → only if done on/after this Monday
     });
 
