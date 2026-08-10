@@ -87,6 +87,7 @@ textarea{min-height:62px;resize:vertical;}
 .mt-status input:checked+.mt-btn{border-color:var(--accent);color:var(--accent);font-weight:600;}
 .mt-status input:checked+.mt-btn.ip{border-color:#4A9EFF;color:#4A9EFF;}
 .mt-status input:checked+.mt-btn.done{border-color:#2ED573;color:#2ED573;background:rgba(46,213,115,0.1);}
+.mt-status input:checked+.mt-btn.bl{border-color:var(--red);color:var(--red);background:var(--red-bg);}
 .pct-field{display:flex;flex-direction:column;gap:4px;}
 .pct-input-wrap{display:flex;align-items:center;gap:6px;}
 .pct-input-wrap input{width:70px;text-align:center;padding:8px 10px;}
@@ -470,6 +471,29 @@ async function loadProjects() {
 }
 
 // ── Your open tasks (mirrors DPR) ─────────────────────────
+// Visit/meeting tasks are auto-scheduled at 0 pts (see syncVisitSchedule in
+// Code.js) — points come from hours × rate once someone marks it Done and
+// fills in the timing, same as dpr.html's assigned-task flow.
+const VISIT_TYPES_ARCH = ['Site Visit (Architecture)', 'Site Visit (Interiors)'];
+const VISIT_TYPES_MTG  = ['Client Meeting (Regular)', 'Client Meeting'];
+function isVisitType(t){ return VISIT_TYPES_ARCH.indexOf(t)>-1 || VISIT_TYPES_MTG.indexOf(t)>-1 || t==='Site Visit' || t==='Meeting' || t==='Material Selection'; }
+function isVisitRate2(t){ return VISIT_TYPES_ARCH.indexOf(t)>-1 || t==='Site Visit' || t==='Material Selection'; }
+function mtHours(start,end){
+  if(!start||!end) return 0;
+  const [sh,sm]=start.split(':').map(Number), [eh,em]=end.split(':').map(Number);
+  const mins=(eh*60+em)-(sh*60+sm);
+  return mins>0 ? Math.round(mins/60*100)/100 : 0;
+}
+function mtCalcVisitPts(i){
+  const t=myTasks[i]; if(!t) return;
+  const start=document.querySelector(`.mt-vstart-${i}`)?.value||'';
+  const end=document.querySelector(`.mt-vend-${i}`)?.value||'';
+  const hrs=mtHours(start,end);
+  const rate=isVisitRate2(t.taskType)?2:1;
+  const pts=Math.round(hrs*rate*10)/10;
+  const durEl=document.querySelector(`#mt-vdur-${i}`);
+  if(durEl) durEl.textContent = hrs>0 ? `${hrs} hr${hrs===1?'':'s'} × ${rate} = ${pts} pts` : '—';
+}
 let myTasks = [];
 async function fetchMyTasks(){
   const panel=document.getElementById('mytasks-panel'), badge=document.getElementById('mytasks-badge');
@@ -517,9 +541,34 @@ function renderMyTasks(){
         </div>
       </div>
       <div class="mt-status">
-        <label><input type="radio" name="mt-r-${i}" value="Not Started" ${cur==='Not Started'?'checked':''}><span class="mt-btn">Not started</span></label>
-        <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''}><span class="mt-btn ip">In progress</span></label>
-        <label><input type="radio" name="mt-r-${i}" value="Done"><span class="mt-btn done">Done</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Not Started" ${cur==='Not Started'?'checked':''} onchange="toggleMtStatus(${i},this)"><span class="mt-btn">Not started</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''} onchange="toggleMtStatus(${i},this)"><span class="mt-btn ip">In progress</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Done" onchange="toggleMtStatus(${i},this)"><span class="mt-btn done">Done</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Blocked" onchange="toggleMtStatus(${i},this)"><span class="mt-btn bl">Blocked</span></label>
+      </div>
+      ${isVisitType(t.taskType) ? `
+      <div id="mt-visit-${i}" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        <div class="lbl" style="margin-bottom:6px">Visit timing (for points)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="field" style="margin-bottom:0">
+            <div class="lbl">Start Time</div>
+            <input type="time" class="mt-vstart-${i}" oninput="mtCalcVisitPts(${i})">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <div class="lbl">End Time</div>
+            <input type="time" class="mt-vend-${i}" oninput="mtCalcVisitPts(${i})">
+          </div>
+        </div>
+        <div id="mt-vdur-${i}" style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:8px">—</div>
+        <div class="lbl" style="margin-bottom:4px">Site visit log shared with client?</div>
+        <div style="display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="mt-vshared-${i}" value="Yes" style="width:auto">Yes</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="mt-vshared-${i}" value="No" style="width:auto">No</label>
+        </div>
+      </div>` : ''}
+      <div id="mt-blockreason-${i}" style="display:none;margin-top:8px">
+        <div style="font-size:10.5px;color:var(--red);margin-bottom:3px">WHAT'S BLOCKING THIS? *</div>
+        <textarea class="mt-blockreason-ta-${i}" placeholder="e.g. site inaccessible / client unavailable / waiting on materials…" style="font-size:12px;padding:6px 8px;width:100%;min-height:34px;border-radius:6px"></textarea>
       </div>
       ${overdue ? (t.delayReason ? `
       <div style="margin-top:6px;font-size:11px;color:var(--text3)"><b style="color:#C0392B">Delay reason:</b> ${t.delayReason}</div>` : `
@@ -536,6 +585,12 @@ function renderMyTasks(){
     <div style="font-size:11px;color:#F5A623;font-weight:600;margin-top:4px">⏳ Awaiting approval — no action needed</div></div>`).join('');
   panel.innerHTML = openHtml + pendHtml;
 }
+function toggleMtStatus(i, radio){
+  const visitDiv = document.getElementById('mt-visit-'+i);
+  const blockDiv = document.getElementById('mt-blockreason-'+i);
+  if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
+  if (blockDiv) blockDiv.style.display = radio.value === 'Blocked' ? 'block' : 'none';
+}
 function toggleMtEdit(i, link){
   const box = document.getElementById('mt-edit-'+i);
   if (!box) return;
@@ -548,14 +603,27 @@ function collectTaskStatuses(){
   return myTasks.map((t,i)=>{
     const units = parseFloat(document.querySelector(`.mt-units-${i}`)?.value) || null;
     const newDrawing = document.querySelector(`.mt-drawing-${i}`)?.value.trim() || '';
-    const note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
+    const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started';
+    let note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
+    let visitHours = null;
+
+    if (status === 'Blocked') {
+      const blockReason = document.querySelector(`.mt-blockreason-ta-${i}`)?.value.trim() || '';
+      note = blockReason || note;
+    } else if (status === 'Done' && isVisitType(t.taskType)) {
+      const start = document.querySelector(`.mt-vstart-${i}`)?.value || '';
+      const end   = document.querySelector(`.mt-vend-${i}`)?.value || '';
+      visitHours = mtHours(start, end) || null;
+      const shared = document.querySelector(`input[name="mt-vshared-${i}"]:checked`)?.value || '';
+      if (shared) note = (note ? note + ' | ' : '') + 'Site visit log shared with client: ' + shared;
+    }
+
     return {
       member:leadName, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
-      status:document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started',
-      actualCompletionDate:today,
+      status, actualCompletionDate:today,
       units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
       newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',
-      note
+      note, visitHours,
     };
   }).filter(s=>s.status!=='Not Started' || s.units || s.newDrawing || s.note);
 }
