@@ -172,7 +172,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 .sc-val{font-size:21px;font-weight:500;color:var(--accent);font-family:'DM Mono',monospace}
 .sc-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
 .close-btn{padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:600}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:normal;max-width:min(92vw,420px);text-align:center;line-height:1.4;z-index:600}
 .toast.show{opacity:1}
 @media(max-width:400px){.task-thead,.task-row{grid-template-columns:1fr 58px 42px 20px}.row2{grid-template-columns:1fr}}
 
@@ -1374,6 +1374,31 @@ function collectData() {
   return data;
 }
 
+// A required field is easy to satisfy with a throwaway "." or "No" — that
+// technically passes the empty check but defeats the point of the field.
+// Block anything that isn't a real sentence describing the day's work.
+const TRIVIAL_DELIVERABLES = new Set(['no','none','na','n/a','nil','ok','okay','done','nothing','yes','same','as usual','-','.']);
+function isTrivialDeliverables(text) {
+  const t = (text||'').trim();
+  if (!t) return true;
+  const stripped = t.toLowerCase().replace(/[.\-\s]/g,'');
+  if (TRIVIAL_DELIVERABLES.has(t.toLowerCase()) || TRIVIAL_DELIVERABLES.has(stripped)) return true;
+  return t.length < 8; // shorter than a real sentence
+}
+
+// Deliverables text describes work, but nothing was actually logged as a
+// scoreable task (Section 2 status change, Section 3 task, or Field Work —
+// Field Work rows are already folded into Done Tasks by collectData()) —
+// this is exactly the gap that let real work go uncredited: people typing
+// their day into the summary and assuming that alone counts.
+function countLoggedWorkItems(d) {
+  let n = 0;
+  try { n += JSON.parse(d['Assigned Statuses']||'[]').filter(s=>s.status==='Done'||s.status==='Ongoing').length; } catch(e){}
+  try { n += JSON.parse(d['Done Tasks']||'[]').length; } catch(e){}
+  try { n += JSON.parse(d['Ongoing Tasks']||'[]').length; } catch(e){}
+  return n;
+}
+
 function validate(d) {
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
   if (!d['Member'])            { toast('Please select your name');              return false; }
@@ -1383,6 +1408,14 @@ function validate(d) {
     if (!document.getElementById('late-punch-in')?.value) { toast('Enter the time you punched in'); return false; }
   }
   if (!d['Deliverables List']) { toast("Fill in today's deliverables");         return false; }
+  if (isTrivialDeliverables(d['Deliverables List'])) {
+    toast('Please describe today’s actual work in the Deliverables list — a placeholder like "." or "No" isn’t enough.', 5500);
+    return false;
+  }
+  if (countLoggedWorkItems(d) === 0) {
+    toast('You described work in your Deliverables list but haven’t logged any of it above — mark an assigned task Done/Ongoing, add it under Additional/Unplanned Work, or log it as Field Work, then submit.', 6500);
+    return false;
+  }
   return true;
 }
 
@@ -1436,10 +1469,11 @@ function toggleLateReq(){
   const wrap = document.getElementById('late-req-wrap');
   if (wrap) wrap.style.display = isLate ? 'block' : 'none';
 }
-function toast(msg) {
+function toast(msg, duration) {
   const el=document.getElementById('toast');
   el.textContent=msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),2800);
+  clearTimeout(el._hideTimer);
+  el._hideTimer=setTimeout(()=>el.classList.remove('show'),duration||2800);
 }
 </script>
 </body>
