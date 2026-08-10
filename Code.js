@@ -52,6 +52,36 @@ function visitFamily(taskType) {
   return null;
 }
 
+// Client Satisfaction /MAX — for Deepak/Aman only, in the slot Planning
+// occupies for team members (their work is reactive, not pre-planned, so
+// Planning doesn't apply — see the 2026-08 revert). Sourced from the
+// FEEDBACK sheet's Overall Satisfaction (1-10, col G) already captured via
+// the CRM form's Monthly Client Feedback section — averaged across whatever
+// ratings landed this week for the given project list (Deepak's active
+// sites / Aman's ongoing projects). No rating recorded this week = full
+// marks (nothing on record against them), same convention as Planning's
+// empty-week case. This is a stand-in until a dedicated weekly capture
+// exists; TODO: replace with a real per-week input once that's built.
+function clientSatisfactionScore(projects, mon, sat, MAX) {
+  var sheet = db().getSheetByName(FEEDBACK_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return MAX;
+  var projSet = {};
+  (projects || []).forEach(function(p) { projSet[String(p||'').trim()] = true; });
+  var rows = sheet.getDataRange().getValues();
+  var vals = [];
+  for (var i = 1; i < rows.length; i++) {
+    var date = cellDate(rows[i][2]);      // C Date Recorded
+    if (!date || date < mon || date > sat) continue;
+    var project = String(rows[i][4]||'').trim();  // E Project/Client
+    if (!projSet[project]) continue;
+    var sat10 = parseFloat(rows[i][6]);   // G Overall Satisfaction (1-10)
+    if (!isNaN(sat10)) vals.push(sat10);
+  }
+  if (!vals.length) return MAX;
+  var avg = vals.reduce(function(s,v){ return s+v; }, 0) / vals.length;
+  return Math.round(Math.min(1, avg/10) * MAX * 10) / 10;
+}
+
 // Append one or more rows to FIELD_WORK (start/end per engagement). Points
 // already flow through the Done-visit-task path; this row store feeds the
 // attendance import (Part B): first start → last end = the member's field-day
@@ -213,6 +243,125 @@ function getFieldWorkForRange(fromStr, toStr) {
       hours:parseFloat(rows[i][8])||0, notes:String(rows[i][9]||'')});
   }
   return {entries:out};
+}
+
+// ── Manual DPR-gap backfill (one-off, Siddharth-reviewed corrections) ──
+// updates: mark an existing not-yet-Done row Done+approved (matches the
+//   first unresolved member+project+taskType row, same semantics as
+//   updateTaskStatusesFromDPR — pass one entry per row you need touched,
+//   e.g. twice for two identical Ajay Chordia rows).
+// creates: append a brand-new Done+approved row (project may be free text
+//   not present in PROJECTS — multiplier then defaults to 1.0, matching
+//   how createSelfAssignedTask/createDoneTask already behave).
+function backfillDPRTasks(updates, creates) {
+  var sheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  var today = dateStr();
+  var results = {updated: 0, created: 0, details: []};
+
+  (updates || []).forEach(function(u) {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      var rM = String(rows[i][3] || '').trim();
+      var rP = String(rows[i][2] || '').trim();
+      var rT = String(rows[i][4] || '').trim();
+      var rS = String(rows[i][13] || '').trim();
+      if (rM !== u.member || rP !== u.project || rT !== u.taskType) continue;
+      if (rS === 'Done' || rS === 'Parked' || rS === 'Reassigned') continue;
+      var doneDate = u.doneDate || today;
+      sheet.getRange(i+1, 14).setValue('Done');       // N SelfStatus
+      sheet.getRange(i+1, 15).setValue(doneDate);      // O SelfStatusDate
+      sheet.getRange(i+1, 16).setValue(doneDate);      // P ActualCompletionDate
+      sheet.getRange(i+1, 17).setValue('Yes');         // Q LeadApproved
+      sheet.getRange(i+1, 18).setValue('Auto-approved (DPR backfill)'); // R ApprovedBy
+      sheet.getRange(i+1, 19).setValue(today);         // S ApprovalDate
+      results.updated++;
+      results.details.push({mode:'update', member:u.member, project:u.project, taskType:u.taskType, doneDate:doneDate});
+      break;
+    }
+  });
+
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  var projMap = {};
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pRows.length; pi++) {
+      var pn = String(pRows[pi][1]||'').trim();
+      if (pn) projMap[pn] = {disc:String(pRows[pi][3]||''), mult:parseFloat(pRows[pi][4])||1.0};
+    }
+  }
+  var newRows = [];
+  (creates || []).forEach(function(c) {
+    var pd = projMap[c.project] || {disc:'', mult:1.0};
+    var units = parseFloat(c.units) || 1;
+    var weightedPts = Math.round((parseFloat(c.basePts)||0) * pd.mult * units * 10) / 10;
+    var doneDate = c.doneDate || today;
+    var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
+    newRows.push([
+      newId, '', c.project, c.member, c.taskType, pd.mult, c.basePts, units, weightedPts,
+      doneDate, doneDate, '', '', 'Done', doneDate, doneDate,
+      'Yes', 'Auto-approved (DPR backfill)', today,
+      '', 'Backfilled from DPR deliverables text — reviewed & approved by Siddharth', c.member, 'Medium',
+    ]);
+    results.created++;
+    results.details.push({mode:'create', member:c.member, project:c.project, taskType:c.taskType, units:units, pts:weightedPts, doneDate:doneDate});
+  });
+  if (newRows.length) sheet.getRange(sheet.getLastRow()+1, 1, newRows.length, 23).setValues(newRows);
+
+  return results;
+}
+
+// ── Read-only audit: what DPR submissions say vs what actually landed in
+// TASK_ASSIGNMENTS, for a date range. Diagnostic only — no writes. Lets us
+// spot free-text "Deliverables" that never became a scored task row.
+function getDPRAudit(fromStr, toStr) {
+  var s = db();
+  var out = {};
+
+  var sum = s.getSheetByName(SUMMARY_TAB);
+  if (sum && sum.getLastRow() > 1) {
+    var sr = sum.getDataRange().getValues();
+    for (var i=1; i<sr.length; i++){
+      var d = cellDate(sr[i][0]);
+      if (fromStr && d < fromStr) continue;
+      if (toStr   && d > toStr)   continue;
+      var member = String(sr[i][2]||'').trim();
+      if (!member) continue;
+      if (!out[member]) out[member] = {dprSubmissions:[], taskRows:[]};
+      out[member].dprSubmissions.push({
+        date: d, time: String(sr[i][1]||''), arrivedOnTime: String(sr[i][4]||''),
+        deliverables: String(sr[i][5]||''), blockers: String(sr[i][6]||''),
+      });
+    }
+  }
+
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  if (asSheet && asSheet.getLastRow() > 1) {
+    var ar = asSheet.getDataRange().getValues();
+    var headers = ar[0].map(function(h){ return String(h||'').trim(); });
+    var is23 = headers.length >= 23 || headers.indexOf('Actual Completion Date') > -1;
+    var C_ADT = is23 ? 15 : -1, C_LAPPR = is23 ? 16 : 15, C_NOTES = is23 ? 20 : 19, C_BY = is23 ? 21 : 20;
+    for (var j=1; j<ar.length; j++){
+      var row = ar[j];
+      var assignedDate = cellDate(row[9]);
+      var statusDate    = cellDate(row[14]);
+      var actualDate    = C_ADT > -1 ? cellDate(row[C_ADT]) : '';
+      var touchDate = actualDate || statusDate || assignedDate;
+      if (fromStr && touchDate < fromStr) continue;
+      if (toStr   && touchDate > toStr)   continue;
+      var member = String(row[3]||'').trim();
+      if (!member) continue;
+      if (!out[member]) out[member] = {dprSubmissions:[], taskRows:[]};
+      out[member].taskRows.push({
+        project: String(row[2]||''), taskType: String(row[4]||''),
+        assignedDate: assignedDate, statusDate: statusDate, actualDate: actualDate,
+        selfStatus: String(row[13]||''), weightedPts: parseFloat(row[8])||0,
+        leadApproved: String(row[C_LAPPR]||''), notes: String(row[C_NOTES]||''),
+        assignedBy: String(row[C_BY]||''),
+      });
+    }
+  }
+
+  return out;
 }
 
 // ── Approved Paid Leaves (manual, per member per month — tied to Siddharth's
@@ -425,7 +574,7 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
-  backfillFieldWorkPoints:1 };
+  backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -804,6 +953,8 @@ function doPost(e) {
     if (data.action === 'submitLateRequest')      return respond(submitLateRequest(data));
     if (data.action === 'getLateRequests')        return respond(getLateRequests(data.from||'', data.to||''));
     if (data.action === 'getFieldWorkForRange')   return respond(getFieldWorkForRange(data.from||'', data.to||''));
+    if (data.action === 'getDPRAudit')            return respond(getDPRAudit(data.from||'', data.to||''));
+    if (data.action === 'backfillDPRTasks')       return respond(withLock(function(){ return backfillDPRTasks(data.updates||[], data.creates||[]); }));
     if (data.action === 'saveMonthlyAdjustments') return respond(saveMonthlyAdjustments(data.month||'', data.adjustments||[]));
     if (data.action === 'getMonthlyAdjustments')  return respond(getMonthlyAdjustments(data.month||''));
     if (data.action === 'saveHolidays')           return respond(saveHolidays(data.dates||[]));
@@ -7114,23 +7265,29 @@ function getDeepakWeeklyStats(weekStart) {
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
   var s_dper   = Math.min(15, Math.round(dperDaysCount / 6 * 15 * 10) / 10);
 
-  // Punctuality /15, Hours /10 — biometric, same base tiers as the team
-  // formula. No Planning score: unlike team members, Deepak's work is
-  // reactive site execution (visits/issues as they come up), not
+  // Punctuality /10 (was /15), Hours /7 (was /10) — rescaled to fund Client
+  // Satisfaction below. No Planning score: unlike team members, Deepak's
+  // work is reactive site execution (visits/issues as they come up), not
   // pre-assigned deadline tasks — there's nothing meaningful to call
   // "planned ahead" vs "unplanned" here, so he's excluded from Planning
-  // entirely rather than scored on a metric that doesn't apply.
+  // entirely. Client Satisfaction fills that slot instead so his table row
+  // is shaped like everyone else's.
   var punctBase   = Math.max(0, 15 - lateCount * 2 - absentDays * 2);
-  var s_punct     = Math.round(Math.min(15, punctBase) * 10) / 10;
+  var s_punct     = Math.round(Math.min(15, punctBase) / 15 * 10 * 10) / 10;
 
   var hrsBase  = Math.max(0, Math.round((daysPresent / 6 * 10 - absentDays * 1.5) * 10) / 10);
-  var s_hrs    = Math.round(Math.min(10, hrsBase) * 10) / 10;
+  var s_hrs    = Math.round(Math.min(10, hrsBase) / 10 * 7 * 10) / 10;
+
+  // Client Satisfaction /8 — see clientSatisfactionScore() for the source
+  // (FEEDBACK sheet Overall Satisfaction, averaged across his active sites
+  // for this week; no rating this week = full marks).
+  var s_client_sat = clientSatisfactionScore(activeProjects, mon, sat, 8);
 
   // Reliability /10 — −1 per late/overdue task, −2 per Work Not Done
   var reliabilityPenalty = dLate * 1 + dWnd * 2;
   var s_reliability = Math.max(0, Math.round((10 - reliabilityPenalty) * 10) / 10);
 
-  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
+  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_client_sat + s_reliability) * 10) / 10;
 
   act.visitHours = Math.round(act.visitHours * 10) / 10;
   act.meetHours  = Math.round(act.meetHours * 10) / 10;
@@ -7173,6 +7330,7 @@ function getDeepakWeeklyStats(weekStart) {
       s_dper   : s_dper,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
+      s_client_sat : s_client_sat,
       s_reliability : s_reliability,
       total    : total,
     },
@@ -7445,20 +7603,27 @@ function getAmanWeeklyStats(weekStart, member) {
   var missedProjects = perProject.filter(function(p){ return !p.connected; }).map(function(p){ return p.project; });
 
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
-  // Punctuality /15, Hours /10 — biometric, same base tiers as the team
-  // formula. No Planning score: Aman's work is reactive client/CRM activity
-  // (calls, site issues, follow-ups as they arise), not pre-assigned
+  // Punctuality /10 (was /15), Hours /7 (was /10) — rescaled to fund Client
+  // Satisfaction below. No Planning score: Aman's work is reactive client/CRM
+  // activity (calls, site issues, follow-ups as they arise), not pre-assigned
   // deadline tasks — excluded from Planning entirely, same reasoning as Deepak.
+  // Client Satisfaction fills that slot instead so his table row is shaped
+  // like everyone else's.
   var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
-  var s_punct  = r1(Math.min(15, punctBase));
+  var s_punct  = r1(Math.min(15, punctBase) / 15 * 10);
   var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
-  var s_hrs    = r1(Math.min(10, hrsBase));
+  var s_hrs    = r1(Math.min(10, hrsBase) / 10 * 7);
+
+  // Client Satisfaction /8 — see clientSatisfactionScore() for the source
+  // (FEEDBACK sheet Overall Satisfaction, averaged across his ongoing
+  // projects for this week; no rating this week = full marks).
+  var s_client_sat = clientSatisfactionScore(ongoing, mon, sat, 8);
 
   // Reliability /10 — 24hr lead first-contact SLA: −1 per missed lead
   var reliabilityPenalty = leadSlaMissed * 1;
   var s_reliability = Math.max(0, r1(10 - reliabilityPenalty));
 
-  var total    = r1(output + s_dpr + s_punct + s_hrs + s_reliability);
+  var total    = r1(output + s_dpr + s_punct + s_hrs + s_client_sat + s_reliability);
 
   return {
     member        : who,
@@ -7504,6 +7669,7 @@ function getAmanWeeklyStats(weekStart, member) {
       s_dpr    : s_dpr,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
+      s_client_sat : s_client_sat,
       s_reliability : s_reliability,
       total    : total,
     },
