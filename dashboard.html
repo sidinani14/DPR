@@ -374,7 +374,13 @@ function renderHeatmap() {
           if (!t.assignedTo.split(',').map(a=>a.trim()).includes(name)) return false;
           // actualCompletion preferred; fall back to selfStatusDate
           const doneOn = t.actualCompletion || t.selfStatusDate || '';
-          return doneOn >= weekDays[0] && doneOn <= weekDays[5];
+          if (!(doneOn >= weekDays[0] && doneOn <= weekDays[5])) return false;
+          // A task whose deadline was a PRIOR week but only got filed/approved
+          // this week (late catch-up) belongs to that prior week's workload,
+          // not this one — otherwise it inflates this week's Done bar for
+          // work that already scored (or should've) in the week it was due.
+          if (t.targetDate && t.targetDate < weekDays[0]) return false;
+          return true;
         })
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
       // Done but awaiting lead approval — work is finished, person is effectively free
@@ -439,17 +445,21 @@ function renderHeatmap() {
       const wkTgt  = TEAM_TARGETS[name] || 50;
       const dayTgt = Math.round(wkTgt / 6 * 10) / 10;
 
-      // Done today — approved tasks completed today
+      // Done today — approved tasks completed today. Excludes late catch-up:
+      // a task whose deadline was a prior week but only got filed/approved
+      // today belongs to that week's workload, not today's occupancy.
       const donePts = doneTasks
         .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
-                     (t.actualCompletion || t.selfStatusDate || '') === today)
+                     (t.actualCompletion || t.selfStatusDate || '') === today &&
+                     !(t.targetDate && t.targetDate < weekDays[0]))
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
       // Done today but awaiting lead approval — person is effectively free
       const apprPts = allTasks
         .filter(t => t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                      t.status === 'Approval Pending' &&
-                     (t.actualCompletion || t.selfStatusDate || '') === today)
+                     (t.actualCompletion || t.selfStatusDate || '') === today &&
+                     !(t.targetDate && t.targetDate < weekDays[0]))
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
       // Pending today — non-completed tasks due today (excludes approval-pending)
