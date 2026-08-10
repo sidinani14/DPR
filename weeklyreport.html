@@ -483,7 +483,7 @@ async function computeWeekScores(weekStart){
       const unexplainedAbsences=(bd.att||[]).filter(x=>x.s==='A').length;
       const reliabilityPenalty=(ds.reliabilityPenalty||0)+unexplainedAbsences*5;
       const s_reliability=Math.max(0,Math.round((10-reliabilityPenalty)*10)/10);
-      const s_output=Math.round((ds.s_visit+ds.s_client+ds.s_tasks)*10)/10;
+      const s_output=Math.round((ds.s_visit+ds.s_client+ds.s_tasks+(ds.s_issues||0))*10)/10;
       const total=Math.round((s_output+s_dper+s_punct+s_hrs+s_reliability)*10)/10;
       out['Deepak Soni']={s_output, s_dpr:s_dper, s_punct, s_hrs, s_reliability, total};
     }
@@ -633,7 +633,7 @@ function buildOverviewPage(team){
     <table class="tt">
       <thead><tr>
         <th style="width:28px">#</th><th style="width:145px">Member</th>
-        <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks</span></th>
+        <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks+Issues</span></th>
         <th>DPR<br><span style="opacity:.5">/15</span></th>
         <th>Punctuality<br><span style="opacity:.5">/15</span></th>
         <th>Hours<br><span style="opacity:.5">/10</span></th>
@@ -956,9 +956,10 @@ function buildDeepakPage(d){
 
     <div class="section-title" style="margin-bottom:1.5mm">Score Breakdown</div>
     <div class="pg">
-      ${pCard('Site Visits',s.s_visit,20,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
+      ${pCard('Site Visits',s.s_visit,17.5,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
       ${pCard('Client Comm',s.s_client,10,`${d.clientCount} of ${d.totalSites} projects updated`)}
-      ${pCard('Task<br>Completion',s.s_tasks,20,d.tasksActive?`${d.tasksCompleted} of ${d.tasksAssigned} assigned this week completed`:`N/A — 0 assigned this week; scored from Site Visits/Client Comm instead`)}
+      ${pCard('Task<br>Completion',s.s_tasks,17.5,d.tasksActive?`${d.tasksCompletedPts} of ${d.tasksAssignedPts} assigned pts completed (${d.tasksCompleted}/${d.tasksAssigned} tasks)`:`N/A — 0 assigned this week; scored from Site Visits/Client Comm instead`)}
+      ${pCard('Issue<br>Reporting',s.s_issues,5,`${d.issuesReportedCount||0} of ${d.issueTarget||3} target site issues logged this week`)}
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of ${d.dprDen} working days · ≥1 submission/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
@@ -1197,14 +1198,14 @@ async function loadAndRender(){
       deepakStats.unexplainedAbsences = (bd.att||[]).filter(x=>x.s==='A').length;
       ds.reliabilityPenalty = (ds.reliabilityPenalty||0) + deepakStats.unexplainedAbsences*5;
       ds.s_reliability = Math.max(0, Math.round((10 - ds.reliabilityPenalty)*10)/10);
-      ds.total = Math.round((ds.s_visit + ds.s_client + ds.s_tasks + ds.s_dper + ds.s_punct + ds.s_hrs + ds.s_reliability) * 10) / 10;
+      ds.total = Math.round((ds.s_visit + ds.s_client + ds.s_tasks + (ds.s_issues||0) + ds.s_dper + ds.s_punct + ds.s_hrs + ds.s_reliability) * 10) / 10;
     }
     team.push({
       name    : 'Deepak Soni',
       _isDeepak: true,
       _deepakData: deepakStats,
       _sc: {
-        s_output: Math.round((ds.s_visit + ds.s_client + ds.s_tasks) * 10) / 10,
+        s_output: Math.round((ds.s_visit + ds.s_client + ds.s_tasks + (ds.s_issues||0)) * 10) / 10,
         s_dpr   : ds.s_dper,
         s_punct : ds.s_punct,
         s_hrs   : ds.s_hrs,

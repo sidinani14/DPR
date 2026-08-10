@@ -6829,6 +6829,7 @@ function getDeepakWeeklyStats(weekStart) {
   // Completed same week: Done + LeadApproved=Yes + doneDate in Mon–Sat
   var asSheet = s.getSheetByName(ASSIGN_TAB);
   var tasksAssignedThisWeek = 0, tasksCompletedThisWeek = 0;
+  var tasksAssignedPts = 0, tasksCompletedPts = 0;   // points-weighted, for Task Completion
   var taskDetails = [];
   var dLate = 0, dWnd = 0;   // reliability: late/overdue and Work-Not-Done tasks
   // "How Deepak spent his week" — activity breakdown from his own tasks
@@ -6865,6 +6866,7 @@ function getDeepakWeeklyStats(weekStart) {
       // Activity breakdown (regardless of approval) — how Deepak spent his week
       var wpts = parseFloat(ar[8]) || 0;      // I Weighted Pts
       var tt   = String(ar[4] || '').trim();  // E Stage/TaskType
+      tasksAssignedPts += wpts;
       if (assignedTo === 'Deepak Soni') {
         if (tt === 'Site Visit')   { act.visitCount++; act.visitHours += wpts/2; act.visitPts += wpts; }
         else if (tt === 'Meeting') { act.meetCount++;  act.meetHours  += wpts;   act.meetPts  += wpts; }
@@ -6876,6 +6878,7 @@ function getDeepakWeeklyStats(weekStart) {
       // Completed within the same week
       if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= doneUpper0) {
         tasksCompletedThisWeek++;
+        tasksCompletedPts += wpts;
         taskDetails.push({
           project   : String(ar[2] || '').trim(),
           taskType  : String(ar[4] || '').trim(),
@@ -6903,6 +6906,22 @@ function getDeepakWeeklyStats(weekStart) {
     }
   }
 
+  // ── 4b. Issues reported this week (SITE_ISSUES, col O = Reported By) ──
+  // Flagging site problems for design/CRM to resolve is core execution-lead
+  // work that previously earned zero credit anywhere in this score.
+  var issuesReportedCount = 0;
+  var siSheet = s.getSheetByName(SITE_ISSUES_TAB);
+  if (siSheet && siSheet.getLastRow() > 1) {
+    var siRows = siSheet.getDataRange().getValues();
+    for (var sii = 1; sii < siRows.length; sii++) {
+      var siDate = cellDate(siRows[sii][2]);         // C Date
+      var siBy   = String(siRows[sii][14]||'').trim(); // O Reported By
+      if (siBy !== 'Deepak Soni') continue;
+      if (!siDate || siDate < mon || siDate > sat) continue;
+      issuesReportedCount++;
+    }
+  }
+
   // ── 5. Biometric from DAILY_SUMMARY ──────────────────────
   var sumSheet    = s.getSheetByName(SUMMARY_TAB);
   var daysPresent = 0, lateCount = 0;
@@ -6924,25 +6943,37 @@ function getDeepakWeeklyStats(weekStart) {
   var absentDays = 6 - daysPresent;
 
   // ── 6. Score calculation ──────────────────────────────────
-  // Site Visits /20
+  // Rebalanced 2026-08: Site Visits and Task Completion each gave up 2.5pts
+  // to a new Issue Reporting component (site problems Deepak flags for
+  // design/CRM — previously zero credit anywhere, despite 40+ on record).
+  var SITE_VISIT_MAX = 17.5, CLIENT_MAX = 10, TASK_MAX = 17.5, ISSUE_MAX = 5;
+  var ISSUE_TARGET_COUNT = 3; // issues reported /week for full marks — tune after a few weeks
+
+  // Site Visits /17.5
   var s_visit  = totalSites > 0
-    ? Math.round(visitedCount / totalSites * 20 * 10) / 10 : 0;
+    ? Math.round(visitedCount / totalSites * SITE_VISIT_MAX * 10) / 10 : 0;
 
   // Client Communication /10
   var s_client = totalSites > 0
-    ? Math.round(clientCount / totalSites * 10 * 10) / 10 : 0;
+    ? Math.round(clientCount / totalSites * CLIENT_MAX * 10) / 10 : 0;
 
-  // Task Completion /20 — completed same week / assigned this week.
-  // 0 assigned is N/A, not an automatic 20: extrapolate from his other
-  // Output metrics this week (Site Visits/20 + Client Comm/10, out of 30)
-  // instead, so an empty week doesn't inflate the total for free.
+  // Task Completion /17.5 — points-weighted (completedPts/assignedPts), so a
+  // large Structural task counts more than a 0.5pt petty task, same as how
+  // team member Output works. 0 assigned is N/A, not an automatic full
+  // score: extrapolate from Site Visits + Client Comm instead, so an empty
+  // week doesn't inflate the total for free.
   var s_tasks;
-  if (tasksAssignedThisWeek > 0) {
-    s_tasks = Math.round(tasksCompletedThisWeek / tasksAssignedThisWeek * 20 * 10) / 10;
+  if (tasksAssignedPts > 0) {
+    s_tasks = Math.round(tasksCompletedPts / tasksAssignedPts * TASK_MAX * 10) / 10;
   } else {
-    var otherOutMax = 30; // Site Visits/20 + Client Comm/10
-    s_tasks = Math.round((s_visit + s_client) / otherOutMax * 20 * 10) / 10;
+    var otherOutMax = SITE_VISIT_MAX + CLIENT_MAX;
+    s_tasks = Math.round((s_visit + s_client) / otherOutMax * TASK_MAX * 10) / 10;
   }
+
+  // Issue Reporting /5 — always active (there's always an opportunity to
+  // flag a site problem), so a quiet week naturally scores low rather than
+  // being excluded like Lead/Revenue can be for Aman.
+  var s_issues = Math.round(Math.min(ISSUE_MAX, issuesReportedCount / ISSUE_TARGET_COUNT * ISSUE_MAX) * 10) / 10;
 
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
   var s_dper   = Math.min(15, Math.round(dperDaysCount / 6 * 15 * 10) / 10);
@@ -6959,7 +6990,7 @@ function getDeepakWeeklyStats(weekStart) {
   var reliabilityPenalty = dLate * 1 + dWnd * 2;
   var s_reliability = Math.max(0, Math.round((10 - reliabilityPenalty) * 10) / 10);
 
-  var total = Math.round((s_visit + s_client + s_tasks + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
+  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
 
   act.visitHours = Math.round(act.visitHours * 10) / 10;
   act.meetHours  = Math.round(act.meetHours * 10) / 10;
@@ -6982,16 +7013,21 @@ function getDeepakWeeklyStats(weekStart) {
     absentDays     : absentDays,
     tasksAssigned  : tasksAssignedThisWeek,
     tasksCompleted : tasksCompletedThisWeek,
+    tasksAssignedPts  : Math.round(tasksAssignedPts*10)/10,
+    tasksCompletedPts : Math.round(tasksCompletedPts*10)/10,
     tasksActive    : tasksAssignedThisWeek > 0,
     taskDetails    : taskDetails,
     perProject     : perProject,
     lateTaskCount  : dLate,
     workNotDone    : dWnd,
     reliabilityPenalty : reliabilityPenalty,
+    issuesReportedCount : issuesReportedCount,
+    issueTarget         : ISSUE_TARGET_COUNT,
     scores: {
       s_visit  : s_visit,
       s_client : s_client,
       s_tasks  : s_tasks,
+      s_issues : s_issues,
       s_dper   : s_dper,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
