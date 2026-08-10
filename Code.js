@@ -7114,29 +7114,23 @@ function getDeepakWeeklyStats(weekStart) {
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
   var s_dper   = Math.min(15, Math.round(dperDaysCount / 6 * 15 * 10) / 10);
 
-  // Punctuality /10 (was /15) — rescaled; trimmed 2026-08 to fund Planning,
-  // same pattern as the team formula.
+  // Punctuality /15, Hours /10 — biometric, same base tiers as the team
+  // formula. No Planning score: unlike team members, Deepak's work is
+  // reactive site execution (visits/issues as they come up), not
+  // pre-assigned deadline tasks — there's nothing meaningful to call
+  // "planned ahead" vs "unplanned" here, so he's excluded from Planning
+  // entirely rather than scored on a metric that doesn't apply.
   var punctBase   = Math.max(0, 15 - lateCount * 2 - absentDays * 2);
-  var s_punct     = Math.round(Math.min(15, punctBase) / 15 * 10 * 10) / 10;
+  var s_punct     = Math.round(Math.min(15, punctBase) * 10) / 10;
 
-  // Hours /7 (was /10) — same rescale approach.
   var hrsBase  = Math.max(0, Math.round((daysPresent / 6 * 10 - absentDays * 1.5) * 10) / 10);
-  var s_hrs    = Math.round(Math.min(10, hrsBase) / 10 * 7 * 10) / 10;
-
-  // Planning /8 (new) — same definition as the team formula: share of this
-  // week's completed task points that were planned ahead vs self-logged
-  // "Unplanned Work" (which can never be late by construction — see
-  // createDoneTask). Empty week = full marks, nothing on record against them.
-  var PLANNING_MAX = 8;
-  var s_planning = tasksCompletedPts > 0
-    ? Math.round(Math.min(1, (tasksCompletedPts - unplannedPts) / tasksCompletedPts) * PLANNING_MAX * 10) / 10
-    : PLANNING_MAX;
+  var s_hrs    = Math.round(Math.min(10, hrsBase) * 10) / 10;
 
   // Reliability /10 — −1 per late/overdue task, −2 per Work Not Done
   var reliabilityPenalty = dLate * 1 + dWnd * 2;
   var s_reliability = Math.max(0, Math.round((10 - reliabilityPenalty) * 10) / 10);
 
-  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_planning + s_reliability) * 10) / 10;
+  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
 
   act.visitHours = Math.round(act.visitHours * 10) / 10;
   act.meetHours  = Math.round(act.meetHours * 10) / 10;
@@ -7179,7 +7173,6 @@ function getDeepakWeeklyStats(weekStart) {
       s_dper   : s_dper,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
-      s_planning : s_planning,
       s_reliability : s_reliability,
       total    : total,
     },
@@ -7452,26 +7445,20 @@ function getAmanWeeklyStats(weekStart, member) {
   var missedProjects = perProject.filter(function(p){ return !p.connected; }).map(function(p){ return p.project; });
 
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
-  // Punctuality /10 (was /15), Hours /7 (was /10) — trimmed 2026-08 to fund
-  // Planning below, same pattern as the team/Deepak formulas.
+  // Punctuality /15, Hours /10 — biometric, same base tiers as the team
+  // formula. No Planning score: Aman's work is reactive client/CRM activity
+  // (calls, site issues, follow-ups as they arise), not pre-assigned
+  // deadline tasks — excluded from Planning entirely, same reasoning as Deepak.
   var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
-  var s_punct  = r1(Math.min(15, punctBase) / 15 * 10);
+  var s_punct  = r1(Math.min(15, punctBase));
   var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
-  var s_hrs    = r1(Math.min(10, hrsBase) / 10 * 7);
-
-  // Planning /8 (new) — share of Aman's own approved task points this week
-  // that were planned ahead vs self-logged "Unplanned Work". Empty week
-  // (nothing of his own approved) = full marks, nothing to judge.
-  var PLANNING_MAX2 = 8;
-  var s_planning = amanApprovedPts > 0
-    ? r1(Math.min(1, amanPlannedPts/amanApprovedPts) * PLANNING_MAX2)
-    : PLANNING_MAX2;
+  var s_hrs    = r1(Math.min(10, hrsBase));
 
   // Reliability /10 — 24hr lead first-contact SLA: −1 per missed lead
   var reliabilityPenalty = leadSlaMissed * 1;
   var s_reliability = Math.max(0, r1(10 - reliabilityPenalty));
 
-  var total    = r1(output + s_dpr + s_punct + s_hrs + s_planning + s_reliability);
+  var total    = r1(output + s_dpr + s_punct + s_hrs + s_reliability);
 
   return {
     member        : who,
@@ -7517,7 +7504,6 @@ function getAmanWeeklyStats(weekStart, member) {
       s_dpr    : s_dpr,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
-      s_planning : s_planning,
       s_reliability : s_reliability,
       total    : total,
     },
