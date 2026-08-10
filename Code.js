@@ -831,6 +831,7 @@ function doPost(e) {
     if (data.action === 'resolveIssue')        return respond(resolveIssue(data.issueId||''));
     if (data.action === 'getSiteExecution')    return respond(getSiteExecutionSummary(data.project||''));
     if (data.action === 'submitDPER')          return respond(handleDPERSubmission(data));
+    if (data.action === 'correctSiteExecution') return respond(correctSiteExecution(data));
     if (data.action === 'getCalendarData')     return respond(getCalendarData());
     if (data.action === 'getDeepakIssues')     return respond(getIssuesByReporter(data.lead||'Deepak Soni', true));
     if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
@@ -5157,6 +5158,7 @@ function getWeeklyStats(weekStart) {
   var COL_DEADLINE= 10;
   var COL_REVTAG  = is23 ? 19 : 18;
   var COL_ASSIGNDT= 9;
+  var COL_NOTES   = is23 ? 20 : 19;
 
   var results = [];
 
@@ -5217,17 +5219,24 @@ function getWeeklyStats(weekStart) {
       return a.project.localeCompare(b.project) || a.doneDate.localeCompare(b.doneDate);
     });
 
-    // Approved pts this week (ActualCompletion → SelfStatusDate filter)
-    var approvedPts = 0;
-    // TASK_LOG source removed
+    // Approved pts this week (ActualCompletion → SelfStatusDate filter).
+    // Also splits out unplannedPts — tasks self-logged via "Unplanned Work"
+    // (createDoneTask stamps Deadline = same day as completion, so they can
+    // never be late by construction — a real planning-avoidance loophole).
+    // plannedPts (approvedPts − unplannedPts) feeds the Planning score below.
+    var approvedPts = 0, unplannedPts = 0;
     asRows.forEach(function(r, i) {
       if (i === 0) return;
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       if (String(r[3]||'').trim() === name &&
           String(r[COL_LEADAPPR]||'').trim() === 'Yes' &&
-          doneDate >= mon && doneDate <= doneUpper)
-        approvedPts += parseFloat(r[8]) || 0;
+          doneDate >= mon && doneDate <= doneUpper) {
+        var pts = parseFloat(r[8]) || 0;
+        approvedPts += pts;
+        if (String(r[COL_NOTES]||'').indexOf('Unplanned task') > -1) unplannedPts += pts;
+      }
     });
+    var plannedPts = Math.round((approvedPts - unplannedPts) * 100) / 100;
 
     // DPR days filed this week
     // DAILY_SUMMARY cols: Date=A(0) Time=B(1) Member=C(2) Email=D(3) ArrivedOnTime=E(4)
@@ -5273,6 +5282,8 @@ function getWeeklyStats(weekStart) {
       completedOnTime: completedOnTime,
       completedLate  : completedLate,
       approvedPts    : Math.round(approvedPts * 10) / 10,
+      unplannedPts   : Math.round(unplannedPts * 10) / 10,
+      plannedPts     : plannedPts,
       dprDays        : dprDays,
       lateCount      : lateCount,
       workNotDone    : wndCount,
@@ -5880,6 +5891,23 @@ function writeSiteExecution(data) {
     data.remarks           || '',
   ]);
   return subId;
+}
+
+// Backfill a SITE_EXECUTION row for a date+project that was genuinely
+// visited but never logged (or logged wrong) — e.g. a real site visit that
+// missed the DPER form that day. Minimal fields only; everything else the
+// row would normally carry (stage, works today, %complete, etc.) is left
+// blank since this is a correction of the visit/client-update flags only,
+// not a full report. Creates a new SITE_EXECUTION row via writeSiteExecution
+// — there's no existing row to match against for a day nothing was filed.
+function correctSiteExecution(data) {
+  if (!data.date || !data.project || !data.lead) return {status:'error', message:'date, project, and lead are required'};
+  var subId = writeSiteExecution({
+    date: data.date, project: data.project, lead: data.lead,
+    siteVisit: data.siteVisit || 'No', clientUpdated: data.clientUpdated || 'No',
+    remarks: data.remarks || 'Backfilled correction',
+  });
+  return {status:'ok', subId: subId};
 }
 
 // ── writeSiteIssues ────────────────────────────────────────

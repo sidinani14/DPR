@@ -403,11 +403,26 @@ function scoreCalc(m, taskData, bioOverride, weekStartOverride) {
   const dprDen = Math.max(1, presentDays);
   const s_dpr = dprNA ? null : dprScore(effectiveDprDays, bio);
 
-  // Punctuality /15 base — with the absent-day penalty applied.
-  const s_punct = Math.round(adjPunct(bio) * 10) / 10;
+  // Punctuality /10 (was /15) — rescaled from its own /15 native tiers, with
+  // the absent-day penalty applied. Trimmed 2026-08 to fund Planning below —
+  // less weight on attendance/hours, more on whether work gets planned ahead.
+  const s_punct = Math.round(adjPunct(bio) / 15 * 10 * 10) / 10;
 
-  // Hours /10 base — with the absent-day penalty applied.
-  const s_hrs = Math.round(adjHrs(bio) * 10) / 10;
+  // Hours /7 (was /10) — same rescale approach.
+  const s_hrs = Math.round(adjHrs(bio) / 10 * 7 * 10) / 10;
+
+  // Planning /8 (new) — share of this week's approved points that came from
+  // PLANNED tasks (assigned ahead of time with a real deadline) rather than
+  // "Unplanned Work" self-logged after the fact. createDoneTask stamps a
+  // same-day deadline on unplanned tasks, so they can never be late by
+  // construction — full credit toward Output with zero Reliability risk,
+  // which was quietly making planning optional. An empty week (nothing
+  // approved) gets full marks — nothing on record to hold against them.
+  const approvedPtsForPlanning = taskData.approvedPts || 0;
+  const plannedPts = taskData.plannedPts != null ? taskData.plannedPts : approvedPtsForPlanning;
+  const s_planning = approvedPtsForPlanning > 0
+    ? Math.round(Math.min(1, plannedPts / approvedPtsForPlanning) * 8 * 10) / 10
+    : 8;
 
   // Reliability /10 — 10 minus delay penalties (−1 late, −2 reassigned)
   const s_reliability = Math.max(0, Math.round((10 - (taskData.reliabilityPenalty || 0)) * 10) / 10);
@@ -415,9 +430,10 @@ function scoreCalc(m, taskData, bioOverride, weekStartOverride) {
   // A just-joined member (dprNA) gets no Total at all — not a rescaled
   // number, not a ranked score. There isn't enough of a track record yet
   // to fold into one figure, so it's left blank rather than guessed at.
-  const total = dprNA ? null : Math.round((s_output + s_dpr + s_punct + s_hrs + s_reliability) * 10) / 10;
+  const total = dprNA ? null : Math.round((s_output + s_dpr + s_punct + s_hrs + s_planning + s_reliability) * 10) / 10;
 
-  return {s_output, s_dpr, s_punct, s_hrs, s_reliability, dprNA,
+  return {s_output, s_dpr, s_punct, s_hrs, s_planning, s_reliability, dprNA,
+          unplannedPts: taskData.unplannedPts||0, plannedPts,
           reliabilityPenalty: taskData.reliabilityPenalty||0, lateCount: taskData.lateCount||0, workNotDone: taskData.workNotDone||0,
           total, tgt, approvedPts,
           dprDays: effectiveDprDays, presentDays, dprDen,
@@ -537,10 +553,14 @@ function buildTrendSection(name, series){
   // dprNA is per-week (a member can cross their DPR_NA_UNTIL cutoff partway
   // through the 5-week window), not a blanket flag for the whole trend.
   const dprTrend = series.map(s=>s && !s.dprNA ? s.s_dpr : null);
+  // Deepak/Aman keep their own Punctuality/15+Hours/10 (unchanged, no
+  // Planning) — the /10+/7+Planning/8 rebalance is team-members-only.
+  const isSpecial = name === 'Deepak Soni' || name === 'Aman Raghuwanshi';
   return trendCard('Output',pick('s_output'),50)
     + trendCard('DPR',dprTrend,15)
-    + trendCard('Punctuality',pick('s_punct'),15)
-    + trendCard('Hours',pick('s_hrs'),10)
+    + (isSpecial ? trendCard('Punctuality',pick('s_punct'),15) : trendCard('Punctuality',pick('s_punct'),10))
+    + (isSpecial ? trendCard('Hours',pick('s_hrs'),10) : trendCard('Hours',pick('s_hrs'),7))
+    + (isSpecial ? '' : trendCard('Planning',pick('s_planning'),8))
     + trendCard('Reliability',pick('s_reliability'),10)
     + trendCard('Total',pick('total'),100);
 }
@@ -614,13 +634,18 @@ function buildOverviewPage(team){
     const s=m._sc;
     const col=s.total==null?'#A8540C':sc(s.total,100);
     const rkc=i===0?'rk1':i===1?'rk2':i===2?'rk3':'rkx';
+    // Deepak/Aman keep their own Punctuality/15+Hours/10 (unchanged, no
+    // Planning column) — the /10+/7+Planning/8 rebalance is team-only.
+    const isSpecial = m._isDeepak || m._isAman;
+    const punctMax = isSpecial ? 15 : 10, hrsMax = isSpecial ? 10 : 7;
     rows+=`<tr>
       <td><span class="rk ${rkc}">${i+1}</span></td>
       <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
       <td>${s.dprNA ? `<div class="sv" style="color:#8A8378">N/A</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div>`}</td>
-      <td><div class="sv" style="color:${sc(s.s_punct,15)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/15*100))}%;background:${sc(s.s_punct,15)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(s.s_hrs,10)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/10*100))}%;background:${sc(s.s_hrs,10)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_punct,punctMax)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/punctMax*100))}%;background:${sc(s.s_punct,punctMax)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_hrs,hrsMax)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/hrsMax*100))}%;background:${sc(s.s_hrs,hrsMax)}"></div></div></td>
+      <td>${isSpecial ? `<div class="sv" style="color:#8A8378">—</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_planning,8)}">${s.s_planning}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_planning/8*100))}%;background:${sc(s.s_planning,8)}"></div></div>`}</td>
       <td><div class="sv" style="color:${sc(s.s_reliability,10)}">${s.s_reliability}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_reliability/10*100))}%;background:${sc(s.s_reliability,10)}"></div></div></td>
       <td>${s.total==null ? `<div class="sv" style="color:#A8540C;font-size:16px;">N/A</div>` : `<div class="sv" style="color:${col};font-size:23px;" contenteditable="true">${s.total}</div>`}</td>
       <td>${statusChip(s)}</td>
@@ -635,8 +660,9 @@ function buildOverviewPage(team){
         <th style="width:28px">#</th><th style="width:145px">Member</th>
         <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks+Issues</span></th>
         <th>DPR<br><span style="opacity:.5">/15</span></th>
-        <th>Punctuality<br><span style="opacity:.5">/15</span></th>
-        <th>Hours<br><span style="opacity:.5">/10</span></th>
+        <th>Punctuality<br><span style="opacity:.5">/10 · Deepak/Aman /15</span></th>
+        <th>Hours<br><span style="opacity:.5">/7 · Deepak/Aman /10</span></th>
+        <th>Planning<br><span style="opacity:.5">/8 · team only</span></th>
         <th>Reliability<br><span style="opacity:.5">/10</span></th>
         <th>Total<br><span style="opacity:.5">/100</span></th>
         <th>Status</th>
@@ -846,8 +872,9 @@ function buildIndividualPage(m, taskData){
     <div class="pg">
       ${paramCard('Output<br>Approved Pts',s.s_output,50,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,s.dprNA?'Newly joined — not yet onboarded to DPR filing':`${s.dprDays} of ${s.dprDen} working days filed`,s.dprNA)}
-      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
-      ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
+      ${paramCard('Punctuality<br>Biometric',s.s_punct,10,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
+      ${paramCard('Hours<br>Biometric',s.s_hrs,7,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
+      ${paramCard('Planning',s.s_planning,8,s.approvedPts>0?`${s.plannedPts} of ${s.approvedPts} approved pts were planned ahead (not self-logged "Unplanned Work")`:'No approved work this week to judge')}
       ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 
