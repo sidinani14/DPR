@@ -288,10 +288,13 @@ const TARGETS = {
   'Poorvi Goyal':48, 'Sahil Maurya':48, 'Kritika Kaushik':30,
 };
 
-// Members exempt from DPR Consistency scoring (e.g. too new to have started
-// filing yet) — their DPR shows N/A and total is rescaled across the
-// remaining active components instead of penalizing them for it.
-const DPR_NA_MEMBERS = ['Kritika Kaushik'];
+// Members exempt from DPR Consistency scoring for weeks before they started
+// filing regularly (too new to have onboarded yet) — DPR/Total show N/A for
+// those weeks only. Once a member's cutoff Monday is reached, they're scored
+// normally from that week onward (checked against whichever week is being
+// computed — see scoreCalc's weekStartOverride, needed because the 5-week
+// trend calls scoreCalc once per historical week, not just the current one).
+const DPR_NA_UNTIL = { 'Kritika Kaushik': '2026-08-03' };
 
 // ── Biometric — live, built from ATTENDANCE via getMemberAttendance ────────
 // hrs score: ≥7:55 (475min) avg→10 · 7:00–7:54→7 · <7:00→4
@@ -372,7 +375,7 @@ async function loadBioForWeek(){
 }
 
 // ── Score calculation ─────────────────────────────────────
-function scoreCalc(m, taskData, bioOverride) {
+function scoreCalc(m, taskData, bioOverride, weekStartOverride) {
   // bioOverride lets the 5-week trend computer score a historical week
   // without touching the global BIO (which always holds the *currently
   // selected* week). undefined (the normal call shape) falls back to BIO;
@@ -381,7 +384,12 @@ function scoreCalc(m, taskData, bioOverride) {
   const tgt         = TARGETS[m.name] || 48;
   const approvedPts = taskData.approvedPts || 0;
   const dprDays     = taskData.dprDays     || 0;
-  const dprNA       = DPR_NA_MEMBERS.indexOf(m.name) > -1;
+  // weekStartOverride (from the trend computer, one historical week at a
+  // time) or the currently-viewed WEEK_START — a DPR_NA_UNTIL cutoff must be
+  // checked against whichever week is actually being scored, not always the
+  // page's current week, or the trend would show every week as N/A too.
+  const ws          = weekStartOverride || WEEK_START;
+  const dprNA       = !!(DPR_NA_UNTIL[m.name] && ws < DPR_NA_UNTIL[m.name]);
 
   // Output /50
   const s_output = Math.min(50, Math.round(approvedPts / tgt * 50 * 10) / 10);
@@ -464,7 +472,7 @@ async function computeWeekScores(weekStart){
   Object.keys(ROLES).forEach(name=>{
     // No attendance data at all for this member this week — mark the whole
     // week unavailable rather than scoring it off a fabricated empty bio.
-    out[name] = bioMap[name] ? scoreCalc({name}, statsMap[name]||{}, bioMap[name]) : null;
+    out[name] = bioMap[name] ? scoreCalc({name}, statsMap[name]||{}, bioMap[name], weekStart) : null;
   });
 
   if (dData && dData.scores){
@@ -526,9 +534,11 @@ function trendCard(label, vals, max){
 function buildTrendSection(name, series){
   // series: TREND_WEEKS entries (oldest→current), each a scores object or null
   const pick=(k)=>series.map(s=>s ? s[k] : null);
-  const dprNA = DPR_NA_MEMBERS.indexOf(name) > -1;
+  // dprNA is per-week (a member can cross their DPR_NA_UNTIL cutoff partway
+  // through the 5-week window), not a blanket flag for the whole trend.
+  const dprTrend = series.map(s=>s && !s.dprNA ? s.s_dpr : null);
   return trendCard('Output',pick('s_output'),50)
-    + (dprNA ? trendCard('DPR',series.map(()=>null),15) : trendCard('DPR',pick('s_dpr'),15))
+    + trendCard('DPR',dprTrend,15)
     + trendCard('Punctuality',pick('s_punct'),15)
     + trendCard('Hours',pick('s_hrs'),10)
     + trendCard('Reliability',pick('s_reliability'),10)
