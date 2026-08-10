@@ -39,6 +39,19 @@ function calcVisitPts(taskType, hours) {
   return 0;
 }
 
+// Which rate-family a visit/meeting task type belongs to — 'site' (×2/hr) or
+// 'meeting' (×1/hr), or null if it's not a visit-type task at all. Used to
+// match a Field-Work-logged visit ('Site Visit', a generic label) back to
+// its pre-scheduled counterpart (syncVisitSchedule creates the discipline-
+// specific 'Site Visit (Architecture)'/'Site Visit (Interiors)') — the two
+// spellings mean the same real-world visit but never string-match exactly.
+function visitFamily(taskType) {
+  var t = String(taskType||'').trim();
+  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection') return 'site';
+  if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting') return 'meeting';
+  return null;
+}
+
 // Append one or more rows to FIELD_WORK (start/end per engagement). Points
 // already flow through the Done-visit-task path; this row store feeds the
 // attendance import (Part B): first start → last end = the member's field-day
@@ -411,7 +424,8 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1, getMeetingLogForEdit:1,
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
-  getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1 };
+  getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
+  backfillFieldWorkPoints:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -832,6 +846,7 @@ function doPost(e) {
     if (data.action === 'getSiteExecution')    return respond(getSiteExecutionSummary(data.project||''));
     if (data.action === 'submitDPER')          return respond(handleDPERSubmission(data));
     if (data.action === 'correctSiteExecution') return respond(correctSiteExecution(data));
+    if (data.action === 'backfillFieldWorkPoints') return respond(backfillFieldWorkPoints(data.from||'', data.to||''));
     if (data.action === 'getCalendarData')     return respond(getCalendarData());
     if (data.action === 'getDeepakIssues')     return respond(getIssuesByReporter(data.lead||'Deepak Soni', true));
     if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
@@ -4845,6 +4860,86 @@ function markNotificationSeen(data) {
 }
 
 
+// Backfill: FIELD_WORK entries in a date range that never got a matching
+// visit/meeting row in TASK_ASSIGNMENTS (the label-mismatch bug fixed
+// above in createDoneTask, or a submission that silently failed) — create
+// one now, points via calcVisitPts(hours), and auto-approve it immediately
+// rather than leaving it in the normal approval.html queue. Skips any
+// FIELD_WORK entry that already has a same-day, same-family, same-project
+// row for that member in ANY status (including Done) — so re-running this
+// is safe and never double-counts.
+// One sheet read, one bulk append — createDoneTask itself does a fresh
+// full-sheet read+possible-write per call, which is fine for a single live
+// submission but far too slow (and timed out in practice) run 60+ times in
+// a loop here. Duplicates its point-calc logic inline instead.
+function backfillFieldWorkPoints(from, to) {
+  var entries = (getFieldWorkForRange(from, to) || {}).entries || [];
+  if (!entries.length) return {status:'ok', processed:0, created:0, details:[]};
+
+  var sheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  var rows  = sheet.getLastRow() > 1 ? sheet.getDataRange().getValues() : [];
+
+  // Project discipline/multiplier lookup, built once.
+  var projMap = {};
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pRows.length; pi++) {
+      var pn = String(pRows[pi][1]||'').trim() || String(pRows[pi][0]||'').trim();
+      if (pn) projMap[pn] = {disc:String(pRows[pi][3]||''), mult:parseFloat(pRows[pi][4])||1.0};
+    }
+  }
+
+  // In-memory index of existing rows (member|project|family → list of AssignedDates)
+  // — checked against, and extended as new rows are queued, so two FIELD_WORK
+  // entries for the same visit within this same run don't double-create.
+  var existing = {};
+  for (var i = 1; i < rows.length; i++) {
+    var fam0 = visitFamily(String(rows[i][4]||'').trim());
+    if (!fam0) continue;
+    var key0 = String(rows[i][3]||'').trim()+'|'+String(rows[i][2]||'').trim()+'|'+fam0;
+    (existing[key0] = existing[key0]||[]).push(cellDate(rows[i][9]));
+  }
+  function hasMatch(member, project, fam, date) {
+    var list = existing[member+'|'+project+'|'+fam] || [];
+    for (var k = 0; k < list.length; k++) {
+      if (list[k] && Math.abs(new Date(list[k]) - new Date(date)) <= 2*86400000) return true;
+    }
+    return false;
+  }
+
+  var today = dateStr();
+  var newRows = [], details = [];
+  entries.forEach(function(e) {
+    var fam = visitFamily(e.type);
+    if (!fam) return; // not a visit/meeting/material-selection entry — skip
+    if (hasMatch(e.member, e.project, fam, e.date)) {
+      details.push({member:e.member, project:e.project, type:e.type, date:e.date, skipped:'already has a matching task'});
+      return;
+    }
+    var pd = projMap[e.project] || {disc:'', mult:1.0};
+    var weightedPts = calcVisitPts(e.type, e.hours);
+    var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
+    newRows.push([
+      newId, '', e.project, e.member, e.type, pd.mult, parseFloat(e.hours)||0, 1, weightedPts,
+      e.date, e.date,                              // J AssignedDate, K Deadline
+      '', '',                                       // L Area, M Drawing
+      'Done', today, e.date,                        // N SelfStatus, O SelfStatusDate, P ActualCompletionDate
+      'Yes', 'Auto-approved (Field Work backfill)', today, // Q LeadApproved, R ApprovedBy, S ApprovalDate
+      // No pre-scheduled task matched this visit, so — same as any other
+      // self-logged field work — it counts as "Unplanned task" for Planning.
+      '', 'Unplanned task — Field Work backfill, auto-approved', e.member, 'Medium',
+    ]);
+    details.push({member:e.member, project:e.project, type:e.type, date:e.date, hours:e.hours, pts:weightedPts, taskId:newId});
+    var key = e.member+'|'+e.project+'|'+fam;
+    (existing[key] = existing[key]||[]).push(e.date);
+  });
+
+  if (newRows.length) sheet.getRange(sheet.getLastRow()+1, 1, newRows.length, 23).setValues(newRows);
+
+  return {status:'ok', processed: entries.length, created: newRows.length, details: details};
+}
+
 // ── Section 3 Done task → TASK_ASSIGNMENTS (replaces TASK_LOG) ───────────
 function createDoneTask(data) {
   var sheet   = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
@@ -4885,6 +4980,14 @@ function createDoneTask(data) {
   // for this member + project + taskType that hasn't been done yet.
   // If found, update it in place instead of creating a duplicate "ghost" row
   // (the old ghost pattern left assigned tasks stuck at Not Started → Delayed).
+  // Visit/meeting types match by RATE FAMILY, not exact label: Field Work
+  // (Section 4) logs the generic 'Site Visit'/'Meeting', but syncVisitSchedule
+  // pre-schedules the discipline-specific 'Site Visit (Architecture)'/
+  // '(Interiors)'/'Client Meeting' — same real-world visit, different label,
+  // so an exact-string match here always missed and left the original task
+  // orphaned (stuck Delayed, 0 pts, dinging Reliability) while a duplicate
+  // Done row silently absorbed the real points from Field Work.
+  var incomingFamily = visitFamily(data.taskType);
   var rows = sheet.getDataRange().getValues();
   var matchRow = -1;
   for (var j = 1; j < rows.length; j++) {
@@ -4894,7 +4997,9 @@ function createDoneTask(data) {
     var rS  = String(rows[j][13] || '').trim();  // N SelfStatus
     var rA  = String(rows[j][11] || '').trim();  // L Area
     var rD  = String(rows[j][12] || '').trim();  // M Drawing
-    if (rM !== member || rP !== (data.project||'') || rT !== (data.taskType||'')) continue;
+    var typeMatches = rT === (data.taskType||'') ||
+                       (incomingFamily && incomingFamily === visitFamily(rT));
+    if (rM !== member || rP !== (data.project||'') || !typeMatches) continue;
     if (rS === 'Done' || rS === 'Parked' || rS === 'Reassigned') continue; // already resolved
     // Area/drawing: only require match if BOTH sides have a value
     if (data.area    && rA && rA !== data.area)    continue;
@@ -6858,6 +6963,7 @@ function getDeepakWeeklyStats(weekStart) {
   var asSheet = s.getSheetByName(ASSIGN_TAB);
   var tasksAssignedThisWeek = 0, tasksCompletedThisWeek = 0;
   var tasksAssignedPts = 0, tasksCompletedPts = 0;   // points-weighted, for Task Completion
+  var unplannedPts = 0;   // slice of tasksCompletedPts that was self-logged "Unplanned Work"
   var taskDetails = [];
   var dLate = 0, dWnd = 0;   // reliability: late/overdue and Work-Not-Done tasks
   // "How Deepak spent his week" — activity breakdown from his own tasks
@@ -6872,6 +6978,7 @@ function getDeepakWeeklyStats(weekStart) {
     var COL_STATDT = 14;
     var COL_LEADAP = is23 ? 16 : 15;
     var COL_ASSIGNDT = 9; // col J AssignedDate
+    var COL_NOTES_D  = is23 ? 20 : 19;
 
     for (var j = 1; j < asRows.length; j++) {
       var ar         = asRows[j];
@@ -6907,6 +7014,7 @@ function getDeepakWeeklyStats(weekStart) {
       if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= doneUpper0) {
         tasksCompletedThisWeek++;
         tasksCompletedPts += wpts;
+        if (String(ar[COL_NOTES_D]||'').indexOf('Unplanned task') > -1) unplannedPts += wpts;
         taskDetails.push({
           project   : String(ar[2] || '').trim(),
           taskType  : String(ar[4] || '').trim(),
@@ -7006,19 +7114,29 @@ function getDeepakWeeklyStats(weekStart) {
   // DPER Consistency /15 — days with ≥1 submission / 6 (mirrors team DPR formula)
   var s_dper   = Math.min(15, Math.round(dperDaysCount / 6 * 15 * 10) / 10);
 
-  // Punctuality /15 — same base as team (punctBase already on a /15 scale)
+  // Punctuality /10 (was /15) — rescaled; trimmed 2026-08 to fund Planning,
+  // same pattern as the team formula.
   var punctBase   = Math.max(0, 15 - lateCount * 2 - absentDays * 2);
-  var s_punct     = Math.min(15, Math.round(punctBase * 10) / 10);
+  var s_punct     = Math.round(Math.min(15, punctBase) / 15 * 10 * 10) / 10;
 
-  // Hours /10 — same base as team (hrsBase already on a /10 scale)
+  // Hours /7 (was /10) — same rescale approach.
   var hrsBase  = Math.max(0, Math.round((daysPresent / 6 * 10 - absentDays * 1.5) * 10) / 10);
-  var s_hrs    = Math.min(10, Math.round(hrsBase * 10) / 10);
+  var s_hrs    = Math.round(Math.min(10, hrsBase) / 10 * 7 * 10) / 10;
+
+  // Planning /8 (new) — same definition as the team formula: share of this
+  // week's completed task points that were planned ahead vs self-logged
+  // "Unplanned Work" (which can never be late by construction — see
+  // createDoneTask). Empty week = full marks, nothing on record against them.
+  var PLANNING_MAX = 8;
+  var s_planning = tasksCompletedPts > 0
+    ? Math.round(Math.min(1, (tasksCompletedPts - unplannedPts) / tasksCompletedPts) * PLANNING_MAX * 10) / 10
+    : PLANNING_MAX;
 
   // Reliability /10 — −1 per late/overdue task, −2 per Work Not Done
   var reliabilityPenalty = dLate * 1 + dWnd * 2;
   var s_reliability = Math.max(0, Math.round((10 - reliabilityPenalty) * 10) / 10);
 
-  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_reliability) * 10) / 10;
+  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_planning + s_reliability) * 10) / 10;
 
   act.visitHours = Math.round(act.visitHours * 10) / 10;
   act.meetHours  = Math.round(act.meetHours * 10) / 10;
@@ -7043,6 +7161,8 @@ function getDeepakWeeklyStats(weekStart) {
     tasksCompleted : tasksCompletedThisWeek,
     tasksAssignedPts  : Math.round(tasksAssignedPts*10)/10,
     tasksCompletedPts : Math.round(tasksCompletedPts*10)/10,
+    unplannedPts   : Math.round(unplannedPts*10)/10,
+    plannedPts     : Math.round((tasksCompletedPts-unplannedPts)*10)/10,
     tasksActive    : tasksAssignedThisWeek > 0,
     taskDetails    : taskDetails,
     perProject     : perProject,
@@ -7059,6 +7179,7 @@ function getDeepakWeeklyStats(weekStart) {
       s_dper   : s_dper,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
+      s_planning : s_planning,
       s_reliability : s_reliability,
       total    : total,
     },
@@ -7261,6 +7382,32 @@ function getAmanWeeklyStats(weekStart, member) {
   }
   var absentDays = 6 - daysPresent;
 
+  // ── 5b. Planned vs unplanned points (TASK_ASSIGNMENTS, assigned to Aman) ──
+  // Same definition as the team/Deepak formulas: approved-this-week points
+  // split by whether the task was self-logged "Unplanned Work" (which can
+  // never be late by construction) vs actually planned ahead.
+  var amanApprovedPts = 0, amanUnplannedPts = 0;
+  var asSheet2 = s.getSheetByName(ASSIGN_TAB);
+  if (asSheet2 && asSheet2.getLastRow() > 1) {
+    var as2Rows = asSheet2.getDataRange().getValues();
+    var as2Hdrs = as2Rows[0] ? as2Rows[0].map(function(h){ return String(h||'').trim(); }) : [];
+    var is23b   = as2Hdrs.length >= 23 || as2Hdrs.indexOf('Actual Completion Date') > -1;
+    var COL_ACTDT2  = is23b ? 15 : -1;
+    var COL_STATDT2 = 14;
+    var COL_LEADAP2 = is23b ? 16 : 15;
+    var COL_NOTES2  = is23b ? 20 : 19;
+    for (var ji = 1; ji < as2Rows.length; ji++) {
+      var ar2 = as2Rows[ji];
+      if (String(ar2[3]||'').trim().toLowerCase() !== whoLC) continue;
+      var doneDate2 = (COL_ACTDT2 > -1 ? cellDate(ar2[COL_ACTDT2]) : '') || cellDate(ar2[COL_STATDT2]);
+      if (String(ar2[COL_LEADAP2]||'').trim() !== 'Yes' || !doneDate2 || doneDate2 < mon || doneDate2 > sat) continue;
+      var pts2 = parseFloat(ar2[8]) || 0;
+      amanApprovedPts += pts2;
+      if (String(ar2[COL_NOTES2]||'').indexOf('Unplanned task') > -1) amanUnplannedPts += pts2;
+    }
+  }
+  var amanPlannedPts = Math.round((amanApprovedPts - amanUnplannedPts) * 100) / 100;
+
   // ── 6. Scores ──
   function r1(n){ return Math.round(n*10)/10; }
 
@@ -7305,16 +7452,26 @@ function getAmanWeeklyStats(weekStart, member) {
   var missedProjects = perProject.filter(function(p){ return !p.connected; }).map(function(p){ return p.project; });
 
   var s_dpr    = Math.min(15, r1(dprDaysCount/6*15));
+  // Punctuality /10 (was /15), Hours /7 (was /10) — trimmed 2026-08 to fund
+  // Planning below, same pattern as the team/Deepak formulas.
   var punctBase= Math.max(0, 15 - lateCount*2 - absentDays*2);
-  var s_punct  = Math.min(15, r1(punctBase));          // /15 (base already on /15 scale)
+  var s_punct  = r1(Math.min(15, punctBase) / 15 * 10);
   var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
-  var s_hrs    = Math.min(10, r1(hrsBase));            // /10 (base already on /10 scale)
+  var s_hrs    = r1(Math.min(10, hrsBase) / 10 * 7);
+
+  // Planning /8 (new) — share of Aman's own approved task points this week
+  // that were planned ahead vs self-logged "Unplanned Work". Empty week
+  // (nothing of his own approved) = full marks, nothing to judge.
+  var PLANNING_MAX2 = 8;
+  var s_planning = amanApprovedPts > 0
+    ? r1(Math.min(1, amanPlannedPts/amanApprovedPts) * PLANNING_MAX2)
+    : PLANNING_MAX2;
 
   // Reliability /10 — 24hr lead first-contact SLA: −1 per missed lead
   var reliabilityPenalty = leadSlaMissed * 1;
   var s_reliability = Math.max(0, r1(10 - reliabilityPenalty));
 
-  var total    = r1(output + s_dpr + s_punct + s_hrs + s_reliability);
+  var total    = r1(output + s_dpr + s_punct + s_hrs + s_planning + s_reliability);
 
   return {
     member        : who,
@@ -7347,6 +7504,9 @@ function getAmanWeeklyStats(weekStart, member) {
     reliabilityPenalty : reliabilityPenalty,
     perProject    : perProject,
     missedProjects: missedProjects,
+    amanApprovedPts: Math.round(amanApprovedPts*10)/10,
+    amanUnplannedPts: Math.round(amanUnplannedPts*10)/10,
+    amanPlannedPts: amanPlannedPts,
     scores: {
       s_client : s_client,
       s_lead   : s_lead,
@@ -7357,6 +7517,7 @@ function getAmanWeeklyStats(weekStart, member) {
       s_dpr    : s_dpr,
       s_punct  : s_punct,
       s_hrs    : s_hrs,
+      s_planning : s_planning,
       s_reliability : s_reliability,
       total    : total,
     },

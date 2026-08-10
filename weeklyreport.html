@@ -494,23 +494,27 @@ async function computeWeekScores(weekStart){
   if (dData && dData.scores){
     const ds=dData.scores, bd=bioMap['Deepak Soni'];
     if (bd){
-      const s_punct=Math.round(adjPunct(bd)*10)/10, s_hrs=Math.round(adjHrs(bd)*10)/10;
+      const s_punct=Math.round(adjPunct(bd)/15*10*10)/10, s_hrs=Math.round(adjHrs(bd)/10*7*10)/10;
       const s_dper=dprScore(dData.dperDaysCount, bd);
       const unexplainedAbsences=(bd.att||[]).filter(x=>x.s==='A').length;
       const reliabilityPenalty=(ds.reliabilityPenalty||0)+unexplainedAbsences*5;
       const s_reliability=Math.max(0,Math.round((10-reliabilityPenalty)*10)/10);
       const s_output=Math.round((ds.s_visit+ds.s_client+ds.s_tasks+(ds.s_issues||0))*10)/10;
-      const total=Math.round((s_output+s_dper+s_punct+s_hrs+s_reliability)*10)/10;
-      out['Deepak Soni']={s_output, s_dpr:s_dper, s_punct, s_hrs, s_reliability, total};
+      const tasksCompletedPts=dData.tasksCompletedPts||0, dPlannedPts=dData.plannedPts!=null?dData.plannedPts:tasksCompletedPts;
+      const s_planning=tasksCompletedPts>0 ? Math.round(Math.min(1,dPlannedPts/tasksCompletedPts)*8*10)/10 : 8;
+      const total=Math.round((s_output+s_dper+s_punct+s_hrs+s_planning+s_reliability)*10)/10;
+      out['Deepak Soni']={s_output, s_dpr:s_dper, s_punct, s_hrs, s_planning, s_reliability, total};
     }
   }
   if (aData && aData.scores){
     const as=aData.scores, ba=bioMap['Aman Raghuwanshi'];
     if (ba){
-      const s_punct=Math.round(adjPunct(ba)*10)/10, s_hrs=Math.round(adjHrs(ba)*10)/10;
+      const s_punct=Math.round(adjPunct(ba)/15*10*10)/10, s_hrs=Math.round(adjHrs(ba)/10*7*10)/10;
       const s_dpr=dprScore(aData.dprDaysCount, ba);
-      const total=Math.round((as.output+s_dpr+s_punct+s_hrs+as.s_reliability)*10)/10;
-      out['Aman Raghuwanshi']={s_output:as.output, s_dpr, s_punct, s_hrs, s_reliability:as.s_reliability, total};
+      const amanApprovedPts=aData.amanApprovedPts||0, amanPlannedPts=aData.amanPlannedPts!=null?aData.amanPlannedPts:amanApprovedPts;
+      const s_planning=amanApprovedPts>0 ? Math.round(Math.min(1,amanPlannedPts/amanApprovedPts)*8*10)/10 : 8;
+      const total=Math.round((as.output+s_dpr+s_punct+s_hrs+s_planning+as.s_reliability)*10)/10;
+      out['Aman Raghuwanshi']={s_output:as.output, s_dpr, s_punct, s_hrs, s_planning, s_reliability:as.s_reliability, total};
     }
   }
   return out;
@@ -553,14 +557,11 @@ function buildTrendSection(name, series){
   // dprNA is per-week (a member can cross their DPR_NA_UNTIL cutoff partway
   // through the 5-week window), not a blanket flag for the whole trend.
   const dprTrend = series.map(s=>s && !s.dprNA ? s.s_dpr : null);
-  // Deepak/Aman keep their own Punctuality/15+Hours/10 (unchanged, no
-  // Planning) — the /10+/7+Planning/8 rebalance is team-members-only.
-  const isSpecial = name === 'Deepak Soni' || name === 'Aman Raghuwanshi';
   return trendCard('Output',pick('s_output'),50)
     + trendCard('DPR',dprTrend,15)
-    + (isSpecial ? trendCard('Punctuality',pick('s_punct'),15) : trendCard('Punctuality',pick('s_punct'),10))
-    + (isSpecial ? trendCard('Hours',pick('s_hrs'),10) : trendCard('Hours',pick('s_hrs'),7))
-    + (isSpecial ? '' : trendCard('Planning',pick('s_planning'),8))
+    + trendCard('Punctuality',pick('s_punct'),10)
+    + trendCard('Hours',pick('s_hrs'),7)
+    + trendCard('Planning',pick('s_planning'),8)
     + trendCard('Reliability',pick('s_reliability'),10)
     + trendCard('Total',pick('total'),100);
 }
@@ -634,18 +635,14 @@ function buildOverviewPage(team){
     const s=m._sc;
     const col=s.total==null?'#A8540C':sc(s.total,100);
     const rkc=i===0?'rk1':i===1?'rk2':i===2?'rk3':'rkx';
-    // Deepak/Aman keep their own Punctuality/15+Hours/10 (unchanged, no
-    // Planning column) — the /10+/7+Planning/8 rebalance is team-only.
-    const isSpecial = m._isDeepak || m._isAman;
-    const punctMax = isSpecial ? 15 : 10, hrsMax = isSpecial ? 10 : 7;
     rows+=`<tr>
       <td><span class="rk ${rkc}">${i+1}</span></td>
       <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
       <td>${s.dprNA ? `<div class="sv" style="color:#8A8378">N/A</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div>`}</td>
-      <td><div class="sv" style="color:${sc(s.s_punct,punctMax)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/punctMax*100))}%;background:${sc(s.s_punct,punctMax)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(s.s_hrs,hrsMax)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/hrsMax*100))}%;background:${sc(s.s_hrs,hrsMax)}"></div></div></td>
-      <td>${isSpecial ? `<div class="sv" style="color:#8A8378">—</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_planning,8)}">${s.s_planning}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_planning/8*100))}%;background:${sc(s.s_planning,8)}"></div></div>`}</td>
+      <td><div class="sv" style="color:${sc(s.s_punct,10)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/10*100))}%;background:${sc(s.s_punct,10)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_hrs,7)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/7*100))}%;background:${sc(s.s_hrs,7)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_planning,8)}">${s.s_planning}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_planning/8*100))}%;background:${sc(s.s_planning,8)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_reliability,10)}">${s.s_reliability}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_reliability/10*100))}%;background:${sc(s.s_reliability,10)}"></div></div></td>
       <td>${s.total==null ? `<div class="sv" style="color:#A8540C;font-size:16px;">N/A</div>` : `<div class="sv" style="color:${col};font-size:23px;" contenteditable="true">${s.total}</div>`}</td>
       <td>${statusChip(s)}</td>
@@ -660,9 +657,9 @@ function buildOverviewPage(team){
         <th style="width:28px">#</th><th style="width:145px">Member</th>
         <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks+Issues</span></th>
         <th>DPR<br><span style="opacity:.5">/15</span></th>
-        <th>Punctuality<br><span style="opacity:.5">/10 · Deepak/Aman /15</span></th>
-        <th>Hours<br><span style="opacity:.5">/7 · Deepak/Aman /10</span></th>
-        <th>Planning<br><span style="opacity:.5">/8 · team only</span></th>
+        <th>Punctuality<br><span style="opacity:.5">/10</span></th>
+        <th>Hours<br><span style="opacity:.5">/7</span></th>
+        <th>Planning<br><span style="opacity:.5">/8</span></th>
         <th>Reliability<br><span style="opacity:.5">/10</span></th>
         <th>Total<br><span style="opacity:.5">/100</span></th>
         <th>Status</th>
@@ -988,8 +985,9 @@ function buildDeepakPage(d){
       ${pCard('Task<br>Completion',s.s_tasks,17.5,d.tasksActive?`${d.tasksCompletedPts} of ${d.tasksAssignedPts} assigned pts completed (${d.tasksCompleted}/${d.tasksAssigned} tasks)`:`N/A — 0 assigned this week; scored from Site Visits/Client Comm instead`)}
       ${pCard('Issue<br>Reporting',s.s_issues,5,`${d.issuesReportedCount||0} of ${d.issueTarget||3} target site issues logged this week`)}
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of ${d.dprDen} working days · ≥1 submission/day`)}
-      ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
-      ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,10,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,7,`${d.daysPresent}/6 days present`)}
+      ${pCard('Planning',s.s_planning,8,d.tasksCompletedPts>0?`${d.plannedPts!=null?d.plannedPts:d.tasksCompletedPts} of ${d.tasksCompletedPts} completed pts from planned tasks`:'No approved work this week to judge')}
       ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done, −5 per unexplained absence. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done${d.unexplainedAbsences?', '+d.unexplainedAbsences+' unexplained absence'+(d.unexplainedAbsences>1?'s':''):''}. <b>To improve:</b> set realistic target dates, close site tasks on time, and inform in advance if you'll be absent.`)}
     </div>
 
@@ -1118,8 +1116,9 @@ function buildAmanPage(d){
     <div class="pg">
       ${pCard('Output<br>(5 components)',s.output,50,`Client ${s.s_client}/20 · Lead ${d.leadActive?s.s_lead+'/10':'N/A'} · Revenue ${d.revActive?s.s_rev+'/8':'N/A'} · Coordination ${s.s_coord}/7 · Feedback ${s.s_feedback}/5`)}
       ${pCard('DPR<br>Consistency',s.s_dpr,15,`${d.dprDaysCount} of ${d.dprDen} working days · ≥1 CRM report/day`)}
-      ${pCard('Punctuality<br>Biometric',s.s_punct,15,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
-      ${pCard('Hours<br>Biometric',s.s_hrs,10,`${d.daysPresent}/6 days present`)}
+      ${pCard('Punctuality<br>Biometric',s.s_punct,10,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
+      ${pCard('Hours<br>Biometric',s.s_hrs,7,`${d.daysPresent}/6 days present`)}
+      ${pCard('Planning',s.s_planning,8,d.amanApprovedPts>0?`${d.amanPlannedPts!=null?d.amanPlannedPts:d.amanApprovedPts} of ${d.amanApprovedPts} approved pts from planned tasks`:'No approved work this week to judge')}
       ${pCard('Reliability<br>Lead SLA',s.s_reliability,10,`Starts at 10 → −1 per new lead not contacted within 24 h. This week: ${d.leadSlaMissed||0} of ${d.leadsThisWeek||0} missed. <b>To improve:</b> contact every new lead within 24 hours.`)}
     </div>
 
