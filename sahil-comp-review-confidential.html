@@ -1,0 +1,162 @@
+<meta charset="utf-8">
+<title>CONFIDENTIAL — Compensation Review — Sahil Maurya</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="auth.js"></script>
+<style>
+:root{--bg:#0F1923;--card:#16212E;--line:rgba(255,255,255,.08);--t1:#fff;--t2:rgba(255,255,255,.72);--t3:rgba(255,255,255,.42);--accent:#F5A623;--red:#EA4335;--amber:#FBBC04;--green:#2ED573;--blue:#4F9DF7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',system-ui,-apple-system,sans-serif;line-height:1.5;padding:0 0 50px}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px}
+.confbar{background:var(--red);color:#fff;text-align:center;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:7px}
+.rh{display:flex;align-items:center;gap:16px;padding:22px 0 16px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.rh h1{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.rh .sub{font-size:11.5px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:1.2px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin-bottom:14px}
+h2{font-size:11.5px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:8px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tile{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.tile .v{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.tile .l{font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+.tile .x{font-size:10px;color:var(--t2);margin-top:3px}
+.grade-box{display:flex;align-items:center;gap:20px;background:rgba(234,67,53,.07);border:1px solid rgba(234,67,53,.3);border-radius:12px;padding:16px 20px;margin-bottom:14px}
+.grade-letter{font-size:44px;font-weight:900;color:var(--red);line-height:1}
+.grade-label{font-size:14px;font-weight:700;color:var(--t1)}
+.grade-sub{font-size:12px;color:var(--t2);margin-top:3px}
+.inc-box{display:flex;align-items:center;gap:20px;background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.3);border-radius:12px;padding:16px 20px;margin-bottom:14px}
+.inc-num{font-size:36px;font-weight:900;color:var(--accent);line-height:1}
+ul{margin:6px 0 0 18px;font-size:12.5px;color:var(--t2);line-height:1.6}
+li{margin-bottom:3px}
+li b{color:var(--t1)}
+.pathgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}
+th{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--t2)}
+td.n,th.n{text-align:center}
+.foot{font-size:10px;color:var(--t3);text-align:center;padding:12px 0}
+@media(max-width:680px){.pathgrid{grid-template-columns:1fr}}
+@page{size:A4;margin:12mm}
+@media print{
+html,body{background:var(--bg) !important;color:var(--t1) !important;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;font-size:10.5pt}
+*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+section{background:var(--card) !important;border:1px solid var(--line) !important;break-inside:avoid-page;margin-bottom:10px}
+.confbar{position:fixed;top:0;left:0;right:0}
+}
+</style>
+
+<div id="gate" style="max-width:430px;margin:16vh auto;text-align:center;color:var(--t2);padding:20px">
+  <div style="font-size:40px">🔒</div>
+  <h2 style="color:var(--accent);margin:10px 0 6px;letter-spacing:1px">Confidential Document</h2>
+  <p style="font-size:13px;color:var(--t3)">Sign in with an authorised Ideaform account (Siddharth / Astha).</p>
+</div>
+
+<div id="app" class="wrap" style="display:none"></div>
+
+<script>
+const MEMBER='Sahil Maurya', ROLE='Junior Interior Designer';
+const WINDOW='11 May – 8 August 2026';
+const WEEK_TGT=48;
+// ── pulled from sahil-review.html's already-verified figures for the same window ──
+const AVG_PTS_WK=13.4, OUTPUT_PCT=28;
+const ONTIME_PCT=44, ONTIME_TGT=80;
+const DPR_DAYS=48, DPR_TOTAL=78, DPR_PCT=Math.round(DPR_DAYS/DPR_TOTAL*100);
+const LATE_PCT=50, PRESENT_PER_WK=4.9, RELIABILITY_PENALTY=26;
+const UNPLANNED_PCT=32;
+const INC_RANGE_LOW=15, INC_RANGE_HIGH=30;
+const RECOMMENDED_INC=15;
+
+function render(){
+  document.getElementById('gate').style.display='none';
+  const app=document.getElementById('app'); app.style.display='block';
+  app.innerHTML=`
+    <div class="confbar">Confidential — Internal / HR Use Only — Not for Employee Distribution</div>
+    <div class="rh"><div><h1>Compensation &amp; Role Review — ${MEMBER}</h1><div class="sub">${ROLE} · ${WINDOW}</div></div></div>
+
+    <div class="grade-box">
+      <div class="grade-letter">C−</div>
+      <div>
+        <div class="grade-label">Overall Grade: Below Expectations</div>
+        <div class="grade-sub">Output, on-time delivery, DPR consistency, punctuality and attendance are all materially below target this cycle. No single metric is in isolation — this is a consistent pattern across the full ${WINDOW} window.</div>
+      </div>
+    </div>
+
+    <section>
+      <h2>This Cycle at a Glance</h2>
+      <div class="tiles">
+        <div class="tile"><div class="v" style="color:var(--red)">${OUTPUT_PCT}%</div><div class="l">Output vs target</div><div class="x">${AVG_PTS_WK} of ${WEEK_TGT} pts/wk avg</div></div>
+        <div class="tile"><div class="v" style="color:var(--red)">${ONTIME_PCT}%</div><div class="l">On-time (planned)</div><div class="x">target ${ONTIME_TGT}%</div></div>
+        <div class="tile"><div class="v" style="color:var(--amber)">${UNPLANNED_PCT}%</div><div class="l">Output unplanned</div><div class="x">self-logged after the fact</div></div>
+        <div class="tile"><div class="v" style="color:var(--red)">${DPR_PCT}%</div><div class="l">DPR filed</div><div class="x">${DPR_DAYS} of ${DPR_TOTAL} working days</div></div>
+        <div class="tile"><div class="v" style="color:var(--red)">${LATE_PCT}%</div><div class="l">Days late</div><div class="x">&gt;09:10 threshold</div></div>
+        <div class="tile"><div class="v" style="color:var(--amber)">${PRESENT_PER_WK}/6</div><div class="l">Avg days present/wk</div><div class="x">15 absences, ~4.6 approved</div></div>
+        <div class="tile"><div class="v" style="color:var(--red)">−${RELIABILITY_PENALTY}</div><div class="l">Reliability penalty</div><div class="x">across 13 weeks</div></div>
+      </div>
+    </section>
+
+    <div class="inc-box">
+      <div class="inc-num">${RECOMMENDED_INC}%</div>
+      <div>
+        <div class="grade-label">Recommended Increment — floor of the ${INC_RANGE_LOW}–${INC_RANGE_HIGH}% junior band</div>
+        <div class="grade-sub">The performance record this cycle supports the lower end of the range, not the middle or upper end. Recommend pairing this with an explicit 60–90 day improvement checkpoint (below) rather than a flat increment with no conditions attached.</div>
+      </div>
+    </div>
+
+    <section>
+      <h2>Why the floor of the range, not higher</h2>
+      <ul>
+        <li><b>Output is the core issue.</b> ${AVG_PTS_WK} pts/week against a ${WEEK_TGT}-pt target (${OUTPUT_PCT}%) is well short of what the role requires — this isn't a bad week or two, it's the average across 13 weeks.</li>
+        <li><b>Delivery discipline is weak.</b> Only ${ONTIME_PCT}% of planned (pre-assigned) tasks were finished on time, against an 80% target — 24 tasks finished late, one still open past deadline.</li>
+        <li><b>A third of his output isn't planned in advance.</b> ${UNPLANNED_PCT}% of approved points came from work self-logged after it was already done — which by construction can't be late, so the on-time number above is measured on a shrinking, favourable subset.</li>
+        <li><b>DPR consistency is the lowest of anyone reviewed this way.</b> A report was filed on only ${DPR_PCT}% of working days — meaning for roughly 4 in 10 working days there is no record of what he did until well after the fact.</li>
+        <li><b>Attendance and punctuality both need correction.</b> Present ${PRESENT_PER_WK} of 6 days a week on average, late on ${LATE_PCT}% of days he does come in, and 15 absences against only ~4.6 days of formally approved leave across the same 3 months — most of his time away has not been informed in advance.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Where he's actually strong — role fit for the path forward</h2>
+      <div class="pathgrid">
+        <div>
+          <div style="font-size:12px;color:var(--t2);line-height:1.6">
+            Breaking his completed work down by task type (not just by project) shows a real split in reliability:
+          </div>
+          <table>
+            <thead><tr><th>Task type</th><th class="n">Pts</th><th class="n">Late</th></tr></thead>
+            <tbody>
+              <tr><td>3D Modelling</td><td class="n">36.8</td><td class="n" style="color:var(--green)">2 of 9</td></tr>
+              <tr><td>3D Rendering</td><td class="n">23.2</td><td class="n" style="color:var(--green)">1 of 5</td></tr>
+              <tr><td>ID Working Drawings</td><td class="n">82.1</td><td class="n" style="color:var(--red)">13 of 23</td></tr>
+              <tr><td>Site Issues</td><td class="n">4.0</td><td class="n" style="color:var(--red)">3 of 4</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:12.5px;color:var(--t2);line-height:1.7">
+          <b style="color:var(--t1)">3D Modelling &amp; Rendering</b> — his most reliable category by a wide margin (~22% late vs 57% late on Working Drawings, which is also his single largest point source). This is a real, data-backed signal, not just a hunch.
+          <br><br>
+          <b style="color:var(--t1)">Recommendation:</b> weight his task allocation more toward visualization work where he's demonstrably stronger, and pair Working Drawing assignments with tighter check-ins or a shorter leash on deadlines until that category's completion rate improves. This isn't a permanent role change — it's using what the data already shows about where he delivers.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Path forward — 60–90 day checkpoint</h2>
+      <ul>
+        <li>DPR filed same-day, target 6/6 days/week (currently ${DPR_PCT}%)</li>
+        <li>On-time completion on planned tasks ≥70% (currently ${ONTIME_PCT}%)</li>
+        <li>Unplanned share of output below 20% (currently ${UNPLANNED_PCT}%) — plan work ahead rather than logging it after</li>
+        <li>Attendance ≥5.5 of 6 days/week, with advance notice for any planned absence</li>
+        <li>Punctuality — materially reduce the ${LATE_PCT}% late-arrival rate</li>
+      </ul>
+      <div style="font-size:12px;color:var(--t2);margin-top:8px;line-height:1.6">If these are met at the next review, the case for moving toward the upper half of the ${INC_RANGE_LOW}–${INC_RANGE_HIGH}% band — and a role weighted more toward visualization work — is straightforward to make. If not, this cycle's pattern simply repeats.</div>
+    </section>
+
+    <div class="foot">© Ideaform Design Studio · Confidential Compensation Review · ${WINDOW} · Internal / HR use only — do not share with employee</div>`;
+}
+
+window.idsOnAuth=function(u){
+  const email=String((u&&u.email)||'').toLowerCase();
+  if(['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'].indexOf(email)===-1){
+    document.getElementById('gate').innerHTML='<div style="font-size:40px">🔒</div><h2 style="color:#EA4335;margin:10px 0">Access restricted</h2><p style="color:rgba(255,255,255,.5);font-size:13px">This document is available to Siddharth &amp; Astha only.</p>';
+    return;
+  }
+  render();
+};
+</script>
