@@ -1,0 +1,292 @@
+<meta charset="utf-8">
+<title>IDS · Performance Review — Sahil Maurya</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="auth.js"></script>
+<style>
+:root{--bg:#0F1923;--card:#16212E;--line:rgba(255,255,255,.08);--t1:#fff;--t2:rgba(255,255,255,.72);--t3:rgba(255,255,255,.42);--accent:#F5A623;--red:#EA4335;--amber:#FBBC04;--green:#2ED573;--blue:#4F9DF7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',system-ui,-apple-system,sans-serif;line-height:1.5;padding:0 0 60px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.rh{display:flex;align-items:center;gap:16px;padding:26px 0 18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.rh h1{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.rh .sub{font-size:12px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:1.4px}
+.badge{margin-left:auto;font-size:11px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:20px;padding:5px 12px;text-transform:uppercase;letter-spacing:1px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+h2{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.6px;margin-bottom:4px}
+.h2sub{font-size:12px;color:var(--t3);margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.tile{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
+.tile .v{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.tile .l{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-top:3px}
+.tile .x{font-size:11px;color:var(--t2);margin-top:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.chart-t{font-size:11px;color:var(--t2);font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px}
+svg{max-width:100%;height:auto;overflow:visible}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--t2)}
+td.n,th.n{text-align:center}
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.pill.ok{background:rgba(46,213,115,.15);color:var(--green)}
+.pill.bad{background:rgba(234,67,53,.15);color:var(--red)}
+.pill.warn{background:rgba(251,188,4,.15);color:var(--amber)}
+.ins{font-size:13px;color:var(--t2);padding:9px 0 9px 16px;border-left:2px solid var(--accent);margin:8px 0;background:rgba(245,166,35,.04)}
+.ins b{color:var(--t1)}
+.strip{display:flex;flex-wrap:wrap;gap:3px}
+.cell{width:26px;height:26px;border-radius:4px;font-size:8px;display:flex;align-items:center;justify-content:center;color:#0F1923;font-weight:700}
+.loading{color:var(--t3);font-size:13px;padding:8px 0}
+.foot{font-size:10.5px;color:var(--t3);text-align:center;padding:14px 0}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+@page{size:A4;margin:12mm}
+@media print{
+html,body{background:var(--bg) !important;color:var(--t1) !important;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;font-size:11pt;line-height:1.45}
+*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+section{background:var(--card) !important;border:1px solid var(--line) !important;break-inside:avoid-page;page-break-inside:avoid;margin-bottom:14px}
+.tile{background:rgba(255,255,255,.03) !important;border:1px solid var(--line) !important;break-inside:avoid-page}
+svg{break-inside:avoid-page;page-break-inside:avoid;width:100%}
+table{page-break-inside:auto}
+thead{display:table-header-group}
+tr{page-break-inside:avoid}
+h1,h2{page-break-after:avoid}
+p{orphans:3;widows:3}
+.grid2,.tiles{break-inside:avoid-page}
+.foot{page-break-before:avoid}
+}
+</style>
+
+<div id="gate" style="max-width:430px;margin:16vh auto;text-align:center;color:var(--t2);padding:20px">
+  <div style="font-size:40px">🔒</div>
+  <h2 style="color:var(--accent);margin:10px 0 6px;letter-spacing:1px">Performance Review</h2>
+  <p style="font-size:13px;color:var(--t3)">Sign in with an authorised Ideaform account (Siddharth / Astha).</p>
+</div>
+
+<div id="app" class="wrap" style="display:none"></div>
+
+<script>
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
+const MEMBER='Sahil Maurya', ROLE='Junior Interior Designer';
+const FROM='2026-05-01', TO='2026-08-08', WINDOW='1 May – 8 August 2026';
+const DAILY_TGT=8, WEEK_TGT=48, ONTIME_TGT=80, LATE_LABEL='09:10';
+
+// ── Biometric attendance, 1 May – 8 Aug 2026 ──
+// May–Jun 28: transcribed from official Paytime monthly exports (Sahil_May26 /
+// Sahil_Jun26 / Sahil_Jul26 PDFs) — present/absent classification matches each
+// PDF's own "Present Days" tally exactly (24/19/21), including the one day
+// (19 Jun) that has a real punch (09:47) but was still marked Absent for being
+// too late without approval — kept out of the "present" count for that reason.
+// Jun 29 – Aug 8: from the live ATTENDANCE sheet (same source of truth the
+// weekly report uses).
+const ATT=[{"week":"2026-04-27","present":2,"absent":0,"late":2,"avgHrs":7.67,"avgGap":1.33,"daily":[{"date":"2026-05-01","present":true,"in":"9:12","hrs":7.82,"gap":1.1,"late":true},{"date":"2026-05-02","present":true,"in":"9:11","hrs":7.52,"gap":1.55,"late":true}]},{"week":"2026-05-04","present":5,"absent":1,"late":4,"avgHrs":7.88,"avgGap":1.26,"daily":[{"date":"2026-05-04","present":true,"in":"9:16","hrs":7.08,"gap":1.45,"late":true},{"date":"2026-05-05","present":true,"in":"9:15","hrs":7.37,"gap":1.45,"late":true},{"date":"2026-05-06","present":false},{"date":"2026-05-07","present":true,"in":"9:15","hrs":9.1,"gap":1.2,"late":true},{"date":"2026-05-08","present":true,"in":"9:14","hrs":7.85,"gap":1.15,"late":true},{"date":"2026-05-09","present":true,"in":"9:09","hrs":8,"gap":1.05,"late":false}]},{"week":"2026-05-11","present":6,"absent":0,"late":2,"avgHrs":6.67,"avgGap":1.34,"daily":[{"date":"2026-05-11","present":true,"in":"9:11","hrs":8.13,"gap":0.9,"late":true},{"date":"2026-05-12","present":true,"in":"9:10","hrs":7.12,"gap":1.67,"late":false},{"date":"2026-05-13","present":true,"in":"9:01","hrs":7.43,"gap":1.52,"late":false},{"date":"2026-05-14","present":true,"in":"9:07","hrs":7.52,"gap":1.25,"late":false},{"date":"2026-05-15","present":true,"in":"9:10","hrs":4.12,"gap":0.43,"late":false},{"date":"2026-05-16","present":true,"in":"10:00","hrs":5.67,"gap":2.28,"late":true}]},{"week":"2026-05-18","present":6,"absent":0,"late":1,"avgHrs":7.72,"avgGap":1.42,"daily":[{"date":"2026-05-18","present":true,"in":"9:06","hrs":7.63,"gap":1.45,"late":false},{"date":"2026-05-19","present":true,"in":"9:07","hrs":8,"gap":0.63,"late":false},{"date":"2026-05-20","present":true,"in":"9:09","hrs":8.88,"gap":1.57,"late":false},{"date":"2026-05-21","present":true,"in":"9:07","hrs":7.42,"gap":1.63,"late":false},{"date":"2026-05-22","present":true,"in":"9:09","hrs":8.02,"gap":1.15,"late":false},{"date":"2026-05-23","present":true,"in":"9:15","hrs":6.35,"gap":2.08,"late":true}]},{"week":"2026-05-25","present":5,"absent":1,"late":2,"avgHrs":8.32,"avgGap":1.19,"daily":[{"date":"2026-05-25","present":true,"in":"9:06","hrs":8.47,"gap":1.65,"late":false},{"date":"2026-05-26","present":true,"in":"9:09","hrs":7.38,"gap":1.37,"late":false},{"date":"2026-05-27","present":true,"in":"9:11","hrs":7.87,"gap":1.35,"late":true},{"date":"2026-05-28","present":false},{"date":"2026-05-29","present":true,"in":"9:11","hrs":7.58,"gap":1.58,"late":true},{"date":"2026-05-30","present":true,"in":"9:09","hrs":10.32,"gap":0,"late":false}]},{"week":"2026-06-01","present":5,"absent":1,"late":3,"avgHrs":7.02,"avgGap":1.33,"daily":[{"date":"2026-06-01","present":true,"in":"9:08","hrs":7.52,"gap":1.5,"late":false},{"date":"2026-06-02","present":true,"in":"9:11","hrs":8.57,"gap":1.13,"late":true},{"date":"2026-06-03","present":false},{"date":"2026-06-04","present":true,"in":"9:10","hrs":7.17,"gap":1.38,"late":false},{"date":"2026-06-05","present":true,"in":"9:11","hrs":7,"gap":2.62,"late":true},{"date":"2026-06-06","present":true,"in":"9:11","hrs":4.85,"gap":0,"late":true}]},{"week":"2026-06-08","present":5,"absent":1,"late":1,"avgHrs":7.49,"avgGap":1.65,"daily":[{"date":"2026-06-08","present":true,"in":"9:10","hrs":7.27,"gap":1.77,"late":false},{"date":"2026-06-09","present":true,"in":"9:06","hrs":7.6,"gap":1.73,"late":false},{"date":"2026-06-10","present":true,"in":"9:13","hrs":7.53,"gap":1.62,"late":true},{"date":"2026-06-11","present":true,"in":"9:10","hrs":8.08,"gap":1.65,"late":false},{"date":"2026-06-12","present":true,"in":"9:08","hrs":6.95,"gap":1.48,"late":false},{"date":"2026-06-13","present":false}]},{"week":"2026-06-15","present":4,"absent":2,"late":4,"avgHrs":7.45,"avgGap":1.58,"daily":[{"date":"2026-06-15","present":true,"in":"9:11","hrs":7.25,"gap":1.45,"late":true},{"date":"2026-06-16","present":true,"in":"9:11","hrs":8.33,"gap":1,"late":true},{"date":"2026-06-17","present":true,"in":"9:11","hrs":8.78,"gap":1.43,"late":true},{"date":"2026-06-18","present":true,"in":"10:00","hrs":5.42,"gap":2.45,"late":true},{"date":"2026-06-19","present":false},{"date":"2026-06-20","present":false}]},{"week":"2026-06-22","present":3,"absent":3,"late":3,"avgHrs":7.91,"avgGap":0.9,"daily":[{"date":"2026-06-22","present":true,"in":"9:13","hrs":7.65,"gap":1.33,"late":true},{"date":"2026-06-23","present":false},{"date":"2026-06-24","present":false},{"date":"2026-06-25","present":true,"in":"9:11","hrs":7.3,"gap":1.38,"late":true},{"date":"2026-06-26","present":true,"in":"9:11","hrs":8.77,"gap":0,"late":true},{"date":"2026-06-27","present":false}]},{"week":"2026-06-29","present":5,"absent":1,"late":4,"avgHrs":6.08,"avgGap":1.26,"daily":[{"date":"2026-06-29","present":true,"in":"16:30","hrs":3.18,"gap":0,"late":true},{"date":"2026-06-30","present":true,"in":"9:12","hrs":7.35,"gap":1.43,"late":true},{"date":"2026-07-01","present":true,"in":"9:10","hrs":6.68,"gap":2.25,"late":false},{"date":"2026-07-02","present":true,"in":"11:10","hrs":6.28,"gap":1.33,"late":true},{"date":"2026-07-03","present":false},{"date":"2026-07-04","present":true,"in":"9:11","hrs":6.93,"gap":1.3,"late":true}]},{"week":"2026-07-06","present":6,"absent":0,"late":2,"avgHrs":7.99,"avgGap":0.83,"daily":[{"date":"2026-07-06","present":true,"in":"9:12","hrs":7.27,"gap":1.48,"late":true},{"date":"2026-07-07","present":true,"in":"9:08","hrs":7.77,"gap":0.75,"late":false},{"date":"2026-07-08","present":true,"in":"9:05","hrs":6,"gap":0.75,"late":false},{"date":"2026-07-09","present":true,"in":"9:06","hrs":9.25,"gap":0.75,"late":false},{"date":"2026-07-10","present":true,"in":"9:04","hrs":9.8,"gap":0.75,"late":false},{"date":"2026-07-11","present":true,"in":"9:30","hrs":7.82,"gap":0.5,"late":true}]},{"week":"2026-07-13","present":6,"absent":1,"late":3,"avgHrs":8.27,"avgGap":1.29,"daily":[{"date":"2026-07-13","present":true,"in":"9:03","hrs":7.8,"gap":1.28,"late":false},{"date":"2026-07-14","present":true,"in":"9:10","hrs":7.57,"gap":1.75,"late":false},{"date":"2026-07-15","present":true,"in":"9:11","hrs":7.77,"gap":1.6,"late":true},{"date":"2026-07-16","present":true,"in":"9:07","hrs":7.88,"gap":1.65,"late":false},{"date":"2026-07-17","present":true,"in":"9:14","hrs":7.32,"gap":1.47,"late":true},{"date":"2026-07-18","present":true,"in":"9:12","hrs":11.3,"gap":0,"late":true},{"date":"2026-07-19","present":false}]},{"week":"2026-07-20","present":5,"absent":1,"late":2,"avgHrs":6.35,"avgGap":0.67,"daily":[{"date":"2026-07-20","present":true,"in":"9:07","hrs":4.57,"gap":0,"late":false},{"date":"2026-07-21","present":true,"in":"9:10","hrs":11.08,"gap":0.5,"late":false},{"date":"2026-07-22","present":true,"in":"12:04","hrs":5.23,"gap":0.9,"late":true},{"date":"2026-07-23","present":false},{"date":"2026-07-24","present":true,"in":"9:14","hrs":6.9,"gap":1.42,"late":true},{"date":"2026-07-25","present":true,"in":"9:09","hrs":3.97,"gap":0.52,"late":false}]},{"week":"2026-07-27","present":2,"absent":4,"late":2,"avgHrs":8,"avgGap":1.06,"daily":[{"date":"2026-07-27","present":false},{"date":"2026-07-28","present":false},{"date":"2026-07-29","present":false},{"date":"2026-07-30","present":false},{"date":"2026-07-31","present":true,"in":"9:14","hrs":6.72,"gap":2.12,"late":true},{"date":"2026-08-01","present":true,"in":"09:13","hrs":9.28,"gap":0,"late":true}]},{"week":"2026-08-03","present":6,"absent":0,"late":3,"avgHrs":7.1,"avgGap":0.88,"daily":[{"date":"2026-08-03","present":true,"in":"09:11","hrs":8.08,"gap":1.5,"late":true},{"date":"2026-08-04","present":true,"in":"09:12","hrs":3.98,"gap":0,"late":true},{"date":"2026-08-05","present":true,"in":"09:08","hrs":8.02,"gap":0,"late":false},{"date":"2026-08-06","present":true,"in":"09:13","hrs":7.13,"gap":1.49,"late":true},{"date":"2026-08-07","present":true,"in":"09:09","hrs":7.38,"gap":1.77,"late":false},{"date":"2026-08-08","present":true,"in":"09:00","hrs":8,"gap":0.5,"late":false}]}];
+
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const mmdd=d=>{const p=d.split('-');return +p[2]+' '+MON[+p[1]-1];};
+const dd=d=>{const p=d.split('-');return +p[2];};
+
+function bars(data, o){
+  o=o||{}; const n=data.length, bw=30, gap=22, padL=34, padB=26, padT=10, H=170;
+  const W=padL+ n*(bw+gap)+10;
+  const vals=data.map(d=>d.v); let max=o.max|| Math.max.apply(null,vals.concat(o.targets||[]).concat([1]));
+  max=max*1.12;
+  const y=v=>padT+(H-padT-padB)*(1-v/max);
+  let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
+  (o.targets||[]).forEach((t,i)=>{const yy=y(t);const c=o.targetColors&&o.targetColors[i]||'var(--t3)';
+    s+=`<line x1="${padL}" y1="${yy}" x2="${W-6}" y2="${yy}" stroke="${c}" stroke-width="1" stroke-dasharray="4 3" opacity=".55"/>`;
+    s+=`<text x="${W-6}" y="${yy-3}" text-anchor="end" font-size="8" fill="${c}">${o.targetLabels?o.targetLabels[i]:t}</text>`;});
+  data.forEach((d,i)=>{const x=padL+i*(bw+gap), h=Math.max(1,(H-padT-padB)-(y(d.v)-padT)); const yy=y(d.v);
+    const col=d.c|| o.color||'var(--accent)';
+    s+=`<rect x="${x}" y="${yy}" width="${bw}" height="${h}" rx="3" fill="${col}"/>`;
+    s+=`<text x="${x+bw/2}" y="${yy-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${d.t!=null?d.t:d.v}</text>`;
+    s+=`<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="var(--t3)">${esc(d.l)}</text>`;
+    if(d.l2)s+=`<text x="${x+bw/2}" y="${H-5}" text-anchor="middle" font-size="7.5" fill="var(--t3)">${esc(d.l2)}</text>`;});
+  s+=`</svg>`; return s;
+}
+function stacked(data,o){
+  o=o||{}; const ca=o.ca||'var(--green)', cb=o.cb||'var(--red)';
+  const n=data.length,bw=30,gap=22,padL=20,padB=26,padT=10,H=170; const W=padL+n*(bw+gap)+10;
+  let max=Math.max.apply(null,data.map(d=>d.a+d.b).concat([1]))*1.12;
+  const hh=v=>(H-padT-padB)*(v/max);
+  let s=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
+  data.forEach((d,i)=>{const x=padL+i*(bw+gap); let yb=H-padB;
+    const ah=hh(d.a), bh=hh(d.b);
+    if(d.b){s+=`<rect x="${x}" y="${yb-bh}" width="${bw}" height="${bh}" fill="${cb}"/>`;yb-=bh;}
+    if(d.a){s+=`<rect x="${x}" y="${yb-ah}" width="${bw}" height="${ah}" rx="2" fill="${ca}"/>`;yb-=ah;}
+    const tot=Math.round((d.a+d.b)*10)/10;
+    s+=`<text x="${x+bw/2}" y="${yb-4}" text-anchor="middle" font-size="8.5" fill="var(--t2)" font-weight="700">${tot?(Number.isInteger(tot)?tot:tot.toFixed(1)):''}</text>`;
+    s+=`<text x="${x+bw/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="var(--t3)">${esc(d.l)}</text>`;});
+  s+=`</svg>`; return s;
+}
+
+const hm=h=>Math.floor(h)+'h '+String(Math.round((h%1)*60)).padStart(2,'0')+'m';
+function attAgg(){
+  let worked=0,late=0,absent=0,gapS=0,hrS=0,zero=0; const brk=[];
+  ATT.forEach(w=>{absent+=w.absent; w.daily.forEach(d=>{if(!d.present)return;worked++;if(d.late)late++;
+    gapS+=d.gap; hrS+=d.hrs; if(d.gap>0.01) brk.push(d.gap); else zero++;});});
+  const brkAvg=brk.length?brk.reduce((s,v)=>s+v,0)/brk.length:0;
+  return {worked,late,absent,avgHrs:hrS/worked,avgGap:gapS/worked,latePct:Math.round(late/worked*100),
+    brkAvg,brkDays:brk.length,zeroDays:zero,totalBreak:gapS,maxBreak:brk.length?Math.max.apply(null,brk):0,
+    avgSpan:(hrS+gapS)/worked, under8:(function(){let c=0;ATT.forEach(w=>w.daily.forEach(d=>{if(d.present&&d.hrs<8)c++;}));return c;})()};
+}
+
+function renderAttendance(){
+  const a=attAgg();
+  const lateBars=ATT.map(w=>({l:mmdd(w.daily[0].date).split(' ')[0],l2:MON[+w.week.split('-')[1]-1],v:w.late,t:w.late,c:w.late>=4?'var(--red)':w.late>=2?'var(--amber)':'var(--green)'}));
+  const hrBars=ATT.map(w=>({l:dd(w.daily[0].date)+'',v:+w.avgHrs.toFixed(1),t:w.avgHrs.toFixed(1),c:w.avgHrs>=7.9?'var(--green)':w.avgHrs>=7?'var(--amber)':'var(--red)'}));
+  const gapBars=ATT.map(w=>{const b=w.daily.filter(d=>d.present&&d.gap>0.01).map(d=>d.gap);
+    const v=b.length?b.reduce((s,x)=>s+x,0)/b.length:0;
+    return {l:dd(w.daily[0].date)+'',v:+v.toFixed(2),t:v?v.toFixed(1):'—',c:v>=1?'var(--red)':v>=.6?'var(--amber)':'var(--green)'};});
+  let strip='';
+  ATT.forEach(w=>{w.daily.forEach(d=>{
+    if(!d.present){strip+=`<div class="cell" style="background:rgba(234,67,53,.25);color:#EA4335" title="${d.date} absent">A</div>`;return;}
+    const col=d.late?'var(--amber)':'var(--green)';
+    strip+=`<div class="cell" style="background:${col}" title="${d.date} in ${d.in} · ${d.hrs}h">${dd(d.date)}</div>`;});});
+  return `<section>
+    <h2>Attendance · Punctuality · Hours</h2>
+    <div class="h2sub">Biometric, ${WINDOW} · late threshold ${LATE_LABEL} · "Total Hrs" = actual time in office; averaged over present days (absences shown separately)</div>
+    <div class="tiles" style="margin-bottom:18px">
+      <div class="tile"><div class="v">${a.worked}</div><div class="l">Present days</div><div class="x">${a.absent} absences (excl.)</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${a.latePct}%</div><div class="l">Days late (&gt;${LATE_LABEL})</div><div class="x">${a.late} of ${a.worked} days</div></div>
+      <div class="tile"><div class="v" style="color:${a.avgHrs>=7.9?'var(--green)':'var(--amber)'}">${hm(a.avgHrs)}</div><div class="l">Avg time in office / day</div><div class="x">vs 8h expected · ${a.under8}/${a.worked} days under 8h</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${hm(a.brkAvg)}</div><div class="l">Lunch / tea break / day</div><div class="x">total ${hm(a.totalBreak)} · longest ${hm(a.maxBreak)}</div></div>
+    </div>
+    <div class="grid2">
+      <div><div class="chart-t">Late arrivals per week</div>${bars(lateBars,{color:'var(--red)'})}</div>
+      <div><div class="chart-t">Avg time in office / present day (8h expected)</div>${bars(hrBars,{targets:[8],targetLabels:['8h'],targetColors:['var(--green)']})}</div>
+    </div>
+    <div style="margin-top:14px"><div class="chart-t">Lunch / tea break per day (hrs) — lower is better</div>${bars(gapBars,{color:'var(--amber)'})}</div>
+    <div style="margin-top:16px"><div class="chart-t">Daily punctuality — green on-time · amber late · red absent</div><div class="strip">${strip}</div></div>
+    ${attInsights(a)}
+  </section>`;
+}
+function attInsights(a){
+  return `<div style="margin-top:16px">
+   <div class="ins">You arrived after ${LATE_LABEL} on <b>${a.late} of ${a.worked} present days (${a.latePct}%)</b> — lateness is the norm rather than the exception across this window.</div>
+   <div class="ins">You are in the building about <b>${hm(a.avgSpan)}</b> a day, but only <b>${hm(a.avgHrs)}</b> of that is time in office — the rest goes to <b>lunch and tea breaks averaging ${hm(a.brkAvg)} a day</b> (longest ${hm(a.maxBreak)}). Across this period that is <b>${hm(a.totalBreak)}</b> of break time — roughly <b>${(a.totalBreak/8).toFixed(1)} full working days</b>.</div>
+   <div class="ins">Your time in office is under the 8-hour expectation on <b>${a.under8} of ${a.worked} days</b>.</div>
+   <div class="ins">There is also a pattern of collapsed days: arrivals of <b>16:30 on 29 Jun</b>, <b>11:10 on 2 Jul</b> and <b>12:04 on 22 Jul</b>, several days under 5 hours in office (15 May, 6 Jun, 20 Jul, 25 Jul, 4 Aug), plus <b>${a.absent} absences</b> in this window — including <b>19 Jun</b>, where you did punch in (09:47) but arrived too late, unapproved, to count as a working day at all.</div>
+  </div>`;
+}
+
+// ── live sections from getMemberReview ──
+function renderLive(d){
+  const weeks=d.weeks||[], projects=(d.projects||[]).slice().sort((a,b)=>(b.pts||0)-(a.pts||0));
+  const T=d.totals||{}, dprInfo=d.dpr||{}, late=d.lateDetail||[], over=d.overdueOpen||[];
+  const wi={}; weeks.forEach(w=>wi[w.week]=w);
+  const order=ATT.map(w=>w.week);
+  const lbl=k=>dd(ATT.find(x=>x.week===k).daily[0].date)+'';
+  const ptsBars=order.map(k=>{const w=wi[k]||{};const v=w.approvedPts||0;return {l:lbl(k),v:+v.toFixed(1),t:v.toFixed(0),c:v>=WEEK_TGT?'var(--green)':v>=WEEK_TGT*0.6?'var(--amber)':'var(--red)'};});
+  const otBars=order.map(k=>{const w=wi[k]||{};return {l:lbl(k),a:w.onTime||0,b:w.delayed||0};});
+  const splitBars=order.map(k=>{const w=wi[k]||{};return {l:lbl(k),a:+(w.plannedPts||0).toFixed(1),b:+(w.unplannedPts||0).toFixed(1)};});
+  const totalPts=weeks.reduce((s,w)=>s+(w.approvedPts||0),0);
+  const pOn=T.plannedOnTime||0, pDel=T.plannedDelayed||0;
+  const onPct=(pOn+pDel)?Math.round(pOn/(pOn+pDel)*100):0;
+  const plPts=T.plannedPts||0, unPts=T.unplannedPts||0;
+  const unPct=totalPts?Math.round(unPts/totalPts*100):0;
+  const nWeeks=order.length, avgWk=totalPts/nWeeks;
+  const relTot=weeks.reduce((s,w)=>s+(w.relLate||0)+2*(w.relWnd||0),0);
+
+  let out=`<section><h2>Output &amp; Task Completion</h2>
+    <div class="h2sub">Approved points per week vs the ${WEEK_TGT}-pt weekly target</div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:${avgWk>=WEEK_TGT?'var(--green)':'var(--red)'}">${avgWk.toFixed(0)}</div><div class="l">Avg pts / week</div><div class="x">target ${WEEK_TGT}</div></div>
+      <div class="tile"><div class="v">${(avgWk/6).toFixed(1)}</div><div class="l">Avg pts / day</div><div class="x">target ${DAILY_TGT}/day</div></div>
+      <div class="tile"><div class="v" style="color:${onPct>=ONTIME_TGT?'var(--green)':'var(--red)'}">${onPct}%</div><div class="l">On-time — planned only</div><div class="x">${pOn} on-time · ${pDel} delayed · target ${ONTIME_TGT}%</div></div>
+      <div class="tile"><div class="v">${totalPts.toFixed(0)}</div><div class="l">Total approved pts</div><div class="x">${nWeeks} weeks</div></div>
+    </div>
+    <div class="grid2">
+      <div><div class="chart-t">Approved points / week</div>${bars(ptsBars,{max:WEEK_TGT*1.2,targets:[WEEK_TGT],targetLabels:['Target '+WEEK_TGT],targetColors:['var(--green)']})}</div>
+      <div><div class="chart-t">Planned tasks — on-time (green) vs delayed (red)</div>${stacked(otBars)}</div>
+    </div>
+    <div class="ins" style="margin-top:14px">You averaged <b>${avgWk.toFixed(1)} pts/week</b> (<b>${(avgWk/6).toFixed(1)} pts/day</b> against a ${DAILY_TGT}/day target) — <b>${Math.round((1-avgWk/WEEK_TGT)*100)}% short</b> of your ${WEEK_TGT}-pt weekly target.</div>
+  </section>`;
+
+  const lateRows=late.length?late.slice(0,12).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n">${esc(t.doneDate)}</td><td class="n"><span class="pill ${t.daysLate>14?'bad':'warn'}">${t.daysLate}d late</span></td></tr>`).join(''):'<tr><td colspan="5" style="color:var(--t3)">No planned tasks completed late in this window.</td></tr>';
+  const overRows=over.length?over.slice(0,8).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n"><span class="pill bad">${t.daysOverdue}d overdue</span></td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--t3)">None open past deadline.</td></tr>';
+  let planSec=`<section><h2>Planning · Planned vs Unplanned Work</h2>
+    <div class="h2sub">Where your points actually come from — and why your on-time number is misleading</div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:var(--blue)">${plPts.toFixed(0)}</div><div class="l">Points — planned</div><div class="x">${T.plannedTasks||0} tasks assigned ahead</div></div>
+      <div class="tile"><div class="v" style="color:var(--amber)">${unPts.toFixed(0)}</div><div class="l">Points — unplanned</div><div class="x">${T.unplannedTasks||0} self-logged in DPR</div></div>
+      <div class="tile"><div class="v" style="color:${unPct>40?'var(--red)':'var(--amber)'}">${unPct}%</div><div class="l">Output that was unplanned</div><div class="x">never visible in advance</div></div>
+      <div class="tile"><div class="v" style="color:${late.length?'var(--red)':'var(--green)'}">${late.length}</div><div class="l">Planned tasks finished late</div><div class="x">${over.length} still open past due</div></div>
+    </div>
+    <div><div class="chart-t">Points per week — planned (blue) vs unplanned self-logged (amber)</div>${stacked(splitBars,{ca:'var(--blue)',cb:'var(--amber)'})}</div>
+    <div class="ins" style="margin-top:14px"><b>Why your on-time percentage cannot be taken at face value.</b> When you log work as <i>unplanned</i> in the DPR, the system records it with <b>deadline = the day you completed it</b> — so it is counted on-time automatically, by construction. <b>${unPct}% of your points (${unPts.toFixed(1)} pts across ${T.unplannedTasks||0} tasks)</b> came in this way. The ${onPct}% above is therefore measured on <b>planned tasks only</b>; unplanned work is excluded, because it cannot be late.</div>
+    <div class="ins">This is the central issue. Because the work is not planned in advance, <b>there is no forward view of how loaded or free you are</b>. Tasks only become visible after they are already done, so work cannot be distributed, deadlines cannot be committed to clients, and no one — including you — can tell whether your week is full or empty until it is over.</div>
+    <div style="margin-top:16px"><div class="chart-t">Planned tasks completed after their deadline</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Completed</th><th class="n">Delay</th></tr></thead><tbody>${lateRows}</tbody></table></div></div>
+    <div style="margin-top:14px"><div class="chart-t">Still open past deadline</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Overdue</th></tr></thead><tbody>${overRows}</tbody></table></div></div>
+  </section>`;
+
+  let rows=projects.map(pr=>`<tr>
+      <td>${esc(pr.project)}</td>
+      <td class="n">${pr.tasks||0}</td><td class="n">${(pr.pts||0).toFixed(1)}</td>
+      <td class="n">${pr.onTime||0}</td><td class="n" style="color:${pr.delayed?'var(--red)':'inherit'}">${pr.delayed||0}</td>
+      <td class="n">${(pr.visits||[]).length}</td><td class="n">${pr.comms||0}</td></tr>`).join('');
+  let projSec=`<section><h2>Project-wise Breakdown</h2>
+    <div class="h2sub">All ${projects.length} projects touched · tasks, points, delayed, site visits (meetings excluded) and client communication (${WINDOW})</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Site visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+
+  const dprBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:w.dprDays||0,t:(w.dprDays||0)+'',c:(w.dprDays||0)>=5?'var(--green)':(w.dprDays||0)>=3?'var(--amber)':'var(--red)'};});
+  const relBars=order.map(k=>{const w=wi[k]||{};const v=(w.relLate||0)+2*(w.relWnd||0);return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v,t:v+'',c:v?'var(--red)':'var(--green)'};});
+  const dprDays=dprInfo.distinctDays||0, workDays=nWeeks*6;
+  let dprSec=`<section><h2>DPR Consistency &amp; Reliability</h2>
+    <div class="h2sub">Days a daily report was filed (of 6/week) · reliability penalty (late −1, work-not-done −2)</div>
+    <div class="tiles" style="margin-bottom:16px">
+      <div class="tile"><div class="v" style="color:${dprDays>=workDays*0.85?'var(--green)':'var(--red)'}">${dprDays}</div><div class="l">Days reported</div><div class="x">of ${workDays} working days</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${workDays-dprDays}</div><div class="l">Days with no report</div><div class="x">${Math.round((workDays-dprDays)/workDays*100)}% of the period</div></div>
+      <div class="tile"><div class="v" style="color:${relTot?'var(--red)':'var(--green)'}">−${relTot}</div><div class="l">Reliability penalty</div><div class="x">late −1 · work-not-done −2</div></div>
+      <div class="tile"><div class="v">${nWeeks}</div><div class="l">Weeks reviewed</div><div class="x">${WINDOW}</div></div>
+    </div>
+    <div class="grid2">
+      <div><div class="chart-t">Days reported / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
+      <div><div class="chart-t">Reliability penalty / week (lower is better)</div>${bars(relBars,{color:'var(--red)'})}</div>
+    </div>
+    <div class="ins" style="margin-top:12px">You filed a report on <b>${dprDays} of ${workDays} working days</b>${relTot?`, and carry a reliability penalty of <b>−${relTot}</b> across the period (tasks missed past their deadline, or work a lead had to take off you and reassign)`:''}.</div>
+    <div class="ins">Just as important as the count: the daily report is often <b>not filed each day as the work happens</b> — several days this window carry two batched submissions filed together, later. The DPR exists so the studio can see <b>during</b> the week what you are working on and how loaded you are; filled in retrospectively, it becomes a record of the past instead of a live picture, and nobody can plan around you.</div>
+  </section>`;
+
+  document.getElementById('live-tasks').innerHTML = out+planSec+projSec;
+  document.getElementById('live-dpr').innerHTML   = dprSec;
+}
+
+function render(){
+  document.getElementById('gate').style.display='none';
+  const app=document.getElementById('app'); app.style.display='block';
+  app.innerHTML=`
+    <div class="rh"><div><h1>Performance Review — ${esc(MEMBER)}</h1><div class="sub">${esc(ROLE)} · ${WINDOW} · Confidential</div></div><div class="badge">Under Review</div></div>
+    <section>
+      <h2>Sahil — please read this in full</h2>
+      <div class="h2sub">${WINDOW}</div>
+      <div style="font-size:13.5px;color:var(--t2);line-height:1.65">
+        This review covers your work as <b>${esc(ROLE)}</b> from <b>${WINDOW}</b>. Every number in it comes straight from
+        your own biometric attendance record and the studio's task data — none of it is opinion, and none of it has been
+        adjusted. Where a measure flatters you, that is said plainly too.
+        <br><br>
+        Your role carries a <b>${WEEK_TGT}-point weekly target</b> and the responsibility to plan work ahead, keep the studio
+        informed through your DPR, and finish what you commit to on time. The pages below set out, honestly, where that has
+        and has not happened — on <b>attendance and punctuality</b>, <b>hours actually in office</b>, <b>output against target</b>,
+        <b>planning</b>, and <b>DPR consistency</b>.
+        <br><br>
+        Read it carefully. The purpose is not to catalogue faults — it is to show you exactly what has to change, and by how much.
+      </div>
+    </section>
+    <div id="live-tasks"><section><div class="loading">Loading task, project &amp; DPR data from the sheet…</div></section></div>
+    ${renderAttendance()}
+    <div id="live-dpr"></div>
+    <div class="foot">© Ideaform Design Studio · Performance Review · ${WINDOW} · Confidential — for internal HR use</div>`;
+  fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMemberReview',member:MEMBER,from:FROM,to:TO})})
+    .then(r=>r.json()).then(d=>{ if(d&&d.error){document.getElementById('live-tasks').innerHTML='<section><div class="loading">Could not load task data: '+esc(d.error)+'</div></section>';return;} renderLive(d); })
+    .catch(e=>{document.getElementById('live-tasks').innerHTML='<section><div class="loading">Could not load task data — '+esc(e.message)+'. Check sign-in.</div></section>';});
+}
+
+window.idsOnAuth=function(u){
+  const email=String((u&&u.email)||'').toLowerCase();
+  if(['siddharth@ideaform.in','sidinani14@gmail.com','astha@ideaform.in','astha.uch@gmail.com'].indexOf(email)===-1){
+    document.getElementById('gate').innerHTML='<div style="font-size:40px">🔒</div><h2 style="color:#EA4335;margin:10px 0">Access restricted</h2><p style="color:rgba(255,255,255,.5);font-size:13px">This review is available to Siddharth &amp; Astha only.</p>';
+    return;
+  }
+  render();
+};
+</script>
