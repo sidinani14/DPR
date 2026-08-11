@@ -174,12 +174,9 @@ function renderAttendance(){
 const APPROVED_LEAVE_MAY_JUL = 2.0 + 1.2 + 1.4; // 4.6 days, May+Jun+Jul payroll (whole calendar months)
 function attInsights(a){
   return `<div style="margin-top:16px">
-   <div class="ins">You are present on average <b>${a.avgDaysPerWeek.toFixed(1)} of 6 days a week</b> across the ${ATT.length} weeks reviewed.</div>
-   <div class="ins">You arrived after ${LATE_LABEL} on <b>${a.late} of ${a.worked} present days (${a.latePct}%)</b> — lateness is the norm rather than the exception across this window.</div>
-   <div class="ins">You are in the building about <b>${hm(a.avgSpan)}</b> a day; of that, <b>${hm(a.avgHrs)}</b> is time in office. The studio allows 30 minutes for lunch every day — that is not counted here. Beyond that allowance, you take an <b>additional ${hm(a.brkAvg)} a day</b> on average (longest single day ${hm(a.maxBreak)}), totalling <b>${hm(a.totalBreak)}</b> of extra break across the period.</div>
-   <div class="ins">Your time in office is under the 8-hour expectation on <b>${a.under8} of ${a.worked} days</b>.</div>
-   <div class="ins">There is also a pattern of collapsed days: arrivals of <b>16:30 on 29 Jun</b>, <b>11:10 on 2 Jul</b> and <b>12:04 on 22 Jul</b>, several days under 5 hours in office (15 May, 6 Jun, 20 Jul, 25 Jul, 4 Aug), plus <b>${a.absent} absences</b> in this window — including <b>19 Jun</b>, where you did punch in (09:47) but arrived too late, unapproved, to count as a working day at all.</div>
-   <div class="ins">Payroll's own records show only <b>~${APPROVED_LEAVE_MAY_JUL.toFixed(1)} days</b> of formally approved paid leave across May–July — against <b>${a.absent} marked-absent days</b> in this window alone. Most of your time away has not been pre-planned or informed leave; it has simply been not showing up.</div>
+   <div class="ins">Present <b>${a.avgDaysPerWeek.toFixed(1)} of 6 days a week</b> on average (${ATT.length} weeks reviewed). Late after ${LATE_LABEL} on <b>${a.late} of ${a.worked} present days (${a.latePct}%)</b> — lateness is the norm here, not the exception.</div>
+   <div class="ins">In the building ~<b>${hm(a.avgSpan)}</b> a day; <b>${hm(a.avgHrs)}</b> of that is time in office (under 8h on <b>${a.under8} of ${a.worked} days</b>). Beyond the studio's 30-min lunch allowance, an <b>additional ${hm(a.brkAvg)}/day</b> goes to breaks (longest ${hm(a.maxBreak)}), totalling <b>${hm(a.totalBreak)}</b> across the period. Notable collapsed days: 16:30 arrival (29 Jun), 11:10 (2 Jul), 12:04 (22 Jul).</div>
+   <div class="ins"><b>${a.absent} absences</b> in this window — including 19 Jun, where he punched in (09:47) but too late, unapproved, to count as a working day. Payroll's own records show only <b>~${APPROVED_LEAVE_MAY_JUL.toFixed(1)} days</b> of formally approved leave across May–July, so most of this time away was not pre-planned or informed.</div>
   </div>`;
 }
 
@@ -216,8 +213,6 @@ function renderLive(d){
     <div class="ins" style="margin-top:14px">You averaged <b>${avgWk.toFixed(1)} pts/week</b> (<b>${(avgWk/6).toFixed(1)} pts/day</b> against a ${DAILY_TGT}/day target) — <b>${Math.round((1-avgWk/WEEK_TGT)*100)}% short</b> of your ${WEEK_TGT}-pt weekly target.</div>
   </section>`;
 
-  const lateRows=late.length?late.slice(0,12).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n">${esc(t.doneDate)}</td><td class="n"><span class="pill ${t.daysLate>14?'bad':'warn'}">${t.daysLate}d late</span></td></tr>`).join(''):'<tr><td colspan="5" style="color:var(--t3)">No planned tasks completed late in this window.</td></tr>';
-  const overRows=over.length?over.slice(0,8).map(t=>`<tr><td>${esc(t.project)}</td><td>${esc(t.task)}</td><td class="n">${esc(t.deadline)}</td><td class="n"><span class="pill bad">${t.daysOverdue}d overdue</span></td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--t3)">None open past deadline.</td></tr>';
   let planSec=`<section><h2>Planning · Planned vs Unplanned Work</h2>
     <div class="h2sub">Where your points actually come from — and why your on-time number is misleading</div>
     <div class="tiles" style="margin-bottom:16px">
@@ -227,12 +222,7 @@ function renderLive(d){
       <div class="tile"><div class="v" style="color:${late.length?'var(--red)':'var(--green)'}">${late.length}</div><div class="l">Planned tasks finished late</div><div class="x">${over.length} still open past due</div></div>
     </div>
     <div><div class="chart-t">Points per week — planned (blue) vs unplanned self-logged (amber)</div>${stacked(splitBars,{ca:'var(--blue)',cb:'var(--amber)'})}</div>
-    <div class="ins" style="margin-top:14px"><b>Why your on-time percentage cannot be taken at face value.</b> When you log work as <i>unplanned</i> in the DPR, the system records it with <b>deadline = the day you completed it</b> — so it is counted on-time automatically, by construction. <b>${unPct}% of your points (${unPts.toFixed(1)} pts across ${T.unplannedTasks||0} tasks)</b> came in this way. The ${onPct}% above is therefore measured on <b>planned tasks only</b>; unplanned work is excluded, because it cannot be late.</div>
-    <div class="ins">This is the central issue. Because the work is not planned in advance, <b>there is no forward view of how loaded or free you are</b>. Tasks only become visible after they are already done, so work cannot be distributed, deadlines cannot be committed to clients, and no one — including you — can tell whether your week is full or empty until it is over.</div>
-    <div style="margin-top:16px"><div class="chart-t">Planned tasks completed after their deadline</div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Completed</th><th class="n">Delay</th></tr></thead><tbody>${lateRows}</tbody></table></div></div>
-    <div style="margin-top:14px"><div class="chart-t">Still open past deadline</div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th>Task</th><th class="n">Due</th><th class="n">Overdue</th></tr></thead><tbody>${overRows}</tbody></table></div></div>
+    <div class="ins" style="margin-top:14px"><b>Why your on-time percentage cannot be taken at face value.</b> Unplanned DPR work is recorded with <b>deadline = the day you completed it</b>, so it's counted on-time by construction — <b>${unPct}% of your points (${unPts.toFixed(1)} pts, ${T.unplannedTasks||0} tasks)</b> came in this way, and the ${onPct}% on-time figure above only covers the planned tasks left over. Because work isn't planned in advance, there's <b>no forward view of how loaded or free you are</b> — tasks only become visible once they're already done.</div>
   </section>`;
 
   let rows=projects.map(pr=>`<tr>
@@ -245,14 +235,29 @@ function renderLive(d){
     <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Site visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 
   // Same points as above, split by the kind of work instead of the project —
-  // shows where he's actually reliable vs where deadlines slip, independent
-  // of which client it happens to be for.
-  const byType = (d.byTaskType||[]).slice().sort((a,b)=>(b.pts||0)-(a.pts||0));
+  // rolled up into 3 broad skill areas (plus a small "Other" catch-all) rather
+  // than 15 exact stage labels, so the read is immediate rather than a table
+  // to study.
+  function superCat(cat){
+    if (cat==='3D Modelling' || cat==='3D Rendering') return '3Ds';
+    if (cat==='ID Working Drawings' || cat==='Working Drawing (Arch)' || cat==='Structural' || cat==='Electrical' || cat==='Plumbing') return 'Working Drawings';
+    if (cat==='Site Visit / Meeting') return 'Site Visits & Meetings';
+    return 'Other';
+  }
+  const superMap = {};
+  (d.byTaskType||[]).forEach(t=>{
+    const k = superCat(t.category);
+    if (!superMap[k]) superMap[k] = {category:k, tasks:0, pts:0, onTime:0, delayed:0, unplannedPts:0};
+    const s = superMap[k];
+    s.tasks += t.tasks; s.pts += (t.pts||0); s.onTime += t.onTime; s.delayed += t.delayed; s.unplannedPts += (t.unplannedPts||0);
+  });
+  const order3 = ['3Ds','Working Drawings','Site Visits & Meetings','Other'];
+  const byType = order3.map(k=>superMap[k]).filter(Boolean);
   // Enough PLANNED-task signal to judge, and not dominated by unplanned work —
   // a category that's mostly self-logged-after-the-fact can look artificially
   // "reliable" (unplanned work can't be late by construction, same caveat as
   // the Planning section above), so it's excluded from strength/weakness picks.
-  const rateable = byType.filter(t=>(t.onTime+t.delayed)>=2 && (t.unplannedPts||0) < (t.pts||0)*0.5);
+  const rateable = byType.filter(t=>t.category!=='Other' && (t.onTime+t.delayed)>=2 && (t.unplannedPts||0) < (t.pts||0)*0.5);
   const typeRows = byType.map(t=>{
     const total=t.onTime+t.delayed;
     const latePct = total ? Math.round(t.delayed/total*100) : null;
@@ -264,11 +269,11 @@ function renderLive(d){
   }).join('');
   const strongest = rateable.slice().sort((a,b)=>(a.delayed/(a.onTime+a.delayed))-(b.delayed/(b.onTime+b.delayed)))[0];
   const weakest = rateable.slice().sort((a,b)=>(b.delayed/(b.onTime+b.delayed))-(a.delayed/(a.onTime+a.delayed)))[0];
-  const strengthNote = strongest ? `<b>${esc(strongest.category)}</b> is your most reliable category — ${strongest.delayed} of ${strongest.onTime+strongest.delayed} planned tasks late (${Math.round(strongest.delayed/(strongest.onTime+strongest.delayed)*100)}%).` : '';
-  const weakNote = (weakest && weakest!==strongest) ? ` <b>${esc(weakest.category)}</b> is where deadlines slip most — ${weakest.delayed} of ${weakest.onTime+weakest.delayed} planned tasks late (${Math.round(weakest.delayed/(weakest.onTime+weakest.delayed)*100)}%), and it's ${weakest.pts>=strongest.pts?'also':'still'} a large share of your points (${(weakest.pts||0).toFixed(0)} pts).` : '';
-  let typeSec = byType.length ? `<section><h2>Strengths &amp; Delays — by Task Type</h2>
-    <div class="h2sub">Same points as the project breakdown above, split by the kind of work instead — where you're reliable vs where deadlines slip (${WINDOW})</div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Task type</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Late %</th><th class="n">Read</th></tr></thead><tbody>${typeRows}</tbody></table></div>
+  const strengthNote = strongest ? `<b>${esc(strongest.category)}</b> is your most reliable area — ${strongest.delayed} of ${strongest.onTime+strongest.delayed} planned tasks late (${Math.round(strongest.delayed/(strongest.onTime+strongest.delayed)*100)}%).` : '';
+  const weakNote = (weakest && weakest!==strongest) ? ` <b>${esc(weakest.category)}</b> is where deadlines slip most — ${weakest.delayed} of ${weakest.onTime+weakest.delayed} planned tasks late (${Math.round(weakest.delayed/(weakest.onTime+weakest.delayed)*100)}%), and it's your single largest point source.` : '';
+  let typeSec = byType.length ? `<section><h2>Strengths &amp; Delays — by Category</h2>
+    <div class="h2sub">Same points as the project breakdown, grouped by skill area — where you're reliable vs where deadlines slip (${WINDOW})</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Category</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Late %</th><th class="n">Read</th></tr></thead><tbody>${typeRows}</tbody></table></div>
     <div class="ins" style="margin-top:14px">${strengthNote}${weakNote}</div>
   </section>` : '';
 
@@ -287,8 +292,7 @@ function renderLive(d){
       <div><div class="chart-t">Days reported / week (target 6)</div>${bars(dprBars,{max:6,targets:[6],targetLabels:['6'],targetColors:['var(--green)']})}</div>
       <div><div class="chart-t">Reliability penalty / week (lower is better)</div>${bars(relBars,{color:'var(--red)'})}</div>
     </div>
-    <div class="ins" style="margin-top:12px">You filed a report on <b>${dprDays} of ${workDays} working days</b>${relTot?`, and carry a reliability penalty of <b>−${relTot}</b> across the period (tasks missed past their deadline, or work a lead had to take off you and reassign)`:''}.</div>
-    <div class="ins">Just as important as the count: the daily report is often <b>not filed each day as the work happens</b> — several days this window carry two batched submissions filed together, later. The DPR exists so the studio can see <b>during</b> the week what you are working on and how loaded you are; filled in retrospectively, it becomes a record of the past instead of a live picture, and nobody can plan around you.</div>
+    <div class="ins" style="margin-top:12px">Filed on <b>${dprDays} of ${workDays} working days</b>${relTot?`, with a reliability penalty of <b>−${relTot}</b> across the period (tasks past deadline, or work reassigned)`:''}. It's also often filed <b>after the fact</b> rather than as the work happens — several days this window carry two batched submissions filed together, later — which defeats the point: the DPR exists so the studio can see <b>during</b> the week how loaded you are, not read about it afterward.</div>
   </section>`;
 
   document.getElementById('live-tasks').innerHTML = out+planSec+projSec+typeSec;
