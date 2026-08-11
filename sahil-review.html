@@ -244,37 +244,30 @@ function renderLive(d){
     if (cat==='Site Visit / Meeting') return 'Site Visits & Meetings';
     return 'Other';
   }
+  // Volume by skill area only — deliberately excludes on-time/delayed here.
+  // Lateness is a planning problem (covered above, in Planning · Planned vs
+  // Unplanned Work); it says nothing about whether he's actually good at the
+  // work itself, so it doesn't belong in a strengths read.
   const superMap = {};
   (d.byTaskType||[]).forEach(t=>{
     const k = superCat(t.category);
-    if (!superMap[k]) superMap[k] = {category:k, tasks:0, pts:0, onTime:0, delayed:0, unplannedPts:0};
+    if (!superMap[k]) superMap[k] = {category:k, tasks:0, pts:0};
     const s = superMap[k];
-    s.tasks += t.tasks; s.pts += (t.pts||0); s.onTime += t.onTime; s.delayed += t.delayed; s.unplannedPts += (t.unplannedPts||0);
+    s.tasks += t.tasks; s.pts += (t.pts||0);
   });
   const order3 = ['3Ds','Working Drawings','Site Visits & Meetings','Other'];
   const byType = order3.map(k=>superMap[k]).filter(Boolean);
-  // Enough PLANNED-task signal to judge, and not dominated by unplanned work —
-  // a category that's mostly self-logged-after-the-fact can look artificially
-  // "reliable" (unplanned work can't be late by construction, same caveat as
-  // the Planning section above), so it's excluded from strength/weakness picks.
-  const rateable = byType.filter(t=>t.category!=='Other' && (t.onTime+t.delayed)>=2 && (t.unplannedPts||0) < (t.pts||0)*0.5);
+  const totalTypePts = byType.reduce((s,t)=>s+t.pts,0) || 1;
   const typeRows = byType.map(t=>{
-    const total=t.onTime+t.delayed;
-    const latePct = total ? Math.round(t.delayed/total*100) : null;
-    const tag = latePct==null ? {l:'—',c:'var(--t3)'} : latePct<=30 ? {l:'Strength',c:'var(--green)'} : latePct>=55 ? {l:'Causes delay',c:'var(--red)'} : {l:'Mixed',c:'var(--amber)'};
-    return `<tr><td>${esc(t.category)}</td><td class="n">${t.tasks}</td><td class="n">${(t.pts||0).toFixed(1)}</td>
-      <td class="n">${t.onTime}</td><td class="n" style="color:${t.delayed?'var(--red)':'inherit'}">${t.delayed}</td>
-      <td class="n">${latePct==null?'—':latePct+'%'}</td>
-      <td class="n"><span class="pill" style="background:${tag.c}22;color:${tag.c}">${tag.l}</span></td></tr>`;
+    const pct = Math.round(t.pts/totalTypePts*100);
+    return `<tr><td>${esc(t.category)}</td><td class="n">${t.tasks}</td><td class="n">${(t.pts||0).toFixed(1)}</td><td class="n">${pct}%</td></tr>`;
   }).join('');
-  const strongest = rateable.slice().sort((a,b)=>(a.delayed/(a.onTime+a.delayed))-(b.delayed/(b.onTime+b.delayed)))[0];
-  const weakest = rateable.slice().sort((a,b)=>(b.delayed/(b.onTime+b.delayed))-(a.delayed/(a.onTime+a.delayed)))[0];
-  const strengthNote = strongest ? `<b>${esc(strongest.category)}</b> is your most reliable area — ${strongest.delayed} of ${strongest.onTime+strongest.delayed} planned tasks late (${Math.round(strongest.delayed/(strongest.onTime+strongest.delayed)*100)}%).` : '';
-  const weakNote = (weakest && weakest!==strongest) ? ` <b>${esc(weakest.category)}</b> is where deadlines slip most — ${weakest.delayed} of ${weakest.onTime+weakest.delayed} planned tasks late (${Math.round(weakest.delayed/(weakest.onTime+weakest.delayed)*100)}%), and it's your single largest point source.` : '';
-  let typeSec = byType.length ? `<section><h2>Strengths &amp; Delays — by Category</h2>
-    <div class="h2sub">Same points as the project breakdown, grouped by skill area — where you're reliable vs where deadlines slip (${WINDOW})</div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Category</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Late %</th><th class="n">Read</th></tr></thead><tbody>${typeRows}</tbody></table></div>
-    <div class="ins" style="margin-top:14px">${strengthNote}${weakNote}</div>
+  const biggest = byType.filter(t=>t.category!=='Other').slice().sort((a,b)=>b.pts-a.pts)[0];
+  const biggestNote = biggest ? `<b>${esc(biggest.category)}</b> is where most of your output comes from — ${Math.round(biggest.pts/totalTypePts*100)}% of your points this window. Whether that work lands on time is a separate, planning question — covered above, not here.` : '';
+  let typeSec = byType.length ? `<section><h2>Strengths — by Category</h2>
+    <div class="h2sub">Same points as the project breakdown, grouped by skill area — where your output actually concentrates (${WINDOW})</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Category</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">Share of output</th></tr></thead><tbody>${typeRows}</tbody></table></div>
+    <div class="ins" style="margin-top:14px">${biggestNote}</div>
   </section>` : '';
 
   const dprBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:w.dprDays||0,t:(w.dprDays||0)+'',c:(w.dprDays||0)>=5?'var(--green)':(w.dprDays||0)>=3?'var(--amber)':'var(--red)'};});
