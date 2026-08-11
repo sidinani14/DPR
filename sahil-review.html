@@ -118,21 +118,29 @@ function stacked(data,o){
 }
 
 const hm=h=>Math.floor(h)+'h '+String(Math.round((h%1)*60)).padStart(2,'0')+'m';
+// Studio allows 30 min of lunch every day to everyone — that's not a break
+// problem, it's the baseline. Only time beyond that 30 min counts as
+// "additional break" below; the raw in-out gap is still used for avgSpan
+// (how long he's actually in the building) since that's a separate question
+// from how much of that time is excess break.
+const LUNCH_ALLOWANCE = 0.5;
 function attAgg(){
-  let worked=0,late=0,absent=0,gapS=0,hrS=0,zero=0; const brk=[];
+  let worked=0,late=0,absent=0,gapS=0,extraGapS=0,hrS=0,zero=0; const brk=[];
   ATT.forEach(w=>{absent+=w.absent; w.daily.forEach(d=>{if(!d.present)return;worked++;if(d.late)late++;
-    gapS+=d.gap; hrS+=d.hrs; if(d.gap>0.01) brk.push(d.gap); else zero++;});});
+    const extra=Math.max(0,d.gap-LUNCH_ALLOWANCE);
+    gapS+=d.gap; extraGapS+=extra; hrS+=d.hrs; if(extra>0.01) brk.push(extra); else zero++;});});
   const brkAvg=brk.length?brk.reduce((s,v)=>s+v,0)/brk.length:0;
   return {worked,late,absent,avgHrs:hrS/worked,avgGap:gapS/worked,latePct:Math.round(late/worked*100),
-    brkAvg,brkDays:brk.length,zeroDays:zero,totalBreak:gapS,maxBreak:brk.length?Math.max.apply(null,brk):0,
-    avgSpan:(hrS+gapS)/worked, under8:(function(){let c=0;ATT.forEach(w=>w.daily.forEach(d=>{if(d.present&&d.hrs<8)c++;}));return c;})()};
+    brkAvg,brkDays:brk.length,zeroDays:zero,totalBreak:extraGapS,maxBreak:brk.length?Math.max.apply(null,brk):0,
+    avgSpan:(hrS+gapS)/worked, under8:(function(){let c=0;ATT.forEach(w=>w.daily.forEach(d=>{if(d.present&&d.hrs<8)c++;}));return c;})(),
+    avgDaysPerWeek:worked/ATT.length};
 }
 
 function renderAttendance(){
   const a=attAgg();
   const lateBars=ATT.map(w=>({l:mmdd(w.daily[0].date).split(' ')[0],l2:MON[+w.week.split('-')[1]-1],v:w.late,t:w.late,c:w.late>=4?'var(--red)':w.late>=2?'var(--amber)':'var(--green)'}));
   const hrBars=ATT.map(w=>({l:dd(w.daily[0].date)+'',v:+w.avgHrs.toFixed(1),t:w.avgHrs.toFixed(1),c:w.avgHrs>=7.9?'var(--green)':w.avgHrs>=7?'var(--amber)':'var(--red)'}));
-  const gapBars=ATT.map(w=>{const b=w.daily.filter(d=>d.present&&d.gap>0.01).map(d=>d.gap);
+  const gapBars=ATT.map(w=>{const b=w.daily.filter(d=>d.present).map(d=>Math.max(0,d.gap-LUNCH_ALLOWANCE)).filter(v=>v>0.01);
     const v=b.length?b.reduce((s,x)=>s+x,0)/b.length:0;
     return {l:dd(w.daily[0].date)+'',v:+v.toFixed(2),t:v?v.toFixed(1):'—',c:v>=1?'var(--red)':v>=.6?'var(--amber)':'var(--green)'};});
   let strip='';
@@ -145,25 +153,33 @@ function renderAttendance(){
     <div class="h2sub">Biometric, ${WINDOW} · late threshold ${LATE_LABEL} · "Total Hrs" = actual time in office; averaged over present days (absences shown separately)</div>
     <div class="tiles" style="margin-bottom:18px">
       <div class="tile"><div class="v">${a.worked}</div><div class="l">Present days</div><div class="x">${a.absent} absences (excl.)</div></div>
+      <div class="tile"><div class="v" style="color:${a.avgDaysPerWeek>=5.5?'var(--green)':a.avgDaysPerWeek>=5?'var(--amber)':'var(--red)'}">${a.avgDaysPerWeek.toFixed(1)}</div><div class="l">Avg days present / week</div><div class="x">of 6 · ${ATT.length} weeks reviewed</div></div>
       <div class="tile"><div class="v" style="color:var(--red)">${a.latePct}%</div><div class="l">Days late (&gt;${LATE_LABEL})</div><div class="x">${a.late} of ${a.worked} days</div></div>
       <div class="tile"><div class="v" style="color:${a.avgHrs>=7.9?'var(--green)':'var(--amber)'}">${hm(a.avgHrs)}</div><div class="l">Avg time in office / day</div><div class="x">vs 8h expected · ${a.under8}/${a.worked} days under 8h</div></div>
-      <div class="tile"><div class="v" style="color:var(--red)">${hm(a.brkAvg)}</div><div class="l">Lunch / tea break / day</div><div class="x">total ${hm(a.totalBreak)} · longest ${hm(a.maxBreak)}</div></div>
+      <div class="tile"><div class="v" style="color:var(--red)">${hm(a.brkAvg)}</div><div class="l">Additional break / day</div><div class="x">beyond the 30-min lunch allowance · total ${hm(a.totalBreak)}</div></div>
     </div>
     <div class="grid2">
       <div><div class="chart-t">Late arrivals per week</div>${bars(lateBars,{color:'var(--red)'})}</div>
       <div><div class="chart-t">Avg time in office / present day (8h expected)</div>${bars(hrBars,{targets:[8],targetLabels:['8h'],targetColors:['var(--green)']})}</div>
     </div>
-    <div style="margin-top:14px"><div class="chart-t">Lunch / tea break per day (hrs) — lower is better</div>${bars(gapBars,{color:'var(--amber)'})}</div>
+    <div style="margin-top:14px"><div class="chart-t">Additional break per day, beyond the 30-min lunch allowance (hrs) — lower is better</div>${bars(gapBars,{color:'var(--amber)'})}</div>
     <div style="margin-top:16px"><div class="chart-t">Daily punctuality — green on-time · amber late · red absent</div><div class="strip">${strip}</div></div>
     ${attInsights(a)}
   </section>`;
 }
+// Payroll's own monthly summaries (May/Jun/Jul Paytime exports) record
+// "Approved paid leaves taken" — the only leave that is formally planned.
+// Compared against total marked-absent days in this window, this shows how
+// much of his absence is pre-approved leave vs simply not showing up.
+const APPROVED_LEAVE_MAY_JUL = 2.0 + 1.2 + 1.4; // 4.6 days, May+Jun+Jul payroll (whole calendar months)
 function attInsights(a){
   return `<div style="margin-top:16px">
+   <div class="ins">You are present on average <b>${a.avgDaysPerWeek.toFixed(1)} of 6 days a week</b> across the ${ATT.length} weeks reviewed.</div>
    <div class="ins">You arrived after ${LATE_LABEL} on <b>${a.late} of ${a.worked} present days (${a.latePct}%)</b> — lateness is the norm rather than the exception across this window.</div>
-   <div class="ins">You are in the building about <b>${hm(a.avgSpan)}</b> a day, but only <b>${hm(a.avgHrs)}</b> of that is time in office — the rest goes to <b>lunch and tea breaks averaging ${hm(a.brkAvg)} a day</b> (longest ${hm(a.maxBreak)}). Across this period that is <b>${hm(a.totalBreak)}</b> of break time — roughly <b>${(a.totalBreak/8).toFixed(1)} full working days</b>.</div>
+   <div class="ins">You are in the building about <b>${hm(a.avgSpan)}</b> a day; of that, <b>${hm(a.avgHrs)}</b> is time in office. The studio allows 30 minutes for lunch every day — that is not counted here. Beyond that allowance, you take an <b>additional ${hm(a.brkAvg)} a day</b> on average (longest single day ${hm(a.maxBreak)}), totalling <b>${hm(a.totalBreak)}</b> of extra break across the period.</div>
    <div class="ins">Your time in office is under the 8-hour expectation on <b>${a.under8} of ${a.worked} days</b>.</div>
    <div class="ins">There is also a pattern of collapsed days: arrivals of <b>16:30 on 29 Jun</b>, <b>11:10 on 2 Jul</b> and <b>12:04 on 22 Jul</b>, several days under 5 hours in office (15 May, 6 Jun, 20 Jul, 25 Jul, 4 Aug), plus <b>${a.absent} absences</b> in this window — including <b>19 Jun</b>, where you did punch in (09:47) but arrived too late, unapproved, to count as a working day at all.</div>
+   <div class="ins">Payroll's own records show only <b>~${APPROVED_LEAVE_MAY_JUL.toFixed(1)} days</b> of formally approved paid leave across May–July — against <b>${a.absent} marked-absent days</b> in this window alone. Most of your time away has not been pre-planned or informed leave; it has simply been not showing up.</div>
   </div>`;
 }
 
