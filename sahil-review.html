@@ -248,7 +248,11 @@ function renderLive(d){
   // shows where he's actually reliable vs where deadlines slip, independent
   // of which client it happens to be for.
   const byType = (d.byTaskType||[]).slice().sort((a,b)=>(b.pts||0)-(a.pts||0));
-  const rateable = byType.filter(t=>(t.onTime+t.delayed)>=2); // enough planned-task signal to judge
+  // Enough PLANNED-task signal to judge, and not dominated by unplanned work —
+  // a category that's mostly self-logged-after-the-fact can look artificially
+  // "reliable" (unplanned work can't be late by construction, same caveat as
+  // the Planning section above), so it's excluded from strength/weakness picks.
+  const rateable = byType.filter(t=>(t.onTime+t.delayed)>=2 && (t.unplannedPts||0) < (t.pts||0)*0.5);
   const typeRows = byType.map(t=>{
     const total=t.onTime+t.delayed;
     const latePct = total ? Math.round(t.delayed/total*100) : null;
