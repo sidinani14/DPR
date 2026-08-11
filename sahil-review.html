@@ -244,6 +244,30 @@ function renderLive(d){
     <div class="h2sub">All ${projects.length} projects touched · tasks, points, delayed, site visits (meetings excluded) and client communication (${WINDOW})</div>
     <div style="overflow-x:auto"><table><thead><tr><th>Project</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Site visits</th><th class="n">Comms</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 
+  // Same points as above, split by the kind of work instead of the project —
+  // shows where he's actually reliable vs where deadlines slip, independent
+  // of which client it happens to be for.
+  const byType = (d.byTaskType||[]).slice().sort((a,b)=>(b.pts||0)-(a.pts||0));
+  const rateable = byType.filter(t=>(t.onTime+t.delayed)>=2); // enough planned-task signal to judge
+  const typeRows = byType.map(t=>{
+    const total=t.onTime+t.delayed;
+    const latePct = total ? Math.round(t.delayed/total*100) : null;
+    const tag = latePct==null ? {l:'—',c:'var(--t3)'} : latePct<=30 ? {l:'Strength',c:'var(--green)'} : latePct>=55 ? {l:'Causes delay',c:'var(--red)'} : {l:'Mixed',c:'var(--amber)'};
+    return `<tr><td>${esc(t.category)}</td><td class="n">${t.tasks}</td><td class="n">${(t.pts||0).toFixed(1)}</td>
+      <td class="n">${t.onTime}</td><td class="n" style="color:${t.delayed?'var(--red)':'inherit'}">${t.delayed}</td>
+      <td class="n">${latePct==null?'—':latePct+'%'}</td>
+      <td class="n"><span class="pill" style="background:${tag.c}22;color:${tag.c}">${tag.l}</span></td></tr>`;
+  }).join('');
+  const strongest = rateable.slice().sort((a,b)=>(a.delayed/(a.onTime+a.delayed))-(b.delayed/(b.onTime+b.delayed)))[0];
+  const weakest = rateable.slice().sort((a,b)=>(b.delayed/(b.onTime+b.delayed))-(a.delayed/(a.onTime+a.delayed)))[0];
+  const strengthNote = strongest ? `<b>${esc(strongest.category)}</b> is your most reliable category — ${strongest.delayed} of ${strongest.onTime+strongest.delayed} planned tasks late (${Math.round(strongest.delayed/(strongest.onTime+strongest.delayed)*100)}%).` : '';
+  const weakNote = (weakest && weakest!==strongest) ? ` <b>${esc(weakest.category)}</b> is where deadlines slip most — ${weakest.delayed} of ${weakest.onTime+weakest.delayed} planned tasks late (${Math.round(weakest.delayed/(weakest.onTime+weakest.delayed)*100)}%), and it's ${weakest.pts>=strongest.pts?'also':'still'} a large share of your points (${(weakest.pts||0).toFixed(0)} pts).` : '';
+  let typeSec = byType.length ? `<section><h2>Strengths &amp; Delays — by Task Type</h2>
+    <div class="h2sub">Same points as the project breakdown above, split by the kind of work instead — where you're reliable vs where deadlines slip (${WINDOW})</div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Task type</th><th class="n">Tasks</th><th class="n">Points</th><th class="n">On-time</th><th class="n">Delayed</th><th class="n">Late %</th><th class="n">Read</th></tr></thead><tbody>${typeRows}</tbody></table></div>
+    <div class="ins" style="margin-top:14px">${strengthNote}${weakNote}</div>
+  </section>` : '';
+
   const dprBars=order.map(k=>{const w=wi[k]||{};return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v:w.dprDays||0,t:(w.dprDays||0)+'',c:(w.dprDays||0)>=5?'var(--green)':(w.dprDays||0)>=3?'var(--amber)':'var(--red)'};});
   const relBars=order.map(k=>{const w=wi[k]||{};const v=(w.relLate||0)+2*(w.relWnd||0);return {l:dd(ATT.find(x=>x.week===k).daily[0].date)+'',v,t:v+'',c:v?'var(--red)':'var(--green)'};});
   const dprDays=dprInfo.distinctDays||0, workDays=nWeeks*6;
@@ -263,7 +287,7 @@ function renderLive(d){
     <div class="ins">Just as important as the count: the daily report is often <b>not filed each day as the work happens</b> — several days this window carry two batched submissions filed together, later. The DPR exists so the studio can see <b>during</b> the week what you are working on and how loaded you are; filled in retrospectively, it becomes a record of the past instead of a live picture, and nobody can plan around you.</div>
   </section>`;
 
-  document.getElementById('live-tasks').innerHTML = out+planSec+projSec;
+  document.getElementById('live-tasks').innerHTML = out+planSec+projSec+typeSec;
   document.getElementById('live-dpr').innerHTML   = dprSec;
 }
 

@@ -45,6 +45,30 @@ function calcVisitPts(taskType, hours) {
 // its pre-scheduled counterpart (syncVisitSchedule creates the discipline-
 // specific 'Site Visit (Architecture)'/'Site Visit (Interiors)') — the two
 // spellings mean the same real-world visit but never string-match exactly.
+// Groups a raw Stage/TaskType string into a coarse category for the
+// strengths/delays breakdown in getMemberReview — e.g. "3D Modelling —
+// Interior per Room" and "3D Modelling — Exterior Elevation per Facade"
+// both roll up to "3D Modelling", so the breakdown reads as a handful of
+// real skill areas rather than one row per exact stage label.
+function taskTypeCategory(taskType) {
+  var t = String(taskType||'').trim();
+  if (/^3D Modelling/.test(t))      return '3D Modelling';
+  if (/^3D Rendering/.test(t))      return '3D Rendering';
+  if (/^ID Working Drawing/.test(t)) return 'ID Working Drawings';
+  if (/^ID Concept/.test(t))        return 'ID Concept / Furniture Layout';
+  if (/^ID Design/.test(t))         return 'ID Design';
+  if (/^Structural/.test(t))        return 'Structural';
+  if (/^Working Drawing/.test(t))   return 'Working Drawing (Arch)';
+  if (/^Concept \/ Schematic/.test(t)) return 'Concept / Schematic';
+  if (/^Coordination/.test(t))      return 'Coordination';
+  if (/^Site Issue/.test(t))        return 'Site Issue';
+  if (/^Procurement/.test(t))       return 'Procurement';
+  if (/^Electrical/.test(t))        return 'Electrical';
+  if (/^Plumbing/.test(t))          return 'Plumbing';
+  if (visitFamily(t))               return 'Site Visit / Meeting';
+  return t || 'Other';
+}
+
 function visitFamily(taskType) {
   var t = String(taskType||'').trim();
   if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection') return 'site';
@@ -292,15 +316,25 @@ function backfillDPRTasks(updates, creates) {
   var newRows = [];
   (creates || []).forEach(function(c) {
     var pd = projMap[c.project] || {disc:'', mult:1.0};
-    var units = parseFloat(c.units) || 1;
-    var weightedPts = Math.round((parseFloat(c.basePts)||0) * pd.mult * units * 10) / 10;
     var doneDate = c.doneDate || today;
     var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
+    var units, basePts, mult, weightedPts;
+    // Visit/meeting types are hours × rate, same as createDoneTask/
+    // backfillFieldWorkPoints — the project multiplier does not apply.
+    if (isVisitTask(c.taskType) && c.visitHours) {
+      units = 1; basePts = parseFloat(c.visitHours) || 0; mult = 1;
+      weightedPts = calcVisitPts(c.taskType, c.visitHours);
+    } else {
+      units = parseFloat(c.units) || 1;
+      basePts = parseFloat(c.basePts) || 0;
+      mult = pd.mult;
+      weightedPts = Math.round(basePts * mult * units * 10) / 10;
+    }
     newRows.push([
-      newId, '', c.project, c.member, c.taskType, pd.mult, c.basePts, units, weightedPts,
+      newId, '', c.project, c.member, c.taskType, mult, basePts, units, weightedPts,
       doneDate, doneDate, '', '', 'Done', doneDate, doneDate,
       'Yes', 'Auto-approved (DPR backfill)', today,
-      '', 'Backfilled from DPR deliverables text — reviewed & approved by Siddharth', c.member, 'Medium',
+      '', 'Unplanned task — backfilled from DPR deliverables text, reviewed & approved by Siddharth', c.member, 'Medium',
     ]);
     results.created++;
     results.details.push({mode:'create', member:c.member, project:c.project, taskType:c.taskType, units:units, pts:weightedPts, doneDate:doneDate});
@@ -308,6 +342,68 @@ function backfillDPRTasks(updates, creates) {
   if (newRows.length) sheet.getRange(sheet.getLastRow()+1, 1, newRows.length, 23).setValues(newRows);
 
   return results;
+}
+
+// One-off correction: the first backfillDPRTasks run (before this fix) wrote
+// Notes without the 'Unplanned task' marker, so Planning silently counted
+// those self-reported-after-the-fact rows as "planned" — inflating Planning
+// scores for everyone that batch touched. Finds rows tagged
+// 'Auto-approved (DPR backfill)' whose Notes start with 'Backfilled from DPR'
+// but don't already say 'Unplanned task', and prepends the marker in place.
+function fixBackfillUnplannedTag() {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {status:'ok', fixed:0};
+  var rows = sheet.getDataRange().getValues();
+  var fixed = [];
+  for (var i = 1; i < rows.length; i++) {
+    var approvedBy = String(rows[i][17]||'').trim();   // R
+    var notes      = String(rows[i][20]||'').trim();   // U
+    if (approvedBy !== 'Auto-approved (DPR backfill)') continue;
+    if (notes.indexOf('Unplanned task') === 0) continue;
+    if (notes.indexOf('Backfilled from DPR') !== 0) continue;
+    var newNotes = 'Unplanned task — ' + notes.charAt(0).toLowerCase() + notes.slice(1);
+    sheet.getRange(i+1, 21).setValue(newNotes);  // U
+    fixed.push({member:String(rows[i][3]||''), project:String(rows[i][2]||''), taskType:String(rows[i][4]||'')});
+  }
+  return {status:'ok', fixed: fixed.length, details: fixed};
+}
+
+// ── Confidential compensation/role reviews (grade, increment recommendation,
+// strengths/weaknesses narrative) — never baked into a static HTML file, since
+// that would be readable by anyone with the URL regardless of the client-side
+// auth gate. Stored server-side instead; both routes are MANAGER_ONLY, so the
+// real protection is verifyIdToken + isManager(), the same boundary every
+// other manager-only route already relies on. The confidential-review HTML
+// pages should be a thin shell that fetches this at load time — no numbers,
+// grades, or reasoning text hardcoded in the page source itself.
+var CONFIDENTIAL_REVIEWS_TAB = 'CONFIDENTIAL_REVIEWS';
+function saveConfidentialReview(member, payload, savedBy) {
+  member = String(member||'').trim();
+  if (!member) return {status:'error', message:'member required'};
+  var sheet = getOrCreate(CONFIDENTIAL_REVIEWS_TAB, function(sh){
+    sh.getRange(1,1,1,4).setValues([['Member','PayloadJSON','SavedAt','SavedBy']]);
+    sh.setFrozenRows(1);
+  });
+  var rows = sheet.getLastRow() > 1 ? sheet.getRange(2,1,sheet.getLastRow()-1,1).getValues() : [];
+  var rowIdx = -1;
+  for (var i=0;i<rows.length;i++){ if (String(rows[i][0]||'').trim() === member) { rowIdx = i+2; break; } }
+  var vals = [member, JSON.stringify(payload||{}), new Date(), savedBy||''];
+  if (rowIdx > -1) sheet.getRange(rowIdx,1,1,4).setValues([vals]);
+  else sheet.appendRow(vals);
+  return {status:'ok'};
+}
+function getConfidentialReview(member) {
+  member = String(member||'').trim();
+  var sheet = db().getSheetByName(CONFIDENTIAL_REVIEWS_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {status:'error', message:'not found'};
+  var rows = sheet.getDataRange().getValues();
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][0]||'').trim() === member) {
+      try { return {status:'ok', member:member, payload: JSON.parse(rows[i][1]||'{}'), savedAt: rows[i][2], savedBy: rows[i][3]}; }
+      catch(e){ return {status:'error', message:'corrupt payload'}; }
+    }
+  }
+  return {status:'error', message:'not found'};
 }
 
 // ── Read-only audit: what DPR submissions say vs what actually landed in
@@ -574,7 +670,8 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
-  backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1 };
+  backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1, fixBackfillUnplannedTag:1,
+  saveConfidentialReview:1, getConfidentialReview:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -955,6 +1052,9 @@ function doPost(e) {
     if (data.action === 'getFieldWorkForRange')   return respond(getFieldWorkForRange(data.from||'', data.to||''));
     if (data.action === 'getDPRAudit')            return respond(getDPRAudit(data.from||'', data.to||''));
     if (data.action === 'backfillDPRTasks')       return respond(withLock(function(){ return backfillDPRTasks(data.updates||[], data.creates||[]); }));
+    if (data.action === 'fixBackfillUnplannedTag') return respond(withLock(function(){ return fixBackfillUnplannedTag(); }));
+    if (data.action === 'saveConfidentialReview')  return respond(withLock(function(){ return saveConfidentialReview(data.member||'', data.payload||{}, authEmail); }));
+    if (data.action === 'getConfidentialReview')   return respond(getConfidentialReview(data.member||''));
     if (data.action === 'saveMonthlyAdjustments') return respond(saveMonthlyAdjustments(data.month||'', data.adjustments||[]));
     if (data.action === 'getMonthlyAdjustments')  return respond(getMonthlyAdjustments(data.month||''));
     if (data.action === 'saveHolidays')           return respond(saveHolidays(data.dates||[]));
@@ -5580,6 +5680,8 @@ function getMemberReview(name, fromStr, toStr) {
   var projects = {};
   function proj(p){ if(!projects[p]) projects[p]={project:p, tasks:0, pts:0, plannedPts:0, unplannedPts:0,
     onTime:0, delayed:0, visits:[], comms:0}; return projects[p]; }
+  var byType = {};
+  function typeAgg(c){ if(!byType[c]) byType[c]={category:c, tasks:0, pts:0, onTime:0, delayed:0, unplannedPts:0}; return byType[c]; }
   var visitDates = {};
   function addVisit(p, d){ if(!p||!d) return; if(!visitDates[p]) visitDates[p]=[]; visitDates[p].push(d); }
   // Only a real SITE VISIT counts toward the 15-day cadence — meetings and
@@ -5611,16 +5713,18 @@ function getMemberReview(name, fromStr, toStr) {
     if (done && appr && doneDate >= from && doneDate <= to){
       var w = wk(doneDate); w.approvedPts += pts;
       var pr = proj(pname); pr.tasks++; pr.pts += pts;
+      var ta = typeAgg(taskTypeCategory(tt)); ta.tasks++; ta.pts += pts;
       if (unplanned){
         w.unplannedPts += pts; w.unplannedTasks++; pr.unplannedPts += pts;
         tot.unplannedTasks++; tot.unplannedPts += pts;
+        ta.unplannedPts += pts;
       } else {
         var onT = dl && doneDate <= dl;
         w.plannedPts += pts; w.plannedTasks++; pr.plannedPts += pts;
         tot.plannedTasks++; tot.plannedPts += pts;
-        if (onT){ w.onTime++; pr.onTime++; tot.plannedOnTime++; }
+        if (onT){ w.onTime++; pr.onTime++; tot.plannedOnTime++; ta.onTime++; }
         else {
-          w.delayed++; pr.delayed++; tot.plannedDelayed++;
+          w.delayed++; pr.delayed++; tot.plannedDelayed++; ta.delayed++;
           if (dl) lateDetail.push({project:pname, task:tt, deadline:dl, doneDate:doneDate,
             daysLate: Math.round((new Date(doneDate+'T00:00:00Z')-new Date(dl+'T00:00:00Z'))/86400000)});
         }
@@ -5700,6 +5804,7 @@ function getMemberReview(name, fromStr, toStr) {
     member:name, from:from, to:to,
     weeks:    Object.keys(weeks).sort().map(function(k){ return weeks[k]; }),
     projects: Object.keys(projects).sort().map(function(k){ return projects[k]; }),
+    byTaskType: Object.keys(byType).map(function(k){ return byType[k]; }).sort(function(a,b){ return b.pts-a.pts; }),
     visitAudit: audit,
     totals: tot,                       // planned vs unplanned tasks + pts, planned on-time/delayed
     lateDetail: lateDetail.slice(0,25), // planned tasks finished after deadline, worst first
