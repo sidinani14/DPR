@@ -95,7 +95,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.55}
   </div>
 </header>
 
-<div class="banner" id="banner">Fill this alongside your DPR · content, documentation, ideas &amp; blockers</div>
+<div class="banner" id="banner">Log this on days you're creating, shooting or posting content — not a daily form</div>
 
 <div class="page">
 
@@ -111,7 +111,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.55}
 
   <!-- Section 2: Content Published/Scheduled -->
   <div class="card">
-    <div class="card-head"><div class="card-num">2</div><div class="card-title">Content published / scheduled today</div><div class="card-sub opt">optional</div></div>
+    <div class="card-head"><div class="card-num">2</div><div class="card-title">Content published / scheduled</div><div class="card-sub opt">optional</div></div>
     <div class="card-body">
       <div id="content-blocks"></div>
       <button class="add-entry" id="add-content-btn" onclick="addContent()">
@@ -200,8 +200,20 @@ function setHeaderDate(){
 }
 
 function projOptions(){
-  return '<option value="">— select project —</option>' +
-    PROJECTS.map(p=>`<option>${p.name}</option>`).join('');
+  return '<option value="">— select —</option>' +
+    '<optgroup label="Projects">' +
+    PROJECTS.map(p=>`<option>${p.name}</option>`).join('') +
+    '</optgroup>' +
+    '<optgroup label="Not project-specific">' +
+    '<option value="__other__">Other — team culture, studio, a new site, etc.</option>' +
+    '</optgroup>';
+}
+function toggleProjOther(sel){
+  const field = sel.closest('.field');
+  const other = field ? field.querySelector('.proj-other') : null;
+  if (!other) return;
+  other.style.display = sel.value === '__other__' ? 'block' : 'none';
+  if (sel.value !== '__other__') other.value = '';
 }
 
 async function fetchAll(){
@@ -288,8 +300,9 @@ function addContent(){
       </div>
     </div>
     <div class="field">
-      <div class="lbl">Project</div>
-      <select class="c-proj">${projOptions()}</select>
+      <div class="lbl">Project <span class="opt">or team culture / studio / new site</span></div>
+      <select class="c-proj" onchange="toggleProjOther(this)">${projOptions()}</select>
+      <input type="text" class="c-proj-other proj-other" style="display:none;margin-top:8px" placeholder="e.g. Team Culture — Diwali celebration, or a site not yet in the system">
     </div>
     <div class="field">
       <div class="lbl">Title / caption</div>
@@ -322,8 +335,9 @@ function addDoc(){
     </div>
     <div class="row2">
       <div class="field">
-        <div class="lbl">Project</div>
-        <select class="doc-proj">${projOptions()}</select>
+        <div class="lbl">Project <span class="opt">or team culture / studio / new site</span></div>
+        <select class="doc-proj" onchange="toggleProjOther(this)">${projOptions()}</select>
+        <input type="text" class="doc-proj-other proj-other" style="display:none;margin-top:8px" placeholder="e.g. Team Culture — Diwali celebration, or a site not yet in the system">
       </div>
       <div class="field">
         <div class="lbl">Shoot type</div>
@@ -349,17 +363,21 @@ function updateSbar(){
 let _submitting = false;
 
 function collectData(){
+  function resolveProj(sel, otherEl){
+    return sel.value === '__other__' ? otherEl.value.trim() : sel.value;
+  }
+
   const content = [...document.querySelectorAll('#content-blocks .entry-block')].map(b=>({
     platform: b.querySelector('.c-platform').value,
     contentType: b.querySelector('.c-type').value,
-    project: b.querySelector('.c-proj').value,
+    project: resolveProj(b.querySelector('.c-proj'), b.querySelector('.c-proj-other')),
     title: b.querySelector('.c-title').value.trim(),
     link: b.querySelector('.c-link').value.trim(),
     status: b.querySelector('.c-status').value,
   })).filter(c=>c.project || c.title || c.link);
 
   const documentation = [...document.querySelectorAll('#doc-blocks .entry-block')].map(b=>({
-    project: b.querySelector('.doc-proj').value,
+    project: resolveProj(b.querySelector('.doc-proj'), b.querySelector('.doc-proj-other')),
     shootType: b.querySelector('.doc-shoot').value,
     notes: b.querySelector('.doc-notes').value.trim(),
   })).filter(d=>d.project || d.notes);
@@ -382,10 +400,10 @@ function validate(data){
     return false;
   }
   for (const c of data.content){
-    if (!c.project){ toast('Select a project for every content item'); return false; }
+    if (!c.project){ toast('Pick a project (or Other and type one) for every content item'); return false; }
   }
   for (const d of data.documentation){
-    if (!d.project){ toast('Select a project for every documentation entry'); return false; }
+    if (!d.project){ toast('Pick a project (or Other and type one) for every documentation entry'); return false; }
   }
   return true;
 }
