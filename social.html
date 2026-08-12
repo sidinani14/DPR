@@ -242,7 +242,7 @@ async function fetchAll(){
   for (let attempt = 1; attempt <= maxAttempts; attempt++){
     try{
       const l = await fetch(APPS_SCRIPT_URL + '?action=getLists').then(r=>r.json());
-      if (l.error) throw new Error(l.error);
+      if (l.status === 'error' || l.error) throw new Error(l.message || l.error || l.code || 'unknown error');
       TEAM = l.team || [];
       PROJECTS = l.projects || [];
       const emails = l.emails || [];
