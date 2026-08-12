@@ -2187,33 +2187,82 @@ function logConnections(data){
 var SOCIAL_MEDIA_TAB = 'SOCIAL_MEDIA_LOG';
 function writeSocialMediaHeaders(sheet){
   var h = ['Log ID','Date','Member','Email','Type','Platform','Content Type',
-           'Project','Title / Caption','Link','Status','Notes'];
+           'Project','Title / Caption','Link','Status','Hours','Notes','Linked Task ID'];
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
 }
+
+// Flat points per published content item -- deliberately NOT multiplied by
+// the project's discipline multiplier (a Reel about a luxury project isn't
+// worth more than one about a small commercial job, unlike design-stage
+// task points). Only 'Published' content earns points; Scheduled/Draft stay
+// visible-only in the log until she comes back and logs the published one.
+var SM_CONTENT_PTS = { 'Reel':2.0, 'Video':2.5, 'Carousel':1.5, 'Blog':2.0, 'Post':1.0, 'Story':0.5 };
+
+// Content items are never pre-assigned, so (unlike createDoneTask's design-
+// task path) there's nothing to match against -- always a brand-new row,
+// always sent for approval (LeadApproved 'Pending'), never auto-approved.
+function logSocialMediaContentTask(member, project, contentType, pts, title, notes){
+  var sheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  var today = dateStr();
+  var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
+  sheet.appendRow([
+    newId, '', project || '', member, 'Social Media — ' + (contentType || 'Content'),
+    1, pts, 1, pts,                          // F mult=1 (flat) · G basePts · H units=1 · I weightedPts
+    today, today,                            // J AssignedDate · K Deadline
+    title || '', '',                         // L Area(title/caption) · M Drawing
+    'Done', today, today,                    // N SelfStatus · O SelfStatusDate · P ActualCompletionDate
+    'Pending', '', '',                       // Q LeadApproved · R ApprovedBy · S ApprovalDate
+    '',                                      // T RevisionTag
+    notes || 'Unplanned task — Social Media content', // U Notes
+    member, 'Medium',                        // V AssignedBy · W Priority
+  ]);
+  return { status:'ok', taskId:newId };
+}
+
 function submitSocialMediaLog(data){
   var sheet = getOrCreate(SOCIAL_MEDIA_TAB, writeSocialMediaHeaders);
   var member = data.member || '', email = data.email || '', day = dateStr(data.date||'');
   var n = 0;
   function parseArr(x){ if (typeof x === 'string'){ try { return JSON.parse(x)||[]; } catch(e){ return []; } } return x||[]; }
+
   parseArr(data.content).forEach(function(c){
     if (!c || (!c.platform && !c.title && !c.project)) return;
+    var taskId = '';
+    if (String(c.status||'').trim() === 'Published'){
+      var pts = SM_CONTENT_PTS.hasOwnProperty(c.contentType) ? SM_CONTENT_PTS[c.contentType] : 1.0;
+      var r = logSocialMediaContentTask(member, c.project||'', c.contentType||'', pts, c.title||'',
+        'Unplanned task — Social Media: ' + (c.platform||'') + ' ' + (c.contentType||'') + (c.link ? ' — '+c.link : ''));
+      taskId = r.taskId;
+    }
     sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Content',
-      c.platform||'', c.contentType||'', c.project||'', c.title||'', c.link||'', c.status||'Published', '' ]);
+      c.platform||'', c.contentType||'', c.project||'', c.title||'', c.link||'', c.status||'Published', '', '', taskId ]);
     n++;
   });
+
   parseArr(data.documentation).forEach(function(doc){
     if (!doc || (!doc.project && !doc.notes)) return;
+    var hrs = parseFloat(doc.hours) || 0;
+    var taskId = '';
+    // Documentation shoots aren't scored on their own -- they're a site visit,
+    // same hours x2/hr pipeline (calcVisitPts) as every other logged visit.
+    if (hrs > 0){
+      var r = createDoneTask({ member: member, project: doc.project||'', taskType: 'Site Visit',
+        visitHours: hrs, date: day,
+        notes: 'Unplanned task — Social Media documentation shoot' + (doc.shootType ? ' (' + doc.shootType + ')' : '') });
+      taskId = r.taskId || '';
+    }
     sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Documentation',
-      '', doc.shootType||'', doc.project||'', '', '', '', doc.notes||'' ]);
+      '', doc.shootType||'', doc.project||'', '', '', '', hrs||'', doc.notes||'', taskId ]);
     n++;
   });
+
   if (data.ideas && String(data.ideas).trim()){
-    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Idea', '', '', '', '', '', '', String(data.ideas).trim() ]);
+    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Idea', '', '', '', '', '', '', '', String(data.ideas).trim(), '' ]);
     n++;
   }
   if (data.blockers && String(data.blockers).trim()){
-    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Blocker', '', '', '', '', '', '', String(data.blockers).trim() ]);
+    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Blocker', '', '', '', '', '', '', '', String(data.blockers).trim(), '' ]);
     n++;
   }
   return {status:'ok', written:n};
@@ -2230,7 +2279,8 @@ function getSocialMediaLog(member, fromStr, toStr){
     out.push({ logId:String(rows[i][0]||''), date:d, member:String(rows[i][2]||''),
       type:String(rows[i][4]||''), platform:String(rows[i][5]||''), contentType:String(rows[i][6]||''),
       project:String(rows[i][7]||''), title:String(rows[i][8]||''), link:String(rows[i][9]||''),
-      status:String(rows[i][10]||''), notes:String(rows[i][11]||'') });
+      status:String(rows[i][10]||''), hours:parseFloat(rows[i][11])||0, notes:String(rows[i][12]||''),
+      taskId:String(rows[i][13]||'') });
   }
   return {entries:out};
 }
@@ -5359,7 +5409,7 @@ function createDoneTask(data) {
     '',                        // R ApprovedBy
     '',                        // S ApprovalDate
     '',                        // T RevisionTag
-    'Unplanned task — self logged via DPR', // U Notes
+    data.notes || 'Unplanned task — self logged via DPR', // U Notes
     member,                    // V AssignedBy (self)
     'Medium',                  // W Priority
   ]);
