@@ -92,6 +92,29 @@
   for Aman (never scored as delayed). Payment stages read from CONFIG cols V(Discipline)/
   W(Milestone) under a "PAYMENT STAGES" marker → readConfig.paymentStages/paymentDisciplines.
 
+## Senior-staff visit/meeting multiplier (built 2026-08)
+- Design task points already reflect a higher target for senior staff; visit/
+  meeting points (`calcVisitPts`, hours × rate) never did — same rate for
+  everyone regardless of target. Fixed for anyone with a daily target > 8 pts
+  (weeklyTarget/6): `seniorityMultiplier(member)` reads their live TEAM-tab
+  WeeklyTarget and returns `dailyTarget/8` (e.g. 72/wk → 12/day → 1.5x;
+  60/wk → 10/day → 1.25x); everyone else gets 1.0 (no change). Fully
+  data-driven off the TEAM tab, not a hardcoded name list — tracks whoever
+  actually has an elevated target.
+- `getProjectMultiplier(projectNameOrId)` — project discipline multiplier
+  lookup, only stacks on top of the seniority multiplier (i.e. only applies
+  to the senior cohort) — everyone else's visits stay pure hours × rate,
+  unaffected. `calcVisitPts(taskType, hours, member, projectMult)` — the last
+  two args are optional and default to no-op, so any call site that doesn't
+  pass them behaves exactly as before.
+- Wired into the 3 live scoring paths: `createDoneTask` (DPR Field Work
+  Section 4, CRM visit/meeting tasks, Social Media documentation-as-site-visit),
+  `updateTaskStatusesFromDPR` (marking a pre-assigned visit/meeting task Done —
+  project multiplier read from the row's own col F, already stored at
+  assignment), and the DPER visit-logging path (`getProjectMultiplier` lookup).
+  Deliberately NOT applied in `backfillDPRTasks`/`backfillFieldWorkPoints` —
+  those are one-off historical-repair tools, this is a going-forward change.
+
 ## EPIC K — Site Visit / Meeting log (built 2026-06-25)
 - meetlog.html (deploy at /DPR/meetlog) — unified form, replaces the two Google Forms.
 - Tabs: MEETING_LOG (20 cols: id,date,time,type,project,loggedBy,team,clients,purpose,
