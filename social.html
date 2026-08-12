@@ -106,6 +106,10 @@ textarea{resize:vertical;min-height:70px;line-height:1.55}
       <div class="field gsignin-wrap">
         <div id="gsignin-confirmed"></div>
       </div>
+      <div id="load-error" style="display:none;margin-top:10px;padding:10px 12px;background:var(--red-light);border:1px solid rgba(139,32,32,.25);border-radius:var(--radius-sm);font-size:12px;color:var(--red);line-height:1.5">
+        <span id="load-error-msg">Couldn't load the project list.</span>
+        <button onclick="retryLoadProjects()" style="margin-left:6px;padding:4px 10px;font-size:11px;color:var(--red);background:#fff;border:1px solid rgba(139,32,32,.3);border-radius:4px;cursor:pointer">Retry</button>
+      </div>
     </div>
   </div>
 
@@ -221,17 +225,55 @@ function toggleProjOther(sel){
   if (sel.value !== '__other__') other.value = '';
 }
 
+function showLoadError(msg){
+  document.getElementById('load-error-msg').textContent = msg;
+  document.getElementById('load-error').style.display = 'block';
+}
+function hideLoadError(){
+  document.getElementById('load-error').style.display = 'none';
+}
+
+// getLists() has occasionally been slow/timed out under load (seen elsewhere
+// in this system) -- retry a couple of times with backoff before giving up,
+// since a transient failure here silently leaves PROJECTS empty (dropdown
+// shows only the "Other" option, nothing else).
 async function fetchAll(){
-  try{
-    const l = await fetch(APPS_SCRIPT_URL + '?action=getLists').then(r=>r.json());
-    if (l.error) throw new Error('Lists error: '+l.error);
-    TEAM = l.team || [];
-    PROJECTS = l.projects || [];
-    const emails = l.emails || [];
-    TEAM.forEach((name,i)=>{ if(emails[i]) EMAIL_MAP[name]=emails[i]; });
-  }catch(e){
-    document.getElementById('sbar-name').textContent = 'Failed to load: '+e.message;
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++){
+    try{
+      const l = await fetch(APPS_SCRIPT_URL + '?action=getLists').then(r=>r.json());
+      if (l.error) throw new Error(l.error);
+      TEAM = l.team || [];
+      PROJECTS = l.projects || [];
+      const emails = l.emails || [];
+      TEAM.forEach((name,i)=>{ if(emails[i]) EMAIL_MAP[name]=emails[i]; });
+      hideLoadError();
+      return true;
+    }catch(e){
+      if (attempt === maxAttempts){
+        document.getElementById('sbar-name').textContent = 'Failed to load projects: '+e.message;
+        showLoadError('Couldn\'t load the project list (' + e.message + ') — check your connection and retry.');
+        return false;
+      }
+      await new Promise(r => setTimeout(r, 700 * attempt));
+    }
   }
+}
+
+// Refresh every already-rendered project <select> in place -- used after a
+// manual retry succeeds, so blocks added before the fix don't stay stuck
+// showing only "Other". Preserves the current selection where it still exists.
+function refreshProjectDropdowns(){
+  document.querySelectorAll('.c-proj, .doc-proj').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = projOptions();
+    if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  });
+}
+
+async function retryLoadProjects(){
+  const ok = await fetchAll();
+  if (ok) refreshProjectDropdowns();
 }
 
 // ── Google Sign-In ────────────────────────────────────────────
