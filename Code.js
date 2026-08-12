@@ -30,13 +30,63 @@ function isVisitTask(taskType) {
          t === 'Material Selection';   // CRM/field-work meeting/visit tasks
 }
 
-function calcVisitPts(taskType, hours) {
+// Senior staff whose weekly target implies more than 8 pts/day (the standard
+// junior daily rate — 48/week ÷ 6) are expected to produce proportionally
+// more per hour. Design task points already reflect that through the higher
+// target itself, but visit/meeting points never did — pure hours × rate, same
+// for everyone. This scales visit/meeting points by dailyTarget/8 for anyone
+// above that baseline (2026-08 decision), read live from the TEAM tab so it
+// tracks whoever actually has an elevated target rather than a hardcoded
+// name list. Returns 1.0 (no change) for anyone at or below 8/day.
+function seniorityMultiplier(member) {
+  if (!member) return 1.0;
+  var sheet = db().getSheetByName(TEAM_TAB);
+  if (!sheet) return 1.0;
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]||'').trim() === member) {
+      var weekly = parseFloat(rows[i][2]) || 0; // C WeeklyTarget
+      var daily  = weekly / 6;                  // Week = Mon-Sat, 6 days
+      return daily > 8 ? daily / 8 : 1.0;
+    }
+  }
+  return 1.0;
+}
+
+// Look up a project's discipline multiplier by name or ID (col E, VLOOKUP-
+// resolved). Defaults to 1.0 if not found — same fallback used everywhere
+// else a project multiplier is read.
+function getProjectMultiplier(projectNameOrId) {
+  var p = String(projectNameOrId||'').trim();
+  if (!p) return 1.0;
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  if (!projSheet) return 1.0;
+  var pRows = projSheet.getDataRange().getValues();
+  for (var i = 1; i < pRows.length; i++) {
+    if (String(pRows[i][1]||'').trim() === p || String(pRows[i][0]||'').trim() === p) {
+      return parseFloat(pRows[i][4]) || 1.0;
+    }
+  }
+  return 1.0;
+}
+
+// member/projectMult are optional — every pre-existing call site that omits
+// them gets the exact same result as before (seniorityMultiplier(undefined)
+// = 1.0, which also forces the project multiplier off). The project
+// multiplier only ever stacks on top of an actual seniority bump (sm > 1) —
+// per the 2026-08 decision, it does NOT start applying to everyone else's
+// visit/meeting points, only to the senior cohort this was built for.
+function calcVisitPts(taskType, hours, member, projectMult) {
   var t = String(taskType||'').trim();
   var h = parseFloat(hours) || 0;
+  var rate = 0;
   // Site Visit + Material Selection = ×2/hr; Meeting = ×1/hr
-  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection') return Math.round(h * 2 * 10) / 10;
-  if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting')    return Math.round(h * 1 * 10) / 10;
-  return 0;
+  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection') rate = 2;
+  else if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting') rate = 1;
+  else return 0;
+  var sm = seniorityMultiplier(member);
+  var pm = sm > 1 ? (parseFloat(projectMult) || 1.0) : 1.0;
+  return Math.round(h * rate * sm * pm * 10) / 10;
 }
 
 // Which rate-family a visit/meeting task type belongs to — 'site' (×2/hr) or
@@ -1770,7 +1820,8 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
 
             // If visit/meeting task — overwrite WeightedPoints (col I) with hours-based pts
             if (isVisitTask(taskType) && a.visitHours) {
-              var visitPts = calcVisitPts(taskType, a.visitHours);
+              var rowMult = parseFloat(rows[i][5]) || 1; // F — project multiplier stored at assignment
+              var visitPts = calcVisitPts(taskType, a.visitHours, a.member, rowMult);
               if (visitPts > 0) {
                 sheet.getRange(i+1, 9).setValue(visitPts);  // I WeightedPoints
                 sheet.getRange(i+1, 7).setValue(a.visitHours); // G StageBasePts = hours
@@ -5331,7 +5382,7 @@ function createDoneTask(data) {
   var units   = parseFloat(data.units)   || 1;
   var weightedPts;
   if (isVisitTask(data.taskType) && data.visitHours) {
-    weightedPts = calcVisitPts(data.taskType, data.visitHours);
+    weightedPts = calcVisitPts(data.taskType, data.visitHours, data.member||'', mult);
     basePts     = parseFloat(data.visitHours) || basePts;
     units       = 1; // visits always 1 unit
   } else {
@@ -6246,7 +6297,7 @@ function handleDPERSubmission(data) {
       var vtype = String(data.visitType || '').trim();
       var vhrs  = parseFloat(data.visitHours || 0) || 0;
       if ((vtype === 'Site Visit' || vtype === 'Meeting' || vtype === 'Material Selection') && vhrs > 0) {
-        visitPts = calcVisitPts(vtype, vhrs);
+        visitPts = calcVisitPts(vtype, vhrs, data.lead||'', getProjectMultiplier(data.project||''));
         var vt = createDperVisitTask(data, vtype, vhrs, visitPts);
         visitTaskId = vt.taskId;
         // Start/end also feeds FIELD_WORK → attendance import (Part B).
