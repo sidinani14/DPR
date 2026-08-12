@@ -189,7 +189,10 @@ const CONTENT_TYPES = ['Reel','Post','Story','Carousel','Video','Photo','Blog','
 const SHOOT_TYPES = ['Photos','Video','Drone','Before / After','Other'];
 const STATUSES = ['Published','Scheduled','Draft'];
 
-let TEAM=[], PROJECTS=[], EMAIL_MAP={};
+let TEAM=[], PROJECTS=[];
+// Hardcoded fallback so owners (not on the "Active" TEAM roster getLists() returns)
+// can still sign in; live fetchAll() overlays/extends this with current TEAM data.
+let EMAIL_MAP = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"};
 let googleUser=null, contentCount=0, docCount=0;
 
 window.addEventListener('DOMContentLoaded', () => { setHeaderDate(); });
