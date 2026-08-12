@@ -165,6 +165,37 @@
 - Junior Architect / Junior ID: 48 pts/week
 - Technical Lead (Achal, Himanshu, Bhavesh): 72 pts/week
 - Deepak Soni (Execution): 30 pts/week (visit-based)
+- Kritika Kaushik (Jr. ID + Social Media Manager): 48 pts/week combined — design
+  task points AND Social Media Log points both feed the same Output pool, target
+  not raised (2026-08 decision; revisit after a few weeks of real data if content
+  work crowds out design output or vice versa).
+
+## Social Media Manager scoring (Kritika Kaushik, built 2026-08)
+- social.html — standalone form filled alongside DPR, only on days she has
+  content activity (not a mandatory daily form, unlike DPR). Backend routes
+  submitSocialMediaLog/getSocialMediaLog write SOCIAL_MEDIA_LOG (14 cols:
+  LogID,Date,Member,Email,Type[Content|Documentation|Idea|Blocker],Platform,
+  ContentType,Project,Title/Caption,Link,Status,Hours,Notes,LinkedTaskID).
+- Every project field (content + documentation) offers an "Other" option
+  revealing free text, for team-culture/studio content, past-project
+  documentation, or a site not yet in PROJECTS.
+- **Scoring (2026-08 decision, all explicit user calls, not defaults):**
+  - Sent for approval, never auto-approved — same approval.html Tasks queue
+    as everything else (LeadApproved 'Pending', generic getPendingTasks already
+    picks it up, no new approval-flow code needed).
+  - Content: only Status='Published' items score, flat points by content type
+    via SM_CONTENT_PTS (Reel 2.0, Video 2.5, Carousel 1.5, Blog 2.0, Post 1.0,
+    Story 0.5, else 1.0) — deliberately NOT multiplied by the project's
+    discipline multiplier (logSocialMediaContentTask always writes mult=1).
+    Scheduled/Draft stay visible-only in the log, no points.
+  - Documentation shoots are NOT scored on their own — they're a site visit,
+    reusing createDoneTask with taskType 'Site Visit' so it scores hours×2/hr
+    through the exact same pipeline as every other logged visit (calcVisitPts).
+    Requires an Hours field on the form.
+  - createDoneTask accepts an optional data.notes override (falls back to its
+    old hardcoded 'Unplanned task — self logged via DPR' string) purely so the
+    Social Media source is identifiable in the approval queue/Notes column —
+    every other caller is unaffected.
 
 ## Important functions in Apps Script
 - syncVisitSchedule() — main visit scheduler (runs Monday 8AM)
