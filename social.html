@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · Social Media Log</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<script src="searchselect.js"></script>
+<style>:root{--ss-bg:#FFFFFF;--ss-fg:#1A1917;--ss-pop-bg:#FFFFFF;--ss-border:#E2DFD8;--ss-accent:#1F3A5F;--ss-muted:#9E9B94;--ss-hover:rgba(31,58,95,0.10)}</style>
+<script>SearchSelect.auto('.c-proj, .doc-proj');</script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;--border:#E2DFD8;--border2:#CBC7BC;--text:#1A1917;--text2:#6B6860;--text3:#9E9B94;--accent:#1F3A5F;--accent-light:#E8EDF4;--green:#2D6A2D;--green-light:#EAF3EA;--amber:#7A4F0A;--amber-light:#FDF3E3;--red:#8B2020;--red-light:#FDEAEA;--radius:10px;--radius-sm:6px;--shadow:0 1px 3px rgba(0,0,0,.06)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:90px}
+.app-header{background:var(--accent);padding:18px 20px 14px;position:sticky;top:0;z-index:100}
+.app-header-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.logo-mark svg{width:14px;height:14px;fill:white}
+.logo-text{font-size:13px;font-weight:500;color:rgba(255,255,255,.9)}
+.logo-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;margin-top:2px}
+.header-date{font-size:11px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;text-align:right}
+.banner{background:var(--amber-light);border-bottom:1px solid #e8c87a;padding:7px 20px;text-align:center;font-size:12px;color:var(--amber);font-weight:500;position:sticky;top:62px;z-index:98}
+.page{max-width:560px;margin:0 auto;padding:16px 20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow);overflow:hidden}
+.card-head{padding:13px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-num{width:21px;height:21px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'DM Mono',monospace}
+.card-title{font-size:13px;font-weight:500;color:var(--text)}
+.card-sub{font-size:11px;color:var(--text3);margin-left:auto}
+.card-body{padding:16px 18px}
+.field{margin-bottom:13px}.field:last-child{margin-bottom:0}
+.lbl{font-size:12px;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.req{font-size:10px;color:var(--red);font-family:'DM Mono',monospace}
+.opt{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+select,input[type=text],input[type=url],textarea{width:100%;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .15s}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239E9B94' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+select:focus,input:focus,textarea:focus{border-color:var(--accent);background:var(--surface)}
+textarea{resize:vertical;min-height:70px;line-height:1.55}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.divider{height:1px;background:var(--border);margin:13px 0}
+.gsignin-wrap{margin-bottom:0}
+.guser-confirmed{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--green-light);border:1px solid rgba(74,155,111,.3);border-radius:var(--radius-sm);margin-top:8px}
+.guser-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.guser-info{flex:1;min-width:0}
+.guser-name{font-size:13px;font-weight:500;color:var(--text)}
+.guser-email{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.guser-verified{font-size:10px;color:var(--green);margin-top:1px}
+.gsignout-btn{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 9px;cursor:pointer;flex-shrink:0}
+.gblocked{font-size:12px;color:var(--red);background:var(--red-light);border:1px solid rgba(139,32,32,.25);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;line-height:1.5}
+.entry-block{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--surface2)}
+.entry-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.entry-title{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-family:'DM Mono',monospace}
+.entry-remove{font-size:11px;color:var(--red);background:none;border:none;cursor:pointer;padding:2px 4px}
+.add-entry{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:var(--accent-light);color:var(--accent);border:1px dashed var(--border2);border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
+.add-entry:hover{background:#dce5f0}
+.submit-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:10px 20px;box-shadow:0 -4px 12px rgba(0,0,0,.06);z-index:100}
+.submit-bar-inner{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.sbar-info{flex:1}
+.sbar-name{font-size:13px;font-weight:500;color:var(--text)}
+.sbar-pts{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.submit-btn{padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap;flex-shrink:0}
+.submit-btn:hover{background:#162d4a}
+.submit-btn:active{transform:scale(.97)}
+.submit-btn:disabled{background:var(--border2);cursor:not-allowed}
+.sending{display:none;position:fixed;inset:0;background:rgba(245,243,238,.88);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.sending.show{display:flex}
+.spinner{width:34px;height:34px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sending-txt{font-size:13px;color:var(--text2)}
+.success{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px}
+.success.show{display:flex}
+.success-icon{width:60px;height:60px;border-radius:50%;background:var(--green-light);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.success-icon svg{width:26px;height:26px;stroke:var(--green)}
+.success-title{font-size:21px;font-weight:500;margin-bottom:7px}
+.success-sub{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:22px}
+.close-btn{padding:11px 26px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:normal;max-width:min(92vw,420px);text-align:center;line-height:1.4;z-index:600}
+.toast.show{opacity:1}
+.status-chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{padding:7px 13px;border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--text2);cursor:pointer;background:var(--surface);user-select:none}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="logo">
+      <div class="logo-mark"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></div>
+      <div><div class="logo-text">Ideaform Design Studio</div><div class="logo-sub">Social Media Log</div></div>
+    </div>
+    <div class="header-date" id="header-date"></div>
+  </div>
+</header>
+
+<div class="banner" id="banner">Fill this alongside your DPR · content, documentation, ideas &amp; blockers</div>
+
+<div class="page">
+
+  <!-- Section 1: Sign In -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">1</div><div class="card-title">Who are you?</div><div class="card-sub">required</div></div>
+    <div class="card-body">
+      <div class="field gsignin-wrap">
+        <div id="gsignin-confirmed"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Content Published/Scheduled -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">2</div><div class="card-title">Content published / scheduled today</div><div class="card-sub opt">optional</div></div>
+    <div class="card-body">
+      <div id="content-blocks"></div>
+      <button class="add-entry" id="add-content-btn" onclick="addContent()">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5.5" y1="1" x2="5.5" y2="10"/><line x1="1" y1="5.5" x2="10" y2="5.5"/></svg>
+        Add content item
+      </button>
+    </div>
+  </div>
+
+  <!-- Section 3: Site & Project Documentation -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">3</div><div class="card-title">Site &amp; project documentation</div><div class="card-sub opt">optional</div></div>
+    <div class="card-body">
+      <div id="doc-blocks"></div>
+      <button class="add-entry" id="add-doc-btn" onclick="addDoc()">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5.5" y1="1" x2="5.5" y2="10"/><line x1="1" y1="5.5" x2="10" y2="5.5"/></svg>
+        Add documentation entry
+      </button>
+    </div>
+  </div>
+
+  <!-- Section 4: Ideas -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">4</div><div class="card-title">Ideas &amp; suggestions</div><div class="card-sub opt">optional</div></div>
+    <div class="card-body">
+      <div class="field">
+        <div class="lbl">Anything to improve the studio's online presence or engagement?</div>
+        <textarea id="ideas" placeholder="e.g. a reel format we should try, a platform we're under-using…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Blockers -->
+  <div class="card">
+    <div class="card-head"><div class="card-num">5</div><div class="card-title">Blockers</div><div class="card-sub opt">optional</div></div>
+    <div class="card-body">
+      <div class="field">
+        <div class="lbl">Anything stopping you from shooting, editing or posting?</div>
+        <textarea id="blockers" placeholder="e.g. waiting on site access, need photos from a completed project…"></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="submit-bar">
+  <div class="submit-bar-inner">
+    <div class="sbar-info">
+      <div class="sbar-name" id="sbar-name">Sign in to continue</div>
+      <div class="sbar-pts" id="sbar-pts">0 entries logged</div>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()" disabled>Submit</button>
+  </div>
+</div>
+
+<div class="sending" id="sending">
+  <div class="spinner"></div>
+  <div class="sending-txt">Submitting…</div>
+</div>
+
+<div class="success" id="success">
+  <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+  <div class="success-title">Logged</div>
+  <div class="success-sub" id="success-sub">Your social media log for today has been recorded.</div>
+  <button class="close-btn" onclick="document.getElementById('success').classList.remove('show')">Close</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
+
+const PLATFORMS = ['Instagram','Facebook','LinkedIn','YouTube','Pinterest','WhatsApp Status','Other'];
+const CONTENT_TYPES = ['Reel','Post','Story','Carousel','Video','Photo','Blog','Other'];
+const SHOOT_TYPES = ['Photos','Video','Drone','Before / After','Other'];
+const STATUSES = ['Published','Scheduled','Draft'];
+
+let TEAM=[], PROJECTS=[], EMAIL_MAP={};
+let googleUser=null, contentCount=0, docCount=0;
+
+window.addEventListener('DOMContentLoaded', () => { setHeaderDate(); });
+
+function setHeaderDate(){
+  document.getElementById('header-date').innerHTML =
+    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+}
+
+function projOptions(){
+  return '<option value="">— select project —</option>' +
+    PROJECTS.map(p=>`<option>${p.name}</option>`).join('');
+}
+
+async function fetchAll(){
+  try{
+    const l = await fetch(APPS_SCRIPT_URL + '?action=getLists').then(r=>r.json());
+    if (l.error) throw new Error('Lists error: '+l.error);
+    TEAM = l.team || [];
+    PROJECTS = l.projects || [];
+    const emails = l.emails || [];
+    TEAM.forEach((name,i)=>{ if(emails[i]) EMAIL_MAP[name]=emails[i]; });
+  }catch(e){
+    document.getElementById('sbar-name').textContent = 'Failed to load: '+e.message;
+  }
+}
+
+// ── Google Sign-In ────────────────────────────────────────────
+window.idsOnAuth = async function(){
+  await fetchAll();
+  onGoogleSignIn({credential: window.IDS_TOKEN});
+};
+function onGoogleSignIn(response){
+  const payload = parseJwt(response.credential);
+  handleGoogleCredential(payload);
+}
+function parseJwt(token){
+  const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(decodeURIComponent(atob(base64).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+}
+
+function handleGoogleCredential(payload){
+  const email = (payload.email||'').toLowerCase();
+  const picture = payload.picture||'';
+  let matchedName = null;
+  Object.entries(EMAIL_MAP).forEach(([n,e])=>{ if(e.toLowerCase()===email) matchedName=n; });
+
+  if (!matchedName){
+    document.getElementById('gsignin-confirmed').innerHTML = `
+      <div class="gblocked">
+        ✗ <strong>${email}</strong> is not registered on the team roster.<br>
+        <span style="font-size:10px;opacity:.7">Ask Siddharth to add your Google account to the team list.</span>
+      </div>`;
+    document.getElementById('submit-btn').disabled = true;
+    return;
+  }
+
+  googleUser = {name:matchedName, email, picture};
+
+  document.getElementById('gsignin-confirmed').innerHTML = `
+    <div class="guser-confirmed">
+      ${picture?`<img class="guser-avatar" src="${picture}" alt="">`:''}
+      <div class="guser-info">
+        <div class="guser-name">${matchedName}</div>
+        <div class="guser-email">${email}</div>
+        <div class="guser-verified">✓ Verified via Google</div>
+      </div>
+      <button class="gsignout-btn" onclick="signOut()">Sign out</button>
+    </div>`;
+
+  document.getElementById('submit-btn').disabled = false;
+  updateSbar();
+  if (contentCount===0) addContent();
+  if (docCount===0) addDoc();
+}
+
+// ── Content blocks ───────────────────────────────────────────
+function addContent(){
+  contentCount++;
+  const id = `cb${contentCount}`;
+  const div = document.createElement('div');
+  div.className='entry-block'; div.id=id;
+  div.innerHTML = `
+    <div class="entry-head">
+      <div class="entry-title">Content ${contentCount}</div>
+      <button class="entry-remove" onclick="document.getElementById('${id}').remove();updateSbar()">✕ Remove</button>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <div class="lbl">Platform</div>
+        <select class="c-platform">${PLATFORMS.map(p=>`<option>${p}</option>`).join('')}</select>
+      </div>
+      <div class="field">
+        <div class="lbl">Content type</div>
+        <select class="c-type">${CONTENT_TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="field">
+      <div class="lbl">Project</div>
+      <select class="c-proj">${projOptions()}</select>
+    </div>
+    <div class="field">
+      <div class="lbl">Title / caption</div>
+      <input type="text" class="c-title" placeholder="e.g. Living room reveal — Ajay Chordia">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <div class="lbl">Link <span class="opt">optional</span></div>
+        <input type="url" class="c-link" placeholder="https://…">
+      </div>
+      <div class="field">
+        <div class="lbl">Status</div>
+        <select class="c-status">${STATUSES.map(s=>`<option>${s}</option>`).join('')}</select>
+      </div>
+    </div>`;
+  document.getElementById('content-blocks').appendChild(div);
+  updateSbar();
+}
+
+// ── Documentation blocks ────────────────────────────────────
+function addDoc(){
+  docCount++;
+  const id = `db${docCount}`;
+  const div = document.createElement('div');
+  div.className='entry-block'; div.id=id;
+  div.innerHTML = `
+    <div class="entry-head">
+      <div class="entry-title">Documentation ${docCount}</div>
+      <button class="entry-remove" onclick="document.getElementById('${id}').remove();updateSbar()">✕ Remove</button>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <div class="lbl">Project</div>
+        <select class="doc-proj">${projOptions()}</select>
+      </div>
+      <div class="field">
+        <div class="lbl">Shoot type</div>
+        <select class="doc-shoot">${SHOOT_TYPES.map(s=>`<option>${s}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="field">
+      <div class="lbl">Notes <span class="opt">optional</span></div>
+      <textarea class="doc-notes" placeholder="what was covered, where the files are saved…" style="min-height:56px"></textarea>
+    </div>`;
+  document.getElementById('doc-blocks').appendChild(div);
+  updateSbar();
+}
+
+function updateSbar(){
+  const n = document.querySelectorAll('#content-blocks .entry-block').length +
+            document.querySelectorAll('#doc-blocks .entry-block').length;
+  document.getElementById('sbar-name').textContent = googleUser ? googleUser.name : 'Sign in to continue';
+  document.getElementById('sbar-pts').textContent = n + (n===1?' entry logged':' entries logged');
+}
+
+// ── Collect & submit ─────────────────────────────────────────
+let _submitting = false;
+
+function collectData(){
+  const content = [...document.querySelectorAll('#content-blocks .entry-block')].map(b=>({
+    platform: b.querySelector('.c-platform').value,
+    contentType: b.querySelector('.c-type').value,
+    project: b.querySelector('.c-proj').value,
+    title: b.querySelector('.c-title').value.trim(),
+    link: b.querySelector('.c-link').value.trim(),
+    status: b.querySelector('.c-status').value,
+  })).filter(c=>c.project || c.title || c.link);
+
+  const documentation = [...document.querySelectorAll('#doc-blocks .entry-block')].map(b=>({
+    project: b.querySelector('.doc-proj').value,
+    shootType: b.querySelector('.doc-shoot').value,
+    notes: b.querySelector('.doc-notes').value.trim(),
+  })).filter(d=>d.project || d.notes);
+
+  return {
+    action: 'submitSocialMediaLog',
+    member: googleUser ? googleUser.name : '',
+    email: googleUser ? googleUser.email : '',
+    date: new Date().toISOString().substring(0,10),
+    content, documentation,
+    ideas: document.getElementById('ideas').value.trim(),
+    blockers: document.getElementById('blockers').value.trim(),
+  };
+}
+
+function validate(data){
+  if (!data.member){ toast('Please sign in first'); return false; }
+  if (!data.content.length && !data.documentation.length && !data.ideas && !data.blockers){
+    toast('Add at least one item — content, documentation, an idea or a blocker');
+    return false;
+  }
+  for (const c of data.content){
+    if (!c.project){ toast('Select a project for every content item'); return false; }
+  }
+  for (const d of data.documentation){
+    if (!d.project){ toast('Select a project for every documentation entry'); return false; }
+  }
+  return true;
+}
+
+async function submitForm(){
+  if (_submitting) return;
+  const data = collectData();
+  if (!validate(data)) return;
+  _submitting = true;
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('sending').classList.add('show');
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify(data),
+    }).then(r=>r.json());
+    if (res && res.status && res.status !== 'ok') throw new Error(res.message||'submit failed');
+    document.getElementById('sending').classList.remove('show');
+    document.getElementById('success-sub').textContent =
+      `Logged ${data.content.length} content item(s) and ${data.documentation.length} documentation entr${data.documentation.length===1?'y':'ies'} for today.`;
+    document.getElementById('success').classList.add('show');
+  }catch(err){
+    document.getElementById('sending').classList.remove('show');
+    _submitting = false;
+    document.getElementById('submit-btn').disabled = false;
+    toast('Submission failed — check your connection and try again');
+  }
+}
+
+function toast(msg, duration){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(()=>el.classList.remove('show'), duration||2800);
+}
+</script>
+</body>
+</html>

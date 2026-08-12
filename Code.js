@@ -671,7 +671,7 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
   backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1, fixBackfillUnplannedTag:1,
-  saveConfidentialReview:1, getConfidentialReview:1 };
+  saveConfidentialReview:1, getConfidentialReview:1, getSocialMediaLog:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -1106,6 +1106,8 @@ function doPost(e) {
     if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
     if (data.action === 'logConnections')      return respond(logConnections(data));
     if (data.action === 'submitBillables')     return respond(submitBillables(data));
+    if (data.action === 'submitSocialMediaLog') return respond(withLock(function(){ return submitSocialMediaLog(data); }));
+    if (data.action === 'getSocialMediaLog')    return respond(getSocialMediaLog(data.member||'', data.from||'', data.to||''));
     if (data.action === 'uploadMeetingPhoto')  return respond(uploadMeetingPhoto(data));
     if (data.action === 'submitMeetingLog')    return respond(submitMeetingLog(data, authEmail));
     if (data.action === 'getMeetingApprovals') return respond(getMeetingApprovals());
@@ -2170,6 +2172,67 @@ function logConnections(data){
   if (typeof conns === 'string'){ try { conns = JSON.parse(conns); } catch(e){ conns = []; } }
   var n = appendConnections(data.member||'', dateStr(data.date||''), conns||[]);
   return {status:'ok', written:n};
+}
+
+// ════════════════════════════════════════════════════════════════
+// Social Media Manager — daily log, filled alongside DPR (separate
+// submission, not merged into DAILY_SUMMARY). Not yet wired into scoring —
+// this is a content/activity log first; a points formula can be added once
+// there's a few weeks of real data to calibrate against, same as every
+// other role's scoring evolved after its capture existed first.
+// SOCIAL_MEDIA_LOG cols: LogID · Date · Member · Email · Type
+//   (Content|Documentation|Idea|Blocker) · Platform · Content Type ·
+//   Project · Title/Caption · Link · Status · Notes
+// ════════════════════════════════════════════════════════════════
+var SOCIAL_MEDIA_TAB = 'SOCIAL_MEDIA_LOG';
+function writeSocialMediaHeaders(sheet){
+  var h = ['Log ID','Date','Member','Email','Type','Platform','Content Type',
+           'Project','Title / Caption','Link','Status','Notes'];
+  sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
+function submitSocialMediaLog(data){
+  var sheet = getOrCreate(SOCIAL_MEDIA_TAB, writeSocialMediaHeaders);
+  var member = data.member || '', email = data.email || '', day = dateStr(data.date||'');
+  var n = 0;
+  function parseArr(x){ if (typeof x === 'string'){ try { return JSON.parse(x)||[]; } catch(e){ return []; } } return x||[]; }
+  parseArr(data.content).forEach(function(c){
+    if (!c || (!c.platform && !c.title && !c.project)) return;
+    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Content',
+      c.platform||'', c.contentType||'', c.project||'', c.title||'', c.link||'', c.status||'Published', '' ]);
+    n++;
+  });
+  parseArr(data.documentation).forEach(function(doc){
+    if (!doc || (!doc.project && !doc.notes)) return;
+    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Documentation',
+      '', doc.shootType||'', doc.project||'', '', '', '', doc.notes||'' ]);
+    n++;
+  });
+  if (data.ideas && String(data.ideas).trim()){
+    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Idea', '', '', '', '', '', '', String(data.ideas).trim() ]);
+    n++;
+  }
+  if (data.blockers && String(data.blockers).trim()){
+    sheet.appendRow([ nextId(sheet,'SM-'), day, member, email, 'Blocker', '', '', '', '', '', '', String(data.blockers).trim() ]);
+    n++;
+  }
+  return {status:'ok', written:n};
+}
+function getSocialMediaLog(member, fromStr, toStr){
+  var sheet = db().getSheetByName(SOCIAL_MEDIA_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {entries:[]};
+  var rows = sheet.getDataRange().getValues(), out = [];
+  for (var i=1;i<rows.length;i++){
+    var d = cellDate(rows[i][1]);
+    if (fromStr && d < fromStr) continue;
+    if (toStr   && d > toStr)   continue;
+    if (member && String(rows[i][2]||'').trim() !== member) continue;
+    out.push({ logId:String(rows[i][0]||''), date:d, member:String(rows[i][2]||''),
+      type:String(rows[i][4]||''), platform:String(rows[i][5]||''), contentType:String(rows[i][6]||''),
+      project:String(rows[i][7]||''), title:String(rows[i][8]||''), link:String(rows[i][9]||''),
+      status:String(rows[i][10]||''), notes:String(rows[i][11]||'') });
+  }
+  return {entries:out};
 }
 
 // ════════════════════════════════════════════════════════════════
