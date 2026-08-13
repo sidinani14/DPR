@@ -28,6 +28,20 @@ one throw kill the batch, (c) return real errors instead of a blanket 'ok'.
 `.catch(()=>{})`) — dpr.html/DPER.html/CRM.html/social.html all do this now
 for their score-relevant POSTs; match that pattern for new forms.
 
+**Follow-up same day — "Unexpected token '<'" on dashboard/form loads**: this
+is `res.json()` choking on an HTML response. Every path in this script goes
+through `respond()`, which only ever emits valid JSON — HTML can only mean
+Google's platform served an error page *before* the script ran, i.e. Apps
+Script's execution quota. The account is a **personal Gmail account, not
+Workspace** — a much lower daily quota tier. Mitigated (not eliminated — a
+hard account-tier ceiling can't be fixed from code) as **@278**: `getAllTasks`/
+`getLists` (whole-team, non-user-specific) cache their response for 30s via
+`cachedSafeRespond()` so concurrent dashboard loads collapse into one sheet
+read instead of N; `verifyIdToken`'s positive cache stretched 30min→55min to
+roughly halve tokeninfo round-trips. If this recurs, the only real diagnostic
+is the account owner checking Apps Script editor → Executions for a
+quota-exceeded failure — don't keep guessing in code without that signal.
+
 ## Who I am
 - Studio: Ideaform Design Studio, Bhopal
 - Owner: Siddharth Inani (sidinani14@gmail.com)
