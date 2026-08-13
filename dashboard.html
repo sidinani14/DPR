@@ -792,6 +792,7 @@ function renderTaskList(tasks) {
         ${(t.status==='Parked')?`<div class="park-reason">⏸ ${t.blockDisposition==='Parked (Stalled)'?'Auto-parked — project stalled':('Parked'+(t.parkReason?': '+t.parkReason:''))}</div>`:''}
         ${(isOverdue||t.status==='Delayed')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" onclick="openReassign(${t.row},this)">↪ Work Not Done — reassign</button></div>`:''}
         ${(t.status==='Parked')?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" style="color:var(--blue);border-color:var(--blue)" onclick="openReassign(${t.row},this)">↪ Assign parked task to…</button></div>`:''}
+        ${(!isOverdue&&['Upcoming','Ongoing','Revision Required','Approval Pending','Blocked'].includes(t.status))?`<div class="reassign-host" id="ra-host-${t.row}"><button class="reassign-btn" style="color:var(--text2);border-color:var(--border)" onclick="openReassign(${t.row},this)">↪ Reassign</button></div>`:''}
         ${(canPark&&PARKABLE.includes(t.status))?`<div class="reassign-host"><button class="park-btn" onclick="doPark(${t.row})">⏸ Park</button></div>`:''}
         ${(canPark&&t.status==='Parked'&&t.blockDisposition!=='Parked (Stalled)')?`<div style="margin-top:6px"><button class="unpark-btn" onclick="doUnpark(${t.row})">▶ Un-park (resume)</button></div>`:''}
       </div>
@@ -836,8 +837,14 @@ function memberOpenPts(name){
                t.assignedTo.split(',').map(a=>a.trim()).includes(name))
     .reduce((s,t)=>s+(t.weightedPts||0),0);
 }
+function reassignNoFault(t){
+  const today = new Date().toISOString().substring(0,10);
+  const isOverdueNow = t.targetDate && t.targetDate<today && t.status!=='Completed';
+  return t.status!=='Delayed' && !isOverdueNow && t.status!=='Parked';
+}
 function openReassign(row, btn){
   const t = allTasks.find(x=>x.row===row); if(!t) return;
+  const noFault = reassignNoFault(t);
   const cur = t.assignedTo.split(',').map(a=>a.trim());
   const opts = allMembers().filter(m=>!cur.includes(m))
     .sort((a,b)=>memberOpenPts(a)-memberOpenPts(b))
@@ -848,7 +855,7 @@ function openReassign(row, btn){
        <button class="reassign-go" onclick="doReassign(${row})">Confirm</button>
        <button class="reassign-x" onclick="renderTasks()">✕</button>
      </div>
-     <div class="reassign-note">Original keeps the −2 reliability penalty; new person earns full points.</div>`;
+     <div class="reassign-note">${noFault ? 'No penalty — task isn\'t overdue yet. New person gets full points.' : 'Original keeps the −2 reliability penalty; new person earns full points.'}</div>`;
 }
 async function doReassign(row){
   const sel = document.getElementById('ra-sel-'+row);
@@ -863,7 +870,7 @@ async function doReassign(row){
   const task = allTasks.find(t=>t.row===row);
   const body = (task && task.status==='Parked')
     ? {action:'disposeBlock', row, disposition:'reassign', newAssignee, reviewedBy:leadName}
-    : {action:'reassignTask', row, newAssignee, leadName};
+    : {action:'reassignTask', row, newAssignee, leadName, noFault: task ? reassignNoFault(task) : false};
   try{
     const res = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
       body: JSON.stringify(body)});

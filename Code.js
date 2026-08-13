@@ -958,13 +958,19 @@ function getAllowedEmails() {
 }
 // Returns the verified allowlisted email, or null. Caches results (token is
 // short-lived) to avoid an external fetch on every single API call.
-// 2026-08 fix: a transient failure reaching Google's tokeninfo endpoint (network
-// blip, brief outage, UrlFetchApp hiccup) was being cached as a hard denial for
-// 5 minutes -- every request on that same token during that window then got
-// "access denied" for a problem that had nothing to do with the token itself.
-// Only a genuine negative verdict (bad aud, unverified email, not on the team
-// allowlist) is cached now; a fetch failure just denies THIS one request so a
-// retry moments later can succeed once the hiccup passes.
+// 2026-08 fix (v1): a transient failure reaching Google's tokeninfo endpoint
+// was being cached as a hard denial for 5 minutes -- one blip on a token then
+// meant "access denied" on that token for 5 min regardless of real
+// authorization. Fixed by not caching transient failures at all.
+// 2026-08 fix (v2, same day): that overcorrected -- with NO negative cache at
+// all, a real slowdown on Google's tokeninfo endpoint (which did happen,
+// causing every form/dashboard to hang/fail site-wide) meant every single
+// request independently paid the full slow-external-call cost with nothing
+// short-circuiting repeat attempts. Now a transient failure IS cached, but
+// only for 20 seconds -- long enough that a burst of concurrent requests
+// during a real hiccup fails fast instead of each hanging, short enough that
+// it recovers almost immediately once the hiccup clears (vs. the old 5 min
+// hard-denial bug this whole fix started from).
 function verifyIdToken(token) {
   if (!token) return null;
   var cache = CacheService.getScriptCache();
@@ -976,7 +982,7 @@ function verifyIdToken(token) {
     var resp = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
       { muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) { return null; } // transient -- don't poison the cache
+    if (resp.getResponseCode() !== 200) { cache.put(key, '-', 20); return null; }
     var info  = JSON.parse(resp.getContentText());
     var email = String(info.email || '').toLowerCase();
     var ok = (info.aud === AUTH_CLIENT_ID) &&
@@ -985,7 +991,7 @@ function verifyIdToken(token) {
     if (!ok) { cache.put(key, '-', 300); return null; }
     cache.put(key, email, 1800);  // 30 min (token itself expires ~1 hr)
     return email;
-  } catch (err) { return null; }
+  } catch (err) { try { cache.put(key, '-', 20); } catch(e2){} return null; }
 }
 function respondUnauthorized() {
   return respond({ status: 'error', code: 'unauthorized',
@@ -1198,7 +1204,7 @@ function doPost(e) {
 
     // Form submission actions
     if (data.action === 'submitApprovals')   return respond(submitApprovals(data));
-    if (data.action === 'reassignTask')      return respond(reassignTask(data));
+    if (data.action === 'reassignTask')      return respond(withLock(function(){ return reassignTask(data); }));
     if (data.action === 'assignTasks')       return respond(withLock(function(){ return assignTasks(data); }));
     if (data.action === 'bulkAssignTasks')   return respond(withLock(function(){ return bulkAssignTasks(data, authEmail); }));
     if (data.action === 'markNotifSeen')     return respond(markNotificationSeen(data));
@@ -3279,17 +3285,25 @@ function reassignTask(data) {
   if (!newAssignee) return {status:'error', message:'No new assignee'};
   var leadName = String(data.leadName||'lead').trim();
   var today = dateStr();
+  // noFault: reassigned before the task was ever overdue/delayed (workload
+  // rebalancing, wrong person assigned, someone's on leave, etc.) -- the
+  // original assignee did nothing wrong, so this must NOT carry the same
+  // −2 Reliability hit as a lead closing off actually-late work. 'Reassigned'
+  // is already a recognized terminal status excluded from the Work Not Done
+  // penalty tally everywhere that tally is computed.
+  var noFault = !!data.noFault;
 
   var lastCol = sheet.getLastColumn();
   var orig = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
   var origAssignee = String(orig[3]||'').trim();
+  var tag = noFault ? '' : ' (delay)';
 
-  // 1. Close the original off the assignee (penalty stays with them)
-  sheet.getRange(row, 14).setValue('Work Not Done');  // N SelfStatus
+  // 1. Close the original off the assignee (penalty stays with them, unless noFault)
+  sheet.getRange(row, 14).setValue(noFault ? 'Reassigned' : 'Work Not Done');  // N SelfStatus
   var existNotes = String(orig[20]||'').trim();        // U Notes
   sheet.getRange(row, 21).setValue(
     (existNotes ? existNotes + ' | ' : '') +
-    'Reassigned to ' + newAssignee + ' by ' + leadName + ' on ' + today + ' (delay)');
+    'Reassigned to ' + newAssignee + ' by ' + leadName + ' on ' + today + tag);
 
   // 2. Fresh copy for the new assignee at full points
   var newId = 'T-' + Utilities.getUuid().substring(0,8).toUpperCase();
@@ -3304,11 +3318,11 @@ function reassignTask(data) {
   n[17] = '';               // R ApprovedBy
   n[18] = '';               // S ApprovalDate
   n[19] = '';               // T RevisionTag
-  n[20] = 'Reassigned from ' + origAssignee + ' (delay)'; // U Notes
+  n[20] = 'Reassigned from ' + origAssignee + tag; // U Notes
   n[21] = leadName + ' (reassigned)'; // V AssignedBy
   sheet.appendRow(n);
 
-  Logger.log('Reassigned row '+row+' from '+origAssignee+' → '+newAssignee+' ('+newId+')');
+  Logger.log('Reassigned row '+row+' from '+origAssignee+' → '+newAssignee+' ('+newId+')'+(noFault?' [no-fault]':' [penalty]'));
   return {status:'ok', newTaskId:newId, original:origAssignee, newAssignee:newAssignee};
 }
 
