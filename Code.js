@@ -801,6 +801,35 @@ function safeRespond(fn) {
   catch(e) { return respond({error: e.toString()}); }
 }
 
+// Short-lived server-side cache for expensive, non-user-specific read
+// endpoints (whole-team task list, project/member lists) hit by every
+// dashboard/form load across the whole team. Apps Script's daily execution
+// quota is shared across every action on this script -- on a personal Gmail
+// account (not Workspace) that quota is tight, and when several people load
+// a dashboard around the same moment that used to mean N nearly-simultaneous
+// full sheet reads, each burning real runtime and each independently paying
+// the auth-check cost. Collapsing them into one computation per cache window
+// is exactly the kind of burst-flattening that reduces the odds of the
+// script tipping into a quota-exceeded HTML error page (2026-08).
+// Deliberately short (seconds, not minutes) -- freshness matters more than
+// squeezing out every possible cache hit; this is about flattening bursts
+// of near-simultaneous requests, not serving stale dashboards.
+function cachedSafeRespond(key, ttlSeconds, fn) {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(key);
+  if (hit) return respondRaw(hit);
+  var json;
+  try { json = JSON.stringify(fn()); }
+  catch (e) { return respond({error: e.toString()}); }
+  try { cache.put(key, json, ttlSeconds); } catch (e) {} // >100KB or similar -- skip caching, still serve fresh
+  return respondRaw(json);
+}
+function respondRaw(jsonString) {
+  var output = ContentService.createTextOutput(jsonString);
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+
 function db() { return SpreadsheetApp.openById(SHEET_ID); }
 function sdb() { return SpreadsheetApp.openById(SCORECARD_SHEET_ID); }
 
@@ -989,7 +1018,13 @@ function verifyIdToken(token) {
              (String(info.email_verified) !== 'false') &&
              getAllowedEmails()[email];
     if (!ok) { cache.put(key, '-', 300); return null; }
-    cache.put(key, email, 1800);  // 30 min (token itself expires ~1 hr)
+    // 55 min -- close to the token's own ~1hr lifetime (small buffer so a
+    // cached verdict never outlives the token itself). Was 30 min; stretched
+    // to roughly halve how often each person's session re-hits the tokeninfo
+    // endpoint, one of several changes (2026-08) aimed at reducing total
+    // script executions/runtime after the script started intermittently
+    // hitting Apps Script's daily quota under this account's tier.
+    cache.put(key, email, 3300);
     return email;
   } catch (err) { try { cache.put(key, '-', 20); } catch(e2){} return null; }
 }
@@ -1060,10 +1095,10 @@ function doGet(e) {
     return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
   // Lightweight access check used by the sign-in gate (auth.js)
   if (action === 'checkAccess') return respond({ allowed: true, email: authEmail });
-  if (action === 'getLists')              return safeRespond(getLists);
+  if (action === 'getLists')              return cachedSafeRespond('c_getLists', 30, getLists);
   if (action === 'getConfig')             return safeRespond(readConfig);
   if (action === 'getPendingTasks')       return safeRespond(getPendingTasks);
-  if (action === 'getAllTasks')           return safeRespond(getAllTasks);
+  if (action === 'getAllTasks')           return cachedSafeRespond('c_getAllTasks', 30, getAllTasks);
   if (action === 'getOpenTasksForMember')    return safeRespond(function() { return getOpenTasksForMember(member); });
   if (action === 'getNotifications')         return safeRespond(function() { return getNotificationsForMember(member); });
   if (action === 'getWeeklyStats')           return safeRespond(function() { return getWeeklyStats(p.weekStart||''); });
@@ -1111,8 +1146,8 @@ function doPost(e) {
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
 
     // GET-style actions sent via POST to bypass CORS
-    if (data.action === 'getAllTasks')         return respond(getAllTasks());
-    if (data.action === 'getLists')            return respond(getLists());
+    if (data.action === 'getAllTasks')         return cachedSafeRespond('c_getAllTasks', 30, getAllTasks);
+    if (data.action === 'getLists')            return cachedSafeRespond('c_getLists', 30, getLists);
     if (data.action === 'getConfig')           return respond(readConfig());
     if (data.action === 'getPendingTasks')     return respond(getPendingTasks());
     if (data.action === 'getOpenTasksForMember') return respond(getOpenTasksForMember(data.member||''));
