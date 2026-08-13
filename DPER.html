@@ -1086,10 +1086,21 @@ async function submitAll(){
         body:JSON.stringify({action:'updateIssueStatus',issueId,status:newStatus,targetDate:act.targetDate||''})});
     }
 
+    // Score-relevant writes only -- tracked and shown to the lead below so a
+    // backend hiccup (lock contention, a bad entry) never silently drops a
+    // task/status with no indication anything went wrong.
+    let scoringErrors = [];
+
     // 1b. Open-task status updates (mark Done / In progress)
     const taskStatuses = collectTaskStatuses();
-    if (taskStatuses.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).catch(()=>{});
+    if (taskStatuses.length) {
+      try {
+        const utsR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).then(r=>r.json());
+        if (utsR && utsR.status === 'error') scoringErrors.push('task status update: '+(utsR.message||'failed'));
+        else if (utsR && utsR.errors && utsR.errors.length) scoringErrors.push(...utsR.errors);
+      } catch(e){ scoringErrors.push('task status update: network error'); }
+    }
 
     // 2. Each project
     let siddharthErrors = [];
@@ -1116,9 +1127,10 @@ async function submitAll(){
       try {
         const r = await resp.json();
         console.log('submitDPER response for', p.proj, r);
+        if (r.status === 'error') scoringErrors.push(p.proj+': '+(r.message||'submission failed'));
         if(p.siddharthPending && r.siddharthError) siddharthErrors.push(p.proj+': '+r.siddharthError);
         if(p.siddharthPending && r.siddharthTaskId) console.log('Siddharth task created:', r.siddharthTaskId);
-      } catch(e){ console.log('Could not parse submitDPER response', e); }
+      } catch(e){ scoringErrors.push(p.proj+': could not confirm submission'); }
 
       // 2b. Directly-assigned tasks for this project (grouped by assignee)
       if(p.tasks && p.tasks.length){
@@ -1126,14 +1138,17 @@ async function submitAll(){
         const byWho={};
         p.tasks.forEach(t=>{ (byWho[t.assignedTo]=byWho[t.assignedTo]||[]).push(t); });
         for(const [assignee,tks] of Object.entries(byWho)){
-          await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-            body:JSON.stringify({
-              action:'assignTasks', assignedBy:leadName, assignedTo:assignee,
-              project:p.proj, projectId:'', multiplier:mult, dateAssigned:p.date||date,
-              tasks:tks.map(t=>({taskType:t.taskType, basePts:t.basePts, units:t.units,
-                weightedPts:Math.round(t.basePts*mult*t.units*10)/10,
-                targetDate:t.targetDate, description:t.description}))
-            })}).catch(err=>console.log('assignTasks error', p.proj, err));
+          try {
+            const atR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+              body:JSON.stringify({
+                action:'assignTasks', assignedBy:leadName, assignedTo:assignee,
+                project:p.proj, projectId:'', multiplier:mult, dateAssigned:p.date||date,
+                tasks:tks.map(t=>({taskType:t.taskType, basePts:t.basePts, units:t.units,
+                  weightedPts:Math.round(t.basePts*mult*t.units*10)/10,
+                  targetDate:t.targetDate, description:t.description}))
+              })}).then(r=>r.json());
+            if (atR && atR.status === 'error') scoringErrors.push(p.proj+' tasks for '+assignee+': '+(atR.message||'failed'));
+          } catch(err){ scoringErrors.push(p.proj+' tasks for '+assignee+': network error'); }
         }
       }
     }
@@ -1163,9 +1178,12 @@ async function submitAll(){
 
     // Unplanned work today → self-logged Done tasks (same as DPR)
     for(const u of collectUnplanned()){
-      await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({action:'createDoneTask', member:leadName, project:u.project,
-          taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, date})}).catch(()=>{});
+      try {
+        const cdtR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'createDoneTask', member:leadName, project:u.project,
+            taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, date})}).then(r=>r.json());
+        if (cdtR && cdtR.status === 'error') scoringErrors.push(u.taskType+' — '+u.project+': '+(cdtR.message||'failed'));
+      } catch(e){ scoringErrors.push(u.taskType+' — '+u.project+': network error'); }
     }
 
     // Clear draft on successful submit
@@ -1181,7 +1199,8 @@ async function submitAll(){
       `${projs.length} project report${projs.length!==1?'s':''} submitted by ${leadName}<br>`+
       (res?`${res} issue${res!==1?'s':''} resolved · `:'')+(esc?`${esc} escalated · `:'')+
       (sidPendingCount && !siddharthErrors.length ? `✅ ${sidPendingCount} Siddharth task${sidPendingCount!==1?'s':''} created` : '')+
-      (siddharthErrors.length ? `⚠️ Siddharth task error: ${siddharthErrors.join('; ')}` : '');
+      (siddharthErrors.length ? `⚠️ Siddharth task error: ${siddharthErrors.join('; ')}` : '')+
+      (scoringErrors.length ? `<div style="margin-top:10px;text-align:left;font-size:12px;color:var(--amber);background:var(--amber-bg);border:1px solid #D97706;border-radius:8px;padding:10px 12px;line-height:1.5">⚠ ${scoringErrors.length} item(s) didn't save — please check and re-enter if needed:<br>${scoringErrors.map(e=>'• '+e).join('<br>')}</div>` : '');
   } catch(e){
     toast('Error: '+e.message);
     document.getElementById('submit-btn').disabled=false;

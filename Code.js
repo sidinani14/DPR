@@ -824,14 +824,25 @@ function dateStr(d) {
 
 // Serialize sheet-mutating actions so concurrent/bulk submissions can't lose
 // rows (Apps Script can run doPost calls in parallel; unguarded appendRow +
-// getLastRow races drop writes). Flush inside the lock so writes commit before
-// the lock is released. Proceeds even if the lock can't be acquired in time.
+// getLastRow races drop writes, and createDoneTask's scan-then-update-in-place
+// pattern is not safe without one). Flush inside the lock so writes commit
+// before the lock is released.
+// 2026-08 fix: this used to proceed UNLOCKED if waitLock() timed out ("Proceeds
+// even if the lock can't be acquired in time") -- under real contention (e.g.
+// several team members submitting DPR near the 7:30 deadline at once) that
+// silently ran concurrent writes against the same rows with no protection at
+// all, which is very likely why some task submissions went missing without
+// any error ever showing. Now it throws instead, so the caller's error
+// surfaces to the client (who can retry) rather than a write silently racing.
 function withLock(fn) {
   var lock = LockService.getScriptLock();
-  var got  = false;
-  try { lock.waitLock(30000); got = true; } catch (e) {}
+  // waitLock() has no meaningful return value on success -- it either
+  // returns (acquired) or throws (timed out). Don't rely on the return value.
+  var got = false;
+  try { lock.waitLock(30000); got = true; } catch (e) { got = false; }
+  if (!got) throw new Error('Server busy — could not save right now. Please try again in a few seconds.');
   try { return fn(); }
-  finally { if (got) { try { SpreadsheetApp.flush(); } catch (e) {} try { lock.releaseLock(); } catch (e) {} } }
+  finally { try { SpreadsheetApp.flush(); } catch (e) {} try { lock.releaseLock(); } catch (e) {} }
 }
 
 // Convert a sheet cell value (Date object or string) to YYYY-MM-DD
@@ -947,6 +958,13 @@ function getAllowedEmails() {
 }
 // Returns the verified allowlisted email, or null. Caches results (token is
 // short-lived) to avoid an external fetch on every single API call.
+// 2026-08 fix: a transient failure reaching Google's tokeninfo endpoint (network
+// blip, brief outage, UrlFetchApp hiccup) was being cached as a hard denial for
+// 5 minutes -- every request on that same token during that window then got
+// "access denied" for a problem that had nothing to do with the token itself.
+// Only a genuine negative verdict (bad aud, unverified email, not on the team
+// allowlist) is cached now; a fetch failure just denies THIS one request so a
+// retry moments later can succeed once the hiccup passes.
 function verifyIdToken(token) {
   if (!token) return null;
   var cache = CacheService.getScriptCache();
@@ -958,7 +976,7 @@ function verifyIdToken(token) {
     var resp = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
       { muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) { cache.put(key, '-', 300); return null; }
+    if (resp.getResponseCode() !== 200) { return null; } // transient -- don't poison the cache
     var info  = JSON.parse(resp.getContentText());
     var email = String(info.email || '').toLowerCase();
     var ok = (info.aud === AUTH_CLIENT_ID) &&
@@ -1145,15 +1163,20 @@ function doPost(e) {
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
     if (data.action === 'resolveIssue')        return respond(resolveIssue(data.issueId||''));
     if (data.action === 'getSiteExecution')    return respond(getSiteExecutionSummary(data.project||''));
-    if (data.action === 'submitDPER')          return respond(handleDPERSubmission(data));
+    if (data.action === 'submitDPER')          return respond(withLock(function(){ return handleDPERSubmission(data); }));
     if (data.action === 'correctSiteExecution') return respond(correctSiteExecution(data));
     if (data.action === 'backfillFieldWorkPoints') return respond(backfillFieldWorkPoints(data.from||'', data.to||''));
     if (data.action === 'getCalendarData')     return respond(getCalendarData());
     if (data.action === 'getDeepakIssues')     return respond(getIssuesByReporter(data.lead||'Deepak Soni', true));
     if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
     if (data.action === 'updateIssueStatus')   return respond(updateIssueStatus(data.issueId||'', data.status||'', data.targetDate||''));
-    if (data.action === 'updateTaskStatuses')  { updateTaskStatusesFromDPR(data.statuses||[], data.date||''); return respond({status:'ok'}); }
-    if (data.action === 'submitAmanCRM')       return respond(submitAmanCRM(data));
+    if (data.action === 'updateTaskStatuses')  {
+      var utsResult = withLock(function(){ return updateTaskStatusesFromDPR(data.statuses||[], data.date||''); });
+      return respond((utsResult && utsResult.errors && utsResult.errors.length)
+        ? {status:'partial', updated:utsResult.updated, errors:utsResult.errors}
+        : {status:'ok'});
+    }
+    if (data.action === 'submitAmanCRM')       return respond(withLock(function(){ return submitAmanCRM(data); }));
     if (data.action === 'logConnections')      return respond(logConnections(data));
     if (data.action === 'submitBillables')     return respond(submitBillables(data));
     if (data.action === 'submitSocialMediaLog') return respond(withLock(function(){ return submitSocialMediaLog(data); }));
@@ -1189,39 +1212,62 @@ function doPost(e) {
     // TASK_LOG no longer used for new tasks — Section 3 Done tasks
     // go to TASK_ASSIGNMENTS via createDoneTask action from DPR form
     // writeTaskLog kept for backward compat but not called for new submissions
-    writeDailySummary(data);
 
-    // Update assigned task statuses + write both date columns
-    if (data['Assigned Statuses']) {
-      try {
-        var st = JSON.parse(data['Assigned Statuses']);
-        updateTaskStatusesFromDPR(st, dateStr(data['Timestamp']));
-      } catch(err) { Logger.log('Status update error: ' + err); }
-    }
+    // 2026-08 fix: this whole batch used to run unlocked, with each step's
+    // errors only Logger.log'd — a single bad item (a stale task match, a
+    // malformed entry) could throw and silently abort every task/status still
+    // left in that submission, while the client was always told 'ok'. Now the
+    // whole batch is one locked, atomic write (safe against a concurrent
+    // submission from someone else), each item is caught individually so one
+    // bad entry doesn't take the rest down with it, and any real failures are
+    // returned to the client instead of being invisible.
+    var submissionErrors = [];
+    withLock(function(){
+      writeDailySummary(data);
 
-    // Section 3 done tasks → TASK_ASSIGNMENTS (replaces TASK_LOG)
-    if (data['Done Tasks']) {
-      try {
-        var doneTasks = JSON.parse(data['Done Tasks']);
-        doneTasks.forEach(function(t) { createDoneTask(t); });
-        Logger.log('Created ' + doneTasks.length + ' done tasks in TASK_ASSIGNMENTS');
-      } catch(err) { Logger.log('Done tasks error: ' + err); }
-    }
+      // Update assigned task statuses + write both date columns
+      if (data['Assigned Statuses']) {
+        try {
+          var st = JSON.parse(data['Assigned Statuses']);
+          var utsResult = updateTaskStatusesFromDPR(st, dateStr(data['Timestamp']));
+          if (utsResult && utsResult.errors) submissionErrors = submissionErrors.concat(utsResult.errors);
+        } catch(err) { Logger.log('Status update error: ' + err); submissionErrors.push('status update: ' + err); }
+      }
 
-    // Field work today (start/end per visit/meeting/material selection) → FIELD_WORK
-    // (points already carried by the Done visit tasks above; this feeds attendance)
-    try { writeFieldWork(data); } catch(err) { Logger.log('Field work error: ' + err); }
+      // Section 3 done tasks → TASK_ASSIGNMENTS (replaces TASK_LOG)
+      if (data['Done Tasks']) {
+        try {
+          var doneTasks = JSON.parse(data['Done Tasks']);
+          var doneOk = 0;
+          doneTasks.forEach(function(t) {
+            try { createDoneTask(t); doneOk++; }
+            catch(err) { Logger.log('Done task error (' + (t.taskType||'') + '): ' + err); submissionErrors.push('task ' + (t.taskType||'') + ' — ' + (t.project||'') + ': ' + err); }
+          });
+          Logger.log('Created ' + doneOk + '/' + doneTasks.length + ' done tasks in TASK_ASSIGNMENTS');
+        } catch(err) { Logger.log('Done tasks error: ' + err); submissionErrors.push('done tasks: ' + err); }
+      }
 
-    // Section 3 ongoing tasks → self-assigned, deadline = tomorrow
-    if (data['Ongoing Tasks']) {
-      try {
-        var ongoing = JSON.parse(data['Ongoing Tasks']);
-        ongoing.forEach(function(t) { createSelfAssignedTask(t); });
-        Logger.log('Created ' + ongoing.length + ' self-assigned ongoing tasks');
-      } catch(err) { Logger.log('Ongoing tasks error: ' + err); }
-    }
+      // Field work today (start/end per visit/meeting/material selection) → FIELD_WORK
+      // (points already carried by the Done visit tasks above; this feeds attendance)
+      try { writeFieldWork(data); } catch(err) { Logger.log('Field work error: ' + err); submissionErrors.push('field work: ' + err); }
 
-    return respond({status: 'ok'});
+      // Section 3 ongoing tasks → self-assigned, deadline = tomorrow
+      if (data['Ongoing Tasks']) {
+        try {
+          var ongoing = JSON.parse(data['Ongoing Tasks']);
+          var ongoingOk = 0;
+          ongoing.forEach(function(t) {
+            try { createSelfAssignedTask(t); ongoingOk++; }
+            catch(err) { Logger.log('Ongoing task error (' + (t.taskType||'') + '): ' + err); submissionErrors.push('ongoing ' + (t.taskType||'') + ' — ' + (t.project||'') + ': ' + err); }
+          });
+          Logger.log('Created ' + ongoingOk + '/' + ongoing.length + ' self-assigned ongoing tasks');
+        } catch(err) { Logger.log('Ongoing tasks error: ' + err); submissionErrors.push('ongoing tasks: ' + err); }
+      }
+    });
+
+    return respond(submissionErrors.length
+      ? {status:'partial', message:'Some items did not save — see errors.', errors: submissionErrors}
+      : {status: 'ok'});
   } catch(err) {
     return respond({status: 'error', message: err.toString()});
   }
@@ -1740,13 +1786,20 @@ function submitDelayReason(data) {
 // member + project + taskType + area + drawing
 // TASK_ASSIGNMENTS: SelfStatus=N(14 1-idx), SelfDoneDate=O(15)
 // ════════════════════════════════════════════════════════════════
+// Returns {updated, errors} — one bad status entry (a stale row index, an
+// unexpected value) used to throw and silently abort every status update
+// still left in the batch, with the caller only logging it server-side and
+// telling the client 'ok' regardless. Each entry is now isolated so one
+// failure doesn't take the rest of the day's task updates down with it.
 function updateTaskStatusesFromDPR(statuses, submissionDate) {
   var sheet = db().getSheetByName(ASSIGN_TAB);
-  if (!sheet || !statuses || !statuses.length) return;
+  if (!sheet || !statuses || !statuses.length) return {updated:0, errors:[]};
   var rows = sheet.getDataRange().getValues();
   var now  = submissionDate || dateStr();
+  var errors = [], updated = 0;
 
   statuses.forEach(function(a) {
+   try {
     if (!a.taskType || !a.project || !a.member) return;
     var newStatus = '';
     if      (a.status === 'Done')    newStatus = 'Done';
@@ -1838,10 +1891,16 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
           sheet.getRange(i+1, 21).setValue(existNote ? existNote + ' | ' + newNote : newNote);
         }
         Logger.log('Task updated: ' + a.member + ' / ' + a.taskType + (newStatus ? (' -> ' + newStatus) : ' (correction only)'));
+        updated++;
         break;
       }
     }
+   } catch (err) {
+     Logger.log('Status update error (' + a.member + ' / ' + a.taskType + '): ' + err);
+     errors.push((a.taskType||'task') + ' — ' + (a.project||'') + ': ' + err);
+   }
   });
+  return {updated: updated, errors: errors};
 }
 
 // ════════════════════════════════════════════════════════════════

@@ -1877,10 +1877,21 @@ async function submitAll() {
         body:JSON.stringify({action:'updateIssueStatus',issueId,status:newStatus,targetDate:act.targetDate||''})});
     }
 
+    // Score-relevant writes only -- tracked and shown below so a backend
+    // hiccup (lock contention, a bad entry) never silently drops a task with
+    // no indication anything went wrong.
+    let scoringErrors = [];
+
     // 1b. Open-task status updates (mark Done / In progress)
     const taskStatuses = collectTaskStatuses();
-    if (taskStatuses.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).catch(()=>{});
+    if (taskStatuses.length) {
+      try {
+        const utsR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'updateTaskStatuses', statuses:taskStatuses, date})}).then(r=>r.json());
+        if (utsR && utsR.status === 'error') scoringErrors.push('task status update: '+(utsR.message||'failed'));
+        else if (utsR && utsR.errors && utsR.errors.length) scoringErrors.push(...utsR.errors);
+      } catch(e){ scoringErrors.push('task status update: network error'); }
+    }
 
     // 1c. Late-arrival context (replaces messaging Siddharth on WhatsApp) —
     // logged whenever Arrived-on-time is No; Siddharth decides excuse-vs-absent
@@ -1935,8 +1946,14 @@ async function submitAll() {
     // Field work today (site visits/meetings/material selections) — separate
     // batch call since it creates its own Done tasks + FIELD_WORK rows.
     const fieldWork = collectFieldWork();
-    if (fieldWork.length) await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'submitFieldWorkBatch', member:crmUser, email:googleUser?.email||'', date, items:fieldWork})}).catch(()=>{});
+    if (fieldWork.length) {
+      try {
+        const fwR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'submitFieldWorkBatch', member:crmUser, email:googleUser?.email||'', date, items:fieldWork})}).then(r=>r.json());
+        if (fwR && fwR.status === 'error') scoringErrors.push('field work: '+(fwR.message||'failed'));
+        else if (fwR && typeof fwR.tasksCreated === 'number' && fwR.tasksCreated < fwR.count) scoringErrors.push(`field work: only ${fwR.tasksCreated}/${fwR.count} entries saved`);
+      } catch(e){ scoringErrors.push('field work: network error'); }
+    }
 
     // Success screen
     document.getElementById('form-body').style.display='none';
@@ -1955,7 +1972,8 @@ async function submitAll() {
       (payAmt?`💰 ₹${payAmt.toLocaleString('en-IN')} payment received<br>`:'')+
       (newIssues.length?`🚩 ${newIssues.length} issue${newIssues.length!==1?'s':''} logged<br>`:'')+
       (feedback.length?`⭐ ${feedback.length} client feedback recorded<br>`:'')+
-      (issActCount?`✅ ${issActCount} issue${issActCount!==1?'s':''} updated`:'');
+      (issActCount?`✅ ${issActCount} issue${issActCount!==1?'s':''} updated`:'')+
+      (scoringErrors.length ? `<div style="margin-top:10px;text-align:left;font-size:12px;color:#7A5000;background:#FFF8E1;border:1px solid #D97706;border-radius:8px;padding:10px 12px;line-height:1.5">⚠ ${scoringErrors.length} item(s) didn't save — please check and re-enter if needed:<br>${scoringErrors.map(e=>'• '+e).join('<br>')}</div>` : '');
 
   } catch(e) {
     toast('Error: '+e.message);

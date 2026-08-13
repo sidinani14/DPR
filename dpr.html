@@ -373,6 +373,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
   <div class="success-icon"><svg viewBox="0 0 26 26" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13l6 6L22 7"/></svg></div>
   <div class="success-title">Report submitted!</div>
   <div class="success-sub">Your progress has been logged.<br>Your lead will review and approve your tasks.</div>
+  <div id="partial-warning" style="display:none;text-align:left;font-size:12px;color:var(--amber);background:var(--amber-light);border:1px solid #e8c87a;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:16px;line-height:1.5"></div>
   <div class="success-scores">
     <div class="sc-cell"><div class="sc-val" id="fin-pts">—</div><div class="sc-lbl">Est. pts</div></div>
     <div class="sc-cell"><div class="sc-val" id="fin-units">—</div><div class="sc-lbl">Units done</div></div>
@@ -1429,11 +1430,18 @@ async function submitForm() {
   document.getElementById('sending').classList.add('show');
   try {
     if (APPS_SCRIPT_URL!=='YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-      await fetch(APPS_SCRIPT_URL, {
+      const mainRes = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: {'Content-Type': 'text/plain'},
         body: JSON.stringify(data),
-      });
+      }).then(r=>r.json());
+      if (mainRes && mainRes.status === 'error') throw new Error(mainRes.message || 'Submission failed');
+      // A backend hiccup on one task/status shouldn't hide the whole submission
+      // behind a generic failure -- most of it saved, so show the success
+      // screen but flag exactly what needs re-checking/re-entering.
+      if (mainRes && mainRes.status === 'partial' && mainRes.errors && mainRes.errors.length) {
+        window._dprPartialErrors = mainRes.errors;
+      }
       // EPIC G/H — log client connections + billable requests (separate writes)
       const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
       const conns = collectConnections(), bills = collectBillables();
@@ -1455,6 +1463,14 @@ async function submitForm() {
     document.getElementById('fin-pts').textContent=data['Total Weighted Pts'].toFixed(1);
     document.getElementById('fin-units').textContent=data['Total Task Units'];
     document.getElementById('fin-proj').textContent=data['Projects Count'];
+    const pw = document.getElementById('partial-warning');
+    if (window._dprPartialErrors && window._dprPartialErrors.length) {
+      pw.innerHTML = '⚠ ' + window._dprPartialErrors.length + ' item(s) didn\'t save — please check and re-enter if needed:<br>' +
+        window._dprPartialErrors.map(e=>'• '+e).join('<br>');
+      pw.style.display = 'block';
+    } else {
+      pw.style.display = 'none';
+    }
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
