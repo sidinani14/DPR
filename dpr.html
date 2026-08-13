@@ -391,7 +391,7 @@ const GOOGLE_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.goog
 let TEAM=[], PROJECTS=[], STAGES=[], VISITS=[], TASK_GROUPS=[], STAGE_IDX={};
 let PAYMENT_STAGES={}, PAYMENT_DISCIPLINES=[];   // EPIC H — from CONFIG V/W
 let connCount=0, billCount=0;
-const CONN_TYPES=['Call','WhatsApp','Meeting','Site Visit','Email','Other'];
+const CONN_TYPES=['Call','WhatsApp','Email','Other']; // Meeting/Site Visit removed 2026-08 — already captured in Field Work Today
 let EMAIL_MAP  = {"Achal Rathore": "achalrathore769@gmail.com", "Himanshu Malviya": "hmalviya95@gmail.com", "Deepak Soni": "dssoni57@gmail.com", "Poorvi Goyal": "poorvigoyal00@gmail.com", "Khushi Agrawal": "khushi.agr24@gmail.com", "Sahil Maurya": "sahilmaurya121@gmail.com", "Aaditya Koshti": "aadityakoshti1@gmail.com", "Aman Raghuwanshi": "raghuwanshiaman481@gmail.com", "Bhavesh Bhagwat": "bhaveshbhagwat9@gmail.com", "Aashi Agrawal": "aashiagrawal0517@gmail.com", "Siddharth Inani": "sidinani14@gmail.com", "Astha Inani": "astha.uch@gmail.com", "Simi": "devenjanapateljbp@gmail.com"}; // hardcoded fallback — overridden by live data
 let googleUser = null;
 let assignedTasks = [];
@@ -963,7 +963,7 @@ function addFieldWork(){
 
 // ── EPIC G: project connections (DPR) — chip UI ──────────────
 const CONN_WITH=['Client','Contractor','Consultant','Vendor','Other'];
-const CONN_TYPE_ICON={'Call':'📞','WhatsApp':'💬','Meeting':'🤝','Site Visit':'🏗️','Email':'📧','Other':'📌'};
+const CONN_TYPE_ICON={'Call':'📞','WhatsApp':'💬','Email':'📧','Other':'📌'};
 const CONN_WITH_ICON={'Client':'👤','Contractor':'👷','Consultant':'📐','Vendor':'🏪','Other':'👥'};
 function pickChip(el){ el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); }
 function chipVal(containerId){ const on=document.querySelector('#'+containerId+' .chip.on'); return on?on.dataset.val:''; }
@@ -1124,15 +1124,14 @@ function addTask(containerId) {
   row.style.cssText='border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;background:var(--surface2)';
   row.innerHTML=`
     <select class="t-cat" onchange="fillTypes(this)" style="width:100%;font-size:12px;padding:6px 10px;margin-bottom:6px">${catOptions()}</select>
-    <div style="display:grid;grid-template-columns:1fr 60px 44px 22px;gap:6px;align-items:center;margin-bottom:7px">
-      <select class="t-type" onchange="refreshTaskPts(this);calcScore()"><option value="">— select category first —</option></select>
+    <select class="t-type" onchange="refreshTaskPts(this);calcScore()" style="width:100%;min-width:0;font-size:12px;padding:6px 10px;margin-bottom:6px"><option value="">— select category first —</option></select>
+    <div style="display:grid;grid-template-columns:1fr 44px 22px;gap:6px;align-items:center;margin-bottom:7px">
       <input type="number" class="t-units" min="0.25" max="30" step="any" value="1" oninput="calcScore()" placeholder="Units">
       <div class="task-pts t-pts-display" style="font-size:11px;color:var(--text3);text-align:center;font-family:'DM Mono',monospace">—</div>
       <button class="rm-task" type="button" onclick="this.closest('.task-entry').remove();calcScore()">×</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px">
-      <input type="text" class="t-area" placeholder="Area / Space (e.g. Drawing Room)" style="font-size:12px;padding:6px 10px">
-      <input type="text" class="t-drawing" placeholder="Drawing name (e.g. False Ceiling Plan)" style="font-size:12px;padding:6px 10px">
+    <div style="margin-bottom:7px">
+      <input type="text" class="t-area" placeholder="Description (optional)" style="font-size:12px;padding:6px 10px">
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">Status:</span>
@@ -1314,8 +1313,8 @@ function collectData() {
       if (!stage) return;
       if (!stage.pts && !isVisitType(stage.label)) return;
       const units=parseFloat(tr.querySelector('.t-units')?.value)||1;
-      const area=tr.querySelector('.t-area')?.value.trim()||'';
-      const drawing=tr.querySelector('.t-drawing')?.value.trim()||'';
+      const area=tr.querySelector('.t-area')?.value.trim()||''; // Description field (drawing name retired — L holds free-text description now)
+      const drawing='';
       const taskStatus=tr.querySelector('.t-status:checked')?.value||'Done';
       // Check if it's a visit type — get hours if so
       const isVisit = isVisitType(stage.label);

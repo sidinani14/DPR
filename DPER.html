@@ -340,9 +340,9 @@ let pbCount      = 0;
 let ibCount      = 0;
 let taskCount    = 0;
 let connCount    = 0;
-const CONN_TYPES = ['Call','WhatsApp','Meeting','Site Visit','Email','Other'];
+const CONN_TYPES = ['Call','WhatsApp','Email','Other']; // Meeting/Site Visit removed 2026-08 — already captured in Field Work Today
 const CONN_WITH  = ['Client','Contractor','Consultant','Vendor','Other'];
-const CONN_TYPE_ICON = {'Call':'📞','WhatsApp':'💬','Meeting':'🤝','Site Visit':'🏗️','Email':'📧','Other':'📌'};
+const CONN_TYPE_ICON = {'Call':'📞','WhatsApp':'💬','Email':'📧','Other':'📌'};
 const CONN_WITH_ICON = {'Client':'👤','Contractor':'👷','Consultant':'📐','Vendor':'🏪','Other':'👥'};
 
 // single-select chip helpers (mirror the DPR form). data-val stays clean; the
