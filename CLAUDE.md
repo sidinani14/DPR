@@ -1,5 +1,33 @@
 # Ideaform Design Studio — Productivity System
 
+## Reliability fixes (2026-08) — read before touching submission paths
+Root-caused two backend bugs behind reported "sometimes access denied" +
+"task submissions not reflected, no score":
+1. `withLock()` used to proceed WITHOUT the lock if `waitLock()` timed out —
+   under real contention (several people submitting DPR near the 7:30
+   deadline) this ran unprotected concurrent writes against the same
+   TASK_ASSIGNMENTS rows. Now throws instead — every `withLock` caller must
+   expect it can throw, and that error should reach the client, not be
+   swallowed.
+2. `verifyIdToken()` cached ANY non-200 tokeninfo response as a hard denial
+   for 5 min — a transient network blip got remembered as "access denied"
+   for that token for 5 min regardless of real authorization. Only genuine
+   negative verdicts (bad aud/unverified email/not on allowlist) are cached now.
+3. The default DPR submission handler ran its whole write batch unlocked with
+   each step's errors only `Logger.log`'d — one bad item in a forEach loop
+   silently aborted the rest of that batch while the client was told 'ok'
+   regardless. Now one locked, atomic batch, per-item try/catch, real errors
+   returned as `{status:'partial', errors:[...]}`. Same pattern applied to
+   `updateTaskStatusesFromDPR` (now returns `{updated, errors}`, not void) and
+   `submitDPER`/`submitAmanCRM` are now wrapped in `withLock` too.
+**Any new score-affecting write path must**: (a) go through `withLock`, (b)
+isolate per-item failures inside a loop with try/catch rather than letting
+one throw kill the batch, (c) return real errors instead of a blanket 'ok'.
+**Any new frontend submit handler must** parse the JSON response and surface
+`status:'error'`/`'partial'` to the user (a visible warning, not a silent
+`.catch(()=>{})`) — dpr.html/DPER.html/CRM.html/social.html all do this now
+for their score-relevant POSTs; match that pattern for new forms.
+
 ## Who I am
 - Studio: Ideaform Design Studio, Bhopal
 - Owner: Siddharth Inani (sidinani14@gmail.com)
