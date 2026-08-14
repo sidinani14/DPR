@@ -4651,7 +4651,15 @@ function loadCadence(planSheet) {
 // ── Load visit history from TASK_LOG ─────────────────────────
 // Returns: {project: {visitType: [{date, member, pts}]}}
 function loadVisitHistory() {
-  // Read from TASK_ASSIGNMENTS — completed (Done + Approved) visit tasks
+  // Read from TASK_ASSIGNMENTS — self-reported Done visit tasks (DPR Field
+  // Work, DPER per-project visits, CRM field work all create these via
+  // createDoneTask, always LeadApproved='Pending' until someone reviews it).
+  // 2026-08 fix: this used to require LeadApproved==='Yes', so the planner
+  // was blind to every visit still sitting in the approval queue -- any lag
+  // approving tasks meant "last visit date" silently went stale even though
+  // the visit genuinely happened. Scheduling the NEXT visit is about physical
+  // reality, not paperwork sign-off, so a self-reported Done visit counts
+  // unless it was explicitly rejected (a rejected report is presumed bogus).
   var sheet = db().getSheetByName(ASSIGN_TAB);
   var history = {};
   if (!sheet) return history;
@@ -4668,7 +4676,7 @@ function loadVisitHistory() {
     var selfStat = String(r[13]||'').trim(); // N SelfStatus
     var approved = String(r[is23?16:15]||'').trim(); // Q LeadApproved
     if (!proj || !isVisitType(tType)) continue;
-    if (selfStat !== 'Done' || approved !== 'Yes') continue;
+    if (selfStat !== 'Done' || approved === 'Rejected') continue;
     var dStr = cellDate(r[15]) || cellDate(r[14]) || cellDate(r[is23?18:17]) || '';
     if (!dStr) continue;
     var vType = normaliseVisitType(tType) || tType;

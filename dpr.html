@@ -875,11 +875,6 @@ function renderAssignedTasks() {
         <span id="atc-pts-${i}" style="font-size:12px;color:var(--accent);font-weight:600;margin-left:8px"></span>
         <span style="font-size:10px;color:var(--text3);margin-left:4px">${isVisitRate2(t.taskType)?'hrs × 2':'hrs × 1'}</span>
       </div>` : ''}
-      <div id="done-date-${i}" style="display:none;padding:0 13px 10px">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">ACTUAL COMPLETION DATE</div>
-        <input type="date" class="atc-done-date-${i}" value="${new Date().toISOString().substring(0,10)}"
-          style="font-size:12px;padding:7px 10px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);color-scheme:dark">
-      </div>
       <div id="block-reason-${i}" style="display:none;padding:0 13px 10px">
         <div style="font-size:11px;color:#E07A7A;margin-bottom:4px;font-family:'DM Mono',monospace">WHAT'S BLOCKING THIS? <span style="color:var(--red)">*</span></div>
         <textarea class="atc-note-${i}" placeholder="e.g. waiting on structural drawings / client hasn't approved layout / need direction from lead…"
@@ -1178,10 +1173,8 @@ function toggleVisitHrs(radio) {
 }
 
 function toggleDoneDate(i, radio) {
-  const doneDiv  = document.getElementById('done-date-'+i);
   const visitDiv = document.getElementById('visit-hrs-'+i);
   const blockDiv = document.getElementById('block-reason-'+i);
-  if (doneDiv)  doneDiv.style.display  = radio.value === 'Done' ? 'block' : 'none';
   if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
   if (blockDiv) blockDiv.style.display = radio.value === 'Blocked' ? 'block' : 'none';
   calcScore(); // recalculate when status changes
@@ -1279,7 +1272,12 @@ function collectData() {
       area:t.area||'', drawing:t.drawing||'',   // original values — used to match the row, unchanged
       status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
       note: blockNote || genNote,
-      actualCompletionDate:document.querySelector(`.atc-done-date-${i}`)?.value||'',
+      // No user-editable completion date for pre-assigned tasks, by design —
+      // an editable date invites backdating to dodge a delayed-task flag.
+      // The backend falls back to the real submission date when this is
+      // blank. Site visits are independently verifiable (visit log +
+      // attendance), which is why Field Work today keeps its own date.
+      actualCompletionDate:'',
       visitHours:parseFloat(document.querySelector(`.atc-visit-hrs-${i}`)?.value)||null,
       // Corrections — only sent if the task's actual scope changed from what was assigned
       units: parseFloat(document.querySelector(`.atc-units-${i}`)?.value) || null,
