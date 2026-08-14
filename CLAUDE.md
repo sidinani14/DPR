@@ -25,6 +25,17 @@
 - `notifyMissedVisits()` emails Siddharth/Astha a digest whenever
   `syncVisitSchedule` finds a missed visit (>1 full frequency cycle
   overdue) — fully automatic via the daily trigger, no email on a clean day.
+- **Bug fixed same day**: `pushVisitTasks`/`flagMissedVisits` didn't fall
+  back to VISIT_PLANNER's manual last-visit-date (col H) the way
+  `buildVisitSchedule` already did — any project whose last visit only
+  existed as a manual entry (true for virtually every row right after a
+  fresh VISIT_PLANNER fill-in) got scheduled from today+frequency instead
+  of manualDate+frequency, silently missing the current week's threshold
+  for Monthly/Fortnightly cadences. Fixed via a shared
+  `getEffectiveLastVisitDate(entry, history)` used by all three functions.
+- Frequency **"None"** (a documented, valid VISIT_PLANNER option) means no
+  automatic scheduling for that row — not a bug if a project shows no
+  visit task and its Frequency is set to None.
 
 ## Reliability fixes (2026-08) — read before touching submission paths
 Root-caused two backend bugs behind reported "sometimes access denied" +
