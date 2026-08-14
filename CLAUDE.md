@@ -42,6 +42,24 @@ DPER's and CRM's report-date fields too, not just DPR's missing one. Fixed in
 both the new-row and matched-existing-row branches — any caller passing
 `data.date` now gets it applied consistently across all date columns.
 
+**Follow-up same day — no backdating pre-assigned task completion**: the
+"Actual Completion Date" picker shown when marking a pre-assigned task Done
+in dpr.html was removed by design — it let people backdate to dodge a
+delayed-task flag, and unlike site visits (verifiable via visit log +
+attendance) there's no independent way to check when a design task actually
+finished. Completion date is now always the real submission date (backend
+already fell back to `now` when no override is sent — zero backend change
+needed, just stopped sending a value). The Report Date field above is a
+*different* thing — it's for self-logged NEW work/field-work only, kept
+editable because those ARE independently verifiable.
+
+**Follow-up same day — visit planner blind to pending-approval visits**:
+`loadVisitHistory()` (feeds VISIT_SCHEDULE/PROJECT_HEALTH/missed-visit
+flagging) required `LeadApproved==='Yes'` to count a visit — but every visit
+logged via DPR/DPER/CRM is created `Pending`, not auto-approved. Any lag
+approving tasks meant the planner silently didn't know a visit had happened.
+Fixed to count any self-reported Done visit unless explicitly `Rejected`.
+
 **Follow-up same day — "Unexpected token '<'" on dashboard/form loads**: this
 is `res.json()` choking on an HTML response. Every path in this script goes
 through `respond()`, which only ever emits valid JSON — HTML can only mean
