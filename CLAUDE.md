@@ -28,6 +28,20 @@ one throw kill the batch, (c) return real errors instead of a blanket 'ok'.
 `.catch(()=>{})`) — dpr.html/DPER.html/CRM.html/social.html all do this now
 for their score-relevant POSTs; match that pattern for new forms.
 
+**Follow-up same day — backdating late-filed work (Report Date)**: DPR had no
+way to date a self-logged task or field-work entry (site visit/meeting) other
+than "today" — filing a day late silently misattributed the points to the
+wrong week. DPER/CRM already had an editable `#f-date` "Report Date" field;
+DPR now has one too (Section 1, defaults today), threaded into Section 3
+(self-logged Done tasks) and Section 4 (Field Work). But the deeper bug was in
+`createDoneTask` itself: it only honored a backdated `data.date` for the
+AssignedDate column — Deadline/SelfStatusDate/ActualCompletionDate were
+hardcoded to `today` regardless, and **SelfStatusDate is the sole source of
+truth for which week a Done task's points land in**. That silently defeated
+DPER's and CRM's report-date fields too, not just DPR's missing one. Fixed in
+both the new-row and matched-existing-row branches — any caller passing
+`data.date` now gets it applied consistently across all date columns.
+
 **Follow-up same day — "Unexpected token '<'" on dashboard/form loads**: this
 is `res.json()` choking on an HTML response. Every path in this script goes
 through `respond()`, which only ever emits valid JSON — HTML can only mean
