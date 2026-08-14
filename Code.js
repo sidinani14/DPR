@@ -4768,6 +4768,26 @@ function loadOpenVisitTasks() {
 }
 
 // ── Calculate next visit date for one cadence entry ───────────
+// Shared "what was the last visit" resolver — prefers real approved system
+// history, falls back to the manually-entered date in VISIT_PLANNER col H
+// (used for pre-system-history records, per the tab's own instructions:
+// "Fill last actual visit date for history before system go-live").
+// 2026-08 bug: buildVisitSchedule already did this fallback correctly, but
+// pushVisitTasks and flagMissedVisits didn't -- they only checked approved
+// history and defaulted to '' otherwise, so ANY project whose last visit was
+// only ever recorded manually (true for virtually every row right after
+// VISIT_PLANNER was freshly filled in, since nothing has an approved system
+// record yet) got treated as "no visits yet" and scheduled from today+
+// frequency instead of manualDate+frequency. For Monthly/Fortnightly cadences
+// that pushed the computed date past this week's threshold, so no task ever
+// got created for it -- the reason several planned visits appeared to be
+// silently skipped after the plan was corrected.
+function getEffectiveLastVisitDate(entry, history) {
+  var hist = (history[entry.project]||{})[entry.visitType]||[];
+  var lastVisit = hist.length > 0 ? hist[0] : null;
+  return lastVisit ? lastVisit.date : (entry.manualLastDate || '');
+}
+
 function calcNextVisitDate(entry, lastVisitDate, openTasks) {
   // Check open task for this specific assignee first, then any assignee
   var assigneeStr = String(entry.assignee||'').split(',')[0].trim();
@@ -4814,8 +4834,7 @@ function buildVisitSchedule(cadence, history, openTasks) {
   cadence.forEach(function(entry) {
     var hist = (history[entry.project] || {})[entry.visitType] || [];
     var lastVisit   = hist.length > 0 ? hist[0] : null;
-    // Use TASK_LOG history if available; fall back to manual date from VISIT_PLANNER col H
-    var lastDate    = lastVisit ? lastVisit.date : (entry.manualLastDate || '');
+    var lastDate    = getEffectiveLastVisitDate(entry, history);
     var lastMember  = lastVisit ? lastVisit.member : (entry.manualLastDate ? 'Pre-system record' : '');
     var nextInfo    = calcNextVisitDate(entry, lastDate, openTasks);
     var nextDate    = nextInfo.date;
@@ -4924,8 +4943,8 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
   }
 
   cadence.forEach(function(entry) {
+    var lastDate = getEffectiveLastVisitDate(entry, history);
     var hist     = (history[entry.project]||{})[entry.visitType]||[];
-    var lastDate = hist.length > 0 ? hist[0].date : '';
     var nextInfo = calcNextVisitDate(entry, lastDate, openTasks);
     var nextDate = nextInfo.date;
 
@@ -5002,8 +5021,7 @@ function flagMissedVisits(schedSheet, cadence, history, openTasks) {
   cadence.forEach(function(entry) {
     var key      = entry.project + '||' + entry.visitType;
     var freqDays = VISIT_FREQ_DAYS[entry.frequency] || 14;
-    var hist     = (history[entry.project]||{})[entry.visitType]||[];
-    var lastDate = hist.length > 0 ? hist[0].date : '';
+    var lastDate = getEffectiveLastVisitDate(entry, history);
     var nextInfo = calcNextVisitDate(entry, lastDate, openTasks);
     var nextDate = nextInfo.date;
     if (!nextDate) return;
