@@ -4694,15 +4694,12 @@ function loadCadence(planSheet) {
 // ── Load visit history from TASK_LOG ─────────────────────────
 // Returns: {project: {visitType: [{date, member, pts}]}}
 function loadVisitHistory() {
-  // Read from TASK_ASSIGNMENTS — self-reported Done visit tasks (DPR Field
-  // Work, DPER per-project visits, CRM field work all create these via
-  // createDoneTask, always LeadApproved='Pending' until someone reviews it).
-  // 2026-08 fix: this used to require LeadApproved==='Yes', so the planner
-  // was blind to every visit still sitting in the approval queue -- any lag
-  // approving tasks meant "last visit date" silently went stale even though
-  // the visit genuinely happened. Scheduling the NEXT visit is about physical
-  // reality, not paperwork sign-off, so a self-reported Done visit counts
-  // unless it was explicitly rejected (a rejected report is presumed bogus).
+  // Read from TASK_ASSIGNMENTS — approved Done visit tasks only.
+  // 2026-08: briefly relaxed to count Pending (not-yet-approved) visits too,
+  // so the planner wouldn't go blind during approval lag -- reverted per
+  // explicit instruction: "future last visit date should be picked from
+  // form logs which are approved visits only." Trust approved records only;
+  // approve promptly so the schedule stays accurate.
   var sheet = db().getSheetByName(ASSIGN_TAB);
   var history = {};
   if (!sheet) return history;
@@ -4719,7 +4716,7 @@ function loadVisitHistory() {
     var selfStat = String(r[13]||'').trim(); // N SelfStatus
     var approved = String(r[is23?16:15]||'').trim(); // Q LeadApproved
     if (!proj || !isVisitType(tType)) continue;
-    if (selfStat !== 'Done' || approved === 'Rejected') continue;
+    if (selfStat !== 'Done' || approved !== 'Yes') continue;
     var dStr = cellDate(r[15]) || cellDate(r[14]) || cellDate(r[is23?18:17]) || '';
     if (!dStr) continue;
     var vType = normaliseVisitType(tType) || tType;
@@ -4993,10 +4990,14 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
 }
 
 // ── Flag missed visits in VISIT_SCHEDULE ─────────────────────
+// Returns the list of missed entries (2026-08: previously only Logger.log'd,
+// invisible to anyone not reading Apps Script execution logs -- now returned
+// so syncVisitSchedule can email a digest to the owner/managers).
 function flagMissedVisits(schedSheet, cadence, history, openTasks) {
   var asSheet = db().getSheetByName(ASSIGN_TAB);
   var today   = todayStr();
   var missed  = 0;
+  var missedList = [];
 
   cadence.forEach(function(entry) {
     var key      = entry.project + '||' + entry.visitType;
@@ -5012,6 +5013,8 @@ function flagMissedVisits(schedSheet, cadence, history, openTasks) {
     if (!daysOverdue || daysOverdue <= freqDays) return;
 
     missed++;
+    missedList.push({ project:entry.project, visitType:entry.visitType, assignee:entry.assignee,
+      dueDate:nextDate, daysOverdue:daysOverdue, frequency:entry.frequency });
     Logger.log('MISSED: '+entry.project+' / '+entry.visitType+
                ' was due '+nextDate+', '+daysOverdue+'d overdue');
 
@@ -5058,6 +5061,35 @@ function flagMissedVisits(schedSheet, cadence, history, openTasks) {
   });
 
   Logger.log('Missed visits flagged: '+missed);
+  return missedList;
+}
+
+// One digest email to Siddharth/Astha listing every missed visit — sent by
+// syncVisitSchedule (daily 7 AM trigger) whenever the list is non-empty.
+// Only fires when there's something to report; no email on a clean day.
+function notifyMissedVisits(missedList){
+  if (!missedList || !missedList.length) return;
+  var rows = missedList.map(function(m){
+    return '<tr><td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(m.project)+'</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(m.visitType)+'</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(m.assignee)+'</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8;color:#8B2020;font-weight:bold">'+mlEsc(m.dueDate)+' ('+m.daysOverdue+'d overdue)</td></tr>';
+  }).join('');
+  var body = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">'
+    + '<div style="background:#8B2020;padding:16px 22px;border-radius:8px 8px 0 0">'
+    + '<p style="color:#fff;font-size:15px;font-weight:bold;margin:0">⚠ '+missedList.length+' Missed Site Visit'+(missedList.length===1?'':'s')+'</p>'
+    + '<p style="color:rgba(255,255,255,.7);font-size:11px;margin:4px 0 0">Ideaform Design Studio — Visit Schedule</p></div>'
+    + '<div style="background:#fff;padding:16px 22px;border:1px solid #E2DFD8;border-top:none;border-radius:0 0 8px 8px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    + '<tr style="text-align:left;color:#6B6860;font-size:10.5px;text-transform:uppercase"><th style="padding:6px 8px">Project</th><th style="padding:6px 8px">Type</th><th style="padding:6px 8px">Assignee</th><th style="padding:6px 8px">Was due</th></tr>'
+    + rows + '</table>'
+    + '<p style="font-size:11px;color:#9E9B94;margin:16px 0 0">An overdue task has been auto-created for each of these in the Task Dashboard, flagged High priority.</p>'
+    + '</div></div>';
+  var recipients = Object.keys(MANAGER_EMAILS).filter(function(e){ return e.indexOf('@ideaform.in')>-1 || e==='sidinani14@gmail.com' || e==='astha.uch@gmail.com'; });
+  try {
+    MailApp.sendEmail({ to: recipients.join(','), subject: '[IDS] '+missedList.length+' missed site visit'+(missedList.length===1?'':'s'), htmlBody: body });
+    Logger.log('Missed-visit digest sent to: '+recipients.join(','));
+  } catch(e) { Logger.log('Missed-visit digest failed: '+e); }
 }
 
 // ── Build PROJECT_HEALTH tab ──────────────────────────────────
@@ -5269,6 +5301,51 @@ function sendVisitNotification(entry, nextDate, hist, isOverdue, email) {
   }
 }
 
+// ONE-OFF (2026-08): VISIT_PLANNER was just corrected (project names, team,
+// frequency, days, last-visit dates) after being wrong for a while. Every
+// visit task auto-created off the OLD plan is now stale AND actively blocks
+// the corrected plan from taking effect: calcNextVisitDate's Priority 1
+// treats any existing open task as "already scheduled" and just echoes its
+// old deadline, so pushVisitTasks would silently do nothing for any
+// project+type+assignee that still has a stale task sitting open.
+// Deletes ONLY visit-type tasks with SelfStatus 'Not Started' (never
+// touched) or blank — anything with real progress (In Progress, Blocked)
+// or a resolution (Done, Parked, Reassigned, Work Not Done) is left
+// completely alone, so no completed/approved work and no in-progress work
+// can ever be removed by this. Then re-runs the full sync so
+// VISIT_SCHEDULE and freshly pushed tasks reflect the corrected plan,
+// including due dates in the past (which show as Delayed, as intended).
+// Run ONCE from the Apps Script editor (select this function → Run) — not
+// wired to any web-app route, so the team can't trigger it by accident.
+function cleanupPendingVisitTasksAndResync(){
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return {status:'error', message:'TASK_ASSIGNMENTS not found'};
+  var rows = sheet.getDataRange().getValues();
+  var toDelete = [];   // 1-indexed sheet row numbers
+  var removed  = [];   // audit trail — logged AND returned before anything is deleted
+  for (var i = 1; i < rows.length; i++){
+    var r = rows[i];
+    var taskType   = String(r[4]||'').trim();
+    var selfStatus = String(r[13]||'').trim();
+    if (!isVisitTask(taskType)) continue;
+    if (selfStatus !== 'Not Started' && selfStatus !== '') continue;
+    toDelete.push(i+1);
+    removed.push({ row:i+1, taskId:String(r[0]||''), project:String(r[2]||''),
+      assignee:String(r[3]||''), taskType:taskType, deadline:cellDate(r[10]) });
+  }
+  Logger.log('cleanupPendingVisitTasksAndResync: about to remove '+removed.length+' stale pending visit tasks:');
+  Logger.log(JSON.stringify(removed, null, 2));
+
+  // Delete bottom-to-top so earlier row numbers in toDelete stay valid.
+  toDelete.sort(function(a,b){ return b-a; });
+  toDelete.forEach(function(r){ sheet.deleteRow(r); });
+
+  syncVisitSchedule();
+
+  Logger.log('cleanupPendingVisitTasksAndResync complete: removed '+removed.length+', schedule resynced.');
+  return { status:'ok', removedCount:removed.length, removed:removed };
+}
+
 function syncVisitSchedule() {
   Logger.log('=== syncVisitSchedule: '+new Date().toISOString()+' ===');
 
@@ -5316,9 +5393,10 @@ function syncVisitSchedule() {
   // 3. Push tasks for visits due within 3 days (also sends emails)
   pushVisitTasks(cadence, history, openTasks);
 
-  // 4. Flag missed visits + create overdue tasks
+  // 4. Flag missed visits + create overdue tasks + email a digest to owner/managers
   var schedSheet = db().getSheetByName(VSCHED_TAB);
-  flagMissedVisits(schedSheet, cadence, history, openTasks);
+  var missedList = flagMissedVisits(schedSheet, cadence, history, openTasks);
+  try { notifyMissedVisits(missedList); } catch(e) { Logger.log('notifyMissedVisits error: '+e); }
 
   // 5. Build PROJECT_HEALTH tab
   buildProjectHealth(cadence, history);
