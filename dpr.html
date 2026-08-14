@@ -221,6 +221,10 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
           <select id="member-name" onchange="updateSubmitBar();fetchAssignedTasks()" style="display:none"></select>
         </div>
       </div>
+      <div class="field">
+        <div class="lbl">Report date <span class="opt">change if filling this late for an earlier day</span></div>
+        <input type="date" id="f-date">
+      </div>
     </div>
   </div>
 
@@ -404,6 +408,7 @@ function isVisitRate2(t){ return VISIT_TYPES_ARCH.indexOf(t)>-1 || t==='Site Vis
 
 window.addEventListener('DOMContentLoaded', () => {
   setHeaderDate(); setDeadlineBanner();
+  document.getElementById('f-date').value = new Date().toISOString().substring(0,10);
   // fetchAll() needs the sign-in token, so it runs after auth (see idsOnAuth below)
 });
 
@@ -1282,8 +1287,14 @@ function collectData() {
     };
   });
 
+  // Defaults to today, editable — lets someone filling this late for an
+  // earlier day (a site visit/meeting that actually happened yesterday, say)
+  // date the work correctly instead of everything landing on today.
+  const reportDate = document.getElementById('f-date')?.value || new Date().toISOString().substring(0,10);
+
   const data={
     'Timestamp'         : new Date().toISOString(),
+    'Report Date'       : reportDate,
     'Member'            : member,
     'Member Email'      : googleUser?googleUser.email:'',
     'Assigned Statuses' : JSON.stringify(assignedStatuses),
@@ -1328,7 +1339,7 @@ function collectData() {
         doneTasks.push({
           taskType:stage.label, area, drawing, units,
           basePts:stage.pts, project:proj.name, member:member,
-          discipline:proj.discipline, date:new Date().toISOString().substring(0,10),
+          discipline:proj.discipline, date:reportDate,
           visitHours: visitHrs,
         });
       } else {
@@ -1364,7 +1375,7 @@ function collectData() {
     doneTasks.push({
       taskType:type, area:'', drawing:'', units:1, basePts:0,
       project, member, discipline:'',
-      date:new Date().toISOString().substring(0,10),
+      date:reportDate,
       visitHours:hrs,
     });
   });

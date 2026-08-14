@@ -207,7 +207,11 @@ function writeFieldWork(data) {
   var raw = data['Field Work']; if (!raw) return;
   var items; try { items = JSON.parse(raw); } catch(e) { return; }
   if (!items || !items.length) return;
-  var date = dateStr(data['Timestamp']);
+  // 'Report Date' lets someone filling this late for an earlier day (a site
+  // visit/meeting that actually happened yesterday, say) date the work
+  // correctly -- falls back to submission time for older clients that don't
+  // send it.
+  var date = data['Report Date'] || dateStr(data['Timestamp']);
   var member = data['Member'] || '', email = data['Member Email'] || '';
   appendFieldWorkRows(items.map(function(it){
     return {date:date, member:member, email:email, type:it.type, project:it.project,
@@ -5533,10 +5537,15 @@ function createDoneTask(data) {
 
   if (matchRow > -1) {
     // Update the existing assigned task row in place
-    var actualDate = data.actualCompletionDate || today;
+    // data.date carries a backdated "Report Date" for work logged late (a
+    // site visit/meeting that actually happened on an earlier day) -- used
+    // for SelfStatusDate too, not just AssignedDate, so weekly scoring
+    // buckets the points into the week the work actually happened in.
+    var effDate = data.date || today;
+    var actualDate = data.actualCompletionDate || effDate;
     sheet.getRange(matchRow, 9 ).setValue(weightedPts); // I WeightedPts (recalc with current mult)
     sheet.getRange(matchRow, 14).setValue('Done');       // N SelfStatus
-    sheet.getRange(matchRow, 15).setValue(today);        // O SelfStatusDate
+    sheet.getRange(matchRow, 15).setValue(effDate);      // O SelfStatusDate
     sheet.getRange(matchRow, 16).setValue(actualDate);   // P ActualCompletionDate
     sheet.getRange(matchRow, 17).setValue('Pending');    // Q LeadApproved (reset for re-approval)
     var existingId = String(rows[matchRow-1][0]||'');
@@ -5546,6 +5555,10 @@ function createDoneTask(data) {
 
   // No matching pre-assigned task — create a new self-logged row
   var newId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
+  // data.date carries a backdated "Report Date" for work logged late -- drives
+  // every date column here (not just AssignedDate), so a site visit/meeting
+  // filed a day or two late still lands in the correct week for scoring.
+  var effDate = data.date || today;
 
   sheet.appendRow([
     newId,
@@ -5557,13 +5570,13 @@ function createDoneTask(data) {
     basePts,                   // G Stage Base Pts
     units,                     // H Units
     weightedPts,               // I Weighted Pts = F × G × H
-    data.date         || today, // J AssignedDate
-    today,                     // K Deadline = today (Done same day)
+    effDate,                   // J AssignedDate
+    effDate,                   // K Deadline = same day (Done same day)
     data.area         || '',   // L Area
     data.drawing      || '',   // M Drawing
     'Done',                    // N SelfStatus
-    today,                     // O SelfStatusDate
-    today,                     // P ActualCompletionDate
+    effDate,                   // O SelfStatusDate
+    effDate,                   // P ActualCompletionDate
     'Pending',                 // Q LeadApproved
     '',                        // R ApprovedBy
     '',                        // S ApprovalDate
