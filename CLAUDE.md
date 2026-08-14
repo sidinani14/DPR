@@ -247,21 +247,44 @@ quota-exceeded failure — don't keep guessing in code without that signal.
 - Punctuality /20 + Hours /15 = biometric from DAILY_SUMMARY (same formulas as Deepak/team, Thr 09:10)
 - weeklyreport.html: buildAmanPage(d), fetched via getAmanWeeklyStats, pushed into team[] with _isAman
 
-## Deepak Soni scoring (separate page in weekly report)
-- Site Visits: /20 (active sites visited ≥1× / total active sites)
-- Client Communication: /10 (sites with clientUpdated=Yes / total active sites)
-- Task Completion: /20 (tasks assigned TO Deepak + assigned BY Deepak to team, with AssignedDate this week, completed within same week)
-- DPER Consistency: /15 (days with ≥1 submission / 6 — mirrors team DPR formula)
-- Punctuality: /20 (same base as team, biometric)
-- Hours: /15 (same base as team, biometric)
-- Total: /100
+## Deepak Soni scoring (separate page in weekly report) — rewritten 2026-08
+Current formula (this doc had drifted badly stale before this rewrite —
+trust this section and getDeepakWeeklyStats/Code.js over anything else):
+- **Output: /35** — `deepakOwnCompletedPts ÷ weeklyTarget × 35`, capped at 35.
+  Same points-over-target mechanism as every team member's Output score.
+  Replaced the old Site Visits/17.5 + Task Completion/17.5 coverage-ratio
+  split (2026-08) — those measured "did he show up" / "did he finish what
+  was assigned", not how much he actually produced. `deepakOwnCompletedPts`
+  is ONLY points from tasks assigned TO Deepak himself (visits, meetings,
+  any other work) — work he delegates to a teammate is that teammate's
+  output, not double-counted here.
+- **Client Communication: /10** (sites with clientUpdated=Yes / total active sites — unchanged)
+- **Issue Reporting: /5** (site problems he flags for design/CRM ÷ target of 3/week — added 2026-08, was previously zero credit anywhere)
+- **DPER Consistency: /15** (days with ≥1 submission / 6 — mirrors team DPR formula)
+- **Punctuality: /10**, **Hours: /7** (rescaled from /15,/10 to fund Client Satisfaction below)
+- **Client Satisfaction: /8** (FEEDBACK sheet Overall Satisfaction, his active sites this week — added 2026-08, fills the Planning slot team members get, since his work is reactive site execution, not pre-assigned deadline tasks)
+- **Reliability: /10** (−1/late task, −2/Work Not Done, −5/unexplained absence)
+- Total: /100 (35+10+5+15+10+7+8+10=100)
+- **Weekly target: 72 pts/week** (TEAM tab col C, read live — NOT the old
+  hardcoded 30 this doc used to say). 72/6=12/day, which is what makes him
+  qualify for the senior visit/meeting point multiplier (`seniorityMultiplier`,
+  dailyTarget>8 → ×1.5) — his visit/meeting task points already carry that
+  before they ever reach the Output sum above.
 - Active projects list: CONFIG tab, under "DEEPAK ACTIVE PROJECTS" header (lives in
   col T — getDeepakWeeklyStats scans ALL columns for the header, not just col A)
+- weeklyreport.html: `buildDeepakPage(d)` (his dedicated report page — pCard
+  calls use max 35 for Output, not the generic 50 team members' page uses)
+  and the Overview-page team[] row builder both read `scores.s_output`
+  directly from the backend now — don't recombine from s_visit/s_tasks,
+  those fields no longer exist in the backend response.
 
 ## Weekly targets by role
 - Junior Architect / Junior ID: 48 pts/week
 - Technical Lead (Achal, Himanshu, Bhavesh): 72 pts/week
-- Deepak Soni (Execution): 30 pts/week (visit-based)
+- Deepak Soni (Execution): 72 pts/week (corrected 2026-08 — was documented
+  as 30 here, stale; live TEAM tab value is 72, same senior tier as Achal/
+  Himanshu, which is what qualifies him for the visit/meeting point
+  multiplier — see the Deepak scoring section below)
 - Kritika Kaushik (Jr. ID + Social Media Manager): 48 pts/week combined — design
   task points AND Social Media Log points both feed the same Output pool, target
   not raised (2026-08 decision; revisit after a few weeks of real data if content

@@ -504,7 +504,9 @@ async function computeWeekScores(weekStart){
       const unexplainedAbsences=(bd.att||[]).filter(x=>x.s==='A').length;
       const reliabilityPenalty=(ds.reliabilityPenalty||0)+unexplainedAbsences*5;
       const s_reliability=Math.max(0,Math.round((10-reliabilityPenalty)*10)/10);
-      const s_output=Math.round((ds.s_visit+ds.s_client+ds.s_tasks+(ds.s_issues||0))*10)/10;
+      // Backend already computed Output (points over target, same mechanism
+      // as team members) — just pass it through, same as Client Satisfaction.
+      const s_output=ds.s_output||0;
       const total=Math.round((s_output+s_dper+s_punct+s_hrs+s_client_sat+s_reliability)*10)/10;
       out['Deepak Soni']={s_output, s_dpr:s_dper, s_punct, s_hrs, s_client_sat, s_reliability, total};
     }
@@ -563,7 +565,10 @@ function buildTrendSection(name, series){
   // Client Satisfaction fills the Planning slot instead — their work is
   // reactive, not pre-assigned deadline tasks, so "planned ahead" doesn't apply.
   const isSpecial = name === 'Deepak Soni' || name === 'Aman Raghuwanshi';
-  return trendCard('Output',pick('s_output'),50)
+  // Deepak's Output caps at /35 (his Client Communication /10 + Issue
+  // Reporting /5 fill the rest of the 50 team members' Output alone covers).
+  const outputMax = name === 'Deepak Soni' ? 35 : 50;
+  return trendCard('Output',pick('s_output'),outputMax)
     + trendCard('DPR',dprTrend,15)
     + trendCard('Punctuality',pick('s_punct'),10)
     + trendCard('Hours',pick('s_hrs'),7)
@@ -646,10 +651,13 @@ function buildOverviewPage(team){
     // reactive, not pre-assigned deadline tasks — see 2026-08 revert).
     const isSpecial = m._isDeepak || m._isAman;
     const planCol = isSpecial ? s.s_client_sat : s.s_planning;
+    // Deepak's Output caps at /35 (Client Comm /10 + Issue Reporting /5 fill
+    // the rest of the 50 team members' Output alone covers).
+    const outMax = m._isDeepak ? 35 : 50;
     rows+=`<tr>
       <td><span class="rk ${rkc}">${i+1}</span></td>
       <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
-      <td><div class="sv" style="color:${sc(s.s_output,50)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/50*100))}%;background:${sc(s.s_output,50)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_output,outMax)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/outMax*100))}%;background:${sc(s.s_output,outMax)}"></div></div></td>
       <td>${s.dprNA ? `<div class="sv" style="color:#8A8378">N/A</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div>`}</td>
       <td><div class="sv" style="color:${sc(s.s_punct,10)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/10*100))}%;background:${sc(s.s_punct,10)}"></div></div></td>
       <td><div class="sv" style="color:${sc(s.s_hrs,7)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/7*100))}%;background:${sc(s.s_hrs,7)}"></div></div></td>
@@ -964,7 +972,7 @@ function buildDeepakPage(d){
         <td style="text-align:center;padding:3.5px 6px;font-size:9px">${t.assignedDt}</td>
         <td style="text-align:center;padding:3.5px 6px;font-size:9px;color:#1B5E20">✓ Done ${t.doneDate}</td>
       </tr>`).join('')
-    : `<tr><td colspan="5" style="padding:7px 6px;font-size:9.5px;color:rgba(43,38,32,0.72);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week — Task Completion scored from this week\'s Site Visits/Client Comm instead':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
+    : `<tr><td colspan="5" style="padding:7px 6px;font-size:9.5px;color:rgba(43,38,32,0.72);text-align:center">${d.tasksAssigned===0?'No tasks assigned this week':'Tasks assigned this week not yet completed/approved'}</td></tr>`;
 
   return `<div class="page">
     ${hdr()}
@@ -991,9 +999,8 @@ function buildDeepakPage(d){
 
     <div class="section-title" style="margin-bottom:1.5mm">Score Breakdown</div>
     <div class="pg">
-      ${pCard('Site Visits',s.s_visit,17.5,`${d.visitedCount} of ${d.totalSites} sites visited ≥1×`)}
+      ${pCard('Output<br>Approved Pts',s.s_output,35,`${d.deepakOwnCompletedPts||0} pts approved this week<br>Target: ${d.weeklyTarget||72} pts`)}
       ${pCard('Client Comm',s.s_client,10,`${d.clientCount} of ${d.totalSites} projects updated`)}
-      ${pCard('Task<br>Completion',s.s_tasks,17.5,d.tasksActive?`${d.tasksCompletedPts} of ${d.tasksAssignedPts} assigned pts completed (${d.tasksCompleted}/${d.tasksAssigned} tasks)`:`N/A — 0 assigned this week; scored from Site Visits/Client Comm instead`)}
       ${pCard('Issue<br>Reporting',s.s_issues,5,`${d.issuesReportedCount||0} of ${d.issueTarget||3} target site issues logged this week`)}
       ${pCard('DPER<br>Consistency',s.s_dper,15,`${d.dperDaysCount} of ${d.dprDen} working days · ≥1 submission/day`)}
       ${pCard('Punctuality<br>Biometric',s.s_punct,10,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
@@ -1216,7 +1223,8 @@ async function loadAndRender(){
     return m;
   });
 
-  // Add Deepak — his output /50 = site visits + client comm + task completion
+  // Add Deepak — Output /35 (approved pts ÷ target, same mechanism as team
+  // members' Output) + Client Comm /10 + Issue Reporting /5.
   // DPR/punctuality/hours map to same columns as team
   if (INCLUDE_DEEPAK_AMAN && deepakStats && deepakStats.scores) {
     const ds = deepakStats.scores;
@@ -1238,14 +1246,14 @@ async function loadAndRender(){
       deepakStats.unexplainedAbsences = (bd.att||[]).filter(x=>x.s==='A').length;
       ds.reliabilityPenalty = (ds.reliabilityPenalty||0) + deepakStats.unexplainedAbsences*5;
       ds.s_reliability = Math.max(0, Math.round((10 - ds.reliabilityPenalty)*10)/10);
-      ds.total = Math.round((ds.s_visit + ds.s_client + ds.s_tasks + (ds.s_issues||0) + ds.s_dper + ds.s_punct + ds.s_hrs + (ds.s_client_sat!=null?ds.s_client_sat:8) + ds.s_reliability) * 10) / 10;
+      ds.total = Math.round((ds.s_output + ds.s_client + (ds.s_issues||0) + ds.s_dper + ds.s_punct + ds.s_hrs + (ds.s_client_sat!=null?ds.s_client_sat:8) + ds.s_reliability) * 10) / 10;
     }
     team.push({
       name    : 'Deepak Soni',
       _isDeepak: true,
       _deepakData: deepakStats,
       _sc: {
-        s_output: Math.round((ds.s_visit + ds.s_client + ds.s_tasks + (ds.s_issues||0)) * 10) / 10,
+        s_output: ds.s_output||0,
         s_dpr   : ds.s_dper,
         s_punct : ds.s_punct,
         s_hrs   : ds.s_hrs,

@@ -7513,6 +7513,11 @@ function getDeepakWeeklyStats(weekStart) {
   var tasksAssignedThisWeek = 0, tasksCompletedThisWeek = 0;
   var tasksAssignedPts = 0, tasksCompletedPts = 0;   // points-weighted, for Task Completion
   var unplannedPts = 0;   // slice of tasksCompletedPts that was self-logged "Unplanned Work"
+  // Output (2026-08) is Deepak's OWN completed+approved points only -- work he
+  // delegated to a teammate is that teammate's output, not his (it's already
+  // in tasksCompletedPts above for the old mixed Task Completion pool, but
+  // double-crediting it here too would inflate his personal Output).
+  var deepakOwnCompletedPts = 0;
   var taskDetails = [];
   var dLate = 0, dWnd = 0;   // reliability: late/overdue and Work-Not-Done tasks
   // "How Deepak spent his week" — activity breakdown from his own tasks
@@ -7563,6 +7568,7 @@ function getDeepakWeeklyStats(weekStart) {
       if (selfStatus === 'Done' && isApproved && doneDate && doneDate >= mon && doneDate <= doneUpper0) {
         tasksCompletedThisWeek++;
         tasksCompletedPts += wpts;
+        if (assignedTo === 'Deepak Soni') deepakOwnCompletedPts += wpts;
         if (String(ar[COL_NOTES_D]||'').indexOf('Unplanned task') > -1) unplannedPts += wpts;
         taskDetails.push({
           project   : String(ar[2] || '').trim(),
@@ -7627,33 +7633,42 @@ function getDeepakWeeklyStats(weekStart) {
 
   var absentDays = 6 - daysPresent;
 
+  // Weekly target — TEAM tab col C, live (same source every team member's
+  // Output reads). 2026-08: confirmed 72/wk for Deepak, not the old
+  // hardcoded 30 -- also why his visit/meeting points already carry the
+  // senior multiplier (72/6=12/day > 8 triggers calcVisitPts's 1.5x, applied
+  // before points ever reach this sum).
+  var deepakTarget = 50;
+  var teamSheetD = s.getSheetByName(TEAM_TAB);
+  if (teamSheetD) {
+    var teamRowsD = teamSheetD.getDataRange().getValues();
+    for (var tdi = 1; tdi < teamRowsD.length; tdi++) {
+      if (String(teamRowsD[tdi][0]||'').trim() === 'Deepak Soni') {
+        deepakTarget = parseFloat(teamRowsD[tdi][2]) || 50;
+        break;
+      }
+    }
+  }
+
   // ── 6. Score calculation ──────────────────────────────────
-  // Rebalanced 2026-08: Site Visits and Task Completion each gave up 2.5pts
-  // to a new Issue Reporting component (site problems Deepak flags for
-  // design/CRM — previously zero credit anywhere, despite 40+ on record).
-  var SITE_VISIT_MAX = 17.5, CLIENT_MAX = 10, TASK_MAX = 17.5, ISSUE_MAX = 5;
+  // 2026-08: Site Visits (/17.5, coverage — visited each site ≥1x) and Task
+  // Completion (/17.5, ratio of completed÷assigned pts) replaced with a
+  // single Output component, same points-over-target mechanism every team
+  // member's Output uses — measures how much he actually produced, not just
+  // whether he showed up / finished what was handed to him. Client
+  // Communication and Issue Reporting are untouched.
+  var CLIENT_MAX = 10, ISSUE_MAX = 5, OUTPUT_MAX = 35;
   var ISSUE_TARGET_COUNT = 3; // issues reported /week for full marks — tune after a few weeks
 
-  // Site Visits /17.5
-  var s_visit  = totalSites > 0
-    ? Math.round(visitedCount / totalSites * SITE_VISIT_MAX * 10) / 10 : 0;
+  // Output /35 — Deepak's own completed+approved points (visits, meetings,
+  // any other assigned/self-logged work) ÷ weekly target × 35.
+  var s_output = deepakTarget > 0
+    ? Math.min(OUTPUT_MAX, Math.round(deepakOwnCompletedPts / deepakTarget * OUTPUT_MAX * 10) / 10)
+    : 0;
 
   // Client Communication /10
   var s_client = totalSites > 0
     ? Math.round(clientCount / totalSites * CLIENT_MAX * 10) / 10 : 0;
-
-  // Task Completion /17.5 — points-weighted (completedPts/assignedPts), so a
-  // large Structural task counts more than a 0.5pt petty task, same as how
-  // team member Output works. 0 assigned is N/A, not an automatic full
-  // score: extrapolate from Site Visits + Client Comm instead, so an empty
-  // week doesn't inflate the total for free.
-  var s_tasks;
-  if (tasksAssignedPts > 0) {
-    s_tasks = Math.round(tasksCompletedPts / tasksAssignedPts * TASK_MAX * 10) / 10;
-  } else {
-    var otherOutMax = SITE_VISIT_MAX + CLIENT_MAX;
-    s_tasks = Math.round((s_visit + s_client) / otherOutMax * TASK_MAX * 10) / 10;
-  }
 
   // Issue Reporting /5 — always active (there's always an opportunity to
   // flag a site problem), so a quiet week naturally scores low rather than
@@ -7685,7 +7700,7 @@ function getDeepakWeeklyStats(weekStart) {
   var reliabilityPenalty = dLate * 1 + dWnd * 2;
   var s_reliability = Math.max(0, Math.round((10 - reliabilityPenalty) * 10) / 10);
 
-  var total = Math.round((s_visit + s_client + s_tasks + s_issues + s_dper + s_punct + s_hrs + s_client_sat + s_reliability) * 10) / 10;
+  var total = Math.round((s_output + s_client + s_issues + s_dper + s_punct + s_hrs + s_client_sat + s_reliability) * 10) / 10;
 
   act.visitHours = Math.round(act.visitHours * 10) / 10;
   act.meetHours  = Math.round(act.meetHours * 10) / 10;
@@ -7710,6 +7725,8 @@ function getDeepakWeeklyStats(weekStart) {
     tasksCompleted : tasksCompletedThisWeek,
     tasksAssignedPts  : Math.round(tasksAssignedPts*10)/10,
     tasksCompletedPts : Math.round(tasksCompletedPts*10)/10,
+    deepakOwnCompletedPts : Math.round(deepakOwnCompletedPts*10)/10,
+    weeklyTarget   : deepakTarget,
     unplannedPts   : Math.round(unplannedPts*10)/10,
     plannedPts     : Math.round((tasksCompletedPts-unplannedPts)*10)/10,
     tasksActive    : tasksAssignedThisWeek > 0,
@@ -7721,9 +7738,8 @@ function getDeepakWeeklyStats(weekStart) {
     issuesReportedCount : issuesReportedCount,
     issueTarget         : ISSUE_TARGET_COUNT,
     scores: {
-      s_visit  : s_visit,
+      s_output : s_output,
       s_client : s_client,
-      s_tasks  : s_tasks,
       s_issues : s_issues,
       s_dper   : s_dper,
       s_punct  : s_punct,
