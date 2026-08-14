@@ -92,8 +92,9 @@ function render(){
       <div class="toggle"><div id="t-m" class="on" onclick="setType('Meeting')">Meeting</div><div id="t-s" onclick="setType('Site Visit')">Site Visit</div></div></div>
     <div class="field"><div class="lbl">Project</div><select class="proj-sel" id="project">${projOpts()}</select></div>
     <div class="row"><div class="field"><div class="lbl">Date</div><input type="date" id="date" value="${today}"></div>
-      <div class="field"><div class="lbl">Time</div><input type="time" id="time"></div>
-      <div class="field"><div class="lbl">Duration (hrs)</div><input type="number" id="duration" min="0" step="0.5" placeholder="e.g. 1.5"></div></div>
+      <div class="field"><div class="lbl">Start time</div><input type="time" id="time"></div>
+      <div class="field"><div class="lbl">End time</div><input type="time" id="endTime"></div></div>
+    <div class="field"><div class="lbl">Duration (hrs) <span class="opt">optional — cross-checked against your Field Work log</span></div><input type="number" id="duration" min="0" step="0.5" placeholder="e.g. 1.5"></div>
     <div class="field"><div class="lbl">Logged by</div><select id="loggedBy">${teamOpts()}</select></div>
   </div>
 
@@ -231,7 +232,8 @@ async function submitLog(){
     }
     msg('Cleaning up wording & saving…');
     const payload={action:'submitMeetingLog', type:LOG_TYPE, project, date,
-      time:document.getElementById('time').value, loggedBy:document.getElementById('loggedBy').value,
+      time:document.getElementById('time').value, endTime:document.getElementById('endTime').value,
+      loggedBy:document.getElementById('loggedBy').value,
       teamAttendees:[...document.querySelectorAll('.ta:checked')].map(c=>c.value),
       clientAttendees:document.getElementById('clientAttendees').value,
       purpose:[...document.querySelectorAll('#purpose .chip.on')].map(c=>c.dataset.v),

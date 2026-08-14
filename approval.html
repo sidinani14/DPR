@@ -453,8 +453,9 @@ function renderMeetingApprovals(){
     <div class="card-body" style="display:flex;flex-direction:column;gap:12px">`
     + logs.map(m=>`
       <div id="ml-${m.row}" style="border:1px solid var(--border);border-radius:8px;padding:12px">
-        <div style="font-weight:600;font-size:13px">${esc(m.type)} · ${esc(m.project)} · ${esc(m.date)}</div>
+        <div style="font-weight:600;font-size:13px">${esc(m.type)} · ${esc(m.project)} · ${esc(m.date)}${m.time?' · '+esc(m.time)+(m.endTime?'–'+esc(m.endTime):''):''}</div>
         <div style="font-size:11px;color:var(--text3);margin:2px 0 7px">by ${esc(m.loggedBy)}${m.clients?' · with '+esc(m.clients):''}${m.purpose?' · '+esc(m.purpose):''}</div>
+        ${m.timingCheck && m.timingCheck.checked && !m.timingCheck.matched ? `<div style="font-size:11px;color:#C0392B;font-weight:600;background:#FDEAEA;border:1px solid rgba(192,57,43,.3);border-radius:6px;padding:6px 9px;margin-bottom:7px">⚠ Timing mismatch — ${esc(m.timingCheck.reason||'')}${m.timingCheck.fieldWorkStart?` (Field Work: ${esc(m.timingCheck.fieldWorkStart)}–${esc(m.timingCheck.fieldWorkEnd||'')})`:''}</div>` : ''}
         ${m.whatChanged?`<div style="font-size:11px;color:#C8863A;font-style:italic;margin-bottom:6px">What changed: ${esc(m.whatChanged)}</div>`:''}
         <div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:3px">Team's raw text</div>
         <div class="mraw">${esc(m.bodyRaw)||'<i>—</i>'}</div>

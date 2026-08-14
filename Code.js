@@ -2517,9 +2517,42 @@ function writeMeetingLogHeaders(sheet){
   var h=['Log ID','Date','Time','Type','Project','Logged By','Team Attendees','Client Attendees',
          'Purpose','Body (raw)','Body (polished)','Duration (hrs)','Drive Folder','Photo IDs',
          'Video Links','Status','Approved By','Approval Date','What Changed','Report PDF ID',
-         'Frozen Snapshot','Lead Reviewed'];
+         'Frozen Snapshot','Lead Reviewed','End Time'];
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
+}
+
+// Cross-check a logged visit/meeting's date+time against what the same
+// person filed in their own DPR/DPER/CRM Field Work Today for that project
+// (FIELD_WORK: A FW-ID B Date C Member D Email E Type F Project G Start
+// H End). 2026-08: lets a reviewer catch a mismatched date or time between
+// the two independent records before approving. Tolerance is generous
+// (45 min) since these are two different people typing free-hand into two
+// different forms about the same real event, not a system copying itself.
+var VISIT_TIMING_TOLERANCE_MIN = 45;
+function checkVisitTimingMatch(member, project, date, time, endTime){
+  if (!member || !project || !date) return {checked:false};
+  var sheet = db().getSheetByName(FIELD_WORK_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {checked:true, matched:false, reason:'No Field Work entry found for this member/project/date'};
+  var rows = sheet.getDataRange().getValues();
+  var toMin = function(hhmm){ var m=/^(\d{1,2}):(\d{2})/.exec(String(hhmm||'')); return m ? (parseInt(m[1],10)*60+parseInt(m[2],10)) : null; };
+  var best = null;
+  for (var i=1;i<rows.length;i++){
+    var fwDate = cellDate(rows[i][1]);
+    var fwMember = String(rows[i][2]||'').trim();
+    var fwProject = String(rows[i][5]||'').trim();
+    if (fwDate !== date || fwMember !== member || fwProject.toLowerCase() !== project.toLowerCase()) continue;
+    best = { start:String(rows[i][6]||''), end:String(rows[i][7]||'') };
+    break; // first match is enough — flag hunts for ANY corroborating entry, not the best one
+  }
+  if (!best) return {checked:true, matched:false, reason:'No Field Work entry found for '+member+' / '+project+' on '+date};
+  var logStart = toMin(time), logEnd = toMin(endTime);
+  var fwStart  = toMin(best.start), fwEnd = toMin(best.end);
+  var diffs = [];
+  if (logStart != null && fwStart != null && Math.abs(logStart-fwStart) > VISIT_TIMING_TOLERANCE_MIN) diffs.push('start '+time+' vs Field Work '+best.start);
+  if (logEnd   != null && fwEnd   != null && Math.abs(logEnd-fwEnd)     > VISIT_TIMING_TOLERANCE_MIN) diffs.push('end '+endTime+' vs Field Work '+best.end);
+  if (diffs.length) return {checked:true, matched:false, reason:'Timing differs — '+diffs.join('; '), fieldWorkStart:best.start, fieldWorkEnd:best.end};
+  return {checked:true, matched:true, fieldWorkStart:best.start, fieldWorkEnd:best.end};
 }
 function writeDecisionLogHeaders(sheet){
   var h=['Item ID','Log ID','Project','Date','Category','Owner','Task','Deadline','Status'];
@@ -2620,7 +2653,8 @@ function submitMeetingLog(data, authEmail){
   prependRow(logSheet, [ logId, day, String(data.time||''), type, project, loggedBy,
     (data.teamAttendees||[]).join(', '), String(data.clientAttendees||''),
     (data.purpose||[]).join(', '), bodyRaw, bodyPolished, String(data.duration||''),
-    folderId, photoIds, videoLinks, 'Draft', '', '', whatChanged, '', '', '' ]);
+    folderId, photoIds, videoLinks, 'Draft', '', '', whatChanged, '', '', '',
+    String(data.endTime||'') ]);
 
   // Decision items → DECISION_LOG (store polished text where available); IDS items → tasks
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
@@ -2746,10 +2780,17 @@ function getMeetingApprovals(){
   var rows = sheet.getDataRange().getValues(), out=[];
   for (var i=1;i<rows.length;i++){
     if (String(rows[i][15]||'').trim() !== 'Pending') continue;
-    out.push({ row:i+1, logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
-      project:String(rows[i][4]||''), loggedBy:String(rows[i][5]||''), team:String(rows[i][6]||''),
+    var logDate = cellDate(rows[i][1]);
+    var logTime = String(rows[i][2]||'');
+    var logProject = String(rows[i][4]||'');
+    var logBy = String(rows[i][5]||'');
+    var logEndTime = String(rows[i][22]||'');
+    var timing = checkVisitTimingMatch(logBy, logProject, logDate, logTime, logEndTime);
+    out.push({ row:i+1, logId:String(rows[i][0]||''), date:logDate, type:String(rows[i][3]||''),
+      project:logProject, loggedBy:logBy, team:String(rows[i][6]||''),
       clients:String(rows[i][7]||''), purpose:String(rows[i][8]||''),
-      bodyRaw:String(rows[i][9]||''), bodyPolished:String(rows[i][10]||''), whatChanged:String(rows[i][18]||'') });
+      bodyRaw:String(rows[i][9]||''), bodyPolished:String(rows[i][10]||''), whatChanged:String(rows[i][18]||''),
+      time:logTime, endTime:logEndTime, timingCheck:timing });
   }
   return {logs:out};
 }
@@ -2807,6 +2848,7 @@ function generateProjectReportPDF(project, callerEmail){
     if (st !== 'Final' && st !== 'Approved') continue;   // shareable entries only
     entries.push({
       logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
+      time:String(rows[i][2]||''), endTime:String(rows[i][22]||''),
       team:String(rows[i][6]||''), clients:String(rows[i][7]||''), purpose:String(rows[i][8]||''),
       body:String(rows[i][10]||''), photoIds:String(rows[i][13]||''), videos:String(rows[i][14]||''),
       snapshot:String(rows[i][20]||'') });   // U — frozen text snapshot (immutable history)
@@ -2879,8 +2921,9 @@ function generateProjectReportPDF(project, callerEmail){
     // entries are reproduced exactly as shared; only the header/badge/images are
     // positional. Fallback to a live build for any legacy entry without a snapshot.
     var bodyHtml = e.snapshot || buildEntryBodyHTML(e, d);
+    var timingStr = e.time ? (' &middot; '+esc(e.time)+(e.endTime?'&ndash;'+esc(e.endTime):'')) : '';
     return '<div class="sec'+(idx>0?' brk':'')+'">'
-      + '<div class="sh">'+esc(e.type)+' &mdash; '+esc(e.date)+(idx===0?' <span class="latest">Latest</span>':'')+'</div>'
+      + '<div class="sh">'+esc(e.type)+' &mdash; '+esc(e.date)+timingStr+(idx===0?' <span class="latest">Latest</span>':'')+'</div>'
       + bodyHtml
       + (e.videos?'<div class="vids"><b>Videos:</b> '+e.videos.split('|').map(function(v){v=v.trim();return v?'<a href="'+esc(v)+'">'+esc(v)+'</a>':'';}).join(' &nbsp; ')+'</div>':'')
       + imgPages
