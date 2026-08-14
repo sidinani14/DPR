@@ -1,5 +1,31 @@
 # Ideaform Design Studio — Productivity System
 
+## Visit planner (2026-08) — VISIT_PLANNER vs VISIT_SCHEDULE
+- **VISIT_PLANNER** = the input you edit by hand: project, visit type,
+  assignee, frequency, fixed day, last-visit date, Active Yes/No.
+- **VISIT_SCHEDULE** = fully auto-generated output, rebuilt from scratch
+  every `syncVisitSchedule()` run (daily 7 AM trigger) — next visit date,
+  status, days overdue, linked Task ID. Col F (Next Visit Date) is the only
+  user-editable manual override; everything else is overwritten each run.
+  Don't delete this tab expecting it to "reset" anything meaningful — it's
+  derived, not a source of truth, and just regenerates.
+- `loadVisitHistory()` only counts **approved** (`LeadApproved==='Yes'`)
+  Done visit tasks as "last visit" — briefly relaxed to also count Pending
+  ones (so approval lag wouldn't blind the planner), reverted same day per
+  explicit instruction: approve visits promptly, don't rely on unapproved
+  self-reports for scheduling.
+- `calcNextVisitDate`'s Priority 1 treats ANY existing open task for a
+  project+type+assignee as "already scheduled" and just echoes its
+  deadline — meaning stale open visit tasks silently block a corrected
+  VISIT_PLANNER cadence from ever taking effect until those stale tasks are
+  cleared. `cleanupPendingVisitTasksAndResync()` (one-off, run manually from
+  the Apps Script editor, not wired to any route) handles this: deletes
+  only `Not Started`/blank-status visit tasks (never anything with
+  progress or a resolution), then re-runs the full sync.
+- `notifyMissedVisits()` emails Siddharth/Astha a digest whenever
+  `syncVisitSchedule` finds a missed visit (>1 full frequency cycle
+  overdue) — fully automatic via the daily trigger, no email on a clean day.
+
 ## Reliability fixes (2026-08) — read before touching submission paths
 Root-caused two backend bugs behind reported "sometimes access denied" +
 "task submissions not reflected, no score":
