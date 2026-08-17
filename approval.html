@@ -545,8 +545,9 @@ function renderTasks() {
       <div class="task-body">
         <div class="task-detail-row">
           <div class="task-type">${t.taskType}</div>
-          <div class="task-pts">${t.pts} pts</div>
+          <div class="task-pts">${t.pts} pts${t.hoursTaken ? ` <span style="font-size:11px;font-weight:600;color:var(--text3);margin-left:6px">· ${t.hoursTaken}h taken</span>` : ''}</div>
         </div>
+        ${t.hoursTaken ? `<div style="font-size:10px;color:var(--text3);margin-bottom:4px">${(t.pts/t.hoursTaken).toFixed(1)} pts/hr — compare against what this task type normally pays</div>` : ''}
         ${t.area||t.drawing ? `<div style="font-size:11px;color:var(--accent);margin-bottom:6px;font-family:'DM Mono',monospace">${t.area||''}${t.area&&t.drawing?' · ':''}${t.drawing||''}</div>` : ''}
         <div style="margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border)">
           <div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:'DM Mono',monospace;text-transform:uppercase">Lead correction (optional)</div>

@@ -466,6 +466,31 @@ trust this section and getDeepakWeeklyStats/Code.js over anything else):
 - CRM new issues carry their own per-issue project; writeSiteIssues uses iss.project || project
 - CRM "Design Deliverable" items set iss.kind='Deliverable' → createIssueTask makes a design task
 
+## TASK_ASSIGNMENTS direct-edit safety net (built 2026-08)
+Siddharth sometimes reassigns/changes status by typing straight into the
+TASK_ASSIGNMENTS sheet instead of using the app. A bare edit skips
+reassignTask()/createDoneTask()'s logic entirely, which could silently steal
+a completed task's earned points or hand a new assignee undeserved credit.
+`onEdit(e)` in Code.js guards against this:
+- Editing **AssignedTo (col D)** on a row that's already `Done`+`LeadApproved=Yes`:
+  the edit is reverted (original assignee's earned record stays intact) and a
+  fresh `Not Started` row is appended for the new assignee instead — same
+  net effect as a real reassignment, just done safely.
+- Editing AssignedTo on a row that's `Done` but not yet approved: resets it
+  to `Not Started` so the new assignee doesn't inherit undeserved credit.
+- Editing AssignedTo on an open task: no-op, harmless as-is.
+- Flipping **SelfStatus (col N) to Done** by hand: auto-stamps
+  SelfStatusDate if left blank (it's the sole source of truth for which
+  week a task scores in).
+**This script is standalone** (scriptId ≠ SHEET_ID — reaches the sheet via
+`SpreadsheetApp.openById`), so `onEdit` does NOT auto-install as a normal
+simple trigger the way it would in a container-bound script. Run
+`setupTaskAssignmentEditGuard()` once from the Apps Script editor (function
+dropdown → Run) to register it as an installable trigger — a one-time,
+manual-authorization step; a web app request can't create triggers itself.
+Never fires for the app's own writes (createDoneTask, assignTasks, etc.) —
+only for a human editing the sheet directly.
+
 ## Do not change
 - Apps Script URL (hardcoded in all HTML forms)
 - Column indices in getAllTasks — any change breaks dashboard

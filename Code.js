@@ -126,34 +126,46 @@ function visitFamily(taskType) {
   return null;
 }
 
-// Client Satisfaction /MAX — for Deepak/Aman only, in the slot Planning
-// occupies for team members (their work is reactive, not pre-planned, so
-// Planning doesn't apply — see the 2026-08 revert). Sourced from the
-// FEEDBACK sheet's Overall Satisfaction (1-10, col G) already captured via
-// the CRM form's Monthly Client Feedback section — averaged across whatever
-// ratings landed this week for the given project list (Deepak's active
-// sites / Aman's ongoing projects). No rating recorded this week = full
-// marks (nothing on record against them), same convention as Planning's
-// empty-week case. This is a stand-in until a dedicated weekly capture
-// exists; TODO: replace with a real per-week input once that's built.
-function clientSatisfactionScore(projects, mon, sat, MAX) {
+// Aman's Client Satisfaction /MAX (2026-08 explicit rule) — count of
+// FEEDBACK entries he recorded this week (any project), not an averaged
+// rating: 0 for none, half marks for exactly one, full marks for two or
+// more. Replaces the old averaged-rating version — Aman's driver is
+// whether he's actually collecting feedback, not the scores themselves.
+function feedbackCountScore(mon, sat, MAX) {
   var sheet = db().getSheetByName(FEEDBACK_TAB);
-  if (!sheet || sheet.getLastRow() < 2) return MAX;
-  var projSet = {};
-  (projects || []).forEach(function(p) { projSet[String(p||'').trim()] = true; });
+  if (!sheet || sheet.getLastRow() < 2) return 0;
   var rows = sheet.getDataRange().getValues();
-  var vals = [];
+  var count = 0;
   for (var i = 1; i < rows.length; i++) {
-    var date = cellDate(rows[i][2]);      // C Date Recorded
-    if (!date || date < mon || date > sat) continue;
-    var project = String(rows[i][4]||'').trim();  // E Project/Client
-    if (!projSet[project]) continue;
-    var sat10 = parseFloat(rows[i][6]);   // G Overall Satisfaction (1-10)
-    if (!isNaN(sat10)) vals.push(sat10);
+    var date = cellDate(rows[i][2]); // C Date Recorded
+    if (date && date >= mon && date <= sat) count++;
   }
-  if (!vals.length) return MAX;
-  var avg = vals.reduce(function(s,v){ return s+v; }, 0) / vals.length;
-  return Math.round(Math.min(1, avg/10) * MAX * 10) / 10;
+  if (count <= 0) return 0;
+  if (count === 1) return Math.round(MAX/2 * 10) / 10;
+  return MAX;
+}
+
+// Deepak's Client Satisfaction /MAX (2026-08 explicit rule) — full marks
+// if every one of his active sites has a Site Visit log (MEETING_LOG,
+// type='Site Visit') generated this week, −2 per site missing one, floored
+// at 0. Replaces the old averaged-FEEDBACK-rating version — for Deepak the
+// signal is whether the site visit got documented at all, not a rating.
+function siteVisitLogScore(activeProjects, mon, sat, MAX) {
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  var loggedSet = {};
+  if (sheet && sheet.getLastRow() > 1) {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      var date = cellDate(rows[i][1]);           // B Date
+      if (!date || date < mon || date > sat) continue;
+      if (String(rows[i][3]||'').trim() !== 'Site Visit') continue; // D Type
+      var project = String(rows[i][4]||'').trim(); // E Project
+      if (project) loggedSet[project] = true;
+    }
+  }
+  var missing = 0;
+  (activeProjects || []).forEach(function(p) { if (!loggedSet[String(p||'').trim()]) missing++; });
+  return Math.max(0, MAX - missing * 2);
 }
 
 // Append one or more rows to FIELD_WORK (start/end per engagement). Points
@@ -704,6 +716,117 @@ var TEAM_TAB      = 'TEAM';
 // core cols, so existing index reads are unaffected. Review date lives in BLOCK_LOG.
 var COL_BLK_PRIOR=24, COL_BLK_ORIGDL=25, COL_BLK_DISPO=26, COL_PARK_REASON=27;  // X,Y,Z,AA
 var COL_DELAY_REASON=28;  // AB — why an overdue task is late (captured once, not re-prompted)
+var COL_HOURS_TAKEN=29;   // AC — hours the assignee says it took to complete (2026-08, self-reported,
+                           // shown in the approval queue so a lead can revise points if the hours don't
+                           // match the effort a task's points imply). For visit/meeting tasks this is
+                           // just the same hours that already drive points (hours × rate) — not a
+                           // separate figure — for everything else it's new, there was no time tracking
+                           // at all before this.
+function writeHoursTaken(sheet, row, hours) {
+  if (hours == null || hours === '' || isNaN(parseFloat(hours))) return;
+  ensureCols(sheet, COL_HOURS_TAKEN);
+  if (!String(sheet.getRange(1, COL_HOURS_TAKEN).getValue()||'').trim()) {
+    sheet.getRange(1, COL_HOURS_TAKEN).setValue('Hours Taken');
+  }
+  sheet.getRange(row, COL_HOURS_TAKEN).setValue(parseFloat(hours));
+}
+
+// ── Safety net for direct edits on TASK_ASSIGNMENTS ─────────────────────
+// A bare edit typed straight into the sheet (reassigning by overwriting
+// AssignedTo, or flipping SelfStatus to Done) skips all of reassignTask's/
+// createDoneTask's logic — no reassign audit trail, no reliability
+// accounting, and worst case a completed+approved task's points silently
+// jump to whoever the cell now says, stealing the original assignee's
+// earned history.
+//
+// This script is STANDALONE (its scriptId differs from SHEET_ID — it reaches
+// the sheet via SpreadsheetApp.openById, not container binding), so a plain
+// function named `onEdit` would NOT auto-install as Apps Script's usual
+// "simple trigger" — that only works for scripts bound to the spreadsheet
+// via Extensions > Apps Script from inside the sheet itself. Run
+// setupTaskAssignmentEditGuard() ONCE from the Apps Script editor (select it
+// in the function dropdown → Run) to register this as an INSTALLABLE trigger
+// instead — that's a one-time action requiring the account owner's manual
+// authorization; a web app request can't create triggers on its own.
+// Either way, it fires ONLY for a human editing the sheet directly — never
+// for this script's own SpreadsheetApp writes (createDoneTask, assignTasks,
+// etc.), so it can't interfere with any normal form submission.
+function setupTaskAssignmentEditGuard() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onEdit') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onEdit')
+    .forSpreadsheet(SpreadsheetApp.openById(SHEET_ID))
+    .onEdit()
+    .create();
+  Logger.log('TASK_ASSIGNMENTS edit guard installed.');
+}
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var sheet = e.range.getSheet();
+    if (sheet.getName() !== ASSIGN_TAB) return;
+    if (e.range.getNumRows() !== 1 || e.range.getNumColumns() !== 1) return; // skip multi-cell paste/edits
+    var row = e.range.getRow();
+    if (row === 1) return; // header
+    var col = e.range.getColumn();
+
+    // Column D (4) = AssignedTo — the reassignment case.
+    if (col === 4) {
+      var oldVal = String(e.oldValue || '').trim();
+      var newVal = String(e.value || '').trim();
+      if (!oldVal || !newVal || oldVal === newVal) return;
+
+      var r = sheet.getRange(row, 1, 1, 23).getValues()[0];
+      var selfStatus   = String(r[13] || '').trim(); // N
+      var leadApproved = String(r[16] || '').trim(); // Q
+
+      if (selfStatus === 'Done' && leadApproved === 'Yes') {
+        // Points already locked in for the original person — undo the raw
+        // edit so their earned record stays intact, and spin off a real
+        // new task for the new assignee instead (Not Started, no points
+        // yet) so the reassignment still happens, just safely.
+        sheet.getRange(row, 4).setValue(oldVal);
+        var newId = 'T-' + Utilities.getUuid().substring(0, 8).toUpperCase();
+        var newRow = r.slice();
+        newRow[0]  = newId;
+        newRow[3]  = newVal;
+        newRow[13] = 'Not Started';
+        newRow[14] = '';
+        newRow[15] = '';
+        newRow[16] = 'Pending';
+        newRow[17] = '';
+        newRow[18] = '';
+        newRow[20] = 'Reassigned via sheet edit — original completion by ' + oldVal + ' preserved';
+        newRow[21] = 'Sheet edit';
+        sheet.appendRow(newRow);
+      } else if (selfStatus === 'Done') {
+        // Done but not yet approved — no points locked in yet. Reset so
+        // the new assignee doesn't inherit undeserved credit for work
+        // someone else actually did.
+        sheet.getRange(row, 14).setValue('Not Started'); // N
+        sheet.getRange(row, 15).setValue('');             // O
+        sheet.getRange(row, 16).setValue('');             // P
+      }
+      // Open task (Not Started/In Progress/etc.): a plain reassignment by
+      // edit is harmless as-is — nothing to protect yet.
+      return;
+    }
+
+    // Column N (14) = SelfStatus — auto-stamp the completion date if
+    // someone flips a task to Done by hand and leaves it blank, since
+    // SelfStatusDate is the sole source of truth for which week it scores in.
+    if (col === 14) {
+      var newStatus = String(e.value || '').trim();
+      if (newStatus === 'Done') {
+        var dateCell = sheet.getRange(row, 15);
+        if (!String(dateCell.getValue() || '').trim()) dateCell.setValue(dateStr());
+      }
+    }
+  } catch (err) {
+    Logger.log('onEdit guard error: ' + err);
+  }
+}
 var BILL_REQ_TAB  = 'BILL_REQUESTS';  // billables raised on DPR → approved → CRM raise-bill task
 // Only Siddharth may park tasks directly from the dashboard (EPIC I).
 var DIRECTOR_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1 };
@@ -725,7 +848,7 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
   backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1, fixBackfillUnplannedTag:1,
-  saveConfidentialReview:1, getConfidentialReview:1, getSocialMediaLog:1 };
+  saveConfidentialReview:1, getConfidentialReview:1, getSocialMediaLog:1, debugCleanupFieldWork:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -1164,6 +1287,18 @@ function doPost(e) {
     if (data.action === 'getLateRequests')        return respond(getLateRequests(data.from||'', data.to||''));
     if (data.action === 'getFieldWorkForRange')   return respond(getFieldWorkForRange(data.from||'', data.to||''));
     if (data.action === 'getDPRAudit')            return respond(getDPRAudit(data.from||'', data.to||''));
+    if (data.action === 'debugCleanupFieldWork') {
+      var cfSheet = db().getSheetByName(FIELD_WORK_TAB);
+      var cfRows = cfSheet.getDataRange().getValues();
+      var cfDeleted = [];
+      for (var cfI = cfRows.length - 1; cfI >= 1; cfI--) {
+        if (String(cfRows[cfI][2]||'').trim() === String(data.member||'')) {
+          cfDeleted.push(String(cfRows[cfI][0]||''));
+          cfSheet.deleteRow(cfI+1);
+        }
+      }
+      return respond({status:'ok', deleted: cfDeleted});
+    }
     if (data.action === 'backfillDPRTasks')       return respond(withLock(function(){ return backfillDPRTasks(data.updates||[], data.creates||[]); }));
     if (data.action === 'fixBackfillUnplannedTag') return respond(withLock(function(){ return fixBackfillUnplannedTag(); }));
     if (data.action === 'saveConfidentialReview')  return respond(withLock(function(){ return saveConfidentialReview(data.member||'', data.payload||{}, authEmail); }));
@@ -1210,7 +1345,7 @@ function doPost(e) {
     if (data.action === 'getSiteExecution')    return respond(getSiteExecutionSummary(data.project||''));
     if (data.action === 'submitDPER')          return respond(withLock(function(){ return handleDPERSubmission(data); }));
     if (data.action === 'correctSiteExecution') return respond(correctSiteExecution(data));
-    if (data.action === 'backfillFieldWorkPoints') return respond(backfillFieldWorkPoints(data.from||'', data.to||''));
+    if (data.action === 'backfillFieldWorkPoints') return respond(withLock(function(){ return backfillFieldWorkPoints(data.from||'', data.to||''); }));
     if (data.action === 'getCalendarData')     return respond(getCalendarData());
     if (data.action === 'getDeepakIssues')     return respond(getIssuesByReporter(data.lead||'Deepak Soni', true));
     if (data.action === 'getAmanIssues')       return respond(getIssuesByReporter(data.member||'Aman Raghuwanshi', false));
@@ -1926,6 +2061,13 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
                 Logger.log('Visit pts updated: ' + taskType + ' ' + a.visitHours + 'h = ' + visitPts + 'pts');
               }
             }
+            // Hours it took to complete — visit tasks already have this via
+            // visitHours (the same figure that drives their points); anything
+            // else only has it if the assignee typed it in.
+            var doneHoursTaken = (a.hoursTaken != null && a.hoursTaken !== '')
+              ? a.hoursTaken
+              : (isVisitTask(taskType) ? a.visitHours : null);
+            writeHoursTaken(sheet, i+1, doneHoursTaken);
           }
         }
 
@@ -1999,6 +2141,7 @@ function getPendingTasks() {
         drawing      : String(asRows[j][12] || ''), // M Drawing
         units        : asRows[j][8]  || 0,           // I WeightedPts
         pts          : asRows[j][8]  || 0,           // I WeightedPts
+        hoursTaken   : asRows[j][COL_HOURS_TAKEN-1] != null ? (parseFloat(asRows[j][COL_HOURS_TAKEN-1]) || null) : null, // AC
         taskAssignRow: j + 1,
         revisionTag  : String(asRows[j][AS_REVTAG] || ''),
         notes        : String(asRows[j][AS_NOTES]  || ''),
@@ -2542,7 +2685,7 @@ function checkVisitTimingMatch(member, project, date, time, endTime){
     var fwMember = String(rows[i][2]||'').trim();
     var fwProject = String(rows[i][5]||'').trim();
     if (fwDate !== date || fwMember !== member || fwProject.toLowerCase() !== project.toLowerCase()) continue;
-    best = { start:String(rows[i][6]||''), end:String(rows[i][7]||'') };
+    best = { start:cellTime(rows[i][6]), end:cellTime(rows[i][7]) };
     break; // first match is enough — flag hunts for ANY corroborating entry, not the best one
   }
   if (!best) return {checked:true, matched:false, reason:'No Field Work entry found for '+member+' / '+project+' on '+date};
@@ -2781,10 +2924,10 @@ function getMeetingApprovals(){
   for (var i=1;i<rows.length;i++){
     if (String(rows[i][15]||'').trim() !== 'Pending') continue;
     var logDate = cellDate(rows[i][1]);
-    var logTime = String(rows[i][2]||'');
+    var logTime = cellTime(rows[i][2]);
     var logProject = String(rows[i][4]||'');
     var logBy = String(rows[i][5]||'');
-    var logEndTime = String(rows[i][22]||'');
+    var logEndTime = cellTime(rows[i][22]);
     var timing = checkVisitTimingMatch(logBy, logProject, logDate, logTime, logEndTime);
     out.push({ row:i+1, logId:String(rows[i][0]||''), date:logDate, type:String(rows[i][3]||''),
       project:logProject, loggedBy:logBy, team:String(rows[i][6]||''),
@@ -2848,7 +2991,7 @@ function generateProjectReportPDF(project, callerEmail){
     if (st !== 'Final' && st !== 'Approved') continue;   // shareable entries only
     entries.push({
       logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
-      time:String(rows[i][2]||''), endTime:String(rows[i][22]||''),
+      time:cellTime(rows[i][2]), endTime:cellTime(rows[i][22]),
       team:String(rows[i][6]||''), clients:String(rows[i][7]||''), purpose:String(rows[i][8]||''),
       body:String(rows[i][10]||''), photoIds:String(rows[i][13]||''), videos:String(rows[i][14]||''),
       snapshot:String(rows[i][20]||'') });   // U — frozen text snapshot (immutable history)
@@ -2921,9 +3064,8 @@ function generateProjectReportPDF(project, callerEmail){
     // entries are reproduced exactly as shared; only the header/badge/images are
     // positional. Fallback to a live build for any legacy entry without a snapshot.
     var bodyHtml = e.snapshot || buildEntryBodyHTML(e, d);
-    var timingStr = e.time ? (' &middot; '+esc(e.time)+(e.endTime?'&ndash;'+esc(e.endTime):'')) : '';
     return '<div class="sec'+(idx>0?' brk':'')+'">'
-      + '<div class="sh">'+esc(e.type)+' &mdash; '+esc(e.date)+timingStr+(idx===0?' <span class="latest">Latest</span>':'')+'</div>'
+      + '<div class="sh">'+esc(e.type)+' &mdash; '+esc(e.date)+(idx===0?' <span class="latest">Latest</span>':'')+'</div>'
       + bodyHtml
       + (e.videos?'<div class="vids"><b>Videos:</b> '+e.videos.split('|').map(function(v){v=v.trim();return v?'<a href="'+esc(v)+'">'+esc(v)+'</a>':'';}).join(' &nbsp; ')+'</div>':'')
       + imgPages
@@ -5408,12 +5550,24 @@ function syncVisitSchedule() {
   // 2. Build VISIT_SCHEDULE tab
   buildVisitSchedule(cadence, history, openTasks);
 
-  // 3. Push tasks for visits due within 3 days (also sends emails)
-  pushVisitTasks(cadence, history, openTasks);
-
-  // 4. Flag missed visits + create overdue tasks + email a digest to owner/managers
-  var schedSheet = db().getSheetByName(VSCHED_TAB);
-  var missedList = flagMissedVisits(schedSheet, cadence, history, openTasks);
+  // 3+4. Push tasks for visits due within 3 days + flag missed visits/create
+  // overdue tasks — both append rows to TASK_ASSIGNMENTS via plain appendRow.
+  // 2026-08 fix: this ran unlocked (syncVisitSchedule fires from a daily 7am
+  // trigger, and was also run manually mid-week), while every doPost form
+  // handler that also appends to TASK_ASSIGNMENTS (createDoneTask, Field Work,
+  // Done Tasks) goes through withLock. appendRow is NOT atomic (it reads
+  // last-row then writes) — an unlocked appendRow racing a locked one can
+  // land on the same row and silently clobber it with no error either side.
+  // This is very likely why several team members' self-logged site
+  // visits/meetings never reached TASK_ASSIGNMENTS despite the form
+  // reporting success. Wrapping the writes here in the same lock that form
+  // submissions use makes them mutually exclusive again.
+  var missedList = [];
+  withLock(function(){
+    pushVisitTasks(cadence, history, openTasks);
+    var schedSheet = db().getSheetByName(VSCHED_TAB);
+    missedList = flagMissedVisits(schedSheet, cadence, history, openTasks);
+  });
   try { notifyMissedVisits(missedList); } catch(e) { Logger.log('notifyMissedVisits error: '+e); }
 
   // 5. Build PROJECT_HEALTH tab
@@ -5649,6 +5803,12 @@ function createDoneTask(data) {
   }
 
   var member = data.member || '';
+  // Visit/meeting tasks already carry real hours via visitHours (that's what
+  // drives their points) — treat that as Hours Taken automatically unless an
+  // explicit hoursTaken was sent, so visit tasks don't need a duplicate field.
+  var hoursTaken = (data.hoursTaken != null && data.hoursTaken !== '')
+    ? data.hoursTaken
+    : (isVisitTask(data.taskType) ? data.visitHours : null);
 
   // Before creating a new row, check if there's an existing pre-assigned task
   // for this member + project + taskType that hasn't been done yet.
@@ -5695,6 +5855,7 @@ function createDoneTask(data) {
     sheet.getRange(matchRow, 15).setValue(effDate);      // O SelfStatusDate
     sheet.getRange(matchRow, 16).setValue(actualDate);   // P ActualCompletionDate
     sheet.getRange(matchRow, 17).setValue('Pending');    // Q LeadApproved (reset for re-approval)
+    writeHoursTaken(sheet, matchRow, hoursTaken);
     var existingId = String(rows[matchRow-1][0]||'');
     Logger.log('Done task updated existing: '+member+' / '+data.taskType+' row '+matchRow+' ('+existingId+')');
     return {status:'ok', taskId:existingId, updated:true};
@@ -5732,6 +5893,7 @@ function createDoneTask(data) {
     member,                    // V AssignedBy (self)
     'Medium',                  // W Priority
   ]);
+  writeHoursTaken(sheet, sheet.getLastRow(), hoursTaken);
 
   Logger.log('Done task created (new): '+member+' / '+data.taskType+' = '+weightedPts+'pts → '+newId);
   return {status:'ok', taskId:newId};
@@ -5980,9 +6142,15 @@ function getWeeklyStats(weekStart) {
           String(r[13]||'').trim() === 'Done' &&
           isApproved &&
           doneDate >= mon && doneDate <= doneUpper) {
+        // Unplanned/self-logged work (createDoneTask stamps Deadline = same
+        // day as completion) can never be "late" by construction — an
+        // on-time flag there is meaningless, not an accomplishment. Only
+        // count/flag on-time-ness for tasks that were actually pre-assigned
+        // with a real deadline.
+        var isUnplanned = String(r[COL_NOTES]||'').indexOf('Unplanned task') > -1;
         var deadline = cellDate(r[COL_DEADLINE]);
-        var onTime   = deadline && doneDate <= deadline;
-        if (onTime) completedOnTime++; else completedLate++;
+        var onTime   = isUnplanned ? null : (deadline && doneDate <= deadline);
+        if (onTime === true) completedOnTime++; else if (onTime === false) completedLate++;
         completedTasks.push({
           project  : String(r[2]  ||'').trim(),
           taskType : String(r[4]  ||'').trim(),
@@ -7830,10 +7998,9 @@ function getDeepakWeeklyStats(weekStart) {
   var hrsBase  = Math.max(0, Math.round((daysPresent / 6 * 10 - absentDays * 1.5) * 10) / 10);
   var s_hrs    = Math.round(Math.min(10, hrsBase) / 10 * 7 * 10) / 10;
 
-  // Client Satisfaction /8 — see clientSatisfactionScore() for the source
-  // (FEEDBACK sheet Overall Satisfaction, averaged across his active sites
-  // for this week; no rating this week = full marks).
-  var s_client_sat = clientSatisfactionScore(activeProjects, mon, sat, 8);
+  // Client Satisfaction /8 — see siteVisitLogScore(): full marks if every
+  // active site has a Site Visit log this week, -2 per site missing one.
+  var s_client_sat = siteVisitLogScore(activeProjects, mon, sat, 8);
 
   // Reliability /10 — −1 per late/overdue task, −2 per Work Not Done
   var reliabilityPenalty = dLate * 1 + dWnd * 2;
@@ -8167,10 +8334,9 @@ function getAmanWeeklyStats(weekStart, member) {
   var hrsBase  = Math.max(0, r1(daysPresent/6*10 - absentDays*1.5));
   var s_hrs    = r1(Math.min(10, hrsBase) / 10 * 7);
 
-  // Client Satisfaction /8 — see clientSatisfactionScore() for the source
-  // (FEEDBACK sheet Overall Satisfaction, averaged across his ongoing
-  // projects for this week; no rating this week = full marks).
-  var s_client_sat = clientSatisfactionScore(ongoing, mon, sat, 8);
+  // Client Satisfaction /8 — see feedbackCountScore(): 0 for no feedback
+  // collected this week, half marks for one, full marks for two or more.
+  var s_client_sat = feedbackCountScore(mon, sat, 8);
 
   // Reliability /10 — 24hr lead first-contact SLA: −1 per missed lead
   var reliabilityPenalty = leadSlaMissed * 1;

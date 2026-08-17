@@ -869,9 +869,13 @@ function renderMyTasks(){
         </div>
       </div>
       <div class="mt-status">
-        <label><input type="radio" name="mt-r-${i}" value="Not Started" ${cur==='Not Started'?'checked':''}><span class="mt-btn">Not started</span></label>
-        <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''}><span class="mt-btn ip">In progress</span></label>
-        <label><input type="radio" name="mt-r-${i}" value="Done"><span class="mt-btn done">Done</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Not Started" ${cur==='Not Started'?'checked':''} onchange="toggleMtStatus(${i},this)"><span class="mt-btn">Not started</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''} onchange="toggleMtStatus(${i},this)"><span class="mt-btn ip">In progress</span></label>
+        <label><input type="radio" name="mt-r-${i}" value="Done" onchange="toggleMtStatus(${i},this)"><span class="mt-btn done">Done</span></label>
+      </div>
+      <div id="mt-hrstaken-${i}" style="display:none;margin-top:8px">
+        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="opacity:.7">(optional — helps track office hours, visible at approval)</span></div>
+        <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
       </div>
       ${overdue ? (t.delayReason ? `
       <div style="margin-top:6px;font-size:11px;color:var(--text3)"><b style="color:#C0392B">Delay reason:</b> ${esc(t.delayReason)}</div>` : `
@@ -895,19 +899,24 @@ function toggleMtEdit(i, link){
   box.style.display = open ? 'none' : 'block';
   if (link) link.textContent = open ? '✎ Task changed? Edit units / drawing / notes' : '✎ Hide edit fields';
 }
+function toggleMtStatus(i, radio){
+  const hrsTakenDiv = document.getElementById('mt-hrstaken-'+i);
+  if (hrsTakenDiv) hrsTakenDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
+}
 function collectTaskStatuses(){
   const today=new Date().toISOString().substring(0,10);
   return myTasks.map((t,i)=>{
     const units = parseFloat(document.querySelector(`.mt-units-${i}`)?.value) || null;
     const newDrawing = document.querySelector(`.mt-drawing-${i}`)?.value.trim() || '';
     const note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
+    const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started';
     return {
       member:crmUser, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
-      status:document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started',
-      actualCompletionDate:today,
+      status, actualCompletionDate:today,
       units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
       newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',
-      note
+      note,
+      hoursTaken: status==='Done' ? (parseFloat(document.querySelector(`.mt-hrstaken-${i}`)?.value) || null) : null,
     };
   }).filter(s=>s.status!=='Not Started' || s.units || s.newDrawing || s.note);
 }

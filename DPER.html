@@ -397,6 +397,7 @@ function addUnplanned(){
       `<div><div class="lbl" style="font-size:10px">Units</div><input type="number" class="unp-units" id="unp-units-${id}" value="1" min="1" step="1" oninput="calcUnpPts(${id})" style="width:100%"></div>`+
       `<div><div class="lbl" style="font-size:10px">Points</div><div class="unp-pts" id="unp-pts-${id}" style="font-size:13px;color:var(--accent);font-weight:600;padding:8px 0">—</div></div>`+
     `</div>`+
+    `<div class="field"><label>Hours taken <span class="opt">optional — helps track office hours</span></label><input type="number" id="unp-hrstaken-${id}" min="0.25" max="16" step="0.25" placeholder="e.g. 2"></div>`+
     `<div class="field"><label>Description <span class="opt">what was done</span></label><input type="text" id="unp-desc-${id}" placeholder="e.g. Supervised plaster work, coordinated material delivery"></div>`+
     `<button type="button" onclick="document.getElementById('unp-${id}').remove()" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer">✕ Remove</button>`;
   document.getElementById('unplanned-blocks').appendChild(div);
@@ -421,6 +422,7 @@ function collectUnplanned(){
       basePts :CFG_STAGES[idx].pts,
       units   :parseFloat(document.getElementById('unp-units-'+id)?.value||1),
       area    :(document.getElementById('unp-desc-'+id)?.value||'').trim(),
+      hoursTaken: parseFloat(document.getElementById('unp-hrstaken-'+id)?.value) || null,
     });
   });
   return out;
@@ -565,7 +567,11 @@ function renderMyTasks(){
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="mt-vshared-${i}" value="Yes" style="width:auto">Yes</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="mt-vshared-${i}" value="No" style="width:auto">No</label>
         </div>
-      </div>` : ''}
+      </div>` : `
+      <div id="mt-hrstaken-${i}" style="display:none;margin-top:8px">
+        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="opacity:.7">(optional — helps track office hours, visible to your lead at approval)</span></div>
+        <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
+      </div>`}
       <div id="mt-blockreason-${i}" style="display:none;margin-top:8px">
         <div style="font-size:10.5px;color:var(--red);margin-bottom:3px">WHAT'S BLOCKING THIS? *</div>
         <textarea class="mt-blockreason-ta-${i}" placeholder="e.g. site inaccessible / client unavailable / waiting on materials…" style="font-size:12px;padding:6px 8px;width:100%;min-height:34px;border-radius:6px"></textarea>
@@ -587,8 +593,10 @@ function renderMyTasks(){
 }
 function toggleMtStatus(i, radio){
   const visitDiv = document.getElementById('mt-visit-'+i);
+  const hrsTakenDiv = document.getElementById('mt-hrstaken-'+i);
   const blockDiv = document.getElementById('mt-blockreason-'+i);
   if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
+  if (hrsTakenDiv) hrsTakenDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
   if (blockDiv) blockDiv.style.display = radio.value === 'Blocked' ? 'block' : 'none';
 }
 function toggleMtEdit(i, link){
@@ -605,7 +613,7 @@ function collectTaskStatuses(){
     const newDrawing = document.querySelector(`.mt-drawing-${i}`)?.value.trim() || '';
     const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started';
     let note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
-    let visitHours = null;
+    let visitHours = null, hoursTaken = null;
 
     if (status === 'Blocked') {
       const blockReason = document.querySelector(`.mt-blockreason-ta-${i}`)?.value.trim() || '';
@@ -616,6 +624,8 @@ function collectTaskStatuses(){
       visitHours = mtHours(start, end) || null;
       const shared = document.querySelector(`input[name="mt-vshared-${i}"]:checked`)?.value || '';
       if (shared) note = (note ? note + ' | ' : '') + 'Site visit log shared with client: ' + shared;
+    } else if (status === 'Done') {
+      hoursTaken = parseFloat(document.querySelector(`.mt-hrstaken-${i}`)?.value) || null;
     }
 
     return {
@@ -623,7 +633,7 @@ function collectTaskStatuses(){
       status, actualCompletionDate:today,
       units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
       newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',
-      note, visitHours,
+      note, visitHours, hoursTaken,
     };
   }).filter(s=>s.status!=='Not Started' || s.units || s.newDrawing || s.note);
 }
@@ -1181,7 +1191,7 @@ async function submitAll(){
       try {
         const cdtR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
           body:JSON.stringify({action:'createDoneTask', member:leadName, project:u.project,
-            taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, date})}).then(r=>r.json());
+            taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, date, hoursTaken:u.hoursTaken})}).then(r=>r.json());
         if (cdtR && cdtR.status === 'error') scoringErrors.push(u.taskType+' — '+u.project+': '+(cdtR.message||'failed'));
       } catch(e){ scoringErrors.push(u.taskType+' — '+u.project+': network error'); }
     }

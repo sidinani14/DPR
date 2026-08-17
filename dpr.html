@@ -874,7 +874,12 @@ function renderAssignedTasks() {
           style="font-size:13px;padding:7px 10px;width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
         <span id="atc-pts-${i}" style="font-size:12px;color:var(--accent);font-weight:600;margin-left:8px"></span>
         <span style="font-size:10px;color:var(--text3);margin-left:4px">${isVisitRate2(t.taskType)?'hrs × 2':'hrs × 1'}</span>
-      </div>` : ''}
+      </div>` : `
+      <div id="hrs-taken-${i}" style="padding:8px 13px 4px;display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">HOURS TAKEN <span style="opacity:.7">(optional — helps track office hours, visible to your lead at approval)</span></div>
+        <input type="number" class="atc-hrs-taken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3"
+          style="font-size:13px;padding:7px 10px;width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+      </div>`}
       <div id="block-reason-${i}" style="display:none;padding:0 13px 10px">
         <div style="font-size:11px;color:#E07A7A;margin-bottom:4px;font-family:'DM Mono',monospace">WHAT'S BLOCKING THIS? <span style="color:var(--red)">*</span></div>
         <textarea class="atc-note-${i}" placeholder="e.g. waiting on structural drawings / client hasn't approved layout / need direction from lead…"
@@ -1146,6 +1151,11 @@ function addTask(containerId) {
           style="width:70px;font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
         <span style="font-size:10px;color:var(--accent)">hrs (visit pts)</span>
       </span>
+      <span class="hrs-taken-wrap" style="display:none;align-items:center;gap:6px">
+        <input type="number" class="t-hrs-taken" min="0.25" max="16" step="0.25" placeholder="hours"
+          style="width:70px;font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+        <span style="font-size:10px;color:var(--text3)">hrs taken (optional)</span>
+      </span>
     </div>`;
   document.getElementById(containerId).appendChild(row);
 }
@@ -1160,22 +1170,27 @@ function refreshTaskPts(sel) {
 }
 
 function toggleVisitHrs(radio) {
-  // Show hours input for visit/meeting tasks when Done is selected
+  // Show hours-spent (visit tasks, drives points) or hours-taken (everything
+  // else, informational) when Done is selected — never both.
   const row = radio.closest('.task-entry');
   if (!row) return;
   const typeVal = row.querySelector('.t-type')?.value;
   const idx = parseInt(typeVal);
   const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
   const wrap = row.querySelector('.visit-hrs-wrap');
-  if (!wrap || !stage) return;
+  const hrsTakenWrap = row.querySelector('.hrs-taken-wrap');
+  if (!stage) { if (wrap) wrap.style.display='none'; if (hrsTakenWrap) hrsTakenWrap.style.display='none'; return; }
   const isVisit2 = isVisitType(stage.label);
-  wrap.style.display = (isVisit2 && radio.value === 'Done') ? 'flex' : 'none';
+  if (wrap) wrap.style.display = (isVisit2 && radio.value === 'Done') ? 'flex' : 'none';
+  if (hrsTakenWrap) hrsTakenWrap.style.display = (!isVisit2 && radio.value === 'Done') ? 'flex' : 'none';
 }
 
 function toggleDoneDate(i, radio) {
   const visitDiv = document.getElementById('visit-hrs-'+i);
+  const hrsTakenDiv = document.getElementById('hrs-taken-'+i);
   const blockDiv = document.getElementById('block-reason-'+i);
   if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
+  if (hrsTakenDiv) hrsTakenDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
   if (blockDiv) blockDiv.style.display = radio.value === 'Blocked' ? 'block' : 'none';
   calcScore(); // recalculate when status changes
 }
@@ -1279,6 +1294,7 @@ function collectData() {
       // attendance), which is why Field Work today keeps its own date.
       actualCompletionDate:'',
       visitHours:parseFloat(document.querySelector(`.atc-visit-hrs-${i}`)?.value)||null,
+      hoursTaken:parseFloat(document.querySelector(`.atc-hrs-taken-${i}`)?.value)||null,
       // Corrections — only sent if the task's actual scope changed from what was assigned
       units: parseFloat(document.querySelector(`.atc-units-${i}`)?.value) || null,
       newDrawing: document.querySelector(`.atc-drawing-${i}`)?.value.trim() || '',
@@ -1328,6 +1344,7 @@ function collectData() {
       // Check if it's a visit type — get hours if so
       const isVisit = isVisitType(stage.label);
       const visitHrs = isVisit ? (parseFloat(tr.querySelector('.t-visit-hrs')?.value)||null) : null;
+      const hrsTaken = !isVisit ? (parseFloat(tr.querySelector('.t-hrs-taken')?.value)||null) : null;
       const earned = isVisit && visitHrs
         ? (VISIT_TYPES_ARCH.indexOf(stage.label)>-1 ? visitHrs*2 : visitHrs).toFixed(1)
         : (stage.pts*proj.multiplier*units).toFixed(1);
@@ -1338,7 +1355,7 @@ function collectData() {
           taskType:stage.label, area, drawing, units,
           basePts:stage.pts, project:proj.name, member:member,
           discipline:proj.discipline, date:reportDate,
-          visitHours: visitHrs,
+          visitHours: visitHrs, hoursTaken: hrsTaken,
         });
       } else {
         // Ongoing → self-assigned task in TASK_ASSIGNMENTS
