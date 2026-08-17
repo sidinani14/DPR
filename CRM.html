@@ -1874,8 +1874,6 @@ function collectNewIssues() {
 async function submitAll() {
   if(!googleUser){ toast('Sign in first'); return; }
   const date=document.getElementById('f-date')?.value||'';
-  const missingHrs = collectTaskStatuses().filter(s=>s.status==='Done' && !s.hoursTaken).length;
-  if (missingHrs > 0) { toast(`Enter Hours Taken for ${missingHrs>1?'every task':'the task'} marked Done — it's required.`, 5000); return; }
 
   document.getElementById('submit-btn').disabled=true;
   document.getElementById('submit-status').textContent='Submitting…';

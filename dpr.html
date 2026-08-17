@@ -1164,9 +1164,16 @@ function refreshTaskPts(sel) {
   const idx=parseInt(sel.value), stage=STAGES[idx];
   const entry=sel.closest('.task-entry');
   const disp=entry?.querySelector('.t-pts-display');
-  if(!disp) return;
-  if(stage?.pts){ disp.textContent=stage.pts+'p'; disp.style.color='var(--green)'; }
-  else { disp.textContent='—'; disp.style.color='var(--text3)'; }
+  if(disp){
+    if(stage?.pts){ disp.textContent=stage.pts+'p'; disp.style.color='var(--green)'; }
+    else { disp.textContent='—'; disp.style.color='var(--text3)'; }
+  }
+  // Picking a task type is usually the FIRST thing filled in on a fresh row
+  // (Done is checked by default), so the hours-spent/hours-taken field needs
+  // to react to the type change too, not just to a later radio click —
+  // otherwise it silently never appears for most unplanned tasks.
+  const checkedRadio = entry?.querySelector('.t-status:checked');
+  if (checkedRadio) toggleVisitHrs(checkedRadio);
 }
 
 function toggleVisitHrs(radio) {
@@ -1425,23 +1432,6 @@ function countLoggedWorkItems(d) {
   return n;
 }
 
-// Hours Taken is required on every Done task that isn't a visit/meeting type
-// (those already have hours via visitHours) — otherwise it never gets filled.
-function missingHoursTaken(d) {
-  let missing = 0;
-  try {
-    JSON.parse(d['Assigned Statuses']||'[]').forEach(s=>{
-      if (s.status==='Done' && !s.visitHours && !s.hoursTaken) missing++;
-    });
-  } catch(e){}
-  try {
-    JSON.parse(d['Done Tasks']||'[]').forEach(t=>{
-      if (!t.visitHours && !t.hoursTaken) missing++;
-    });
-  } catch(e){}
-  return missing;
-}
-
 function validate(d) {
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
   if (!d['Member'])            { toast('Please select your name');              return false; }
@@ -1457,11 +1447,6 @@ function validate(d) {
   }
   if (countLoggedWorkItems(d) === 0) {
     toast('You described work in your Deliverables list but haven’t logged any of it above — mark an assigned task Done/Ongoing, add it under Additional/Unplanned Work, or log it as Field Work, then submit.', 6500);
-    return false;
-  }
-  const missingHrs = missingHoursTaken(d);
-  if (missingHrs > 0) {
-    toast(`Enter Hours Taken for ${missingHrs>1?'every task':'the task'} marked Done — it's required.`, 5000);
     return false;
   }
   return true;

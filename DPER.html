@@ -1083,9 +1083,6 @@ async function submitAll(){
   const projs=collectProjects();
   const hasOther = collectTaskStatuses().length || collectUnplanned().length || collectConnections().length || Object.keys(issueActions).length;
   if(!projs.length && !hasOther){ toast('Nothing to submit — add a report, a task update, or an activity'); return; }
-  const missingHrs = collectTaskStatuses().filter(s=>s.status==='Done' && !s.visitHours && !s.hoursTaken).length
-                    + collectUnplanned().filter(u=>!u.hoursTaken).length;
-  if (missingHrs > 0) { toast(`Enter Hours Taken for ${missingHrs>1?'every task':'the task'} marked Done — it's required.`, 5000); return; }
   const date=document.getElementById('f-date')?.value||'';
 
   document.getElementById('submit-btn').disabled=true;
