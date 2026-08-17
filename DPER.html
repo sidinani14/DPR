@@ -397,7 +397,7 @@ function addUnplanned(){
       `<div><div class="lbl" style="font-size:10px">Units</div><input type="number" class="unp-units" id="unp-units-${id}" value="1" min="1" step="1" oninput="calcUnpPts(${id})" style="width:100%"></div>`+
       `<div><div class="lbl" style="font-size:10px">Points</div><div class="unp-pts" id="unp-pts-${id}" style="font-size:13px;color:var(--accent);font-weight:600;padding:8px 0">—</div></div>`+
     `</div>`+
-    `<div class="field"><label>Hours taken <span class="opt">optional — helps track office hours</span></label><input type="number" id="unp-hrstaken-${id}" min="0.25" max="16" step="0.25" placeholder="e.g. 2"></div>`+
+    `<div class="field"><label>Hours taken <span style="color:var(--red,#C0392B)">*</span></label><input type="number" id="unp-hrstaken-${id}" min="0.25" max="16" step="0.25" placeholder="e.g. 2"></div>`+
     `<div class="field"><label>Description <span class="opt">what was done</span></label><input type="text" id="unp-desc-${id}" placeholder="e.g. Supervised plaster work, coordinated material delivery"></div>`+
     `<button type="button" onclick="document.getElementById('unp-${id}').remove()" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer">✕ Remove</button>`;
   document.getElementById('unplanned-blocks').appendChild(div);
@@ -569,7 +569,7 @@ function renderMyTasks(){
         </div>
       </div>` : `
       <div id="mt-hrstaken-${i}" style="display:none;margin-top:8px">
-        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="opacity:.7">(optional — helps track office hours, visible to your lead at approval)</span></div>
+        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="color:#C0392B">*</span></div>
         <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
       </div>`}
       <div id="mt-blockreason-${i}" style="display:none;margin-top:8px">
@@ -1083,6 +1083,9 @@ async function submitAll(){
   const projs=collectProjects();
   const hasOther = collectTaskStatuses().length || collectUnplanned().length || collectConnections().length || Object.keys(issueActions).length;
   if(!projs.length && !hasOther){ toast('Nothing to submit — add a report, a task update, or an activity'); return; }
+  const missingHrs = collectTaskStatuses().filter(s=>s.status==='Done' && !s.visitHours && !s.hoursTaken).length
+                    + collectUnplanned().filter(u=>!u.hoursTaken).length;
+  if (missingHrs > 0) { toast(`Enter Hours Taken for ${missingHrs>1?'every task':'the task'} marked Done — it's required.`, 5000); return; }
   const date=document.getElementById('f-date')?.value||'';
 
   document.getElementById('submit-btn').disabled=true;

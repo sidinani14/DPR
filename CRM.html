@@ -874,7 +874,7 @@ function renderMyTasks(){
         <label><input type="radio" name="mt-r-${i}" value="Done" onchange="toggleMtStatus(${i},this)"><span class="mt-btn done">Done</span></label>
       </div>
       <div id="mt-hrstaken-${i}" style="display:none;margin-top:8px">
-        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="opacity:.7">(optional — helps track office hours, visible at approval)</span></div>
+        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="color:#C0392B">*</span></div>
         <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
       </div>
       ${overdue ? (t.delayReason ? `
@@ -1874,6 +1874,8 @@ function collectNewIssues() {
 async function submitAll() {
   if(!googleUser){ toast('Sign in first'); return; }
   const date=document.getElementById('f-date')?.value||'';
+  const missingHrs = collectTaskStatuses().filter(s=>s.status==='Done' && !s.hoursTaken).length;
+  if (missingHrs > 0) { toast(`Enter Hours Taken for ${missingHrs>1?'every task':'the task'} marked Done — it's required.`, 5000); return; }
 
   document.getElementById('submit-btn').disabled=true;
   document.getElementById('submit-status').textContent='Submitting…';

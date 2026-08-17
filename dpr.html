@@ -876,7 +876,7 @@ function renderAssignedTasks() {
         <span style="font-size:10px;color:var(--text3);margin-left:4px">${isVisitRate2(t.taskType)?'hrs × 2':'hrs × 1'}</span>
       </div>` : `
       <div id="hrs-taken-${i}" style="padding:8px 13px 4px;display:none">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">HOURS TAKEN <span style="opacity:.7">(optional — helps track office hours, visible to your lead at approval)</span></div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace">HOURS TAKEN <span style="color:var(--red)">*</span></div>
         <input type="number" class="atc-hrs-taken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3"
           style="font-size:13px;padding:7px 10px;width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
       </div>`}
@@ -1154,7 +1154,7 @@ function addTask(containerId) {
       <span class="hrs-taken-wrap" style="display:none;align-items:center;gap:6px">
         <input type="number" class="t-hrs-taken" min="0.25" max="16" step="0.25" placeholder="hours"
           style="width:70px;font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
-        <span style="font-size:10px;color:var(--text3)">hrs taken (optional)</span>
+        <span style="font-size:10px;color:var(--red)">hrs taken *</span>
       </span>
     </div>`;
   document.getElementById(containerId).appendChild(row);
@@ -1425,6 +1425,23 @@ function countLoggedWorkItems(d) {
   return n;
 }
 
+// Hours Taken is required on every Done task that isn't a visit/meeting type
+// (those already have hours via visitHours) — otherwise it never gets filled.
+function missingHoursTaken(d) {
+  let missing = 0;
+  try {
+    JSON.parse(d['Assigned Statuses']||'[]').forEach(s=>{
+      if (s.status==='Done' && !s.visitHours && !s.hoursTaken) missing++;
+    });
+  } catch(e){}
+  try {
+    JSON.parse(d['Done Tasks']||'[]').forEach(t=>{
+      if (!t.visitHours && !t.hoursTaken) missing++;
+    });
+  } catch(e){}
+  return missing;
+}
+
 function validate(d) {
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
   if (!d['Member'])            { toast('Please select your name');              return false; }
@@ -1440,6 +1457,11 @@ function validate(d) {
   }
   if (countLoggedWorkItems(d) === 0) {
     toast('You described work in your Deliverables list but haven’t logged any of it above — mark an assigned task Done/Ongoing, add it under Additional/Unplanned Work, or log it as Field Work, then submit.', 6500);
+    return false;
+  }
+  const missingHrs = missingHoursTaken(d);
+  if (missingHrs > 0) {
+    toast(`Enter Hours Taken for ${missingHrs>1?'every task':'the task'} marked Done — it's required.`, 5000);
     return false;
   }
   return true;
