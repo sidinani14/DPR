@@ -568,7 +568,7 @@ function renderMyTasks(){
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="mt-vshared-${i}" value="No" style="width:auto">No</label>
         </div>
       </div>` : `
-      <div id="mt-hrstaken-${i}" style="display:none;margin-top:8px">
+      <div id="mt-hrstaken-${i}" style="margin-top:8px">
         <div class="lbl" style="margin-bottom:4px">Hours taken <span style="color:#C0392B">*</span></div>
         <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
       </div>`}
@@ -593,10 +593,8 @@ function renderMyTasks(){
 }
 function toggleMtStatus(i, radio){
   const visitDiv = document.getElementById('mt-visit-'+i);
-  const hrsTakenDiv = document.getElementById('mt-hrstaken-'+i);
   const blockDiv = document.getElementById('mt-blockreason-'+i);
   if (visitDiv) visitDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
-  if (hrsTakenDiv) hrsTakenDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
   if (blockDiv) blockDiv.style.display = radio.value === 'Blocked' ? 'block' : 'none';
 }
 function toggleMtEdit(i, link){
@@ -613,7 +611,8 @@ function collectTaskStatuses(){
     const newDrawing = document.querySelector(`.mt-drawing-${i}`)?.value.trim() || '';
     const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started';
     let note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
-    let visitHours = null, hoursTaken = null;
+    let visitHours = null;
+    const hoursTaken = !isVisitType(t.taskType) ? (parseFloat(document.querySelector(`.mt-hrstaken-${i}`)?.value) || null) : null;
 
     if (status === 'Blocked') {
       const blockReason = document.querySelector(`.mt-blockreason-ta-${i}`)?.value.trim() || '';
@@ -624,8 +623,6 @@ function collectTaskStatuses(){
       visitHours = mtHours(start, end) || null;
       const shared = document.querySelector(`input[name="mt-vshared-${i}"]:checked`)?.value || '';
       if (shared) note = (note ? note + ' | ' : '') + 'Site visit log shared with client: ' + shared;
-    } else if (status === 'Done') {
-      hoursTaken = parseFloat(document.querySelector(`.mt-hrstaken-${i}`)?.value) || null;
     }
 
     return {

@@ -873,7 +873,7 @@ function renderMyTasks(){
         <label><input type="radio" name="mt-r-${i}" value="Ongoing" ${cur==='Ongoing'?'checked':''} onchange="toggleMtStatus(${i},this)"><span class="mt-btn ip">In progress</span></label>
         <label><input type="radio" name="mt-r-${i}" value="Done" onchange="toggleMtStatus(${i},this)"><span class="mt-btn done">Done</span></label>
       </div>
-      <div id="mt-hrstaken-${i}" style="display:none;margin-top:8px">
+      <div id="mt-hrstaken-${i}" style="margin-top:8px">
         <div class="lbl" style="margin-bottom:4px">Hours taken <span style="color:#C0392B">*</span></div>
         <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
       </div>
@@ -899,10 +899,6 @@ function toggleMtEdit(i, link){
   box.style.display = open ? 'none' : 'block';
   if (link) link.textContent = open ? '✎ Task changed? Edit units / drawing / notes' : '✎ Hide edit fields';
 }
-function toggleMtStatus(i, radio){
-  const hrsTakenDiv = document.getElementById('mt-hrstaken-'+i);
-  if (hrsTakenDiv) hrsTakenDiv.style.display = radio.value === 'Done' ? 'block' : 'none';
-}
 function collectTaskStatuses(){
   const today=new Date().toISOString().substring(0,10);
   return myTasks.map((t,i)=>{
@@ -916,7 +912,7 @@ function collectTaskStatuses(){
       units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
       newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',
       note,
-      hoursTaken: status==='Done' ? (parseFloat(document.querySelector(`.mt-hrstaken-${i}`)?.value) || null) : null,
+      hoursTaken: parseFloat(document.querySelector(`.mt-hrstaken-${i}`)?.value) || null,
     };
   }).filter(s=>s.status!=='Not Started' || s.units || s.newDrawing || s.note);
 }
