@@ -131,12 +131,6 @@ textarea{min-height:62px;resize:vertical;}
 .pri-btn.on-2{background:var(--amber-bg);border-color:#D97706;color:var(--amber);}
 .pri-btn.on-3{background:var(--red-bg);border-color:var(--red);color:var(--red);}
 
-/* Blocker toggle */
-.blocker-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;margin-top:6px;user-select:none;}
-.blocker-toggle input{accent-color:var(--accent);}
-.blocker-field{display:none;margin-top:7px;}
-.blocker-field.open{display:block;}
-
 /* WA */
 .wa-block{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius);padding:13px;margin-bottom:10px;}
 .wa-proj-name{font-size:12px;font-weight:700;color:#1B5E20;margin-bottom:7px;display:flex;align-items:center;gap:7px;}
@@ -786,12 +780,6 @@ function setPBYN(id,group,val){
   generateAllWA();
 }
 
-function toggleBlocker(id){
-  const chk=document.getElementById(`pb-blk-chk-${id}`);
-  document.getElementById(`pb-blk-${id}`).classList.toggle('open',chk.checked);
-  generateAllWA();
-}
-
 // Start/end → hours, matching fwHours in dpr.html (Site Visit + Material
 // Selection ×2/hr, Meeting ×1/hr) — feeds visit points AND the FIELD_WORK
 // attendance record (first start → last end = a day out of office).
@@ -937,8 +925,6 @@ function collectProjects(){
     const id=b.id.replace('pb-','');
     const proj=document.getElementById(`pb-proj-${id}`)?.value||'';
     if(!proj) return;
-    const procNotes=(document.getElementById(`pb-proc-${id}`)?.value||'').trim();
-    // Split procurement notes into materials/delays — send full text to materials col
     const issues=[];
     b.querySelectorAll('.iss-block').forEach(ib=>{
       const parts=ib.id.split('-');
@@ -980,12 +966,8 @@ function collectProjects(){
       visitEnd    :document.getElementById(`pb-vend-${id}`)?.value||'',
       visitHours  :fwHours(document.getElementById(`pb-vstart-${id}`)?.value||'', document.getElementById(`pb-vend-${id}`)?.value||''),
       tasks,
-      worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
-      workTomorrow:(document.getElementById(`pb-tomorrow-${id}`)?.value||'').trim(),
-      blocking    :(document.getElementById(`pb-blocking-${id}`)?.value||'').trim(),
       onTrack     :b.dataset.track||'Yes',
       delayReason :(document.getElementById(`pb-dr-${id}`)?.value||'').trim(),
-      materials   :procNotes,
       materialDelays:'',
       clientUpdated:document.getElementById(`pb-cl-yes-${id}`)?.classList.contains('on-yes')?'Yes':'No',
       clientConcerns:(document.getElementById(`pb-clc-${id}`)?.value||'').trim(),
@@ -1010,12 +992,9 @@ function generateWAForProject(p){
     .filter(([,v])=>v.action==='escalate').map(([id])=>id);
 
   let msg=`*Project Update — ${p.proj}*\n*Date:* ${ds} | *Lead:* ${leadName}\n\n`;
-  if(p.worksToday) msg+=`*Today\'s Progress:*\n${p.worksToday}\n\n`;
   msg+=`*Site Status:* ${statusEmoji}\n`;
   if(p.delayReason) msg+=`*Reason:* ${p.delayReason}\n`;
   msg+='\n';
-  if(p.workTomorrow) msg+=`*Work Planned Tomorrow:*\n${p.workTomorrow}\n\n`;
-  if(p.blocking) msg+=`*Blocking Tomorrow:*\n${p.blocking}\n\n`;
   if(nonDesign.length){
     msg+=`*Issues Requiring Attention:*\n`;
     nonDesign.forEach((iss,i)=>{ msg+=`${i+1}. [${iss.issueType}] ${iss.description}\n`; });
@@ -1026,7 +1005,6 @@ function generateWAForProject(p){
     design.forEach((iss,i)=>{ msg+=`${i+1}. [Design] ${iss.description}\n`; });
     msg+='\n';
   }
-  if(p.materials) msg+=`*Procurement Notes:*\n${p.materials}\n\n`;
   msg+=`— Ideaform Design Studio`;
   return msg;
 }
@@ -1099,12 +1077,11 @@ async function submitAll(){
           project:p.proj, lead:leadName,
           siteVisit:p.siteVisit, visitType:p.visitType, visitHours:p.visitHours,
           visitStart:p.visitStart||'', visitEnd:p.visitEnd||'',
-          worksToday:p.worksToday,
-          workTomorrow:p.workTomorrow, onTrack:p.onTrack, delayReason:p.delayReason,
+          onTrack:p.onTrack, delayReason:p.delayReason,
           idleTime:'No', idleReason:'',
-          materials:p.materials, materialDelays:'',
+          materialDelays:'',
           clientUpdated:p.clientUpdated, clientConcerns:p.clientConcerns,
-          blocking:p.blocking, remarks:'',
+          remarks:'',
           siddharthPending:p.siddharthPending||'',
           issues:JSON.stringify(p.issues),
           whatsappMsg:waMsg,
@@ -1256,13 +1233,8 @@ function collectDraftData() {
       vtype       : document.getElementById('pb-vtype-'+id)?.value||'',
       vstart      : document.getElementById('pb-vstart-'+id)?.value||'',
       vend        : document.getElementById('pb-vend-'+id)?.value||'',
-      works       : document.getElementById('pb-works-'+id)?.value||'',
-      tomorrow    : document.getElementById('pb-tomorrow-'+id)?.value||'',
-      blockerOn   : document.getElementById('pb-blk-chk-'+id)?.checked||false,
-      blocking    : document.getElementById('pb-blocking-'+id)?.value||'',
       track       : b.dataset.track||'Yes',
       delayReason : document.getElementById('pb-dr-'+id)?.value||'',
-      proc        : document.getElementById('pb-proc-'+id)?.value||'',
       clientYes   : document.getElementById('pb-cl-yes-'+id)?.classList.contains('on-yes')||false,
       clientCon   : document.getElementById('pb-clc-'+id)?.value||'',
       issues,
@@ -1334,9 +1306,6 @@ function resumeDraft() {
     { const vs=document.getElementById('pb-vstart-'+id); if(vs) vs.value=b.vstart||''; }
     { const ve=document.getElementById('pb-vend-'+id);   if(ve) ve.value=b.vend||''; }
     if (b.vtype) { toggleVisit(id); updatePBVisitCalc(id); }
-    document.getElementById('pb-works-'+id).value    = b.works||'';
-    document.getElementById('pb-tomorrow-'+id).value = b.tomorrow||'';
-    document.getElementById('pb-proc-'+id).value     = b.proc||'';
     document.getElementById('pb-dr-'+id).value       = b.delayReason||'';
     document.getElementById('pb-clc-'+id).value      = b.clientCon||'';
 
@@ -1346,14 +1315,6 @@ function resumeDraft() {
     // Client
     if (b.clientYes) {
       setPBYN(id, 'cl', 'yes');
-    }
-
-    // Blocker
-    if (b.blockerOn) {
-      const chk = document.getElementById('pb-blk-chk-'+id);
-      if (chk) { chk.checked = true; toggleBlocker(id); }
-      const blkInput = document.getElementById('pb-blocking-'+id);
-      if (blkInput) blkInput.value = b.blocking||'';
     }
 
     // Issue blocks
@@ -1419,24 +1380,6 @@ function buildPBInnerHTML(id, projOpts) {
         <input type="time" id="pb-vend-${id}" onchange="updatePBVisitCalc(${id})" style="flex:1">
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:6px"><span id="pb-vdur-${id}">—</span> · <span id="pb-vpts-${id}" style="color:var(--accent);font-weight:600">— pts</span></div>
-    </div>
-    <div class="field">
-      <div class="lbl">Works Completed Today</div>
-      <textarea id="pb-works-${id}" oninput="saveDraft();generateAllWA()" placeholder="Describe work done today…"></textarea>
-    </div>
-    <div class="field">
-      <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
-      <textarea id="pb-proc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
-    </div>
-    <div class="field">
-      <div class="lbl">Work Planned for Tomorrow</div>
-      <textarea id="pb-tomorrow-${id}" oninput="saveDraft();generateAllWA()" placeholder="What is planned for tomorrow?"></textarea>
-      <label class="blocker-toggle">
-        <input type="checkbox" id="pb-blk-chk-${id}" onchange="toggleBlocker(${id})"> Any blockers?
-      </label>
-      <div class="blocker-field" id="pb-blk-${id}">
-        <input type="text" id="pb-blocking-${id}" oninput="saveDraft();generateAllWA()" placeholder="What might block tomorrow's work?">
-      </div>
     </div>
     <div class="field">
       <div class="lbl">Is Work on Track?</div>
