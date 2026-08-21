@@ -266,13 +266,12 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- Unplanned / additional work -->
+  <!-- Unplanned / additional work — same categories, fields and UI as DPR Section 3 -->
   <div class="section">
-    <div class="section-head"><span class="section-num">✎</span><span class="section-title">Unplanned Work Today</span></div>
+    <div class="section-head"><span class="section-num">✎</span><span class="section-title">Additional / unplanned work today <span class="opt">up to 3 projects</span></span></div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Anything you did today that wasn't already assigned — logged to your name (pending approval), so your day is fully accounted for.</p>
       <div id="unplanned-blocks"></div>
-      <button class="add-proj-btn" onclick="addUnplanned()">+ Add unplanned task</button>
+      <button class="add-proj-btn" id="unp-add-proj-btn" onclick="addUnplannedProject()">+ Add another project</button>
     </div>
   </div>
 
@@ -367,50 +366,163 @@ function collectConnections(){
   return out;
 }
 
-// ── Unplanned work (mirrors DPR "tasks completed") — self-logged Done tasks ──
-let unpCount = 0;
-function addUnplanned(){
-  unpCount++; const id=unpCount;
+// ── Unplanned work — same categories, fields and UI as DPR Section 3 ──
+// (project blocks, each with its own "Tasks completed on this project" list;
+// Done → self-logged Done task, Ongoing → self-assigned open task, exactly
+// like dpr.html's addProject()/addTask()/collectData() Section 3 handling.)
+let unpProjCount = 0, unpTaskSeq = 0;
+
+function unpCatOptions() {
+  if (!TASK_GROUPS.length) return '<option value="__all">All tasks</option>';
+  return '<option value="">— select category —</option>'+
+    TASK_GROUPS.map(g=>`<option value="${g.name}">${g.name}</option>`).join('');
+}
+
+function unpFillTypes(catSel) {
+  const row = catSel.closest('.unp-task-entry');
+  const typeSel = row.querySelector('.unp-type');
+  let labels;
+  if (catSel.value === '__all' || !TASK_GROUPS.length) labels = CFG_STAGES.map(s=>s.label);
+  else { const g = TASK_GROUPS.find(x=>x.name===catSel.value); labels = g ? g.tasks : []; }
+  typeSel.innerHTML = '<option value="">— select task —</option>' +
+    labels.map(lb => { const idx = STAGE_IDX[lb];
+      // Site visits / meetings are logged via Section pb-vtype visit toggle, not as task rows
+      if (idx==null || isVisitType(CFG_STAGES[idx].label)) return '';
+      return `<option value="${idx}">${CFG_STAGES[idx].label} · ${CFG_STAGES[idx].pts}pts</option>`; }).join('');
+  unpRefreshPts(typeSel);
+}
+
+function unpRefreshPts(sel) {
+  const idx=parseInt(sel.value), stage=CFG_STAGES[idx];
+  const entry=sel.closest('.unp-task-entry');
+  const disp=entry?.querySelector('.unp-pts-display');
+  if(disp){
+    if(stage?.pts){ disp.textContent=stage.pts+'p'; disp.style.color='var(--accent)'; }
+    else { disp.textContent='—'; disp.style.color='var(--text3)'; }
+  }
+  const checkedRadio = entry?.querySelector('.unp-status:checked');
+  if (checkedRadio) unpToggleVisitHrs(checkedRadio);
+}
+
+function unpToggleVisitHrs(radio) {
+  const row = radio.closest('.unp-task-entry');
+  if (!row) return;
+  const idx = parseInt(row.querySelector('.unp-type')?.value);
+  const stage = (!isNaN(idx) && CFG_STAGES[idx]) ? CFG_STAGES[idx] : null;
+  const wrap = row.querySelector('.unp-visit-hrs-wrap');
+  if (!stage) { if (wrap) wrap.style.display='none'; return; }
+  if (wrap) wrap.style.display = (isVisitType(stage.label) && radio.value === 'Done') ? 'flex' : 'none';
+}
+
+function addUnplannedProject(){
+  if (unpProjCount>=3) return;
+  unpProjCount++;
+  const id='unp-pb-'+unpProjCount;
   const projOpts='<option value="">Select project…</option>'+projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
-  const stageOpts='<option value="">Task type…</option>'+CFG_STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
-  const div=document.createElement('div'); div.className='pb-block'; div.id='unp-'+id;
+  const div=document.createElement('div');
+  div.className='unp-proj-block'; div.id=id;
   div.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px';
-  div.innerHTML=
-    `<div class="field"><label>Project</label><select class="unp-proj" id="unp-proj-${id}" onchange="calcUnpPts(${id})">${projOpts}</select></div>`+
-    `<div class="field"><label>Task type</label><select class="unp-type" id="unp-type-${id}" onchange="calcUnpPts(${id})">${stageOpts}</select></div>`+
-    `<div class="field-row">`+
-      `<div><div class="lbl" style="font-size:10px">Units</div><input type="number" class="unp-units" id="unp-units-${id}" value="1" min="1" step="1" oninput="calcUnpPts(${id})" style="width:100%"></div>`+
-      `<div><div class="lbl" style="font-size:10px">Points</div><div class="unp-pts" id="unp-pts-${id}" style="font-size:13px;color:var(--accent);font-weight:600;padding:8px 0">—</div></div>`+
-    `</div>`+
-    `<div class="field"><label>Hours taken <span style="color:var(--red,#C0392B)">*</span></label><input type="number" id="unp-hrstaken-${id}" min="0.25" max="16" step="0.25" placeholder="e.g. 2"></div>`+
-    `<div class="field"><label>Description <span class="opt">what was done</span></label><input type="text" id="unp-desc-${id}" placeholder="e.g. Supervised plaster work, coordinated material delivery"></div>`+
-    `<button type="button" onclick="document.getElementById('unp-${id}').remove()" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer">✕ Remove</button>`;
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em">PROJECT ${unpProjCount}</span>
+      <button type="button" onclick="removeUnpProject('${id}')" style="font-size:11px;color:var(--red,#C0392B);background:transparent;border:1px solid var(--border);border-radius:5px;padding:3px 9px;cursor:pointer">✕ Remove</button>
+    </div>
+    <div class="field">
+      <div class="lbl">Project <span style="color:var(--red,#C0392B)">*</span></div>
+      <select class="unp-proj" onchange="unpOnProjSelect(this)">${projOpts}</select>
+    </div>
+    <div class="field">
+      <div class="lbl">Discipline <span class="opt">auto from project</span></div>
+      <div class="unp-disc-display" style="font-size:12px;color:var(--text3)">— select project first —</div>
+    </div>
+    <div class="field" style="margin-top:6px">
+      <div class="lbl">Tasks completed on this project</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:6px;display:grid;grid-template-columns:1fr 60px 44px 22px;gap:6px;text-transform:uppercase;letter-spacing:.06em">
+        <div>Task type</div><div>Units</div><div style="text-align:center">Pts</div><div></div>
+      </div>
+      <div class="unp-task-rows"></div>
+      <button type="button" class="add-btn" onclick="addUnplannedTask('${id}')">+ Add task / drawing</button>
+    </div>`;
   document.getElementById('unplanned-blocks').appendChild(div);
+  addUnplannedTask(id);
+  if (unpProjCount>=3) document.getElementById('unp-add-proj-btn').disabled=true;
 }
-function calcUnpPts(id){
-  const idx=parseInt(document.getElementById('unp-type-'+id)?.value);
-  const stage=(!isNaN(idx)&&CFG_STAGES[idx])?CFG_STAGES[idx]:null;
-  const units=parseFloat(document.getElementById('unp-units-'+id)?.value||1);
-  const mult=projMultiplier(document.getElementById('unp-proj-'+id)?.value||'');
-  const disp=document.getElementById('unp-pts-'+id);
-  if(disp) disp.textContent = stage ? (Math.round(stage.pts*mult*units*10)/10+' pts') : '—';
+
+function removeUnpProject(id){
+  document.getElementById(id).remove();
+  unpProjCount--;
+  document.getElementById('unp-add-proj-btn').disabled=false;
 }
+
+function unpOnProjSelect(sel){
+  const proj=projects.find(p=>p.name===sel.value);
+  const disp=sel.closest('.unp-proj-block')?.querySelector('.unp-disc-display');
+  if(!disp) return;
+  if(proj){ disp.textContent=(proj.discipline||'—')+' · '+(proj.multiplier||1)+'x'; disp.style.color='var(--accent)'; }
+  else { disp.textContent='— select project first —'; disp.style.color='var(--text3)'; }
+}
+
+function addUnplannedTask(projBlockId){
+  const rowKey = projBlockId+'-'+(++unpTaskSeq);
+  const row=document.createElement('div');
+  row.className='unp-task-entry';
+  row.style.cssText='border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--surface2)';
+  row.innerHTML=`
+    <select class="unp-cat" onchange="unpFillTypes(this)" style="width:100%;font-size:12px;padding:6px 10px;margin-bottom:6px">${unpCatOptions()}</select>
+    <select class="unp-type" onchange="unpRefreshPts(this)" style="width:100%;min-width:0;font-size:12px;padding:6px 10px;margin-bottom:6px"><option value="">— select category first —</option></select>
+    <div style="display:grid;grid-template-columns:1fr 44px 22px;gap:6px;align-items:center;margin-bottom:7px">
+      <input type="number" class="unp-units" min="0.25" max="30" step="any" value="1" placeholder="Units">
+      <div class="unp-pts-display" style="font-size:11px;color:var(--text3);text-align:center">—</div>
+      <button type="button" onclick="this.closest('.unp-task-entry').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1">×</button>
+    </div>
+    <div style="margin-bottom:7px">
+      <input type="text" class="unp-desc" placeholder="Description (optional)" style="width:100%;font-size:12px;padding:6px 10px">
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+      <span style="font-size:11px;color:var(--red,#C0392B);font-weight:600">Hours taken *</span>
+      <input type="number" class="unp-hrstaken" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:80px;font-size:12px;padding:4px 8px">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text3)">Status:</span>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
+        <input type="radio" name="unp-status-${rowKey}" class="unp-status" value="Done" checked onchange="unpToggleVisitHrs(this)"> Done
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
+        <input type="radio" name="unp-status-${rowKey}" class="unp-status" value="Ongoing" onchange="unpToggleVisitHrs(this)"> Ongoing
+      </label>
+      <span class="unp-visit-hrs-wrap" style="display:none;align-items:center;gap:6px">
+        <input type="number" class="unp-visit-hrs" min="0.5" max="12" step="0.5" placeholder="hours" style="width:70px;font-size:12px;padding:4px 8px">
+        <span style="font-size:10px;color:var(--accent)">hrs (visit pts)</span>
+      </span>
+    </div>`;
+  document.getElementById(projBlockId).querySelector('.unp-task-rows').appendChild(row);
+}
+
 function collectUnplanned(){
-  const out=[];
-  document.querySelectorAll('#unplanned-blocks > .pb-block').forEach(d=>{
-    const id=d.id.replace('unp-','');
-    const idx=parseInt(document.getElementById('unp-type-'+id)?.value);
-    if(isNaN(idx)||!CFG_STAGES[idx]) return;
-    out.push({
-      project :document.getElementById('unp-proj-'+id)?.value||'',
-      taskType:CFG_STAGES[idx].label,
-      basePts :CFG_STAGES[idx].pts,
-      units   :parseFloat(document.getElementById('unp-units-'+id)?.value||1),
-      area    :(document.getElementById('unp-desc-'+id)?.value||'').trim(),
-      hoursTaken: parseFloat(document.getElementById('unp-hrstaken-'+id)?.value) || null,
+  const done=[], ongoing=[];
+  document.querySelectorAll('.unp-proj-block').forEach(pb=>{
+    const projName = pb.querySelector('.unp-proj')?.value||'';
+    if (!projName) return;
+    const proj = projects.find(p=>p.name===projName);
+    pb.querySelectorAll('.unp-task-entry').forEach(tr=>{
+      const idx=parseInt(tr.querySelector('.unp-type')?.value);
+      const stage=(!isNaN(idx)&&CFG_STAGES[idx])?CFG_STAGES[idx]:null;
+      if (!stage) return;
+      const units=parseFloat(tr.querySelector('.unp-units')?.value)||1;
+      const area=(tr.querySelector('.unp-desc')?.value||'').trim();
+      const status=tr.querySelector('.unp-status:checked')?.value||'Done';
+      const isVisit=isVisitType(stage.label);
+      const visitHours=isVisit ? (parseFloat(tr.querySelector('.unp-visit-hrs')?.value)||null) : null;
+      const hoursTaken=!isVisit ? (parseFloat(tr.querySelector('.unp-hrstaken')?.value)||null) : null;
+      const item={
+        taskType:stage.label, basePts:stage.pts, units, area,
+        project:projName, discipline:proj?proj.discipline:'',
+      };
+      if (status==='Done') done.push({...item, visitHours, hoursTaken});
+      else ongoing.push(item);
     });
   });
-  return out;
+  return {done, ongoing};
 }
 let issueActions = {};
 
@@ -767,7 +879,6 @@ function setPBTrack(id,val){
     document.getElementById(`pb-tr-${k}-${id}`).className='track-btn'+(val===map[k]?` on-${k}`:'');
   });
   document.getElementById(`pb-${id}`).dataset.track=val;
-  document.getElementById(`pb-drf-${id}`).classList.toggle('hidden',val==='Yes');
   generateAllWA();
 }
 
@@ -967,7 +1078,6 @@ function collectProjects(){
       visitHours  :fwHours(document.getElementById(`pb-vstart-${id}`)?.value||'', document.getElementById(`pb-vend-${id}`)?.value||''),
       tasks,
       onTrack     :b.dataset.track||'Yes',
-      delayReason :(document.getElementById(`pb-dr-${id}`)?.value||'').trim(),
       materialDelays:'',
       clientUpdated:document.getElementById(`pb-cl-yes-${id}`)?.classList.contains('on-yes')?'Yes':'No',
       clientConcerns:(document.getElementById(`pb-clc-${id}`)?.value||'').trim(),
@@ -993,7 +1103,6 @@ function generateWAForProject(p){
 
   let msg=`*Project Update — ${p.proj}*\n*Date:* ${ds} | *Lead:* ${leadName}\n\n`;
   msg+=`*Site Status:* ${statusEmoji}\n`;
-  if(p.delayReason) msg+=`*Reason:* ${p.delayReason}\n`;
   msg+='\n';
   if(nonDesign.length){
     msg+=`*Issues Requiring Attention:*\n`;
@@ -1035,7 +1144,8 @@ function copyWA(id){
 async function submitAll(){
   if(!googleUser){toast('Sign in first');return;}
   const projs=collectProjects();
-  const hasOther = collectTaskStatuses().length || collectUnplanned().length || collectConnections().length || Object.keys(issueActions).length;
+  const unp = collectUnplanned();
+  const hasOther = collectTaskStatuses().length || unp.done.length || unp.ongoing.length || collectConnections().length || Object.keys(issueActions).length;
   if(!projs.length && !hasOther){ toast('Nothing to submit — add a report, a task update, or an activity'); return; }
   const date=document.getElementById('f-date')?.value||'';
 
@@ -1077,7 +1187,7 @@ async function submitAll(){
           project:p.proj, lead:leadName,
           siteVisit:p.siteVisit, visitType:p.visitType, visitHours:p.visitHours,
           visitStart:p.visitStart||'', visitEnd:p.visitEnd||'',
-          onTrack:p.onTrack, delayReason:p.delayReason,
+          onTrack:p.onTrack,
           idleTime:'No', idleReason:'',
           materialDelays:'',
           clientUpdated:p.clientUpdated, clientConcerns:p.clientConcerns,
@@ -1138,13 +1248,23 @@ async function submitAll(){
         reportedPunchIn: document.getElementById('late-punch-in')?.value||'',
         reason: document.getElementById('late-req-reason')?.value.trim()||''})}).catch(()=>{});
 
-    // Unplanned work today → self-logged Done tasks (same as DPR)
-    for(const u of collectUnplanned()){
+    // Unplanned work today (same as DPR) — Done → self-logged Done task, Ongoing → self-assigned open task
+    for(const u of unp.done){
       try {
         const cdtR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
           body:JSON.stringify({action:'createDoneTask', member:leadName, project:u.project,
-            taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, date, hoursTaken:u.hoursTaken})}).then(r=>r.json());
+            taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, discipline:u.discipline,
+            date, visitHours:u.visitHours, hoursTaken:u.hoursTaken})}).then(r=>r.json());
         if (cdtR && cdtR.status === 'error') scoringErrors.push(u.taskType+' — '+u.project+': '+(cdtR.message||'failed'));
+      } catch(e){ scoringErrors.push(u.taskType+' — '+u.project+': network error'); }
+    }
+    for(const u of unp.ongoing){
+      try {
+        const cstR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'createSelfTask', member:leadName, project:u.project,
+            taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, discipline:u.discipline,
+            date})}).then(r=>r.json());
+        if (cstR && cstR.status === 'error') scoringErrors.push(u.taskType+' — '+u.project+': '+(cstR.message||'failed'));
       } catch(e){ scoringErrors.push(u.taskType+' — '+u.project+': network error'); }
     }
 
@@ -1234,7 +1354,6 @@ function collectDraftData() {
       vstart      : document.getElementById('pb-vstart-'+id)?.value||'',
       vend        : document.getElementById('pb-vend-'+id)?.value||'',
       track       : b.dataset.track||'Yes',
-      delayReason : document.getElementById('pb-dr-'+id)?.value||'',
       clientYes   : document.getElementById('pb-cl-yes-'+id)?.classList.contains('on-yes')||false,
       clientCon   : document.getElementById('pb-clc-'+id)?.value||'',
       issues,
@@ -1306,7 +1425,6 @@ function resumeDraft() {
     { const vs=document.getElementById('pb-vstart-'+id); if(vs) vs.value=b.vstart||''; }
     { const ve=document.getElementById('pb-vend-'+id);   if(ve) ve.value=b.vend||''; }
     if (b.vtype) { toggleVisit(id); updatePBVisitCalc(id); }
-    document.getElementById('pb-dr-'+id).value       = b.delayReason||'';
     document.getElementById('pb-clc-'+id).value      = b.clientCon||'';
 
     // On track
@@ -1389,10 +1507,6 @@ function buildPBInnerHTML(id, projOpts) {
         <div class="track-btn" id="pb-tr-delay-${id}" onclick="setPBTrack(${id},'Delayed')">🔴 Delayed</div>
       </div>
     </div>
-    <div class="field hidden" id="pb-drf-${id}">
-      <div class="lbl">Reason for Delay / Risk</div>
-      <textarea id="pb-dr-${id}" oninput="saveDraft();generateAllWA()" placeholder="Specify reason…" style="min-height:50px"></textarea>
-    </div>
     <div class="field">
       <div class="lbl">Was Client Updated?</div>
       <div class="yn-btns">
@@ -1415,8 +1529,8 @@ function buildPBInnerHTML(id, projOpts) {
       <button class="add-btn" onclick="addTaskBlock(${id})">+ Add Task</button>
     </div>
     <div class="field">
-      <div class="lbl">Pending Discussion with Siddharth</div>
-      <textarea id="pb-siddharth-${id}" oninput="saveDraft()" placeholder="Items needing discussion or decision from Siddharth sir..." style="min-height:50px"></textarea>
+      <div class="lbl">Important Notes <span class="opt">if any</span></div>
+      <textarea id="pb-siddharth-${id}" oninput="saveDraft()" placeholder="Anything worth flagging — decisions needed, context for the team…" style="min-height:50px"></textarea>
     </div>`;
 }
 </script>
