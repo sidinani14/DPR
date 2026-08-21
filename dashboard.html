@@ -401,16 +401,18 @@ function renderHeatmap() {
       const openCount = openTasks
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                     t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5]).length;
-      // Bar spread is proportional to THIS member's own total assigned points
-      // (not the fixed weekly target) — otherwise, once Done+Approval already
-      // account for the full target, Pending/Delayed get silently clipped to
-      // 0% width even when real overdue points exist. Delayed always takes
-      // the remainder so it can never be clipped away.
+      // Bar is scaled against the weekly TARGET, so someone under target shows
+      // real blank space at the end (signal to assign them more work) — but
+      // when total assigned exceeds target, everything is scaled down
+      // proportionally (not sequentially clipped) so the bar fills exactly
+      // 100% and no category — especially Delayed — ever gets hidden.
       const totalAssigned = donePts + apprPts + pendPts + delayedPts2;
-      const donePct   = totalAssigned > 0 ? Math.round(donePts / totalAssigned * 100) : 0;
-      const apprPct   = totalAssigned > 0 ? Math.min(100 - donePct, Math.round(apprPts / totalAssigned * 100)) : 0;
-      const pendPct   = totalAssigned > 0 ? Math.min(100 - donePct - apprPct, Math.round(pendPts / totalAssigned * 100)) : 0;
-      const delayPct  = totalAssigned > 0 ? (100 - donePct - apprPct - pendPct) : 0;
+      const scale     = (wkTgt > 0 && totalAssigned > wkTgt) ? wkTgt / totalAssigned : 1;
+      const donePct   = wkTgt > 0 ? Math.round(donePts * scale / wkTgt * 100) : 0;
+      const apprPct   = wkTgt > 0 ? Math.round(apprPts * scale / wkTgt * 100) : 0;
+      const pendPct   = wkTgt > 0 ? Math.round(pendPts * scale / wkTgt * 100) : 0;
+      const filledPct = wkTgt > 0 ? Math.min(100, Math.round(totalAssigned / wkTgt * 100)) : 0;
+      const delayPct  = Math.max(0, filledPct - donePct - apprPct - pendPct);
       const pctLabel  = Math.round(donePts/wkTgt*100); // vs target — separate metric, unchanged
 
       html += `<tr>
@@ -481,13 +483,16 @@ function renderHeatmap() {
                      t.status === 'Delayed')
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
-      // Same fix as This-Week: spread against this member's own total load
-      // today, not the fixed daily target — see comment in the 'week' branch.
+      // Same fix as This-Week: scaled against the daily TARGET so under-target
+      // shows real blank space, but scaled proportionally (not sequentially
+      // clipped) once total exceeds target — see comment in the 'week' branch.
       const totalLoad = donePts + apprPts + pendPts + delayedPts;
-      const donePct   = totalLoad > 0 ? Math.round(donePts / totalLoad * 100) : 0;
-      const apprPct   = totalLoad > 0 ? Math.min(100 - donePct, Math.round(apprPts / totalLoad * 100)) : 0;
-      const pendPct   = totalLoad > 0 ? Math.min(100 - donePct - apprPct, Math.round(pendPts / totalLoad * 100)) : 0;
-      const delPct    = totalLoad > 0 ? (100 - donePct - apprPct - pendPct) : 0;
+      const scale     = (dayTgt > 0 && totalLoad > dayTgt) ? dayTgt / totalLoad : 1;
+      const donePct   = dayTgt > 0 ? Math.round(donePts * scale / dayTgt * 100) : 0;
+      const apprPct   = dayTgt > 0 ? Math.round(apprPts * scale / dayTgt * 100) : 0;
+      const pendPct   = dayTgt > 0 ? Math.round(pendPts * scale / dayTgt * 100) : 0;
+      const filledPct = dayTgt > 0 ? Math.min(100, Math.round(totalLoad / dayTgt * 100)) : 0;
+      const delPct    = Math.max(0, filledPct - donePct - apprPct - pendPct);
       const loadPct   = Math.round(totalLoad / dayTgt * 100); // vs target — separate metric, unchanged
 
       const statusLabel = totalLoad === 0
