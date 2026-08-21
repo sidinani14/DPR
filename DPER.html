@@ -71,10 +71,6 @@ textarea{min-height:62px;resize:vertical;}
 .chip{padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .15s;user-select:none;}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 
-/* Pct inputs */
-.pct-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.pb-more-toggle{background:none;border:1px dashed var(--border2,var(--border));color:var(--text2);font-size:11px;padding:7px 10px;border-radius:6px;cursor:pointer;margin-bottom:10px;width:100%;text-align:left;font-family:inherit;}
-.pb-more-toggle:hover{border-color:var(--accent);color:var(--accent);}
 .mt-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
 .mt-type{font-size:13px;font-weight:600;color:var(--text);}
 .mt-sub{font-size:11px;color:var(--text2);margin-top:2px;}
@@ -88,10 +84,6 @@ textarea{min-height:62px;resize:vertical;}
 .mt-status input:checked+.mt-btn.ip{border-color:#4A9EFF;color:#4A9EFF;}
 .mt-status input:checked+.mt-btn.done{border-color:#2ED573;color:#2ED573;background:rgba(46,213,115,0.1);}
 .mt-status input:checked+.mt-btn.bl{border-color:var(--red);color:var(--red);background:var(--red-bg);}
-.pct-field{display:flex;flex-direction:column;gap:4px;}
-.pct-input-wrap{display:flex;align-items:center;gap:6px;}
-.pct-input-wrap input{width:70px;text-align:center;padding:8px 10px;}
-.pct-label{font-size:12px;color:var(--text3);}
 
 /* Issue cards — open issues panel */
 .issue-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:9px;}
@@ -328,7 +320,6 @@ const EMAIL_MAP = {
   'astha.uch@gmail.com'         :'Astha Inani',
 };
 const ISSUE_TYPES = ['Procurement','Contractor','Client','Site Condition'];
-const STAGES = ['Design Finalization','Civil Work','Plaster','Electrical','Plumbing','Fabrication','Carpentry','Flooring','False Ceiling','Finishing','Procurement','Handover'];
 
 let googleUser   = null;
 let leadName     = '';
@@ -801,14 +792,6 @@ function toggleBlocker(id){
   generateAllWA();
 }
 
-function toggleMore(id){
-  const wrap=document.getElementById('pb-more-'+id);
-  const btn=document.getElementById('pb-more-btn-'+id);
-  if(!wrap) return;
-  const open = !wrap.classList.toggle('hidden');
-  if(btn) btn.innerHTML = open ? '− Less details' : '＋ More details <span style="opacity:.6">(% progress · materials)</span>';
-}
-
 // Start/end → hours, matching fwHours in dpr.html (Site Visit + Material
 // Selection ×2/hr, Meeting ×1/hr) — feeds visit points AND the FIELD_WORK
 // attendance record (first start → last end = a day out of office).
@@ -954,7 +937,6 @@ function collectProjects(){
     const id=b.id.replace('pb-','');
     const proj=document.getElementById(`pb-proj-${id}`)?.value||'';
     if(!proj) return;
-    const stages=[...b.querySelectorAll('.chips .chip.on')].map(c=>c.textContent).join(', ');
     const procNotes=(document.getElementById(`pb-proc-${id}`)?.value||'').trim();
     // Split procurement notes into materials/delays — send full text to materials col
     const issues=[];
@@ -998,10 +980,7 @@ function collectProjects(){
       visitEnd    :document.getElementById(`pb-vend-${id}`)?.value||'',
       visitHours  :fwHours(document.getElementById(`pb-vstart-${id}`)?.value||'', document.getElementById(`pb-vend-${id}`)?.value||''),
       tasks,
-      stage       :stages,
       worksToday  :(document.getElementById(`pb-works-${id}`)?.value||'').trim(),
-      pctPlan     :parseInt(document.getElementById(`pb-pctplan-${id}`)?.value)||0,
-      pctOverall  :parseInt(document.getElementById(`pb-pctover-${id}`)?.value)||0,
       workTomorrow:(document.getElementById(`pb-tomorrow-${id}`)?.value||'').trim(),
       blocking    :(document.getElementById(`pb-blocking-${id}`)?.value||'').trim(),
       onTrack     :b.dataset.track||'Yes',
@@ -1120,8 +1099,7 @@ async function submitAll(){
           project:p.proj, lead:leadName,
           siteVisit:p.siteVisit, visitType:p.visitType, visitHours:p.visitHours,
           visitStart:p.visitStart||'', visitEnd:p.visitEnd||'',
-          stage:p.stage,
-          worksToday:p.worksToday, pctPlan:p.pctPlan, pctOverall:p.pctOverall,
+          worksToday:p.worksToday,
           workTomorrow:p.workTomorrow, onTrack:p.onTrack, delayReason:p.delayReason,
           idleTime:'No', idleReason:'',
           materials:p.materials, materialDelays:'',
@@ -1259,7 +1237,6 @@ function collectDraftData() {
   const blocks = [];
   document.querySelectorAll('.proj-block').forEach(b => {
     const id = b.id.replace('pb-','');
-    const stageChips = [...b.querySelectorAll('.chips .chip.on')].map(c => c.textContent);
     // Collect issue blocks
     const issues = [];
     b.querySelectorAll('.iss-block').forEach(ib => {
@@ -1279,10 +1256,7 @@ function collectDraftData() {
       vtype       : document.getElementById('pb-vtype-'+id)?.value||'',
       vstart      : document.getElementById('pb-vstart-'+id)?.value||'',
       vend        : document.getElementById('pb-vend-'+id)?.value||'',
-      stageChips,
       works       : document.getElementById('pb-works-'+id)?.value||'',
-      pctPlan     : document.getElementById('pb-pctplan-'+id)?.value||'0',
-      pctOver     : document.getElementById('pb-pctover-'+id)?.value||'0',
       tomorrow    : document.getElementById('pb-tomorrow-'+id)?.value||'',
       blockerOn   : document.getElementById('pb-blk-chk-'+id)?.checked||false,
       blocking    : document.getElementById('pb-blocking-'+id)?.value||'',
@@ -1361,20 +1335,10 @@ function resumeDraft() {
     { const ve=document.getElementById('pb-vend-'+id);   if(ve) ve.value=b.vend||''; }
     if (b.vtype) { toggleVisit(id); updatePBVisitCalc(id); }
     document.getElementById('pb-works-'+id).value    = b.works||'';
-    document.getElementById('pb-pctplan-'+id).value  = b.pctPlan||0;
-    document.getElementById('pb-pctover-'+id).value  = b.pctOver||0;
     document.getElementById('pb-tomorrow-'+id).value = b.tomorrow||'';
     document.getElementById('pb-proc-'+id).value     = b.proc||'';
     document.getElementById('pb-dr-'+id).value       = b.delayReason||'';
     document.getElementById('pb-clc-'+id).value      = b.clientCon||'';
-
-    // Stage chips
-    const chipsEl = document.getElementById('pb-stages-'+id);
-    if (chipsEl && b.stageChips) {
-      chipsEl.querySelectorAll('.chip').forEach(c => {
-        if (b.stageChips.includes(c.textContent)) c.classList.add('on');
-      });
-    }
 
     // On track
     setPBTrack(id, b.track||'Yes');
@@ -1457,31 +1421,12 @@ function buildPBInnerHTML(id, projOpts) {
       <div style="font-size:11px;color:var(--text3);margin-top:6px"><span id="pb-vdur-${id}">—</span> · <span id="pb-vpts-${id}" style="color:var(--accent);font-weight:600">— pts</span></div>
     </div>
     <div class="field">
-      <div class="lbl">Current Stage <span class="opt">select all that apply</span></div>
-      <div class="chips" id="pb-stages-${id}">
-        ${STAGES.map(s=>`<div class="chip" onclick="this.classList.toggle('on');saveDraft();generateAllWA()">${s}</div>`).join('')}
-      </div>
-    </div>
-    <div class="field">
       <div class="lbl">Works Completed Today</div>
       <textarea id="pb-works-${id}" oninput="saveDraft();generateAllWA()" placeholder="Describe work done today…"></textarea>
     </div>
-    <button type="button" class="pb-more-toggle" id="pb-more-btn-${id}" onclick="toggleMore(${id})">＋ More details <span style="opacity:.6">(% progress · materials)</span></button>
-    <div class="pb-more hidden" id="pb-more-${id}">
-      <div class="pct-row">
-        <div class="pct-field">
-          <div class="lbl">% Works per Plan</div>
-          <div class="pct-input-wrap"><input type="number" id="pb-pctplan-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()"><span class="pct-label">%</span></div>
-        </div>
-        <div class="pct-field">
-          <div class="lbl">% Overall Completion</div>
-          <div class="pct-input-wrap"><input type="number" id="pb-pctover-${id}" min="0" max="100" value="0" oninput="saveDraft();generateAllWA()"><span class="pct-label">%</span></div>
-        </div>
-      </div>
-      <div class="field" style="margin-top:10px">
-        <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
-        <textarea id="pb-proc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
-      </div>
+    <div class="field">
+      <div class="lbl">Procurement Notes <span class="opt">materials needed, delays</span></div>
+      <textarea id="pb-proc-${id}" oninput="saveDraft();generateAllWA()" placeholder="Materials needed in 3-5 days, any vendor delays…"></textarea>
     </div>
     <div class="field">
       <div class="lbl">Work Planned for Tomorrow</div>

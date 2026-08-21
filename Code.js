@@ -2104,11 +2104,23 @@ function getPendingTasks() {
   // and marked Done via DPR Section 2. Need separate approval.
   // TASK_ASSIGNMENTS cols (23 total after col P insertion):
   //   TaskID(A=0) ProjectID(B=1) Project(C=2) AssignedTo(D=3)
-  //   Stage(E=4) Discipline(F=5) BasePts(G=6) Multiplier(H=7) WeightedPts(I=8)
+  //   Stage(E=4) Multiplier(F=5) BasePts(G=6) Units(H=7) WeightedPts(I=8)
   //   AssignedDate(J=9) Deadline(K=10) Area(L=11) Drawing(M=12)
   //   SelfStatus(N=13) SelfStatusDate(O=14) ActualCompletionDate(P=15)
   //   LeadApproved(Q=16) ApprovedBy(R=17) ApprovalDate(S=18)
   //   RevisionTag(T=19) Notes(U=20) AssignedBy(V=21) Priority(W=22)
+  // (Discipline isn't stored per-row — F is the numeric discipline multiplier;
+  // the display text comes from a PROJECTS-tab lookup, same as getAllTasks.)
+  var discMap = {};
+  var projSheet = db().getSheetByName(PROJECTS_TAB);
+  if (projSheet) {
+    var pRows = projSheet.getDataRange().getValues();
+    for (var pi = 1; pi < pRows.length; pi++) {
+      var pn = String(pRows[pi][1] || '').trim();
+      var pd = String(pRows[pi][3] || '').trim();
+      if (pn) discMap[pn] = pd;
+    }
+  }
   var asSheet = db().getSheetByName(ASSIGN_TAB);
   if (asSheet) {
     var asRows = asSheet.getDataRange().getValues();
@@ -2135,12 +2147,12 @@ function getPendingTasks() {
         date         : doneDate,
         member       : String(asRows[j][3]  || ''), // D AssignedTo
         project      : String(asRows[j][2]  || ''), // C Project
-        discipline   : String(asRows[j][5]  || ''), // F Discipline
+        discipline   : discMap[String(asRows[j][2] || '').trim()] || '', // PROJECTS-tab lookup
         taskType     : String(asRows[j][4]  || ''), // E Stage
         area         : String(asRows[j][11] || ''), // L Area
         drawing      : String(asRows[j][12] || ''), // M Drawing
-        units        : asRows[j][8]  || 0,           // I WeightedPts
-        pts          : asRows[j][8]  || 0,           // I WeightedPts
+        units        : parseFloat(asRows[j][7]) || 1, // H Units
+        pts          : parseFloat(asRows[j][8]) || 0, // I WeightedPts
         hoursTaken   : asRows[j][COL_HOURS_TAKEN-1] != null ? (parseFloat(asRows[j][COL_HOURS_TAKEN-1]) || null) : null, // AC
         taskAssignRow: j + 1,
         revisionTag  : String(asRows[j][AS_REVTAG] || ''),
@@ -6944,14 +6956,13 @@ function createIssueTask(iss, project, date, onTrack) {
   // Nothing named, or a generic external-party placeholder ('Vendor','PMC',...)
   // — self-assign to whoever reported it (Deepak on DPER, Aman on CRM) rather
   // than falling back to the project lead, so nothing they flag on their own
-  // form silently disappears unassigned. Design issues/deliverables always
-  // get a task regardless of assignee; any other issue type only becomes a
-  // task in this self-assigned case (2026-07-21).
+  // form silently disappears unassigned. A real team member picked in the
+  // Assign To selector always gets a task too, regardless of issue type —
+  // previously only Design/Deliverable issues did this, silently dropping
+  // any explicit tag on a Procurement/Contractor/Client/Site Condition issue
+  // (2026-08 fix: DPER/CRM's own Assign To picker offers every issue type,
+  // so tagging someone must actually create their task).
   var selfAssign = !explicit || GENERIC_ROLES.indexOf(explicit) > -1;
-  if (!selfAssign && (iss.issueType||'') !== 'Design' && (iss.kind||'') !== 'Deliverable') {
-    Logger.log('Skipping non-design issue task: ' + iss.issueType);
-    return '';
-  }
 
   var sheet = db().getSheetByName(ASSIGN_TAB);
   if (!sheet) return '';
@@ -6969,8 +6980,7 @@ function createIssueTask(iss, project, date, onTrack) {
 
   var srcLabel = (iss.reportedBy === 'Aman Raghuwanshi') ? 'CRM' : 'DPER';
   var taskType = (iss.kind === 'Deliverable') ? 'Design Deliverable — CRM'
-               : selfAssign ? 'Site Issue — ' + (iss.issueType || 'General')
-               : 'Site Issue — Design';
+               : 'Site Issue — ' + (iss.issueType || 'General');
   var description = iss.description || '';
   var metaNotes   = '[' + srcLabel + ': ' + project + ', ' + date + ']';
 
