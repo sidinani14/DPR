@@ -401,11 +401,17 @@ function renderHeatmap() {
       const openCount = openTasks
         .filter(t=> t.assignedTo.split(',').map(a=>a.trim()).includes(name) &&
                     t.targetDate >= weekDays[0] && t.targetDate <= weekDays[5]).length;
-      const donePct   = Math.min(100, Math.round(donePts / wkTgt * 100));
-      const apprPct   = Math.min(100 - donePct, Math.round(apprPts / wkTgt * 100));
-      const pendPct   = Math.min(100 - donePct - apprPct, Math.round(pendPts / wkTgt * 100));
-      const delayPct  = Math.min(100 - donePct - apprPct - pendPct, Math.round(delayedPts2 / wkTgt * 100));
-      const pctLabel  = Math.round(donePts/wkTgt*100);
+      // Bar spread is proportional to THIS member's own total assigned points
+      // (not the fixed weekly target) — otherwise, once Done+Approval already
+      // account for the full target, Pending/Delayed get silently clipped to
+      // 0% width even when real overdue points exist. Delayed always takes
+      // the remainder so it can never be clipped away.
+      const totalAssigned = donePts + apprPts + pendPts + delayedPts2;
+      const donePct   = totalAssigned > 0 ? Math.round(donePts / totalAssigned * 100) : 0;
+      const apprPct   = totalAssigned > 0 ? Math.min(100 - donePct, Math.round(apprPts / totalAssigned * 100)) : 0;
+      const pendPct   = totalAssigned > 0 ? Math.min(100 - donePct - apprPct, Math.round(pendPts / totalAssigned * 100)) : 0;
+      const delayPct  = totalAssigned > 0 ? (100 - donePct - apprPct - pendPct) : 0;
+      const pctLabel  = Math.round(donePts/wkTgt*100); // vs target — separate metric, unchanged
 
       html += `<tr>
         <td class="hm-name">${name}<br><span style="font-size:9px;color:rgba(255,255,255,0.35)">${pctLabel}% complete</span></td>
@@ -475,12 +481,14 @@ function renderHeatmap() {
                      t.status === 'Delayed')
         .reduce((s,t)=>s+(t.weightedPts||0), 0);
 
+      // Same fix as This-Week: spread against this member's own total load
+      // today, not the fixed daily target — see comment in the 'week' branch.
       const totalLoad = donePts + apprPts + pendPts + delayedPts;
-      const donePct   = Math.min(100, Math.round(donePts   / dayTgt * 100));
-      const apprPct   = Math.min(100 - donePct, Math.round(apprPts / dayTgt * 100));
-      const pendPct   = Math.min(100 - donePct - apprPct, Math.round(pendPts   / dayTgt * 100));
-      const delPct    = Math.min(100 - donePct - apprPct - pendPct, Math.round(delayedPts / dayTgt * 100));
-      const loadPct   = Math.round(totalLoad / dayTgt * 100);
+      const donePct   = totalLoad > 0 ? Math.round(donePts / totalLoad * 100) : 0;
+      const apprPct   = totalLoad > 0 ? Math.min(100 - donePct, Math.round(apprPts / totalLoad * 100)) : 0;
+      const pendPct   = totalLoad > 0 ? Math.min(100 - donePct - apprPct, Math.round(pendPts / totalLoad * 100)) : 0;
+      const delPct    = totalLoad > 0 ? (100 - donePct - apprPct - pendPct) : 0;
+      const loadPct   = Math.round(totalLoad / dayTgt * 100); // vs target — separate metric, unchanged
 
       const statusLabel = totalLoad === 0
         ? '<span style="font-size:9px;color:rgba(255,255,255,0.3)">No tasks today</span>'
