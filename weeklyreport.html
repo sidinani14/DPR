@@ -294,7 +294,12 @@ const TARGETS = {
 // normally from that week onward (checked against whichever week is being
 // computed — see scoreCalc's weekStartOverride, needed because the 5-week
 // trend calls scoreCalc once per historical week, not just the current one).
-const DPR_NA_UNTIL = { 'Kritika Kaushik': '2026-08-03' };
+// Khushi Gupta / Sanskar Gupta: exempted from DPR filing entirely "for now"
+// (2026-08-22, Siddharth's call) — no known onboarding date yet, so a
+// far-future placeholder keeps them N/A indefinitely until that's decided;
+// update/remove their entries once they're actually expected to start.
+const DPR_NA_UNTIL = { 'Kritika Kaushik': '2026-08-03',
+  'Khushi Gupta': '2099-01-01', 'Sanskar Gupta': '2099-01-01' };
 
 // ── Biometric — live, built from ATTENDANCE via getMemberAttendance ────────
 // hrs score: ≥7:55 (475min) avg→10 · 7:00–7:54→7 · <7:00→4
