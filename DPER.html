@@ -1120,6 +1120,11 @@ function generateWAForProject(p){
 
   let msg=`*Project Update — ${p.proj}*\n*Date:* ${ds} | *Lead:* ${leadName}\n\n`;
   msg+=`*Site Status:* ${statusEmoji}\n`;
+  if(p.visitType && p.visitHours){
+    msg+=`*${p.visitType}:* ${p.visitHours} hr${p.visitHours===1?'':'s'} today\n`;
+  }
+  msg+=`*Client Updated:* ${p.clientUpdated==='Yes'?'✅ Yes':'Not yet'}\n`;
+  if(p.clientConcerns) msg+=`*Client Concerns:*\n${p.clientConcerns}\n`;
   msg+='\n';
   if(nonDesign.length){
     msg+=`*Issues Requiring Attention:*\n`;
@@ -1129,6 +1134,11 @@ function generateWAForProject(p){
   if(design.length){
     msg+=`*Design Deliverables Required:*\n`;
     design.forEach((iss,i)=>{ msg+=`${i+1}. [Design] ${iss.description}\n`; });
+    msg+='\n';
+  }
+  if(p.tasks && p.tasks.length){
+    msg+=`*Tasks Assigned Today:*\n`;
+    p.tasks.forEach((t,i)=>{ msg+=`${i+1}. ${t.taskType}${t.description?' — '+t.description:''} → ${t.assignedTo}\n`; });
     msg+='\n';
   }
   msg+=`— Ideaform Design Studio`;
