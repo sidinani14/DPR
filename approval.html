@@ -528,8 +528,17 @@ function renderTasks() {
     html += `<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;font-family:'DM Mono',monospace">${label}</div>`;
     byDate[date].forEach(t => {
       const i = t.idx;
+      // Restore any prior decision for this task (stable key, survives filter
+      // changes / re-renders) — otherwise a lead who decides tasks, changes
+      // the filter, and comes back sees everything reset to "Pending" with
+      // blank correction fields, even though the underlying decision/note
+      // still exists — and any typed correction that was never persisted
+      // anywhere else is lost outright.
+      const key = t.row + '-' + (t.source||'');
+      const dec = decisions[key];
+      const decided = dec && (dec.decision === 'Yes' || dec.decision === 'No');
       html += `
-    <div class="task-card" id="tc-${i}">
+    <div class="task-card${decided ? (dec.decision==='Yes'?' approved':' rejected') : ''}" id="tc-${i}">
       <div class="task-head">
         <div>
           <div class="task-member">
@@ -540,7 +549,7 @@ function renderTasks() {
           </div>
           <div class="task-project">${t.project} · ${t.discipline}</div>
         </div>
-        <div class="task-status st-pending" id="st-${i}">Pending</div>
+        <div class="task-status ${decided ? (dec.decision==='Yes'?'st-approved':'st-rejected') : 'st-pending'}" id="st-${i}">${decided ? (dec.decision==='Yes'?'Approved':'Rejected') : 'Pending'}</div>
       </div>
       <div class="task-body">
         <div class="task-detail-row">
@@ -554,12 +563,14 @@ function renderTasks() {
           <div style="display:grid;grid-template-columns:1fr 80px;gap:8px">
             <div>
               <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Correct task type</div>
-              <input type="text" id="corr-type-${i}" placeholder="Leave blank if correct"
+              <input type="text" id="corr-type-${i}" placeholder="Leave blank if correct" value="${(dec?.correctedTaskType||'').replace(/"/g,'&quot;')}"
+                oninput="updateCorrection(${i}, 'correctedTaskType', this.value)"
                 style="width:100%;font-size:12px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'DM Sans',sans-serif">
             </div>
             <div>
               <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Correct pts</div>
-              <input type="number" id="corr-pts-${i}" placeholder="${t.pts}" min="0" step="0.25"
+              <input type="number" id="corr-pts-${i}" placeholder="${t.pts}" min="0" step="0.25" value="${dec?.correctedPts||''}"
+                oninput="updateCorrection(${i}, 'correctedPts', this.value)"
                 style="width:100%;font-size:12px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'DM Sans',sans-serif">
             </div>
           </div>
@@ -569,11 +580,11 @@ function renderTasks() {
           <div class="task-meta-item">Sub ID: <span>${t.subId}</span></div>
         </div>
         <div class="action-row">
-          <button class="btn-approve" id="btn-approve-${i}" onclick="decide(${i}, 'Yes')">✓ Approve</button>
-          <button class="btn-reject"  id="btn-reject-${i}"  onclick="decide(${i}, 'No')">✕ Reject</button>
+          <button class="btn-approve${dec?.decision === 'Yes' ? ' active' : ''}" id="btn-approve-${i}" onclick="decide(${i}, 'Yes')">✓ Approve</button>
+          <button class="btn-reject${dec?.decision === 'No' ? ' active' : ''}"  id="btn-reject-${i}"  onclick="decide(${i}, 'No')">✕ Reject</button>
         </div>
-        <div class="note-field" id="note-${i}">
-          <textarea placeholder="Note for ${t.member} (optional for approval, recommended for rejection)…" oninput="updateNote(${i}, this.value)"></textarea>
+        <div class="note-field${decided ? ' open' : ''}" id="note-${i}">
+          <textarea placeholder="Note for ${t.member} (optional for approval, recommended for rejection)…" oninput="updateNote(${i}, this.value)">${dec?.note||''}</textarea>
         </div>
       </div>
     </div>`;
@@ -655,6 +666,17 @@ function updateNote(i, val) {
   decisions[key].taskIdx = i;
 }
 
+// Correction fields used to be read live from the DOM only at submit time —
+// switching the member/project filter rebuilds the card list from scratch,
+// which silently wiped any typed correction. Persist it the same way notes
+// already are, so it survives a filter change and back.
+function updateCorrection(i, field, val) {
+  const key = tasks[i] ? (tasks[i].row + '-' + (tasks[i].source||'')) : i;
+  if (!decisions[key]) decisions[key] = {};
+  decisions[key][field] = val;
+  decisions[key].taskIdx = i;
+}
+
 function updateSummary() {
   const approved = Object.values(decisions).filter(d => d && d.decision === 'Yes').length;
   const rejected = Object.values(decisions).filter(d => d && d.decision === 'No').length;
@@ -664,7 +686,16 @@ function updateSummary() {
 
 function updateBar() {
   const leadName = document.getElementById('lead-name').value;
-  const reviewed = Object.values(decisions).filter(d => d && (d.decision === 'Yes' || d.decision === 'No')).length;
+  // Scoped to the CURRENTLY filtered task list, not every decision ever made
+  // this session — decisions{} persists across filter changes (by design, so
+  // switching filters and back doesn't lose anything), but counting all of
+  // them against the current filter's total produced nonsense like
+  // "20 of 6 reviewed" / "-14 remaining" once a lead narrowed the filter
+  // after reviewing a broader set.
+  const reviewed = tasks.filter(t => {
+    const d = decisions[t.row + '-' + (t.source||'')];
+    return d && (d.decision === 'Yes' || d.decision === 'No');
+  }).length;
   const total    = tasks.length;
   const canSubmit= reviewed > 0 && leadName;
 

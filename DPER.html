@@ -498,6 +498,23 @@ function addUnplannedTask(projBlockId){
   document.getElementById(projBlockId).querySelector('.unp-task-rows').appendChild(row);
 }
 
+// Same silent-drop risk as dpr.html Section 3: a project block with real
+// task content but no project selected is dropped entirely by collectUnplanned()
+// with no error. Flag it so nothing vanishes unnoticed.
+function flagIncompleteUnpBlocks() {
+  let firstBad = null;
+  document.querySelectorAll('.unp-proj-block').forEach(pb=>{
+    const hasProj = !!pb.querySelector('.unp-proj')?.value;
+    const hasTaskContent = [...pb.querySelectorAll('.unp-task-entry')].some(tr=>{
+      const idx = parseInt(tr.querySelector('.unp-type')?.value);
+      return !isNaN(idx) && CFG_STAGES[idx];
+    });
+    pb.style.outline = (!hasProj && hasTaskContent) ? '2px solid var(--red,#C0392B)' : '';
+    if (!hasProj && hasTaskContent && !firstBad) firstBad = pb;
+  });
+  return firstBad;
+}
+
 function collectUnplanned(){
   const done=[], ongoing=[];
   document.querySelectorAll('.unp-proj-block').forEach(pb=>{
@@ -1143,6 +1160,12 @@ function copyWA(id){
 // ── Submit ─────────────────────────────────────────────────
 async function submitAll(){
   if(!googleUser){toast('Sign in first');return;}
+  const incompleteUnp = flagIncompleteUnpBlocks();
+  if (incompleteUnp) {
+    incompleteUnp.scrollIntoView({behavior:'smooth', block:'center'});
+    toast('Unplanned work: pick a project for the task you added below — without it, that entry won\'t be saved.', 6000);
+    return;
+  }
   const projs=collectProjects();
   const unp = collectUnplanned();
   const hasOther = collectTaskStatuses().length || unp.done.length || unp.ongoing.length || collectConnections().length || Object.keys(issueActions).length;

@@ -1422,6 +1422,28 @@ function isTrivialDeliverables(text) {
 // Field Work rows are already folded into Done Tasks by collectData()) —
 // this is exactly the gap that let real work go uncredited: people typing
 // their day into the summary and assuming that alone counts.
+// Section 3 silently drops an entire project block (all its task rows) if
+// no project was picked for it — collectData()'s `if (!proj) return;`. That
+// happens with zero error because it's a client-side filter, not a server
+// failure, and countLoggedWorkItems() below can't catch it either if the
+// person also has ANY other logged item that day (an assigned task marked
+// Done, say) — the overall "you logged nothing" check passes even though
+// this specific unplanned entry vanished. Flag it explicitly instead.
+function flagIncompleteUnplannedBlocks() {
+  let firstBad = null;
+  document.querySelectorAll('.proj-block').forEach(pb=>{
+    const pnIdx = parseInt(pb.querySelector('.p-name')?.value);
+    const hasProj = !isNaN(pnIdx) && PROJECTS[pnIdx];
+    const hasTaskContent = [...pb.querySelectorAll('.task-entry')].some(tr=>{
+      const idx = parseInt(tr.querySelector('.t-type')?.value);
+      return !isNaN(idx) && STAGES[idx];
+    });
+    pb.style.outline = (!hasProj && hasTaskContent) ? '2px solid var(--red,#C0392B)' : '';
+    if (!hasProj && hasTaskContent && !firstBad) firstBad = pb;
+  });
+  return firstBad;
+}
+
 function countLoggedWorkItems(d) {
   let n = 0;
   try { n += JSON.parse(d['Assigned Statuses']||'[]').filter(s=>s.status==='Done'||s.status==='Ongoing').length; } catch(e){}
@@ -1431,6 +1453,12 @@ function countLoggedWorkItems(d) {
 }
 
 function validate(d) {
+  const incompleteBlock = flagIncompleteUnplannedBlocks();
+  if (incompleteBlock) {
+    incompleteBlock.scrollIntoView({behavior:'smooth', block:'center'});
+    toast('Section 3: pick a project for the unplanned work you added below — without it, that entry won\'t be saved.', 6000);
+    return false;
+  }
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
   if (!d['Member'])            { toast('Please select your name');              return false; }
   if (!d['Arrived on Time'])   { toast('Please mark your arrival time');        return false; }
