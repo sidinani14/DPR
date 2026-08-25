@@ -1266,10 +1266,16 @@ async function submitAll(){
     // Daily check-in, once per submission (not per project) — same brief shape
     // DPR writes to DAILY_SUMMARY. SITE_EXECUTION keeps the full per-project
     // detail unchanged; this is just so "did they check in today" is visible
-    // in one shared place across DPR/DPER/CRM.
-    await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'submitDailySummary', 'Member':leadName, 'Member Email':googleUser?.email||'',
-        'Arrived on Time': document.querySelector('input[name=ontime]:checked')?.value||''})}).catch(()=>{});
+    // in one shared place across DPR/DPER/CRM. Was a bare .catch(()=>{}) that
+    // never checked the response — DPR Consistency reads from this sheet, so
+    // a silently-dropped row here meant a real submission still counted as a
+    // missed day with no indication anything went wrong.
+    try {
+      const dsR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'submitDailySummary', 'Member':leadName, 'Member Email':googleUser?.email||'',
+          'Arrived on Time': document.querySelector('input[name=ontime]:checked')?.value||''})}).then(r=>r.json());
+      if (dsR && dsR.status === 'error') scoringErrors.push('Daily check-in: '+(dsR.message||'failed'));
+    } catch(e){ scoringErrors.push('Daily check-in: network error'); }
 
     // Late-arrival context (replaces messaging Siddharth on WhatsApp) — logged
     // whenever Arrived-on-time is No; Siddharth decides excuse-vs-absent when

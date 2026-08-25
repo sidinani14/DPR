@@ -1310,7 +1310,15 @@ function doPost(e) {
     if (data.action === 'getDirectorPendingItems') return respond(getDirectorPendingItems());
     if (data.action === 'completeDirectorItem')   return respond(completeDirectorItem(data, authEmail));
     if (data.action === 'submitDelayReason')      return respond(submitDelayReason(data));
-    if (data.action === 'submitDailySummary')     { writeDailySummary(data); return respond({status:'ok'}); }
+    // 2026-08 fix: this used to call writeDailySummary() unlocked — the main
+    // DPR handler wraps the same function in withLock (2026-08 reliability
+    // fix) since prependRow isn't atomic, but this standalone route (used by
+    // DPER/CRM) never got the same protection, so a submission landing near
+    // another write to SUMMARY_TAB could silently lose the row with zero
+    // error surfaced (the caller's fire-and-forget fetch never even checked
+    // the response). Root-caused Deepak's DPR Consistency showing 0 days
+    // filed via DAILY_SUMMARY despite 4 real DPER submissions that week.
+    if (data.action === 'submitDailySummary')     { withLock(function(){ writeDailySummary(data); }); return respond({status:'ok'}); }
     if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
     if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
     if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
