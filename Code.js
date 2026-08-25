@@ -1302,6 +1302,9 @@ function doPost(e) {
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
     if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
     if (data.action === 'getMemberReview')        return respond(getMemberReview(data.member||'', data.from||'', data.to||''));
+    if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
+    if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
+    if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
     if (data.action === 'getMemberAttendance')    return respond(getMemberAttendance(data.member||'', data.from||'', data.to||''));
     if (data.action === 'importAttendance')       return respond(importAttendance(data));
     if (data.action === 'submitLateRequest')      return respond(submitLateRequest(data));
@@ -4874,6 +4877,106 @@ function loadCadence(planSheet) {
   return cadence;
 }
 
+// Real VISIT_PLANNER rows for one assignee — used by member-specific visit
+// cadence reporting so it matches the actual planner (project/frequency),
+// not a hardcoded guess list.
+// TEMP diagnostic (2026-08): tracking down a getWeeklyStats vs getMemberReview
+// mismatch — dumps raw TASK_ASSIGNMENTS rows for one member whose done-date
+// falls in a range, with the exact columns both scoring functions read.
+function debugTaskRows(member, from, to) {
+  var s = db();
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  var asRows = asSheet ? asSheet.getDataRange().getValues() : [];
+  var asHeaders = asRows[0] ? asRows[0].map(function(h){ return String(h||'').trim(); }) : [];
+  var is23 = asHeaders.length >= 23 || asHeaders.indexOf('Actual Completion Date') > -1;
+  var C_LAPPR = is23 ? 16 : 15, C_SDT = 14, C_ADT = is23 ? 15 : -1, C_DL = 10, C_NOTES = is23 ? 20 : 19;
+  var out = [];
+  var m = String(member||'').trim();
+  for (var i = 1; i < asRows.length; i++) {
+    var r = asRows[i];
+    if (String(r[3]||'').trim() !== m) continue;
+    var doneDate = (C_ADT > -1 ? cellDate(r[C_ADT]) : '') || cellDate(r[C_SDT]);
+    if (!doneDate || doneDate < from || doneDate > to) continue;
+    out.push({
+      row: i+1, project: String(r[2]||'').trim(), taskType: String(r[4]||'').trim(),
+      selfStatus: String(r[13]||'').trim(), leadApproved: String(r[C_LAPPR]||'').trim(),
+      selfStatusDateRaw: String(r[C_SDT]||''), actualCompletionDateRaw: C_ADT>-1?String(r[C_ADT]||''):'(n/a col)',
+      doneDate: doneDate, deadline: cellDate(r[C_DL]), pts: parseFloat(r[8])||0,
+      notes: String(r[C_NOTES]||'').slice(0,60), is23: is23, headerCount: asHeaders.length,
+    });
+  }
+  return out;
+}
+// Extra DPR-adjacent context for a member-review report: daily mood/blockers
+// (DAILY_SUMMARY), billables raised (BILL_REQUESTS), and client feedback
+// (FEEDBACK, filtered to the member's own project list) over a date range.
+function getMemberExtras(member, fromStr, toStr) {
+  var m = String(member || '').trim();
+  var from = fromStr || '', to = toStr || '';
+  var s = db();
+  var out = { mood: [], billables: [], feedback: [] };
+
+  var sumSheet = s.getSheetByName(SUMMARY_TAB);
+  if (sumSheet && sumSheet.getLastRow() > 1) {
+    var sr = sumSheet.getDataRange().getValues();
+    for (var i = 1; i < sr.length; i++) {
+      if (String(sr[i][2] || '').trim() !== m) continue;
+      var d = cellDate(sr[i][0]);
+      if (d < from || d > to) continue;
+      out.mood.push({ date: d, moodScore: String(sr[i][7] || ''), blockers: String(sr[i][6] || '').trim() });
+    }
+  }
+
+  var billSheet = s.getSheetByName(BILL_REQ_TAB);
+  if (billSheet && billSheet.getLastRow() > 1) {
+    var br = billSheet.getDataRange().getValues();
+    for (var j = 1; j < br.length; j++) {
+      if (String(br[j][2] || '').trim() !== m) continue;
+      var bd = cellDate(br[j][1]);
+      if (bd < from || bd > to) continue;
+      out.billables.push({ date: bd, project: String(br[j][3] || '').trim(), discipline: String(br[j][4] || '').trim(),
+        stage: String(br[j][5] || '').trim(), status: String(br[j][6] || '').trim() });
+    }
+  }
+
+  // Feedback: FEEDBACK isn't member-attributed, so surface it only for
+  // projects that appear in this member's own TASK_ASSIGNMENTS rows in range.
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  var memberProjects = {};
+  if (asSheet) {
+    var asRows = asSheet.getDataRange().getValues();
+    for (var k = 1; k < asRows.length; k++) {
+      if (String(asRows[k][3] || '').trim() === m) memberProjects[String(asRows[k][2] || '').trim()] = true;
+    }
+  }
+  var fbSheet = s.getSheetByName(FEEDBACK_TAB);
+  if (fbSheet && fbSheet.getLastRow() > 1) {
+    var fr = fbSheet.getDataRange().getValues();
+    for (var f = 1; f < fr.length; f++) {
+      var proj = String(fr[f][4] || '').trim();
+      if (!memberProjects[proj]) continue;
+      var fd = cellDate(fr[f][2]);
+      if (fd < from || fd > to) continue;
+      out.feedback.push({
+        date: fd, project: proj, overallSatisfaction: fr[f][6], designFunctionality: fr[f][8],
+        communication: fr[f][9], problemResolution: fr[f][10], responsiveness: fr[f][11],
+        qualityOfWork: fr[f][12], professionalism: fr[f][13], nps: fr[f][15],
+        comments: String(fr[f][16] || '').trim(), appraisalOfPerson: String(fr[f][17] || '').trim(),
+        referrals: String(fr[f][18] || '').trim(),
+      });
+    }
+  }
+  return out;
+}
+function getVisitPlannerForMember(member) {
+  var s = db();
+  var planSheet = s.getSheetByName(PLANNER_TAB);
+  if (!planSheet) return [];
+  var cadence = loadCadence(planSheet);
+  var m = String(member || '').trim().toLowerCase();
+  return cadence.filter(function(c) { return c.assignee.toLowerCase() === m; });
+}
+
 // ── Load visit history from TASK_LOG ─────────────────────────
 // Returns: {project: {visitType: [{date, member, pts}]}}
 function loadVisitHistory() {
@@ -6116,6 +6219,7 @@ function getWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
   var sat = addDaysToStr(mon, 5);
+  var sun = addDaysToStr(mon, 6);   // the Sunday right after this week's Saturday
   // doneUpper extends a few days past Saturday (a short grace window for
   // late lead-approval), but ONLY while we're still within that window —
   // once we're well past it, fall back to sat with no extension at all.
@@ -6127,9 +6231,24 @@ function getWeeklyStats(weekStart) {
   // just-concluded week still gets its grace window, while a week from a
   // month ago (the 5-week trend's historical queries) is long past its
   // window and stays strictly bounded to its own Saturday.
+  //
   var today    = dateStr();
   var graceEnd = addDaysToStr(sat, 3);
   var doneUpper = (today <= sat) ? sat : (today <= graceEnd ? today : sat);
+  // 2026-08 fix: completion/Output counting used to stop dead at `sat`, so
+  // anyone who completed/self-logged a task on the Sunday right after
+  // Saturday (the work week is Mon-Sat, but self-logged "Unplanned Work"
+  // isn't bound by that) had those points counted in NEITHER this week nor
+  // the next — silently dropped from every weekly Output total.
+  // getMemberReview's separate weekly-trend bucketing (monday() of the
+  // done-date) already attributed a trailing Sunday to the week that just
+  // ended, so this was also a live discrepancy between the two, not just
+  // missing points. outputUpper guarantees a trailing Sunday always folds
+  // into the week that just ended, matching that attribution — used ONLY
+  // for the completed-task/Output loops below, deliberately NOT for the
+  // Reliability lateRefDate judgment further down, which is a different
+  // question (has a task's deadline passed) that this fix has no bearing on.
+  var outputUpper = doneUpper > sun ? doneUpper : sun;
 
   var asSheet  = s.getSheetByName(ASSIGN_TAB);
   var sumSheet = s.getSheetByName(SUMMARY_TAB);
@@ -6182,7 +6301,7 @@ function getWeeklyStats(weekStart) {
       if (String(r[3]||'').trim() === name &&
           String(r[13]||'').trim() === 'Done' &&
           isApproved &&
-          doneDate >= mon && doneDate <= doneUpper) {
+          doneDate >= mon && doneDate <= outputUpper) {
         // Unplanned/self-logged work (createDoneTask stamps Deadline = same
         // day as completion) can never be "late" by construction — an
         // on-time flag there is meaningless, not an accomplishment. Only
@@ -6227,7 +6346,7 @@ function getWeeklyStats(weekStart) {
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       if (String(r[3]||'').trim() === name &&
           String(r[COL_LEADAPPR]||'').trim() === 'Yes' &&
-          doneDate >= mon && doneDate <= doneUpper) {
+          doneDate >= mon && doneDate <= outputUpper) {
         var pts = parseFloat(r[8]) || 0;
         approvedPts += pts;
         if (String(r[COL_NOTES]||'').indexOf('Unplanned task') > -1) unplannedPts += pts;
@@ -7782,7 +7901,12 @@ function getDeepakWeeklyStats(weekStart) {
   // fall back to sat so old historical queries don't leak later approvals.
   var today0    = dateStr();
   var graceEnd0 = addDaysToStr(sat, 3);
-  var doneUpper0 = (today0 <= sat) ? sat : (today0 <= graceEnd0 ? today0 : sat);
+  var sun0 = addDaysToStr(mon, 6);
+  var rawUpper0 = (today0 <= sat) ? sat : (today0 <= graceEnd0 ? today0 : sat);
+  // Same Sunday-completion fix as getWeeklyStats (2026-08): a task
+  // completed on the Sunday right after Saturday was previously counted in
+  // neither this week nor the next.
+  var doneUpper0 = rawUpper0 > sun0 ? rawUpper0 : sun0;
 
   // ── 1. Read active projects from CONFIG tab ───────────────
   // Scans ALL columns for the "DEEPAK ACTIVE PROJECTS" header (it lives in

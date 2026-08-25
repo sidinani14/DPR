@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance Review — Achal Rathore</title>
+<script src="auth.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:#FFFFFF;color:#2B2620;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 26px 60px;}
+.mono{font-family:'DM Mono',monospace;}
+
+/* header */
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid rgba(43,38,32,0.1);padding-bottom:14px;margin-bottom:20px;}
+.hdr-brand{font-size:11px;font-weight:800;color:#A8540C;text-transform:uppercase;letter-spacing:1.4px;}
+.hdr h1{font-size:26px;font-weight:900;margin-top:4px;}
+.hdr-sub{font-size:13px;color:rgba(43,38,32,0.72);margin-top:4px;}
+.hdr-right{text-align:right;font-size:11px;color:rgba(43,38,32,0.6);}
+button.pbtn{font:inherit;font-size:12.5px;font-weight:700;color:#2B2620;background:rgba(43,38,32,.05);border:1px solid rgba(43,38,32,.15);border-radius:7px;padding:7px 13px;cursor:pointer;margin-top:8px;}
+button.pbtn:hover{background:rgba(43,38,32,.1);}
+
+.section{margin-top:30px;}
+.section-title{font-size:13px;font-weight:800;color:#A8540C;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid rgba(245,166,35,0.3);}
+.lead{font-size:13.5px;line-height:1.6;color:rgba(43,38,32,0.88);margin-bottom:14px;}
+
+/* summary stat grid */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+.stat-card{background:rgba(43,38,32,0.03);border:1px solid rgba(43,38,32,0.08);border-radius:10px;padding:12px 14px;}
+.stat-lbl{font-size:9.5px;color:rgba(43,38,32,0.65);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.stat-val{font-size:20px;font-weight:900;line-height:1.1;}
+.stat-note{font-size:10.5px;color:rgba(43,38,32,0.6);margin-top:3px;}
+.stat-card.warn .stat-val{color:#C0392B;}
+.stat-card.ok .stat-val{color:#1B5E20;}
+
+/* rating cards (13-week average, same categories as weekly report) */
+.rating-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px;}
+.rc{background:rgba(43,38,32,0.04);border:1px solid rgba(43,38,32,0.08);border-radius:10px;padding:10px 12px;position:relative;overflow:hidden;}
+.rc::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;}
+.rc.g::before{background:linear-gradient(90deg,#2ED573,#00B894);}
+.rc.a::before{background:linear-gradient(90deg,#B8860B,#F5A623);}
+.rc.o::before{background:linear-gradient(90deg,#F5A623,#FF8C00);}
+.rc.r::before{background:linear-gradient(90deg,#EA4335,#FF6B6B);}
+.rc-lbl{font-size:9px;color:rgba(43,38,32,0.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.rc-val{font-size:21px;font-weight:900;line-height:1;}
+.rc-max{font-size:11px;color:rgba(43,38,32,0.55);font-weight:400;}
+.rc-sub{font-size:9px;color:rgba(43,38,32,0.55);margin-top:4px;}
+
+/* charts */
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:14px;}
+.chart-card{background:rgba(43,38,32,0.02);border:1px solid rgba(43,38,32,0.07);border-radius:10px;padding:12px 14px;}
+.chart-title{font-size:10.5px;font-weight:700;color:rgba(43,38,32,0.78);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:baseline;}
+.chart-title .avg{font-weight:900;font-size:13px;color:#2B2620;}
+.chart-note{font-size:9.5px;color:rgba(43,38,32,0.55);margin-top:2px;}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+thead th{background:#2B2620;color:#fff;padding:6px 8px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left;}
+tbody td{padding:5px 8px;border-bottom:1px solid rgba(43,38,32,0.06);vertical-align:middle;}
+tbody tr:nth-child(even){background:rgba(43,38,32,0.02);}
+tbody tr.hot{background:rgba(234,67,53,0.07);}
+tbody tr.warm{background:rgba(251,188,4,0.08);}
+.t-proj{font-weight:700;color:#A8540C;}
+.dow-weekend{color:#C0392B;font-weight:800;}
+.table-note{font-size:10px;color:rgba(43,38,32,0.55);margin-top:6px;font-style:italic;}
+.table-wrap{overflow-x:auto;}
+
+.small-note{font-size:11px;color:rgba(43,38,32,0.6);margin-top:8px;}
+
+@media print{
+  .wrap{max-width:100%;}
+  .no-print{display:none;}
+  .section{page-break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+<div id="app" style="display:none">
+<div class="wrap">
+
+  <div class="hdr">
+    <div>
+      <div class="hdr-brand">Ideaform Design Studio</div>
+      <h1>Performance Review</h1>
+      <div class="hdr-sub">Achal Rathore &nbsp;&middot;&nbsp; Technical Lead</div>
+      <div class="hdr-sub">Review Period: May 15, 2026 – August 16, 2026 &nbsp;(13 weeks, 80 working days)</div>
+    </div>
+    <div class="hdr-right">
+      <div>Source: DPR/DPER logs, TASK_ASSIGNMENTS,<br>site visit logs (VISIT_PLANNER), biometric attendance</div>
+      <button class="pbtn no-print" onclick="window.print()">🖨 Print / Export PDF</button>
+    </div>
+  </div>
+
+  <!-- 1. SUMMARY -->
+  <div class="section">
+    <div class="section-title">1 &middot; Summary Figures</div>
+    <div class="stat-grid" id="summaryGrid"></div>
+  </div>
+
+  <!-- 2. 13-WEEK AVERAGE RATINGS -->
+  <div class="section">
+    <div class="section-title">2 &middot; 13-Week Average Ratings <span style="font-weight:400;color:rgba(43,38,32,.55);text-transform:none;letter-spacing:0;">(same categories &amp; scale as the weekly report)</span></div>
+    <div class="rating-grid" id="ratingGrid"></div>
+    <div class="small-note">Punctuality and Hours are biometric — sourced from Paytime attendance data for all 13 weeks (May–Aug 2026).</div>
+  </div>
+
+  <!-- 3. TRENDS -->
+  <div class="section">
+    <div class="section-title">3 &middot; Week-by-Week Trend, All 13 Weeks</div>
+    <div class="lead">Each chart plots one score category across every week of the review period. The pattern that matters isn't any single week — it's the shape: does a category ever hold steady, or does it swing?</div>
+    <div class="chart-grid" id="chartGrid"></div>
+  </div>
+
+  <!-- 4. DPR PATTERN -->
+  <div class="section">
+    <div class="section-title">4 &middot; DPR Filing Pattern</div>
+    <div class="lead" id="dprLead"></div>
+    <div class="table-wrap"><table id="batchTable"></table></div>
+    <div class="table-note">The date shown is the submission date recorded by the system; each batched entry is a separate DPR report submitted together, not filed on the day the work occurred.</div>
+  </div>
+
+  <!-- 5. DELAYS -->
+  <div class="section">
+    <div class="section-title">5 &middot; Task &amp; Drawing Delivery — Delays</div>
+    <div class="lead" id="delayLead"></div>
+    <div class="table-wrap"><table id="lateTable"></table></div>
+    <div style="height:14px"></div>
+    <div style="font-size:11.5px;font-weight:700;color:rgba(43,38,32,.75);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Still open past deadline as of review date</div>
+    <div class="table-wrap"><table id="overdueTable"></table></div>
+    <div style="height:14px"></div>
+    <div style="font-size:11.5px;font-weight:700;color:rgba(43,38,32,.75);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">By deliverable category</div>
+    <div class="table-wrap"><table id="typeTable"></table></div>
+  </div>
+
+  <!-- 6. VISIT CADENCE -->
+  <div class="section">
+    <div class="section-title">6 &middot; Site Visit Cadence Compliance</div>
+    <div class="lead" id="visitLead"></div>
+    <div class="table-wrap"><table id="visitTable"></table></div>
+    <div class="table-note">Projects and cadence pulled directly from VISIT_PLANNER — Fortnightly (14-day) cadence, assignee = Achal Rathore. Projects with no defined cadence are not included in this audit.</div>
+  </div>
+
+  <!-- 7. OTHER SIGNALS -->
+  <div class="section">
+    <div class="section-title">7 &middot; Other DPR-Collected Signals</div>
+    <div class="stat-grid" id="extrasGrid"></div>
+  </div>
+
+  <!-- 8. PROJECTS -->
+  <div class="section">
+    <div class="section-title">8 &middot; Projects Handled in Review Period</div>
+    <div class="lead">25 projects carried tasks assigned to Achal in this period. A "Delivery / Client Impact" column is left blank for project-specific detail to be added.</div>
+    <div class="table-wrap"><table id="projTable"></table></div>
+    <div class="table-note">Rows shaded indicate projects with delayed deliverables this period (light = 1+, red = 5+).</div>
+  </div>
+
+</div>
+</div>
+<div id="loading" style="text-align:center;padding:60px;color:rgba(43,38,32,0.6);font-size:15px;">Checking access…</div>
+
+<script>
+// ══════════════════════ DATA (pulled live from the Productivity Sheet, 2026-08-25) ══════════════════════
+const TOTAL_WORKING_DAYS = 80;
+const DPR_DAYS = 40, DPR_SUBS = 51;
+const WEEKLY_TARGET = 72;
+
+const WEEKS = ['2026-05-18','2026-05-25','2026-06-01','2026-06-08','2026-06-15','2026-06-22','2026-06-29','2026-07-06','2026-07-13','2026-07-20','2026-07-27','2026-08-03','2026-08-10'];
+const WEEK_LABELS = ['May 18','May 25','Jun 01','Jun 08','Jun 15','Jun 22','Jun 29','Jul 06','Jul 13','Jul 20','Jul 27','Aug 03','Aug 10'];
+
+// score trend: {s_output,s_dpr,s_punct,s_hrs,s_planning,s_reliability,total} per week — from scoreCalc, same formula as the weekly report
+const TREND = [
+ {out:2.5, dpr:12,   punct:2.7, hrs:3.9, plan:0,   rel:10, total:31.1},
+ {out:4.2, dpr:10,   punct:6,   hrs:4.9, plan:8,   rel:4,  total:37.1},
+ {out:12.3,dpr:15,   punct:6.7, hrs:3.9, plan:0.5, rel:10, total:48.4},
+ {out:18.5,dpr:10,   punct:6,   hrs:4.9, plan:1.1, rel:6,  total:46.5},
+ {out:12.7,dpr:9,    punct:8.7, hrs:3.9, plan:1.5, rel:10, total:45.8},
+ {out:27.4,dpr:12.5, punct:4,   hrs:4.9, plan:0.8, rel:9,  total:58.6},
+ {out:19.1,dpr:9,    punct:2.7, hrs:3.9, plan:1.7, rel:9,  total:45.4},
+ {out:19.7,dpr:9,    punct:8.7, hrs:3.9, plan:4.5, rel:7,  total:52.8},
+ {out:5.9, dpr:9,    punct:4.7, hrs:3.9, plan:0,   rel:9,  total:32.5},
+ {out:27.5,dpr:12.5, punct:4,   hrs:4.9, plan:7.1, rel:7,  total:63.0},
+ {out:17.6,dpr:11.3, punct:3.3, hrs:2.8, plan:0,   rel:10, total:45.0},
+ {out:14.7,dpr:12.5, punct:8,   hrs:7,   plan:6.1, rel:3,  total:51.3},
+ {out:19.1,dpr:0,    punct:6.7, hrs:3.9, plan:7.9, rel:9,  total:46.6},
+];
+
+const BATCH_DAYS = [
+ {date:'2026-05-28', dow:'Thu', count:2, times:['06:06','13:59']},
+ {date:'2026-06-06', dow:'Sat', count:5, times:['05:15','05:27','05:35','05:44','05:49']},
+ {date:'2026-07-30', dow:'Thu', count:3, times:['05:28','05:37','05:47']},
+ {date:'2026-08-02', dow:'Sun', count:2, times:['04:30','04:34']},
+ {date:'2026-08-06', dow:'Thu', count:3, times:['16:24','16:38','16:54']},
+ {date:'2026-08-08', dow:'Sat', count:2, times:['04:38','04:39']},
+];
+
+const LATE_DETAIL = [
+ ['Venkatesh Mandir','Plumbing — Underground Sanitation','2026-05-26','2026-06-15',20],
+ ['Dr. Aalok Somani','Working Drawing - Coordination Check & Release','2026-06-08','2026-06-27',19],
+ ['Simrol Resort','Site Visit (Architecture)','2026-05-26','2026-06-12',17],
+ ['Tarun Maheshwari','Working Drawing - Coordination Check & Release','2026-05-25','2026-06-06',12],
+ ['Mayank Makhija Residence','Structural — Beam & Slab per floor','2026-08-06','2026-08-16',10],
+ ['Tarun Maheshwari','Structural — Beam & Slab per floor','2026-08-08','2026-08-16',8],
+ ['Sai Kripa Biaora','Structural — Coordination Check & Release','2026-06-08','2026-06-15',7],
+ ['Simrol Resort','MoM Action','2026-07-03','2026-07-10',7],
+ ['Nilesh Lathi','Working Drawing — Brickwork Drawing per floor incl. DW schedule and annotations','2026-05-25','2026-05-29',4],
+ ['Simrol Resort','Site Visit (Architecture)','2026-06-26','2026-06-30',4],
+ ['Simrol Resort','Working Drawing - Coordination Check & Release','2026-07-06','2026-07-10',4],
+ ['Simrol Resort','Structural — Coordination Check & Release','2026-07-06','2026-07-10',4],
+ ['Aditya Jhawar','Steel Calculation per Floor','2026-07-07','2026-07-10',3],
+ ['Kharat House','Structural — Foundation Layout','2026-07-21','2026-07-24',3],
+ ['Stone Gallery Showroom','Working Drawing - Coordination Check & Release','2026-05-27','2026-05-29',2],
+ ['Vishal Gautam','Site Issue — Design','2026-07-04','2026-07-06',2],
+ ['Kharat House','Structural — Beam & Slab per floor','2026-07-22','2026-07-24',2],
+ ['Alankar Wadhwani Row houses','Structural — Beam & Slab per floor','2026-07-23','2026-07-25',2],
+ ['Mayank Makhija Residence','Structural — Foundation Layout','2026-08-06','2026-08-08',2],
+ ['Simrol Resort','Working Drawing — Building Section / Staircase Details','2026-08-03','2026-08-04',1],
+];
+
+const OVERDUE_OPEN = [
+ ['Simrol Resort','Site Visit (Architecture)','2026-07-14',42],
+ ['Tulsivanam','Working Drawing - Gate or Boundary Walls','2026-08-05',20],
+ ['Stone Gallery Showroom','Site Visit (Architecture)','2026-08-07',18],
+ ['Nikhar Garg Farm house','Structural — Beam & Slab per floor','2026-08-08',17],
+ ['Tarun Maheshwari','Plumbing — Per Floor','2026-08-08',17],
+ ['Nikhar Garg Farm house','Coordination — Petty task/ small discussion','2026-08-18',7],
+ ['Simrol Resort','Structural — Coordination Check & Release','2026-08-18',7],
+ ['Tarun Maheshwari','Working Drawing — Building Section / Staircase Details','2026-08-21',4],
+ ['Simrol Resort','Site Visit (Architecture)','2026-08-24',1],
+ ['Stone Gallery Showroom','Site Visit (Architecture)','2026-08-24',1],
+];
+
+const BY_TYPE = [
+ ['Structural',22,87.4,6,8],
+ ['Site Visit / Meeting',22,72.0,2,2],
+ ['Working Drawing (Arch)',13,39.2,0,6],
+ ['Concept / Schematic',4,30.6,0,0],
+ ['Coordination',35,30.4,0,0],
+ ['Steel Calculation per Floor',1,7.2,0,1],
+ ['Civil Area Statement',3,6.8,0,0],
+ ['Electrical',2,4.0,0,0],
+ ['Plumbing',2,4.0,0,1],
+ ['Firefighting / HVAC Layout',1,3.6,0,0],
+ ['MoM Action',2,2.0,1,1],
+ ['ID Working Drawings',1,1.5,0,0],
+ ['Site Issue',1,1.0,0,1],
+];
+
+// VISIT_PLANNER real assignments, Fortnightly cadence, expected=6 over the 93-day window
+const VISIT_CADENCE = [
+ ['Tarun Maheshwari', ['2026-07-24','2026-07-31','2026-08-02']],
+ ['Amit Maheshwari', ['2026-07-24','2026-08-08']],
+ ['Simrol Resort', ['2026-06-12','2026-06-30']],
+ ['Venkatesh Mandir', ['2026-06-09']],
+ ['Stone Gallery Showroom', ['2026-06-25','2026-07-24']],
+];
+
+const PROJECTS = [
+ ['Aditya Jhawar',1,7.2,0,1,0,0],
+ ['Alankar Wadhwani Row houses',2,8.4,1,1,0,0],
+ ['Amit Maheshwari',13,29.8,4,0,2,6],
+ ['BBM 140',0,0.0,0,0,0,2],
+ ['BBM Mhow',1,3.5,0,0,1,1],
+ ['Chaman Rai',1,1.0,0,0,0,0],
+ ['Dr. Aalok Somani',1,1.5,0,1,0,0],
+ ['Hemant Kakani',1,0.5,0,0,0,0],
+ ['Highway Resort Bhopal',3,5.5,0,0,0,0],
+ ['Kharat House',3,19.2,0,2,0,0],
+ ['Madhur Business Park',1,1.0,0,0,0,0],
+ ['Mayank Makhija Residence',2,22.8,0,2,0,0],
+ ['New Project',1,1.3,0,0,0,0],
+ ['Nikhar Garg Farm house',1,0.5,0,0,0,3],
+ ['Nilesh Lathi',2,3.9,0,1,0,0],
+ ["Param - 40' x 60' Ratnesh",1,8.0,0,0,1,0],
+ ['Ritesh Somani Warehouse',9,10.0,0,0,0,3],
+ ['Rohit Jain',1,3.0,0,0,1,0],
+ ['Sai Kripa Biaora',1,1.0,0,1,0,0],
+ ['Sameer Yadav',2,5.0,0,0,0,2],
+ ['Simrol Resort',24,73.9,1,6,2,17],
+ ['Stone Gallery Showroom',11,20.5,1,1,2,2],
+ ['Tarun Maheshwari',18,45.8,1,2,3,5],
+ ['Venkatesh Mandir',7,11.0,0,1,1,0],
+ ['Vishal Gautam',2,5.5,1,1,0,1],
+];
+
+const EXTRAS = {
+  moodEntries: 55, moodDistinct: {3:55}, blockersReported: 0,
+  billables: [{date:'2026-08-16', project:'Mayank Makhija Residence', discipline:'Architecture', stage:'Structural Working Drawings', status:'Approved'}],
+  feedbackCount: 0,
+};
+
+const plannedTasks = 29, unplannedTasksCount = 80, plannedOnTime = 9, plannedDelayed = 20;
+const unplannedPts = 174.25, plannedPts = 115.5;
+const totalApprovedPts = plannedPts + unplannedPts;
+const totalTargetPts = WEEKS.length * WEEKLY_TARGET;
+
+// ══════════════════════ RENDER HELPERS ══════════════════════
+function pct(a,b){ return Math.round(a/b*100); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function statCard(label, val, note, cls){
+  return `<div class="stat-card ${cls||''}"><div class="stat-lbl">${label}</div><div class="stat-val">${val}</div>${note?`<div class="stat-note">${note}</div>`:''}</div>`;
+}
+
+function renderSummary(){
+  const el = document.getElementById('summaryGrid');
+  el.innerHTML = [
+    statCard('DPR Filed', `${DPR_DAYS} of ${TOTAL_WORKING_DAYS} days (${pct(DPR_DAYS,TOTAL_WORKING_DAYS)}%)`, `${DPR_SUBS} total submissions`, 'warn'),
+    statCard('Planned Tasks On Time', `${plannedOnTime} of ${plannedTasks} (${pct(plannedOnTime,plannedTasks)}%)`, '', 'warn'),
+    statCard('Planned Tasks Late', `${plannedDelayed} of ${plannedTasks} (${pct(plannedDelayed,plannedTasks)}%)`, 'up to 20 days late', 'warn'),
+    statCard('Working Drawing (Arch) On Time', '0 of 6 (0%)', 'his core deliverable category', 'warn'),
+    statCard('Tasks Still Open Past Deadline', String(OVERDUE_OPEN.length), `up to ${OVERDUE_OPEN[0][3]} days overdue`, 'warn'),
+    statCard('Approved Output vs Target', `${totalApprovedPts.toFixed(1)} of ${totalTargetPts} pts (${pct(totalApprovedPts,totalTargetPts)}%)`, `${WEEKLY_TARGET} pts/wk target, avg ${(totalApprovedPts/WEEKS.length).toFixed(1)} actual`, 'warn'),
+    statCard('Self-Logged vs Pre-Assigned Output', `${pct(unplannedPts, unplannedPts+plannedPts)}% self-logged`, `${unplannedTasksCount} self-logged tasks vs ${plannedTasks} pre-assigned`),
+    statCard('Site Visit Cadence Compliance', `${VISIT_CADENCE.reduce((s,v)=>s+v[1].length,0)} of ${VISIT_CADENCE.length*6} expected (${pct(VISIT_CADENCE.reduce((s,v)=>s+v[1].length,0), VISIT_CADENCE.length*6)}%)`, 'gaps up to 92 days', 'warn'),
+    statCard('Projects Handled', String(PROJECTS.length)),
+  ].join('');
+}
+
+function ratingCard(label, val, max, sub){
+  const p = val/max;
+  const cls = p>=0.85?'g':p>=0.6?'a':p>=0.4?'o':'r';
+  return `<div class="rc ${cls}"><div class="rc-lbl">${label}</div><div class="rc-val">${val.toFixed(1)}<span class="rc-max">/${max}</span></div><div class="rc-sub">${sub||''}</div></div>`;
+}
+function avg(key){ return TREND.reduce((s,w)=>s+w[key],0)/TREND.length; }
+function renderRatings(){
+  document.getElementById('ratingGrid').innerHTML = [
+    ratingCard('Output', avg('out'), 50, 'approved pts vs 72/wk target'),
+    ratingCard('DPR Consistency', avg('dpr'), 15, `${DPR_DAYS} of ${TOTAL_WORKING_DAYS} days filed`),
+    ratingCard('Punctuality', avg('punct'), 10, 'biometric, Thr: 10:40'),
+    ratingCard('Hours', avg('hrs'), 7, 'biometric'),
+    ratingCard('Planning', avg('plan'), 8, 'planned vs self-logged work'),
+    ratingCard('Reliability', avg('rel'), 10, 'late/reassigned task penalty'),
+    ratingCard('Total', avg('total'), 100, '13-week average'),
+  ].join('');
+}
+
+// simple SVG line chart
+function lineChart(vals, max, color){
+  const W=280, H=90, PAD=6;
+  const n = vals.length;
+  const stepX = (W-PAD*2)/(n-1);
+  const pts = vals.map((v,i)=>{
+    const x = PAD + i*stepX;
+    const y = H - PAD - (Math.max(0,Math.min(v,max))/max)*(H-PAD*2);
+    return [x,y];
+  });
+  const path = pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const areaPath = path + ` L${pts[pts.length-1][0].toFixed(1)},${H-PAD} L${pts[0][0].toFixed(1)},${H-PAD} Z`;
+  const dots = pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${color}"/>`).join('');
+  // gridlines at 25/50/75%
+  const grid = [0.25,0.5,0.75].map(f=>{
+    const y = H-PAD-f*(H-PAD*2);
+    return `<line x1="${PAD}" y1="${y.toFixed(1)}" x2="${W-PAD}" y2="${y.toFixed(1)}" stroke="rgba(43,38,32,0.08)" stroke-width="1"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="90" preserveAspectRatio="none">
+    ${grid}
+    <path d="${areaPath}" fill="${color}" opacity="0.08"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>
+    ${dots}
+  </svg>`;
+}
+function stdev(vals){
+  const m = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const v = vals.reduce((a,b)=>a+(b-m)*(b-m),0)/vals.length;
+  return Math.sqrt(v);
+}
+function chartCard(title, key, max, color){
+  const vals = TREND.map(w=>w[key]);
+  const a = vals.reduce((s,v)=>s+v,0)/vals.length;
+  const sd = stdev(vals);
+  const cv = a>0 ? Math.round(sd/a*100) : 0;
+  return `<div class="chart-card">
+    <div class="chart-title"><span>${title}</span><span class="avg">avg ${a.toFixed(1)}/${max}</span></div>
+    ${lineChart(vals, max, color)}
+    <div class="chart-note">week-to-week variation (coefficient of variation): ${cv}%</div>
+  </div>`;
+}
+function renderCharts(){
+  document.getElementById('chartGrid').innerHTML =
+    chartCard('Output /50','out',50,'#F5A623') +
+    chartCard('DPR Consistency /15','dpr',15,'#2E7D32') +
+    chartCard('Punctuality /10','punct',10,'#C0392B') +
+    chartCard('Hours /7','hrs',7,'#8A6408') +
+    chartCard('Planning /8','plan',8,'#B8860B') +
+    chartCard('Reliability /10','rel',10,'#EA4335') +
+    chartCard('Total /100','total',100,'#2B2620');
+}
+
+function renderDpr(){
+  document.getElementById('dprLead').innerHTML =
+    `Achal filed a DPR entry on <b>${DPR_DAYS} of ${TOTAL_WORKING_DAYS}</b> working days (${pct(DPR_DAYS,TOTAL_WORKING_DAYS)}%). The remaining entries were not spread across the missed days — on six occasions, multiple DPR forms were submitted within minutes of each other in a single early-morning or off-hours sitting, evidently to retroactively cover several prior days at once. <b>Three of these six sessions fell on a Saturday or Sunday.</b>`;
+  const rows = BATCH_DAYS.map(b=>{
+    const wk = b.dow==='Sat'||b.dow==='Sun';
+    return `<tr class="${wk?'hot':''}"><td>${b.date}</td><td class="${wk?'dow-weekend':''}">${b.dow}</td><td>${b.count}</td><td>${b.times.join(', ')}</td><td>${wk?'Weekend catch-up filing':'Same-day cluster, off-hours'}</td></tr>`;
+  }).join('');
+  document.getElementById('batchTable').innerHTML =
+    `<thead><tr><th>Date</th><th>Day</th><th># Filed</th><th>Submission Times</th><th>Notes</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+function renderDelays(){
+  document.getElementById('delayLead').innerHTML =
+    `Of ${plannedTasks} pre-assigned tasks with a tracked deadline completed in the review period, only <b>${plannedOnTime} (${pct(plannedOnTime,plannedTasks)}%)</b> were delivered on time; <b>${plannedDelayed} (${pct(plannedDelayed,plannedTasks)}%)</b> were late — by as much as 20 days. Working Drawing deliverables (Architecture) went 0 for 6 on tracked-deadline items completed this period.`;
+  document.getElementById('lateTable').innerHTML =
+    `<thead><tr><th>Project</th><th>Task</th><th>Deadline</th><th>Delivered</th><th>Days Late</th></tr></thead><tbody>` +
+    LATE_DETAIL.map(r=>`<tr class="${r[4]>=10?'hot':r[4]>=5?'warm':''}"><td class="t-proj">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td><b>${r[4]}</b></td></tr>`).join('') +
+    `</tbody>`;
+  document.getElementById('overdueTable').innerHTML =
+    `<thead><tr><th>Project</th><th>Task</th><th>Deadline</th><th>Days Overdue</th></tr></thead><tbody>` +
+    OVERDUE_OPEN.map(r=>`<tr class="${r[3]>=15?'hot':r[3]>=5?'warm':''}"><td class="t-proj">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${r[2]}</td><td><b>${r[3]}</b></td></tr>`).join('') +
+    `</tbody>`;
+  document.getElementById('typeTable').innerHTML =
+    `<thead><tr><th>Category</th><th>Tasks</th><th>Points</th><th>On Time</th><th>Delayed</th></tr></thead><tbody>` +
+    BY_TYPE.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2].toFixed(1)}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join('') +
+    `</tbody>`;
+}
+
+function renderVisits(){
+  const totalVisits = VISIT_CADENCE.reduce((s,v)=>s+v[1].length,0);
+  const expected = VISIT_CADENCE.length*6;
+  document.getElementById('visitLead').innerHTML =
+    `Five of his projects carry a mandatory 14-day (Fortnightly) site visit cadence per VISIT_PLANNER. Across the review period (93 days, expected 6 visits per project), actual visit logging: <b>${totalVisits} of ${expected} expected visits (${pct(totalVisits,expected)}%)</b>.`;
+  function dayGap(a,b){ return Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/86400000); }
+  const from='2026-05-15', to='2026-08-15';
+  const rows = VISIT_CADENCE.map(([pn, visits])=>{
+    const v = visits.slice().sort();
+    const gaps=[]; let prev=from;
+    v.forEach(d=>{ if(dayGap(prev,d)>14) gaps.push(`${dayGap(prev,d)}d (${prev} to ${d})`); prev=d; });
+    if (dayGap(prev,to)>14) gaps.push(`${dayGap(prev,to)}d (${prev} to ${to})`);
+    return `<tr><td class="t-proj">${esc(pn)}</td><td>${v.length}</td><td>6</td><td>${gaps.join(', ')}</td></tr>`;
+  }).join('');
+  document.getElementById('visitTable').innerHTML =
+    `<thead><tr><th>Project</th><th>Visits Logged</th><th>Expected</th><th>Gaps &gt; 14 days</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+function renderExtras(){
+  const el = document.getElementById('extrasGrid');
+  el.innerHTML = [
+    statCard('DPR Mood Score', 'Always 3/5 (default)', `${EXTRAS.moodEntries} entries, every one left at the form default — field not meaningfully used`),
+    statCard('Blockers Reported', String(EXTRAS.blockersReported), 'in any DPR entry this period'),
+    statCard('Billables Raised', String(EXTRAS.billables.length), EXTRAS.billables.length ? `${EXTRAS.billables[0].project} — ${EXTRAS.billables[0].stage} (${EXTRAS.billables[0].status})` : ''),
+    statCard('Client Feedback Logged', String(EXTRAS.feedbackCount), 'for his projects this period — no monthly feedback on record'),
+  ].join('');
+}
+
+function renderProjects(){
+  const rows = PROJECTS.map(r=>{
+    const shade = r[4]>=5?'hot':r[4]>=1?'warm':'';
+    return `<tr class="${shade}"><td class="t-proj">${esc(r[0])}</td><td>${r[1]}</td><td>${r[2].toFixed(1)}</td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td><td></td></tr>`;
+  }).join('');
+  document.getElementById('projTable').innerHTML =
+    `<thead><tr><th>Project</th><th>Tasks</th><th>Pts</th><th>On Time</th><th>Delayed</th><th>Visits</th><th>Comms</th><th>Delivery / Client Impact</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+function renderAll(){
+  renderSummary(); renderRatings(); renderCharts(); renderDpr(); renderDelays(); renderVisits(); renderExtras(); renderProjects();
+}
+
+// auth.js reveals #app / calls idsOnAuth once signed in + on the allowlist
+window.idsOnAuth = function(){
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderAll();
+};
+</script>
+</body>
+</html>
