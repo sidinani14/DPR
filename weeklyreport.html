@@ -227,7 +227,7 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
 const INCLUDE_DEEPAK_AMAN = true;   // Deepak & Aman included this week
 let COMMEND = [
-  {name:'Aman Raghuwanshi', detail:'Came in on Sunday (Aug 23, his day off) and put in 2.25 hours of unpaid overtime.'}
+  {name:'Aman Raghuwanshi', detail:'Came in on Sunday (Aug 23, his day off) and put in 2.25 hours of paid overtime.'}
 ];
 let TOP_NOTE = {};
 
@@ -1013,7 +1013,7 @@ function buildDeepakPage(d){
       ${pCard('Punctuality<br>Biometric',s.s_punct,10,`${d.lateCount} late · ${d.absentDays} absent${d.leaveDays?' · '+d.leaveDays+' approved leave':''} · Thr: 09:10`)}
       ${pCard('Hours<br>Biometric',s.s_hrs,7,`${d.daysPresent}/6 days present`)}
       ${pCard('Client<br>Satisfaction',s.s_client_sat,8,`Avg. Overall Satisfaction rating from Monthly Client Feedback this week, across his active sites — no rating logged this week defaults to full marks`)}
-      ${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done, −5 per unexplained absence. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done${d.unexplainedAbsences?', '+d.unexplainedAbsences+' unexplained absence'+(d.unexplainedAbsences>1?'s':''):''}. <b>To improve:</b> set realistic target dates, close site tasks on time, and inform in advance if you'll be absent.`)}
+      <div style="grid-column:1/-1">${pCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue site task, −2 per work not done, −5 per unexplained absence. This week: ${d.lateTaskCount||0} late, ${d.workNotDone||0} not done${d.unexplainedAbsences?', '+d.unexplainedAbsences+' unexplained absence'+(d.unexplainedAbsences>1?'s':''):''}. <b>To improve:</b> set realistic target dates, close site tasks on time, and inform in advance if you'll be absent.`)}</div>
     </div>
 
     <div style="margin-top:2mm">
