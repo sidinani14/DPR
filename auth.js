@@ -145,6 +145,39 @@
     if (el) google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with' });
   }
 
+  // A login_hint-personalized button ("Sign in as X") drives its "continue"
+  // click through FedCM's navigator.credentials.get() under the hood, which
+  // can silently abort in some browser/session states — leaving the chip
+  // inert with no error and no way forward except a manual reload. If that
+  // happens, this re-initializes WITHOUT login_hint so the re-rendered
+  // button falls back to the plain, non-personalized account-chooser flow.
+  function reinitPlain() {
+    try { google.accounts.id.disableAutoSelect(); } catch (e) {}
+    try {
+      google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false });
+      _inited = true;
+    } catch (e) { _inited = false; }
+    buildGate('signin'); // renders the button itself once _inited is set above
+  }
+
+  // If the sign-in button has been up for a while with no token, offer a
+  // visible way out instead of leaving the user stuck staring at a chip
+  // that silently failed.
+  function armStuckHelp() {
+    setTimeout(function () {
+      if (window.IDS_TOKEN) return; // already signed in, nothing to do
+      var g = document.getElementById('ids-gate');
+      if (!g || document.getElementById('ids-stuck-help')) return;
+      var help = document.createElement('div');
+      help.id = 'ids-stuck-help';
+      help.style.cssText = 'margin-top:14px;font-size:11px;color:#5A5652';
+      help.innerHTML = 'Stuck? <span id="ids-force-retry" style="color:#C8A96E;text-decoration:underline;cursor:pointer">Click to retry sign-in</span>';
+      g.firstChild.appendChild(help);
+      var btn = document.getElementById('ids-force-retry');
+      if (btn) btn.onclick = reinitPlain;
+    }, 8000);
+  }
+
   function onCredential(resp) {
     var token = resp && resp.credential;
     var p = token ? parseJwt(token) : null;
@@ -212,7 +245,7 @@
     buildGate('checking');
     // Safety net: if GIS prompt doesn't call back within 4 s, show the button anyway.
     var _signinShown = false;
-    function showSignin(){ if(!_signinShown){ _signinShown=true; buildGate('signin'); } }
+    function showSignin(){ if(!_signinShown){ _signinShown=true; buildGate('signin'); armStuckHelp(); } }
     var _signinTimer = setTimeout(showSignin, 4000);
     loadGis(function () {
       // Always initialize (with client_id) before prompting. use_fedcm_for_prompt

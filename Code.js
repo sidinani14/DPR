@@ -1133,18 +1133,23 @@ function verifyIdToken(token) {
   var key = 'auth_' + Utilities.base64EncodeWebSafe(
               Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, token));
   var cached = cache.get(key);
-  if (cached) return cached === '-' ? null : cached;
+  if (cached) return (cached === '-transient' || cached === '-denied') ? null : cached;
   try {
     var resp = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
       { muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) { cache.put(key, '-', 20); return null; }
+    // Non-200 here means Google's tokeninfo endpoint hiccupped, not that the
+    // token is bad -- tag it '-transient' (distinct from a real '-denied')
+    // so respondUnauthorized() can tell the client this wasn't a genuine
+    // denial and the frontend gate doesn't nuke a perfectly valid session
+    // over a passing network blip.
+    if (resp.getResponseCode() !== 200) { cache.put(key, '-transient', 20); return null; }
     var info  = JSON.parse(resp.getContentText());
     var email = String(info.email || '').toLowerCase();
     var ok = (info.aud === AUTH_CLIENT_ID) &&
              (String(info.email_verified) !== 'false') &&
              getAllowedEmails()[email];
-    if (!ok) { cache.put(key, '-', 300); return null; }
+    if (!ok) { cache.put(key, '-denied', 300); return null; }
     // 55 min -- close to the token's own ~1hr lifetime (small buffer so a
     // cached verdict never outlives the token itself). Was 30 min; stretched
     // to roughly halve how often each person's session re-hits the tokeninfo
@@ -1153,9 +1158,25 @@ function verifyIdToken(token) {
     // hitting Apps Script's daily quota under this account's tier.
     cache.put(key, email, 3300);
     return email;
-  } catch (err) { try { cache.put(key, '-', 20); } catch(e2){} return null; }
+  } catch (err) { try { cache.put(key, '-transient', 20); } catch(e2){} return null; }
 }
-function respondUnauthorized() {
+function isTransientAuthFailure(token) {
+  if (!token) return false;
+  try {
+    var cache = CacheService.getScriptCache();
+    var key = 'auth_' + Utilities.base64EncodeWebSafe(
+                Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, token));
+    return cache.get(key) === '-transient';
+  } catch (e) { return false; }
+}
+function respondUnauthorized(token) {
+  // A transient tokeninfo hiccup gets its own 'code' so auth.js's fetch
+  // patch (which only nukes the session on code==='unauthorized') leaves a
+  // genuinely-valid session alone and just lets that one call fail/retry.
+  if (isTransientAuthFailure(token)) {
+    return respond({ status: 'error', code: 'transient',
+                     message: 'Temporary issue verifying sign-in -- please retry.' });
+  }
   return respond({ status: 'error', code: 'unauthorized',
                    message: 'Sign in with an authorized Ideaform team account.' });
 }
@@ -1216,7 +1237,7 @@ function doGet(e) {
     return respond(out);
   }
   var authEmail = verifyIdToken(p.idToken);
-  if (!authEmail) return respondUnauthorized();
+  if (!authEmail) return respondUnauthorized(p.idToken);
   var action = p.action || '', member = p.member || '';
   if (MANAGER_ONLY[action] && !isManager(authEmail))
     return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
@@ -1267,7 +1288,7 @@ function doPost(e) {
     var raw  = e && e.postData ? e.postData.contents : '';
     var data = JSON.parse(raw);
     var authEmail = verifyIdToken(data.idToken);
-    if (!authEmail) return respondUnauthorized();
+    if (!authEmail) return respondUnauthorized(data.idToken);
     if (MANAGER_ONLY[data.action] && !isManager(authEmail))
       return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
