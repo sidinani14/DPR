@@ -197,6 +197,15 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
 
 <div class="banner" id="banner">Submit before 7:30 PM · responses go directly to your scoresheet</div>
 
+<div id="draft-banner" style="display:none;background:var(--amber-light);border:1.5px solid var(--amber);border-radius:var(--radius);padding:12px 16px;margin:10px 14px 0;">
+  <div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">📋 Unsaved draft found</div>
+  <div id="draft-banner-sub" style="font-size:11px;color:var(--text2);margin-bottom:10px">Resume where you left off?</div>
+  <div style="display:flex;gap:8px">
+    <button onclick="resumeDraft()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Resume Draft</button>
+    <button onclick="discardDraft()" style="background:none;border:1px solid var(--border2);border-radius:7px;padding:7px 14px;font-size:12px;color:var(--text2);cursor:pointer">Start Fresh</button>
+  </div>
+</div>
+
 <div class="score-strip">
   <div class="score-strip-inner">
     <div class="score-cell"><div class="score-val" id="sc-pts">0.0</div><div class="score-lbl">Weighted pts</div></div>
@@ -664,6 +673,7 @@ function handleGoogleCredential(payload) {
   updateSubmitBar();
   fetchAssignedTasks();
   fetchNotifications();
+  loadDraftAndCheck();
 }
 
 async function fetchNotifications() {
@@ -1054,6 +1064,202 @@ function collectBillables(){
   });
   return out;
 }
+
+// ── Draft auto-save — never lose a filled report on a failed submit or an
+// interrupted session. Covers Section 3 (self-logged project/task blocks),
+// Section 4 (field work), connections, billables, and the accountability/
+// summary fields (Section 7-8). Deliberately does NOT restore Section 2
+// (marking pre-assigned tasks Done/Ongoing) -- that's fast to redo by
+// clicking, and depends on a freshly-fetched assigned-task list that could
+// legitimately differ between sessions.
+function getDraftKey(){ return 'dpr_draft_' + ((googleUser&&googleUser.email)||'anon'); }
+function collectDraftData(){
+  const g = id => document.getElementById(id);
+  const projBlocks = [...document.querySelectorAll('#proj-blocks > .proj-block')].map(pb => {
+    const tasks = [...pb.querySelectorAll('.task-rows .task-entry')].map(row => ({
+      cat: row.querySelector('.t-cat')?.value||'', type: row.querySelector('.t-type')?.value||'',
+      units: row.querySelector('.t-units')?.value||'', area: row.querySelector('.t-area')?.value||'',
+      hrsTaken: row.querySelector('.t-hrs-taken')?.value||'',
+      status: row.querySelector('.t-status:checked')?.value||'Done',
+      visitHrs: row.querySelector('.t-visit-hrs')?.value||'',
+    }));
+    return { proj: pb.querySelector('.p-name')?.value||'', tasks };
+  });
+  const fwBlocks = [...document.querySelectorAll('#fw-blocks > .fw-block')].map(fb => ({
+    type: fb.querySelector('.fw-type')?.value||'', proj: fb.querySelector('.fw-proj')?.value||'',
+    start: fb.querySelector('.fw-start')?.value||'', end: fb.querySelector('.fw-end')?.value||'',
+    notes: fb.querySelector('.fw-notes')?.value||'',
+  }));
+  const connBlocks = [...document.querySelectorAll('#conn-blocks > .conn-block')].map(cb => {
+    const id = cb.id.replace('cn-','');
+    return {
+      proj: cb.querySelector('.conn-proj')?.value||'', with: chipVal('cn-with-'+id),
+      name: (document.getElementById('cn-name-'+id)||{}).value||'',
+      type: chipVal('cn-type-'+id),
+      notes: (document.getElementById('cn-notes-'+id)||{}).value||'',
+    };
+  });
+  const billBlocks = [...document.querySelectorAll('#bill-blocks > .conn-block')].map(bb => {
+    const id = bb.id.replace('bl-','');
+    return { proj: (document.getElementById('bill-proj-'+id)||{}).value||'', stage: (document.getElementById('bill-stage-'+id)||{}).value||'' };
+  });
+  return {
+    savedAt: new Date().toISOString(),
+    date: g('f-date')?.value||'',
+    projBlocks, fwBlocks, connBlocks, billBlocks,
+    billraised: document.querySelector('input[name=billraised]:checked')?.value||'No',
+    ontime: document.querySelector('input[name=ontime]:checked')?.value||'',
+    lateInformed: document.querySelector('input[name=late-informed]:checked')?.value||'',
+    latePunchIn: g('late-punch-in')?.value||'', lateReqReason: g('late-req-reason')?.value||'',
+    referrals: g('referrals')?.value||'', deliverables: g('deliverables')?.value||'',
+    blockers: g('blockers')?.value||'', mood: document.querySelector('input[name=mood]:checked')?.value||'',
+  };
+}
+function draftHasContent(d){
+  if (!d) return false;
+  return !!(d.deliverables || d.blockers ||
+    (d.projBlocks||[]).some(p=>p.proj || (p.tasks||[]).some(t=>t.type||t.area)) ||
+    (d.fwBlocks||[]).some(f=>f.proj||f.notes) ||
+    (d.connBlocks||[]).some(c=>c.proj) || (d.billBlocks||[]).some(b=>b.proj));
+}
+let _draftSoonT=null, _srvDraftT=null;
+function saveDraft(){
+  if (!googleUser) return;
+  const d = collectDraftData();
+  if (!draftHasContent(d)) return;
+  try { localStorage.setItem(getDraftKey(), JSON.stringify(d)); } catch(e){}
+  clearTimeout(_srvDraftT); _srvDraftT = setTimeout(pushServerDraft, 3000);
+}
+function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
+function pushServerDraft(){
+  try {
+    const d = collectDraftData();
+    if (!draftHasContent(d)) return;
+    fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'savePlanDraft', draft:JSON.stringify(d), formType:'dpr'})}).catch(()=>{});
+  } catch(e){}
+}
+function flushDraftNow(){ clearTimeout(_draftSoonT); saveDraft(); }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
+window.addEventListener('pagehide', flushDraftNow);
+document.addEventListener('input',  e=>{ if(e.target.closest('#proj-blocks')||e.target.closest('#fw-blocks')||e.target.closest('#conn-blocks')||e.target.closest('#bill-blocks')||e.target.closest('.card-body')) saveDraftSoon(); });
+document.addEventListener('change', e=>{ if(e.target.closest('#proj-blocks')||e.target.closest('#fw-blocks')||e.target.closest('#conn-blocks')||e.target.closest('#bill-blocks')||e.target.closest('.card-body')) saveDraftSoon(); });
+document.addEventListener('click',  e=>{ if(e.target.closest('.chip')) saveDraftSoon(); });
+
+async function loadDraftAndCheck(){
+  try {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getPlanDraft', formType:'dpr'})}).then(x=>x.json());
+    if (r && r.draft) {
+      const localRaw = localStorage.getItem(getDraftKey());
+      let localTs=0, svTs=0;
+      try { localTs = new Date(JSON.parse(localRaw||'{}').savedAt||0).getTime()||0; } catch(e){}
+      try { svTs = new Date(JSON.parse(r.draft).savedAt||0).getTime()||0; } catch(e){}
+      if (!localRaw || svTs > localTs) localStorage.setItem(getDraftKey(), r.draft);
+    }
+  } catch(e){}
+  checkForDraft();
+}
+function checkForDraft(){
+  let d; try { d = JSON.parse(localStorage.getItem(getDraftKey())||'null'); } catch(e){}
+  if (!draftHasContent(d)) return;
+  const savedAt = new Date(d.savedAt);
+  const minsAgo = Math.round((Date.now()-savedAt.getTime())/60000);
+  const timeLabel = minsAgo<2?'just now':minsAgo<60?minsAgo+' min ago':Math.round(minsAgo/60)+' hr ago';
+  const n = (d.projBlocks||[]).reduce((a,p)=>a+(p.tasks||[]).filter(t=>t.type).length,0);
+  document.getElementById('draft-banner-sub').textContent = 'Last saved '+timeLabel+(n?` · ${n} task${n!==1?'s':''}`:'');
+  document.getElementById('draft-banner').style.display='block';
+  window._pendingDprDraft = d;
+}
+function resumeDraft(){
+  const d = window._pendingDprDraft; if (!d) return;
+  document.getElementById('draft-banner').style.display='none';
+  const g = id => document.getElementById(id);
+  if (d.date && g('f-date')) g('f-date').value = d.date;
+
+  document.getElementById('proj-blocks').innerHTML=''; projCount=0;
+  (d.projBlocks||[]).forEach(pb => {
+    addProject();
+    const el = document.querySelector('#proj-blocks > .proj-block:last-child');
+    const sel = el.querySelector('.p-name'); if (sel && pb.proj) { sel.value = pb.proj; onProjSelect(sel); }
+    const rows = el.querySelector('.task-rows'); rows.innerHTML='';
+    (pb.tasks||[]).forEach(t => {
+      addTask(rows.id);
+      const row = rows.querySelector('.task-entry:last-child');
+      if (t.cat) { row.querySelector('.t-cat').value = t.cat; fillTypes(row.querySelector('.t-cat')); }
+      if (t.type) { row.querySelector('.t-type').value = t.type; refreshTaskPts(row.querySelector('.t-type')); }
+      if (t.units) row.querySelector('.t-units').value = t.units;
+      if (t.area) row.querySelector('.t-area').value = t.area;
+      if (t.hrsTaken) row.querySelector('.t-hrs-taken').value = t.hrsTaken;
+      const radio = row.querySelector(`.t-status[value="${t.status}"]`);
+      if (radio) { radio.checked = true; toggleVisitHrs(radio); }
+      if (t.visitHrs) { const vh = row.querySelector('.t-visit-hrs'); if (vh) vh.value = t.visitHrs; }
+    });
+    if (!(pb.tasks||[]).length) addTask(rows.id);
+  });
+
+  document.getElementById('fw-blocks').innerHTML=''; fwCount=0;
+  (d.fwBlocks||[]).forEach(fb => {
+    addFieldWork();
+    const el = document.querySelector('#fw-blocks > .fw-block:last-child');
+    if (fb.type) el.querySelector('.fw-type').value = fb.type;
+    if (fb.proj) el.querySelector('.fw-proj').value = fb.proj;
+    if (fb.start) el.querySelector('.fw-start').value = fb.start;
+    if (fb.end) el.querySelector('.fw-end').value = fb.end;
+    if (fb.notes) el.querySelector('.fw-notes').value = fb.notes;
+  });
+
+  document.getElementById('conn-blocks').innerHTML=''; connCount=0;
+  (d.connBlocks||[]).forEach(cb => {
+    addConnection();
+    const el = document.querySelector('#conn-blocks > .conn-block:last-child');
+    const id = el.id.replace('cn-','');
+    if (cb.proj) el.querySelector('.conn-proj').value = cb.proj;
+    if (cb.with) { const c = document.querySelector(`#cn-with-${id} [data-val="${cb.with}"]`); if (c) pickChip(c); }
+    if (cb.type) { const c2 = document.querySelector(`#cn-type-${id} [data-val="${cb.type}"]`); if (c2) pickChip(c2); }
+    if (cb.name && g('cn-name-'+id)) g('cn-name-'+id).value = cb.name;
+    if (cb.notes && g('cn-notes-'+id)) g('cn-notes-'+id).value = cb.notes;
+  });
+
+  document.getElementById('bill-blocks').innerHTML=''; billCount=0;
+  if (d.billraised === 'Yes') {
+    const yesRadio = document.querySelector('input[name=billraised][value="Yes"]');
+    if (yesRadio) { yesRadio.checked = true; document.getElementById('bill-wrap').style.display='block'; }
+    (d.billBlocks||[]).forEach(bb => {
+      addBillable();
+      const el = document.querySelector('#bill-blocks > .conn-block:last-child');
+      const projSel = el.querySelector('.bill-proj');
+      if (bb.proj) { projSel.value = bb.proj; fillBillStagesFromProject(projSel); }
+      const stageSel = el.querySelector('.bill-stage');
+      if (bb.stage && stageSel) stageSel.value = bb.stage;
+    });
+  }
+
+  if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
+  if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
+  if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
+  if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
+  if (d.referrals && g('referrals')) g('referrals').value = d.referrals;
+  if (d.deliverables && g('deliverables')) g('deliverables').value = d.deliverables;
+  if (d.blockers && g('blockers')) g('blockers').value = d.blockers;
+  if (d.mood) { const mr = document.querySelector(`input[name=mood][value="${d.mood}"]`); if (mr) mr.checked = true; }
+
+  calcScore();
+  toast('Draft restored ✓');
+}
+function discardDraft(){
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  document.getElementById('draft-banner').style.display='none';
+  window._pendingDprDraft=null;
+  try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'dpr'})}).catch(()=>{}); } catch(e){}
+}
+function clearDraft(){
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'dpr'})}).catch(()=>{}); } catch(e){}
+}
+
 function stageOptions() {
   return '<option value="">— select task type —</option>'+
     STAGES.map((s,i)=>`<option value="${i}">${s.label} · ${s.pts}pts</option>`).join('');
@@ -1529,6 +1735,7 @@ async function submitForm() {
     } else {
       pw.style.display = 'none';
     }
+    clearDraft();
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');

@@ -28,9 +28,23 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 .toggle{display:flex;gap:0;border:1.5px solid #1F3A5F;border-radius:9px;overflow:hidden;width:fit-content}
 .toggle div{padding:7px 18px;font-size:13px;cursor:pointer;color:#1F3A5F}.toggle div.on{background:#1F3A5F;color:#fff}
 .ph-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.ph-list .t{font-size:10px;background:#EEE;border-radius:5px;padding:3px 7px}
+.draft-banner{background:#FFF8E1;border:1.5px solid #FFE082;border-radius:12px;padding:12px 16px;margin-bottom:14px;display:none}
+.draft-banner-title{font-size:13px;font-weight:700;color:#7A5000;margin-bottom:4px}
+.draft-banner-sub{font-size:11px;color:#A0522D;margin-bottom:10px}
+.draft-banner-btns{display:flex;gap:8px}
+.draft-resume{background:#1F3A5F;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.draft-discard{background:none;border:1px solid #CBC7BC;border-radius:7px;padding:7px 14px;font-size:12px;color:#6B6860;cursor:pointer}
 </style></head><body>
 <h1>Site Visit / Meeting Log</h1>
 <div class="sub">Ideaform Design Studio · replaces the Google Forms · sign in to begin.</div>
+<div class="draft-banner" id="draft-banner">
+  <div class="draft-banner-title">📋 Unsaved draft found</div>
+  <div class="draft-banner-sub" id="draft-banner-sub">Resume where you left off?</div>
+  <div class="draft-banner-btns">
+    <button class="draft-resume" onclick="resumeDraft()">Resume Draft</button>
+    <button class="draft-discard" onclick="discardDraft()">Start Fresh</button>
+  </div>
+</div>
 <div id="app"><div class="card">Sign in with your Ideaform account to load the form…</div></div>
 
 <script>
@@ -131,6 +145,7 @@ function render(){
 
   <div id="bar"><button id="go" onclick="submitLog()">Submit log</button><div class="msg" id="msg"></div></div>`;
   setType(LOG_TYPE);
+  loadDraftAndCheck();
 }
 function setType(t){
   LOG_TYPE=t; const app=document.getElementById('app');
@@ -141,6 +156,110 @@ function setType(t){
   document.getElementById('body-lbl').textContent = t==='Site Visit'?'Note observations & issues (numbered)':'Write area-wise minutes (numbered)';
   const pc=document.getElementById('purpose');
   pc.innerHTML=PURPOSE[t].map(p=>`<div class="chip" data-v="${esc(p)}" onclick="this.classList.toggle('on')">${esc(p)}</div>`).join('');
+}
+
+// ── Draft auto-save — never lose a filled log on a failed submit or an
+// interrupted session (photos aren't included: too large for localStorage,
+// re-attaching them is the one manual step on restore) ──
+function getDraftKey(){ return 'meetlog_draft_' + ((window.IDS_USER&&window.IDS_USER.email)||'anon'); }
+function collectDraftData(){
+  const g = id => document.getElementById(id);
+  return {
+    savedAt: new Date().toISOString(), type: LOG_TYPE,
+    project: g('project')?.value||'', date: g('date')?.value||'', time: g('time')?.value||'',
+    endTime: g('endTime')?.value||'', duration: g('duration')?.value||'', loggedBy: g('loggedBy')?.value||'',
+    teamAttendees: [...document.querySelectorAll('.ta:checked')].map(c=>c.value),
+    clientAttendees: g('clientAttendees')?.value||'',
+    purpose: [...document.querySelectorAll('#purpose .chip.on')].map(c=>c.dataset.v),
+    body: g('body')?.value||'',
+    actions: CATS.map(c=>({cat:c[0], owner: g('own-'+c[0])?.value||'', text: g('actt-'+c[0])?.value||''})),
+    videos: g('videos')?.value||'',
+  };
+}
+function draftHasContent(d){
+  return !!(d && (d.project || d.body || d.clientAttendees || (d.actions||[]).some(a=>a.text)));
+}
+let _draftSoonT=null, _srvDraftT=null;
+function saveDraft(){
+  if (!(window.IDS_USER&&window.IDS_USER.email)) return;
+  const d = collectDraftData();
+  if (!draftHasContent(d)) return;
+  try { localStorage.setItem(getDraftKey(), JSON.stringify(d)); } catch(e){}
+  clearTimeout(_srvDraftT); _srvDraftT = setTimeout(pushServerDraft, 3000); // also persist server-side (cross-device)
+}
+function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
+function pushServerDraft(){
+  try {
+    const d = collectDraftData();
+    if (!draftHasContent(d)) return;
+    fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'savePlanDraft', draft:JSON.stringify(d), formType:'meetlog'})}).catch(()=>{});
+  } catch(e){}
+}
+function flushDraftNow(){ clearTimeout(_draftSoonT); saveDraft(); }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
+window.addEventListener('pagehide', flushDraftNow);
+document.addEventListener('input',  e=>{ if(e.target.closest('#app')) saveDraftSoon(); });
+document.addEventListener('change', e=>{ if(e.target.closest('#app')) saveDraftSoon(); });
+document.addEventListener('click',  e=>{ if(e.target.closest('.chip')||e.target.closest('.toggle div')) saveDraftSoon(); });
+
+async function loadDraftAndCheck(){
+  try {
+    const r = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getPlanDraft', formType:'meetlog'})}).then(x=>x.json());
+    if (r && r.draft) {
+      const localRaw = localStorage.getItem(getDraftKey());
+      let localTs=0, svTs=0;
+      try { localTs = new Date(JSON.parse(localRaw||'{}').savedAt||0).getTime()||0; } catch(e){}
+      try { svTs = new Date(JSON.parse(r.draft).savedAt||0).getTime()||0; } catch(e){}
+      if (!localRaw || svTs > localTs) localStorage.setItem(getDraftKey(), r.draft);
+    }
+  } catch(e){}
+  checkForDraft();
+}
+function checkForDraft(){
+  let d; try { d = JSON.parse(localStorage.getItem(getDraftKey())||'null'); } catch(e){}
+  if (!draftHasContent(d)) return;
+  const savedAt = new Date(d.savedAt);
+  const minsAgo = Math.round((Date.now()-savedAt.getTime())/60000);
+  const timeLabel = minsAgo<2?'just now':minsAgo<60?minsAgo+' min ago':Math.round(minsAgo/60)+' hr ago';
+  document.getElementById('draft-banner-sub').textContent = 'Last saved '+timeLabel+(d.project?' · '+d.project:'');
+  document.getElementById('draft-banner').style.display='block';
+  window._pendingDraft = d;
+}
+function resumeDraft(){
+  const d = window._pendingDraft; if (!d) return;
+  document.getElementById('draft-banner').style.display='none';
+  setType(d.type||'Meeting');
+  const g = id => document.getElementById(id);
+  if (g('project')) g('project').value = d.project||'';
+  if (g('date')) g('date').value = d.date||'';
+  if (g('time')) g('time').value = d.time||'';
+  if (g('endTime')) g('endTime').value = d.endTime||'';
+  if (g('duration')) g('duration').value = d.duration||'';
+  if (g('loggedBy')) g('loggedBy').value = d.loggedBy||'';
+  (d.teamAttendees||[]).forEach(v=>{ document.querySelectorAll('.ta').forEach(c=>{ if(c.value===v) c.checked=true; }); });
+  if (g('clientAttendees')) g('clientAttendees').value = d.clientAttendees||'';
+  (d.purpose||[]).forEach(v=>{ document.querySelectorAll('#purpose .chip').forEach(c=>{ if(c.dataset.v===v) c.classList.add('on'); }); });
+  if (g('body')) g('body').value = d.body||'';
+  (d.actions||[]).forEach(a=>{
+    if (g('own-'+a.cat)) g('own-'+a.cat).value = a.owner||'';
+    if (g('actt-'+a.cat)) g('actt-'+a.cat).value = a.text||'';
+  });
+  if (g('videos')) g('videos').value = d.videos||'';
+  msg('Draft restored ✓');
+}
+function discardDraft(){
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  document.getElementById('draft-banner').style.display='none';
+  window._pendingDraft=null;
+  try { fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'meetlog'})}).catch(()=>{}); } catch(e){}
+}
+function clearDraft(){
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  try { fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'meetlog'})}).catch(()=>{}); } catch(e){}
 }
 // Auto-number a textarea: hitting Enter inserts the next "N. " so points are
 // never missed; focusing an empty box seeds "1. ".
@@ -241,7 +360,7 @@ async function submitLog(){
       duration:document.getElementById('duration').value, photoIds, folderId,
       videoLinks:(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean)};
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
-    if(res.status==='ok'){ showReview(res, payload); window.scrollTo(0,0); }
+    if(res.status==='ok'){ clearDraft(); showReview(res, payload); window.scrollTo(0,0); }
     else { msg('Error: '+(res.message||'failed')); go.disabled=false; }
   }catch(e){ msg('Network error — try again.'); go.disabled=false; }
 }
