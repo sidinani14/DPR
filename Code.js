@@ -1133,7 +1133,16 @@ function verifyIdToken(token) {
   var key = 'auth_' + Utilities.base64EncodeWebSafe(
               Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, token));
   var cached = cache.get(key);
-  if (cached) return (cached === '-transient' || cached === '-denied') ? null : cached;
+  // '-denied' is a confident negative verdict -- safe to trust for its TTL.
+  // '-transient' is NOT: it only exists so respondUnauthorized() (called
+  // right after this, same request) can tell the client "retry me" instead
+  // of "you're locked out". Trusting it on a LATER request too meant a
+  // user's very next retry -- the thing the message told them to do --
+  // short-circuited straight back to the same stale failure without ever
+  // re-checking tokeninfo, for up to 20s. A single real blip looked like a
+  // stuck, unfixable error. Every request now gets a fresh tokeninfo check.
+  if (cached === '-denied') return null;
+  if (cached && cached !== '-transient') return cached;
   try {
     var resp = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
@@ -1143,13 +1152,47 @@ function verifyIdToken(token) {
     // so respondUnauthorized() can tell the client this wasn't a genuine
     // denial and the frontend gate doesn't nuke a perfectly valid session
     // over a passing network blip.
-    if (resp.getResponseCode() !== 200) { cache.put(key, '-transient', 20); return null; }
-    var info  = JSON.parse(resp.getContentText());
+    if (resp.getResponseCode() !== 200) {
+      logTransientAuth('non200', resp.getResponseCode(), resp.getContentText());
+      cache.put(key, '-transient', 20); return null;
+    }
+    var info;
+    try { info = JSON.parse(resp.getContentText()); } catch (parseErr) {
+      logTransientAuth('parse-error', String(parseErr), resp.getContentText());
+      cache.put(key, '-transient', 20); return null;
+    }
+    // A genuine denial requires tokeninfo to have actually told us WHO this
+    // is (real aud + email) and that identity failing the checks below. A
+    // 200 with neither field present isn't tokeninfo saying "this token is
+    // bad" -- it's tokeninfo itself returning something malformed (Google's
+    // endpoint glitching without dropping to a non-200 status), which the
+    // resp.getResponseCode() check above can't catch. Treating that as a
+    // confident 5-minute denial was the same false-lockout bug as the
+    // non-200 case, just via a different-shaped failure.
+    if (!info || (!info.aud && !info.email)) {
+      logTransientAuth('malformed-200', JSON.stringify(info), resp.getContentText());
+      cache.put(key, '-transient', 20); return null;
+    }
     var email = String(info.email || '').toLowerCase();
-    var ok = (info.aud === AUTH_CLIENT_ID) &&
-             (String(info.email_verified) !== 'false') &&
-             getAllowedEmails()[email];
-    if (!ok) { cache.put(key, '-denied', 300); return null; }
+    var audMatch = info.aud === AUTH_CLIENT_ID;
+    var emailVerifiedOk = String(info.email_verified) !== 'false';
+    var inAllow = !!getAllowedEmails()[email];
+    var ok = audMatch && emailVerifiedOk && inAllow;
+    if (!ok) {
+      // TEMP debug (2026-08): a well-formed 200 response is still producing a
+      // real denial for accounts confirmed to be on the allowlist -- logging
+      // exactly which check failed and Google's raw aud/email so the next
+      // occurrence is diagnosable via getLastDenialDebug instead of needing
+      // to catch a live token at the exact moment it happens.
+      try {
+        CacheService.getScriptCache().put('last_denial_debug', JSON.stringify({
+          at: new Date().toISOString(), email: email, aud: info.aud, audExpected: AUTH_CLIENT_ID,
+          audMatch: audMatch, emailVerified: info.email_verified, emailVerifiedOk: emailVerifiedOk,
+          inAllow: inAllow, rawKeys: Object.keys(info)
+        }), 1800);
+      } catch (logErr) {}
+      cache.put(key, '-denied', 300); return null;
+    }
     // 55 min -- close to the token's own ~1hr lifetime (small buffer so a
     // cached verdict never outlives the token itself). Was 30 min; stretched
     // to roughly halve how often each person's session re-hits the tokeninfo
@@ -1158,7 +1201,26 @@ function verifyIdToken(token) {
     // hitting Apps Script's daily quota under this account's tier.
     cache.put(key, email, 3300);
     return email;
-  } catch (err) { try { cache.put(key, '-transient', 20); } catch(e2){} return null; }
+  } catch (err) {
+    logTransientAuth('exception', String(err), err && err.stack);
+    try { cache.put(key, '-transient', 20); } catch(e2){} return null;
+  }
+}
+// TEMP debug (2026-08): the transient path swallows non-200/malformed/exception
+// tokeninfo failures on purpose (see comments above), but that means a genuinely
+// PERSISTENT failure -- not a one-off blip -- looks identical to the user
+// ("Temporary issue... please retry", never clearing up). This records the last
+// occurrence's actual cause so it's diagnosable via getLastTransientDebug instead
+// of guessing between non-200 config drift / Google API response shape changes /
+// getAllowedEmails() sheet-read exceptions (which land here via the outer catch too).
+function logTransientAuth(reason, detail, raw) {
+  try {
+    CacheService.getScriptCache().put('last_transient_debug', JSON.stringify({
+      at: new Date().toISOString(), reason: reason,
+      detail: String(detail || '').slice(0, 500),
+      raw: String(raw || '').slice(0, 500)
+    }), 1800);
+  } catch (e) {}
 }
 function isTransientAuthFailure(token) {
   if (!token) return false;
@@ -1308,6 +1370,16 @@ function doPost(e) {
     // Manager-only: is a specific email in the TEAM tab allowlist right now?
     // For chasing down a real "access denied" report without that person's
     // own ID token to run through whoami.
+    if (data.action === 'getLastDenialDebug') {
+      if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
+      var dbg = CacheService.getScriptCache().get('last_denial_debug');
+      return respond({ debug: dbg ? JSON.parse(dbg) : null });
+    }
+    if (data.action === 'getLastTransientDebug') {
+      if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
+      var tdbg = CacheService.getScriptCache().get('last_transient_debug');
+      return respond({ debug: tdbg ? JSON.parse(tdbg) : null });
+    }
     if (data.action === 'checkEmailAllowed') {
       if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
       var checkEmail = String(data.email || '').trim().toLowerCase();
@@ -1419,8 +1491,8 @@ function doPost(e) {
     if (data.action === 'getOpenLeads')        return respond(getOpenLeads(data.member||''));
     if (data.action === 'getProjectWeeklyReport') return respond(getProjectWeeklyReport(data.project||'', data.weekStart||''));
     if (data.action === 'get3MData')           return respond(get3MData(data.project||'', data.weekStart||''));
-    if (data.action === 'savePlanDraft')       return respond(savePlanDraft(authEmail, data.draft||''));
-    if (data.action === 'getPlanDraft')        return respond(getPlanDraft(authEmail));
+    if (data.action === 'savePlanDraft')       return respond(savePlanDraft(authEmail, data.draft||'', data.formType||''));
+    if (data.action === 'getPlanDraft')        return respond(getPlanDraft(authEmail, data.formType||''));
     if (data.action === 'generate3MMessage')   return respond(generate3MMessage(data, authEmail));
 
     // Form submission actions
@@ -7599,22 +7671,34 @@ function getProjectWeeklyReport(project, weekStart) {
   return out;
 }
 
+// Form drafts — one per user+form (keyed by verified email, optionally
+// namespaced by formType), so an unsubmitted form survives a failed submit
+// or an interrupted session, even across devices. 'tasks' (Bulk Task
+// Planning, the original caller) keeps the bare-email key it always used —
+// changing that would orphan any draft already sitting in the sheet under
+// the old key. Every other form gets its own email|formType key so they
+// don't collide with each other or with tasks.
+function draftKey(email, formType){
+  var e = String(email||'').trim().toLowerCase();
+  var f = String(formType||'tasks').trim().toLowerCase();
+  return f === 'tasks' ? e : e + '|' + f;
+}
 // Plan Tasks drafts — one per user (keyed by verified email), so an
 // unsubmitted bulk plan survives a failed submit even across devices.
-function savePlanDraft(email, draft){
+function savePlanDraft(email, draft, formType){
   var sh = getOrCreate('PLAN_DRAFTS', function(s){ s.appendRow(['Email','Draft','Updated']); });
-  var key = String(email||'').toLowerCase();
+  var key = draftKey(email, formType);
   var val = String(draft||'').slice(0, 48000);
   var rows = sh.getDataRange().getValues();
   for (var i=1;i<rows.length;i++){
     if (String(rows[i][0]||'').toLowerCase()===key){ sh.getRange(i+1,2,1,2).setValues([[val, new Date()]]); return {status:'ok'}; }
   }
-  sh.appendRow([email, val, new Date()]);
+  sh.appendRow([key, val, new Date()]);
   return {status:'ok'};
 }
-function getPlanDraft(email){
+function getPlanDraft(email, formType){
   var sh = db().getSheetByName('PLAN_DRAFTS'); if(!sh) return {draft:''};
-  var key = String(email||'').toLowerCase();
+  var key = draftKey(email, formType);
   var rows = sh.getDataRange().getValues();
   for (var i=1;i<rows.length;i++){
     if (String(rows[i][0]||'').toLowerCase()===key)
