@@ -284,6 +284,15 @@ textarea{min-height:62px;resize:vertical;}
     <button class="new-btn" onclick="resetForm()">Submit Another Report</button>
   </div>
 
+  <div id="draft-banner" style="display:none;background:var(--amber-bg);border:1.5px solid var(--amber);border-radius:10px;padding:12px 16px;margin-bottom:14px;">
+    <div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">📋 Unsaved draft found</div>
+    <div id="draft-banner-sub" style="font-size:11px;color:var(--text2,#6B6860);margin-bottom:10px">Resume where you left off?</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="resumeDraft()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Resume Draft</button>
+      <button onclick="discardDraft()" style="background:none;border:1px solid var(--border2);border-radius:7px;padding:7px 14px;font-size:12px;color:var(--text2,#6B6860);cursor:pointer">Start Fresh</button>
+    </div>
+  </div>
+
   <div id="form-body">
 
   <!-- ── S0: Open Issues ───────────────────────── -->
@@ -684,6 +693,7 @@ function onGoogleSignIn(resp) {
   loadIssues();
   loadOpenLeads();
   fetchMyTasks();
+  loadDraftAndCheck();
 }
 
 // ════════════════════════════════════════
@@ -1867,6 +1877,181 @@ function collectNewIssues() {
 // ════════════════════════════════════════
 // SUBMIT
 // ════════════════════════════════════════
+// ── Draft auto-save — never lose a filled report on a failed submit or an
+// interrupted session. Covers Field Work, Client Connections, New Projects
+// pending-add fields, Issues/Deliverables, Agenda/Meetings, and the
+// accountability fields (date, on-time/late). Deliberately does not cover
+// Leads/Finance/Other-Activities entries or the Monthly Feedback panel --
+// those are numerous, lower-effort-to-redo chip/select toggles rather than
+// free text, and covering everything would multiply this file's size for
+// comparatively little protection against real loss.
+function getDraftKey(){ return 'crm_draft_' + ((googleUser&&googleUser.email)||'anon'); }
+function collectDraftData(){
+  const g = id => document.getElementById(id);
+  const fwBlocks = [...document.querySelectorAll('#fw-blocks > .fw-block')].map(fb=>{
+    const id = fb.id.replace('fw-','');
+    return { type: g('fw-type-'+id)?.value||'', proj: g('fw-proj-'+id)?.value||'',
+      start: g('fw-start-'+id)?.value||'', end: g('fw-end-'+id)?.value||'', notes: g('fw-notes-'+id)?.value||'' };
+  });
+  const contactBlocks = [...document.querySelectorAll('#contact-blocks > .contact-block')].map(cb=>{
+    const id = cb.id.replace('cb-','');
+    return { proj: g('cb-proj-'+id)?.value||'', type: g('cb-type-'+id)?.value||'', notes: g('cb-notes-'+id)?.value||'' };
+  });
+  const agendaBlocks = [...document.querySelectorAll('#agenda-blocks > .agenda-block')].map(ab=>{
+    const id = ab.id.replace('ab-','');
+    return { proj: g('ag-proj-'+id)?.value||'', type: g('ag-type-'+id)?.value||'',
+      date: g('ag-date-'+id)?.value||'', time: g('ag-time-'+id)?.value||'',
+      agenda: g('ag-agenda-'+id)?.value||'', others: g('ag-others-'+id)?.value||'',
+      team: [...document.querySelectorAll('#ag-team-'+id+' .chip.on')].map(c=>c.dataset.name) };
+  });
+  const newIssBlocks = [...document.querySelectorAll('#new-iss-blocks > .new-iss-block')].map(ni=>{
+    const id = ni.id.replace('ni-','');
+    return { kind: g('ni-kind-'+id)?.value||'Issue', type: g('ni-type-'+id)?.value||'',
+      proj: g('ni-proj-'+id)?.value||'', assign: g('ni-assign-'+id)?.value||'',
+      desc: g('ni-desc-'+id)?.value||'', tdate: g('ni-tdate-'+id)?.value||'' };
+  });
+  return {
+    savedAt: new Date().toISOString(), date: g('f-date')?.value||'',
+    fwBlocks, contactBlocks, agendaBlocks, newIssBlocks,
+    ontime: document.querySelector('input[name=ontime]:checked')?.value||'',
+    lateInformed: document.querySelector('input[name=late-informed]:checked')?.value||'',
+    latePunchIn: g('late-punch-in')?.value||'', lateReqReason: g('late-req-reason')?.value||'',
+  };
+}
+function draftHasContent(d){
+  if (!d) return false;
+  return !!((d.fwBlocks||[]).some(f=>f.proj||f.notes) ||
+    (d.contactBlocks||[]).some(c=>c.proj||c.notes) ||
+    (d.agendaBlocks||[]).some(a=>a.proj||a.agenda) ||
+    (d.newIssBlocks||[]).some(n=>n.proj||n.desc));
+}
+let _draftSoonT=null, _srvDraftT=null;
+function saveDraft(){
+  if (!googleUser) return;
+  const d = collectDraftData();
+  if (!draftHasContent(d)) return;
+  try { localStorage.setItem(getDraftKey(), JSON.stringify(d)); } catch(e){}
+  clearTimeout(_srvDraftT); _srvDraftT = setTimeout(pushServerDraft, 3000);
+}
+function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
+function pushServerDraft(){
+  try {
+    const d = collectDraftData();
+    if (!draftHasContent(d)) return;
+    fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'savePlanDraft', draft:JSON.stringify(d), formType:'crm'})}).catch(()=>{});
+  } catch(e){}
+}
+function flushDraftNow(){ clearTimeout(_draftSoonT); saveDraft(); }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
+window.addEventListener('pagehide', flushDraftNow);
+document.addEventListener('input',  e=>{ if(e.target.closest('#fw-blocks')||e.target.closest('#contact-blocks')||e.target.closest('#agenda-blocks')||e.target.closest('#new-iss-blocks')||e.target.closest('#f-date')||e.target.closest('#late-req-wrap')) saveDraftSoon(); });
+document.addEventListener('change', e=>{ if(e.target.closest('#fw-blocks')||e.target.closest('#contact-blocks')||e.target.closest('#agenda-blocks')||e.target.closest('#new-iss-blocks')||e.target.id==='f-date'||e.target.closest('#late-req-wrap')||e.target.name==='ontime') saveDraftSoon(); });
+document.addEventListener('click',  e=>{ if(e.target.closest('.chip')||e.target.closest('.type-btn')||e.target.closest('.kind-btn')) saveDraftSoon(); });
+
+async function loadDraftAndCheck(){
+  try {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getPlanDraft', formType:'crm'})}).then(x=>x.json());
+    if (r && r.draft) {
+      const localRaw = localStorage.getItem(getDraftKey());
+      let localTs=0, svTs=0;
+      try { localTs = new Date(JSON.parse(localRaw||'{}').savedAt||0).getTime()||0; } catch(e){}
+      try { svTs = new Date(JSON.parse(r.draft).savedAt||0).getTime()||0; } catch(e){}
+      if (!localRaw || svTs > localTs) localStorage.setItem(getDraftKey(), r.draft);
+    }
+  } catch(e){}
+  checkForDraft();
+}
+function checkForDraft(){
+  let d; try { d = JSON.parse(localStorage.getItem(getDraftKey())||'null'); } catch(e){}
+  if (!draftHasContent(d)) return;
+  const savedAt = new Date(d.savedAt);
+  const minsAgo = Math.round((Date.now()-savedAt.getTime())/60000);
+  const timeLabel = minsAgo<2?'just now':minsAgo<60?minsAgo+' min ago':Math.round(minsAgo/60)+' hr ago';
+  document.getElementById('draft-banner-sub').textContent = 'Last saved '+timeLabel;
+  document.getElementById('draft-banner').style.display='block';
+  window._pendingCrmDraft = d;
+}
+function resumeDraft(){
+  const d = window._pendingCrmDraft; if (!d) return;
+  document.getElementById('draft-banner').style.display='none';
+  const g = id => document.getElementById(id);
+  if (d.date && g('f-date')) g('f-date').value = d.date;
+
+  document.getElementById('fw-blocks').innerHTML=''; fwCount=0;
+  (d.fwBlocks||[]).forEach(fb=>{
+    addFieldWork();
+    const id=fwCount;
+    if (fb.type) g('fw-type-'+id).value = fb.type;
+    if (fb.proj) g('fw-proj-'+id).value = fb.proj;
+    if (fb.start) g('fw-start-'+id).value = fb.start;
+    if (fb.end) g('fw-end-'+id).value = fb.end;
+    if (fb.notes) g('fw-notes-'+id).value = fb.notes;
+    updateFWCalc(id);
+  });
+
+  document.getElementById('contact-blocks').innerHTML=''; contCount=0;
+  (d.contactBlocks||[]).forEach(cb=>{
+    addContactBlock();
+    const id=contCount;
+    if (cb.proj) g('cb-proj-'+id).value = cb.proj;
+    if (cb.notes) g('cb-notes-'+id).value = cb.notes;
+    if (cb.type) {
+      const chip = document.querySelector(`#cb-${id} .chip[data-type="${cb.type}"]`);
+      if (chip) selContactType(chip, id);
+    }
+  });
+
+  document.getElementById('agenda-blocks').innerHTML=''; agendaCount=0;
+  (d.agendaBlocks||[]).forEach(ab=>{
+    addAgendaBlock();
+    const id=agendaCount;
+    if (ab.proj) g('ag-proj-'+id).value = ab.proj;
+    if (ab.type) setAgendaType(id, ab.type);
+    if (ab.date) g('ag-date-'+id).value = ab.date;
+    if (ab.time) g('ag-time-'+id).value = ab.time;
+    if (ab.agenda) g('ag-agenda-'+id).value = ab.agenda;
+    if (ab.others) g('ag-others-'+id).value = ab.others;
+    (ab.team||[]).forEach(name=>{
+      const chip = document.querySelector(`#ag-team-${id} [data-name="${name}"]`);
+      if (chip) chip.classList.add('on');
+    });
+  });
+  generateAllWA();
+
+  document.getElementById('new-iss-blocks').innerHTML=''; issCount=0;
+  (d.newIssBlocks||[]).forEach(ni=>{
+    addNewIssue();
+    const id=issCount;
+    if (ni.kind) setNIKind(id, ni.kind);
+    if (ni.type) selNITypeByValue(id, ni.type);
+    if (ni.proj) g('ni-proj-'+id).value = ni.proj;
+    if (ni.assign) g('ni-assign-'+id).value = ni.assign;
+    if (ni.desc) g('ni-desc-'+id).value = ni.desc;
+    if (ni.tdate) g('ni-tdate-'+id).value = ni.tdate;
+  });
+
+  if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
+  if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
+  if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
+  if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
+
+  toast('Draft restored ✓');
+}
+function discardDraft(){
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  document.getElementById('draft-banner').style.display='none';
+  window._pendingCrmDraft=null;
+  try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'crm'})}).catch(()=>{}); } catch(e){}
+}
+function clearDraft(){
+  try { localStorage.removeItem(getDraftKey()); } catch(e){}
+  try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'crm'})}).catch(()=>{}); } catch(e){}
+}
+
 async function submitAll() {
   if(!googleUser){ toast('Sign in first'); return; }
   const date=document.getElementById('f-date')?.value||'';
@@ -1961,6 +2146,7 @@ async function submitAll() {
     }
 
     // Success screen
+    clearDraft();
     document.getElementById('form-body').style.display='none';
     document.getElementById('success-screen').style.display='block';
     document.querySelector('.submit-bar').style.display='none';
