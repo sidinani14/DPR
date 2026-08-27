@@ -559,6 +559,7 @@ function onGoogleSignIn(resp) {
   loadProjects();
   loadIssues();
   fetchMyTasks();
+  loadDraftAndCheck();
 }
 
 // ── Projects ──────────────────────────────────────────────
@@ -1366,6 +1367,46 @@ function saveDraft() {
   try {
     localStorage.setItem(getDraftKey(), JSON.stringify(draft));
   } catch(e) { console.warn('Draft save failed:', e); }
+  clearTimeout(_srvDraftT); _srvDraftT = setTimeout(pushServerDraft, 3000); // also persist server-side (cross-device)
+}
+let _draftSoonT = null;
+function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
+let _srvDraftT = null;
+function pushServerDraft(){
+  if (!googleUser) return;
+  try {
+    const draft = collectDraftData();
+    if (!draft.blocks || !draft.blocks.length) return;
+    fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'savePlanDraft', draft:JSON.stringify(draft), formType:'dper'})}).catch(()=>{});
+  } catch(e){}
+}
+function flushDraftNow(){ clearTimeout(_draftSoonT); if (googleUser) saveDraft(); }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
+window.addEventListener('pagehide', flushDraftNow);
+// Any edit anywhere in the form (project blocks, issues, toggles — all live
+// inside #proj-blocks, or are the top-level date field) schedules a save —
+// covers dynamically-added elements too since the listener is delegated.
+document.addEventListener('input',  e=>{ if(e.target.closest('#proj-blocks')||e.target.id==='f-date') saveDraftSoon(); });
+document.addEventListener('change', e=>{ if(e.target.closest('#proj-blocks')||e.target.id==='f-date') saveDraftSoon(); });
+
+// Pull any server-saved draft (survives a cleared browser / different
+// device), keep whichever copy is newer, then show the restore banner —
+// this used to be built but never actually called from anywhere, so the
+// whole safety net was silently inert.
+async function loadDraftAndCheck(){
+  try {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getPlanDraft', formType:'dper'})}).then(x=>x.json());
+    if (r && r.draft) {
+      const localRaw = localStorage.getItem(getDraftKey());
+      let localTs = 0, svTs = 0;
+      try { localTs = new Date(JSON.parse(localRaw||'{}').savedAt||0).getTime()||0; } catch(e){}
+      try { svTs = new Date(JSON.parse(r.draft).savedAt||0).getTime()||0; } catch(e){}
+      if (!localRaw || svTs > localTs) localStorage.setItem(getDraftKey(), r.draft);
+    }
+  } catch(e){}
+  checkForDraft();
 }
 
 function collectDraftData() {
@@ -1507,11 +1548,15 @@ function discardDraft() {
   try { localStorage.removeItem(getDraftKey()); } catch(e){}
   document.getElementById('draft-banner').style.display = 'none';
   window._pendingDraft = null;
+  try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'dper'})}).catch(()=>{}); } catch(e){}
 }
 
 function clearDraft() {
   try { localStorage.removeItem(getDraftKey()); } catch(e){}
   if (autoSaveTimer) { clearInterval(autoSaveTimer); autoSaveTimer = null; }
+  try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'savePlanDraft', draft:'', formType:'dper'})}).catch(()=>{}); } catch(e){}
 }
 
 // Build project block inner HTML (extracted for reuse in resumeDraft)
