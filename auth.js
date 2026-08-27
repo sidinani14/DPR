@@ -111,7 +111,8 @@
         window.__idsDenied = false;
         try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
         // Re-initialize (no auto_select → fresh account picker) BEFORE rendering.
-        try { google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false }); _inited = true; } catch (e) {}
+        _inited = false;
+        ensureInit(false);
         buildGate('signin');
         try {
           google.accounts.id.prompt(function(n){ if(n.isNotDisplayed()||n.isSkippedMoment()) renderButton(); });
@@ -123,14 +124,27 @@
   // GIS must be initialize()'d with the client_id BEFORE any prompt or
   // renderButton — otherwise Google's OAuth endpoint is hit without client_id
   // ("Missing required parameter: client_id"). Idempotent; safe to call often.
+  //
+  // use_fedcm_for_prompt: true — explicitly opt IN rather than leaving this
+  // unset. Chrome has been progressively enforcing FedCM for Google One Tap
+  // (the console warning "may stop functioning when FedCM becomes mandatory"
+  // has been visible in this app for a while); leaving the flag unset meant
+  // we rode whatever Google's current default happened to be, which shifts
+  // over time as enforcement rolls out — explaining reports that this worked
+  // fine for weeks and then started failing again with no code change here.
+  // Opting in explicitly puts us on Google's current, supported, documented
+  // path instead of an implicit legacy fallback that's actively being
+  // deprecated out from under us.
   var _inited = false;
-  function ensureInit() {
+  function ensureInit(personalized) {
     if (_inited) return true;
     if (!(window.google && google.accounts && google.accounts.id)) return false;
     try {
-      var opts = { client_id: CLIENT_ID, callback: onCredential, auto_select: true };
-      var hint = storeGet(HINT_KEY) || '';
-      if (hint) opts.login_hint = hint;
+      var opts = { client_id: CLIENT_ID, callback: onCredential, auto_select: !!personalized, use_fedcm_for_prompt: true };
+      if (personalized) {
+        var hint = storeGet(HINT_KEY) || '';
+        if (hint) opts.login_hint = hint;
+      }
       google.accounts.id.initialize(opts);
       _inited = true;
       return true;
@@ -153,10 +167,8 @@
   // button falls back to the plain, non-personalized account-chooser flow.
   function reinitPlain() {
     try { google.accounts.id.disableAutoSelect(); } catch (e) {}
-    try {
-      google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential, auto_select: false });
-      _inited = true;
-    } catch (e) { _inited = false; }
+    _inited = false;
+    ensureInit(false);
     buildGate('signin'); // renders the button itself once _inited is set above
   }
 
@@ -238,19 +250,26 @@
     } catch (e) {}
 
     // No valid stored token — try silent FedCM re-auth first, then show sign-in UI.
-    // Read the persistent HINT_KEY (not the deleted STORE_KEY) so Chrome picks the
-    // right account even after session expiry.
-    var loginHint = storeGet(HINT_KEY) || '';
-
     buildGate('checking');
     // Safety net: if GIS prompt doesn't call back within 4 s, show the button anyway.
+    // showSignin() force-reinitializes WITHOUT personalization (no login_hint,
+    // auto_select:false) before rendering — the silent attempt above already
+    // tried the personalized/FedCM-continue path once; falling back to that
+    // exact same path a second time just repeats whatever made it hang the
+    // first time. The plain button (classic account-chooser, not a FedCM
+    // continue-as chip) is a genuinely different, more resilient path.
     var _signinShown = false;
-    function showSignin(){ if(!_signinShown){ _signinShown=true; buildGate('signin'); armStuckHelp(); } }
+    function showSignin(){
+      if (_signinShown) return;
+      _signinShown = true;
+      _inited = false;
+      ensureInit(false);
+      buildGate('signin');
+      armStuckHelp();
+    }
     var _signinTimer = setTimeout(showSignin, 4000);
     loadGis(function () {
-      // Always initialize (with client_id) before prompting. use_fedcm_for_prompt
-      // intentionally omitted — FedCM can silently swallow the prompt callback.
-      if (!ensureInit()) { clearTimeout(_signinTimer); showSignin(); return; }
+      if (!ensureInit(true)) { clearTimeout(_signinTimer); showSignin(); return; }
       try {
         google.accounts.id.prompt(function(n){
           if(n.isNotDisplayed()||n.isSkippedMoment()){ clearTimeout(_signinTimer); showSignin(); }
