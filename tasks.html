@@ -219,6 +219,13 @@ function maybeShowDraftBanner(){
 }
 document.addEventListener('input',  e=>{ if(e.target.closest('.block')||e.target.closest('.meta-row')) saveDraftSoon(); });
 document.addEventListener('change', e=>{ if(e.target.closest('.block')||e.target.closest('.meta-row')) saveDraftSoon(); });
+// Mobile browsers can background/kill a tab well within the 500ms debounce
+// above (switching to WhatsApp mid-entry, screen lock, etc.) — flush the
+// draft immediately, no debounce, the moment the tab is hidden or unloaded,
+// so the autosave safety net can't lose the last few keystrokes to timing.
+function flushDraftNow(){ clearTimeout(_draftT); try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){} }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
+window.addEventListener('pagehide', flushDraftNow);
 
 // ── BULK BLOCKS ──────────────────────────────────────────
 function addBlock(preProject){

@@ -1305,6 +1305,21 @@ function doPost(e) {
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
+    // Manager-only: is a specific email in the TEAM tab allowlist right now?
+    // For chasing down a real "access denied" report without that person's
+    // own ID token to run through whoami.
+    if (data.action === 'checkEmailAllowed') {
+      if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
+      var checkEmail = String(data.email || '').trim().toLowerCase();
+      var allowSet = getAllowedEmails();
+      var tSheetDiag = db().getSheetByName(TEAM_TAB);
+      var teamRowsDiag = tSheetDiag ? tSheetDiag.getDataRange().getValues() : [];
+      var teamEmails = [];
+      for (var ti2 = 1; ti2 < teamRowsDiag.length; ti2++) {
+        teamEmails.push({ name: String(teamRowsDiag[ti2][0]||''), email: String(teamRowsDiag[ti2][4]||''), active: String(teamRowsDiag[ti2][5]||'') });
+      }
+      return respond({ checkEmail: checkEmail, inAllowlist: !!allowSet[checkEmail], allowlistSize: Object.keys(allowSet).length, teamRows: teamEmails });
+    }
     if (data.action === 'getMemberAttendance')    return respond(getMemberAttendance(data.member||'', data.from||'', data.to||''));
     if (data.action === 'importAttendance')       return respond(importAttendance(data));
     if (data.action === 'submitLateRequest')      return respond(submitLateRequest(data));
