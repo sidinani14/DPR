@@ -429,18 +429,43 @@ trust this section and getDeepakWeeklyStats/Code.js over anything else):
 - Section order: Open Issues, Report Date, Client Connections, Issues/Deliverables,
   Tomorrow's Meetings, (WhatsApp agendas), Finance, Other Activities, Lead Management, Monthly Feedback.
 
-## Sheet structure — LEADS (matches LMS Google Sheet format; 16 cols A–P)
+## Sheet structure — LEADS (matches LMS Google Sheet format; 19 cols A–S)
 - A: Lead ID (LEAD-001…), B: Client Name, C: Contact No., D: Referred By
 - E: Validation Check (Valid/Invalid/Not checked)
-- F: Lead Status, G: Contacted By, H: Lead Creation Date, I: Last Contacted
+- F: Lead Status (…/Lost/Dormant/Invalid — Dormant added 2026-08, a stale-
+  but-not-formally-lost terminal state), G: Contacted By, H: Lead Creation
+  Date (now stamped with time, "YYYY-MM-DD HH:MM" — feeds the Q SLA clock;
+  every reader keys off `.substring(0,10)` so date-only comparisons
+  elsewhere are unaffected), I: Last Contacted
 - J: Lead Manager, K: Remarks, L: Lost Reasons, M: 24hr Contact Done
-- N: Lead Source (BNI/Client/Vendor/Lead Manager/Business Associate/Friends & Family/Walk-in/Others)
+- N: Lead Source (Phone/Referral/Walk-in/BNI/Architect-Contractor Referral/Other)
 - O: Briefing Date, P: Proposal Date — stamped on stage transition (SLA clocks)
-- migrateLeadsColumns(sheet) adds N/O/P to existing tabs (non-destructive).
-- Lost leads MUST carry a Lost Reason (8 standard: High Fee, Project on Hold,
-  Portfolio Shortage, Design Proposal Not at Par, Looking for Different Plot,
-  Low Scale Project, No Response/Lost Contact, Other) — enforced in CRM form.
-- SLAs: contact within 24h (col M), proposal within 48h of Briefing Date (O→P).
+- Q: First Response At (date+time, stamped once on first status change away
+  from Not Contacted — never overwritten again), R: Meeting Scheduled Date,
+  S: Follow-Up Log (JSON array of `{day,date,note}` for a fixed Day
+  2/5/9/14/21 cadence)
+- migrateLeadsColumns(sheet) adds any missing trailing header (non-destructive).
+- `LEADS_FIELD_COLS` (Code.js) maps CRM.html's Open Leads panel field keys
+  → column number; `applyLeadFieldUpdates()` writes whichever keys a
+  partial-update payload includes. `getOpenLeads(member)` returns every
+  non-terminal lead (status not in Lead Converted/Lost/Invalid/Dormant) —
+  broadened 2026-08 from just the first two pipeline stages, so a lead
+  mid-pipeline still shows up for review, not just early status decisions.
+- `leadResponseSla(created, firstResponseAt)` — 12h/48h first-response SLA
+  read, shown as a badge per lead. Falls back to Last Contacted (col I) for
+  leads contacted before col Q existed (display-only approximation, never
+  written back).
+- **2026-08 field-set history**: initially shipped as a 17-field rich lead-
+  lifecycle expansion (project type, location, budget, qualification
+  status, fee discussed, retainer, conversion notes, etc.) per an explicit
+  spec, then trimmed same day to just Q/R/S above after review — the goal
+  is "is the funnel moving on time", not a full CRM intake; the dropped
+  fields were business/qualification detail that didn't measure timing.
+  Don't re-add them without that conversation happening again.
+- Lost leads MUST carry a Lost Reason (5 standard: Unresponsive, Price,
+  Chose another firm, Project shelved, Other) — enforced in CRM form.
+- SLAs: contact within 24h (col M, legacy) / 12h-48h via col Q (current),
+  proposal within 48h of Briefing Date (O→P).
 
 ## Leads analytics & dashboard
 - getLeadsAnalytics(month='YYYY-MM') → funnel (contacted/briefing/proposal/converted/
