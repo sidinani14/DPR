@@ -657,10 +657,6 @@ const LEAD_STATUSES = [
 
 const LEAD_SOURCES   = ['Phone','Referral','Walk-in','BNI','Architect/Contractor Referral','Other'];
 const LOST_REASONS   = ['Unresponsive','Price','Chose another firm','Project shelved','Other'];
-const PROJECT_TYPES  = ['Residential','High-rise','Township','Hospitality','Other'];
-const QUALIFICATION_STATUSES = ['Fit','Needs Review','Disqualified'];
-const DISQUALIFY_REASONS = ['Price-shopping','Seeking free design only','No decision authority','Other'];
-const NEXT_STEP_OPTIONS = ['Office meeting','Video call','CRM site visit'];
 const FOLLOWUP_DAYS = [2, 5, 9, 14, 21];
 const CONTACT_TYPES  = ['📞 Call','💬 WhatsApp','👥 Meeting','🏗️ Site Visit','📧 Email'];
 const CRM_ISS_TYPES  = ['CRM/Process','Design','Finance','Contractor','Client'];
@@ -1080,9 +1076,11 @@ const SLA_TONE_STYLE = {
   pending:'background:var(--blue-bg);color:var(--blue)',
 };
 
-// A lead stays here — full detail visible and editable — from first contact
-// until it's Won/Lost/Dormant (getOpenLeads already excludes those terminal
-// stages). Every field below writes straight to the LEADS row via
+// A lead stays here from first contact until it's Won/Lost/Dormant
+// (getOpenLeads already excludes those terminal stages). Deliberately
+// narrow — the goal is "is the funnel moving on time", not a full CRM
+// record: status, the first-response SLA badge, and a Day 2/5/9/14/21
+// follow-up cadence log. Every field writes straight to the LEADS row via
 // LEADS_FIELD_COLS on next submit; nothing here is "final" until then.
 function renderOpenLeads() {
   const badge=document.getElementById('leads-badge');
@@ -1113,76 +1111,20 @@ function renderOpenLeads() {
           ${LOST_REASONS.map(s=>`<option value="${s}" ${lead.lostReasons===s?'selected':''}>${s}</option>`).join('')}
         </select>
       </div>
-      <a href="javascript:void(0)" onclick="toggleLeadDetail(${i},this)" style="display:block;margin-top:10px;font-size:11px;color:var(--accent);text-decoration:none">▾ Full details</a>
-      <div id="lc-detail-${i}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border2)">
-        <div class="field-row">
-          <div class="field"><span class="lbl">Contact No.</span><input type="text" id="lc-contactNo-${i}" value="${esc(lead.contactNo)}"></div>
-          <div class="field"><span class="lbl">Referred By</span><input type="text" id="lc-referredBy-${i}" value="${esc(lead.referredBy)}"></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Lead Source</span><select id="lc-leadSource-${i}"><option value="">Select…</option>${LEAD_SOURCES.map(s=>`<option value="${s}" ${lead.leadSource===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div class="field"><span class="lbl">Lead Manager</span><select id="lc-leadManager-${i}"><option value="">Select…</option>${TEAM_MEMBERS.map(n=>`<option value="${n}" ${lead.leadManager===n?'selected':''}>${n}</option>`).join('')}</select></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Project Type</span><select id="lc-projectType-${i}"><option value="">Select…</option>${PROJECT_TYPES.map(s=>`<option value="${s}" ${lead.projectType===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div class="field"><span class="lbl">Location</span><input type="text" id="lc-location-${i}" value="${esc(lead.location)}"></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Plot/Built-up Size</span><input type="text" id="lc-plotSize-${i}" value="${esc(lead.plotSize)}"></div>
-          <div class="field"><span class="lbl">Budget Shared</span><input type="text" id="lc-budget-${i}" value="${esc(lead.budget)}"></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Start Timeline</span><input type="text" id="lc-timeline-${i}" value="${esc(lead.timeline)}"></div>
-          <div class="field"><span class="lbl">Decision-Maker Confirmed?</span><select id="lc-decisionMaker-${i}"><option value="">—</option><option value="Yes" ${lead.decisionMaker==='Yes'?'selected':''}>Yes</option><option value="No" ${lead.decisionMaker==='No'?'selected':''}>No</option></select></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Validation Check</span><select id="lc-validation-${i}"><option value="Not checked" ${lead.validation==='Not checked'?'selected':''}>Not Checked</option><option value="Valid" ${lead.validation==='Valid'?'selected':''}>Valid</option><option value="Invalid" ${lead.validation==='Invalid'?'selected':''}>Invalid</option></select></div>
-          <div class="field"><span class="lbl">Validation Call Date</span><input type="date" id="lc-validationCallDate-${i}" value="${esc(lead.validationCallDate)}"></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Qualification Status</span><select id="lc-qualification-${i}" onchange="document.getElementById('lc-disqual-${i}').style.display=this.value==='Disqualified'?'block':'none'"><option value="">Select…</option>${QUALIFICATION_STATUSES.map(s=>`<option value="${s}" ${lead.qualification===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div class="field" id="lc-disqual-${i}" style="display:${lead.qualification==='Disqualified'?'block':'none'}"><span class="lbl">Disqualification Reason</span><select id="lc-disqualReason-${i}"><option value="">Select…</option>${DISQUALIFY_REASONS.map(s=>`<option value="${s}" ${lead.disqualReason===s?'selected':''}>${s}</option>`).join('')}</select></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Next Step Offered</span><select id="lc-nextStep-${i}"><option value="">Select…</option>${NEXT_STEP_OPTIONS.map(s=>`<option value="${s}" ${lead.nextStep===s?'selected':''}>${s}</option>`).join('')}</select></div>
-          <div class="field"><span class="lbl">Meeting Scheduled Date</span><input type="date" id="lc-meetingDate-${i}" value="${esc(lead.meetingDate)}"></div>
-        </div>
-        <div class="field">
-          <span class="lbl">Meeting Outcome</span>
-          <input type="text" id="lc-meetingOutcome-${i}" value="${esc(lead.meetingOutcome)}" placeholder="What happened / was decided…">
-        </div>
-        <div class="field-row">
-          <div class="field"><span class="lbl">Fee Discussed</span><input type="text" id="lc-feeDiscussed-${i}" value="${esc(lead.feeDiscussed)}" placeholder="₹/sqft or lump sum"></div>
-          <div class="field"><span class="lbl">Retainer Requested?</span><select id="lc-retainer-${i}"><option value="">—</option><option value="Yes" ${lead.retainer==='Yes'?'selected':''}>Yes</option><option value="No" ${lead.retainer==='No'?'selected':''}>No</option></select></div>
-        </div>
-        <div class="field">
-          <span class="lbl">Remarks</span>
-          <textarea id="lc-remarks-${i}" style="min-height:40px">${esc(lead.remarks)}</textarea>
-        </div>
-        <div class="field">
-          <span class="lbl" style="margin-bottom:7px">Follow-Up Log</span>
-          ${FOLLOWUP_DAYS.map(d=>`
-            <div class="field-row" style="grid-template-columns:60px 1fr 1.4fr;gap:6px;margin-bottom:6px">
-              <span style="font-size:11px;color:var(--text2);align-self:center">Day ${d}</span>
-              <input type="date" id="lc-fu-date-${i}-${d}" value="${esc((logByDay[d]||{}).date||'')}">
-              <input type="text" id="lc-fu-note-${i}-${d}" value="${esc((logByDay[d]||{}).note||'')}" placeholder="Note…">
-            </div>`).join('')}
-        </div>
-        ${lead.leadStatus==='Lead Converted'?`
-        <div class="field">
-          <span class="lbl">Conversion Notes</span>
-          <textarea id="lc-conversionNotes-${i}" style="min-height:40px">${esc(lead.conversionNotes)}</textarea>
-        </div>`:''}
+      <div class="field-row" style="margin-top:8px">
+        <div class="field"><span class="lbl">Meeting Scheduled Date</span><input type="date" id="lc-meetingDate-${i}" value="${esc(lead.meetingDate)}"></div>
+      </div>
+      <div class="field">
+        <span class="lbl" style="margin-bottom:7px">Follow-Up Log</span>
+        ${FOLLOWUP_DAYS.map(d=>`
+          <div class="field-row" style="grid-template-columns:60px 1fr 1.4fr;gap:6px;margin-bottom:6px">
+            <span style="font-size:11px;color:var(--text2);align-self:center">Day ${d}</span>
+            <input type="date" id="lc-fu-date-${i}-${d}" value="${esc((logByDay[d]||{}).date||'')}">
+            <input type="text" id="lc-fu-note-${i}-${d}" value="${esc((logByDay[d]||{}).note||'')}" placeholder="Note…">
+          </div>`).join('')}
       </div>
     </div>`;
   }).join('');
-}
-
-function toggleLeadDetail(i, link) {
-  const d=document.getElementById('lc-detail-'+i);
-  const open = d.style.display==='none';
-  d.style.display = open ? 'block' : 'none';
-  link.textContent = open ? '▴ Hide details' : '▾ Full details';
 }
 
 function setLeadAction(i, statusKey) {
@@ -1193,21 +1135,11 @@ function setLeadAction(i, statusKey) {
   });
   const lostWrap=document.getElementById('lc-lost-'+i);
   if(lostWrap) lostWrap.style.display = statusKey==='Lost' ? 'block' : 'none';
-  const convWrap=document.getElementById('lc-detail-'+i);
-  if(convWrap && statusKey==='Lead Converted' && !document.getElementById('lc-conversionNotes-'+i)){
-    // Status just changed to Converted after render — re-render so the
-    // Conversion Notes field appears (cheap: openLeads[i] already updated).
-    openLeads[i].leadStatus = statusKey;
-    renderOpenLeads();
-  }
 }
 
 // Fields inside a lead card that map straight onto LEADS_FIELD_COLS by id
 // suffix — kept as one list so collectLeadUpdates() doesn't hand-read each one.
-const LEAD_DETAIL_FIELDS = ['contactNo','referredBy','leadSource','leadManager',
-  'projectType','location','plotSize','budget','timeline','decisionMaker',
-  'validation','validationCallDate','qualification','disqualReason','nextStep',
-  'meetingDate','meetingOutcome','feeDiscussed','retainer','remarks','conversionNotes'];
+const LEAD_DETAIL_FIELDS = ['meetingDate'];
 
 // ════════════════════════════════════════
 // LEAD BLOCKS — Section 2
@@ -1245,43 +1177,6 @@ function addLeadBlock() {
           <option value="">Select source…</option>
           ${LEAD_SOURCES.map(s=>`<option value="${s}">${s}</option>`).join('')}
         </select>
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <span class="lbl">Project Type</span>
-        <select id="lb-ptype-${id}">
-          <option value="">Select…</option>
-          ${PROJECT_TYPES.map(s=>`<option value="${s}">${s}</option>`).join('')}
-        </select>
-      </div>
-      <div class="field">
-        <span class="lbl">Location</span>
-        <input type="text" id="lb-loc-${id}" placeholder="Area / city…">
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <span class="lbl">Approx. Plot/Built-up Size</span>
-        <input type="text" id="lb-size-${id}" placeholder="e.g. 2400 sqft">
-      </div>
-      <div class="field">
-        <span class="lbl">Approx. Budget Shared</span>
-        <input type="text" id="lb-budget-${id}" placeholder="e.g. ₹80L">
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <span class="lbl">Desired Start Timeline</span>
-        <input type="text" id="lb-timeline-${id}" placeholder="e.g. Within 2 months">
-      </div>
-      <div class="field">
-        <span class="lbl">Decision-Maker Confirmed?</span>
-        <div class="val-btns">
-          <div class="val-btn" id="lbdm-y-${id}" onclick="setLeadDM(${id},'Yes')">Yes</div>
-          <div class="val-btn" id="lbdm-n-${id}" onclick="setLeadDM(${id},'No')">No</div>
-        </div>
-        <input type="hidden" id="lb-dm-${id}" value="">
       </div>
     </div>
     <div class="field">
@@ -1333,12 +1228,6 @@ function setLeadVal(id, val) {
   document.getElementById('lbv-nc-'+id).className='val-btn'+(val==='Not checked'?' on-nc':'');
   document.getElementById('lbv-v-'+id).className='val-btn'+(val==='Valid'?' on-valid':'');
   document.getElementById('lbv-i-'+id).className='val-btn'+(val==='Invalid'?' on-invalid':'');
-}
-
-function setLeadDM(id, val) {
-  document.getElementById('lb-dm-'+id).value=val;
-  document.getElementById('lbdm-y-'+id).className='val-btn'+(val==='Yes'?' on-valid':'');
-  document.getElementById('lbdm-n-'+id).className='val-btn'+(val==='No'?' on-invalid':'');
 }
 
 function setLeadStatus(id, status) {
@@ -1932,12 +1821,6 @@ function collectLeads() {
       leadManager: document.getElementById('lb-mgr-'+id)?.value||'',
       remarks    : (document.getElementById('lb-remarks-'+id)?.value||'').trim(),
       lostReasons: document.getElementById('lb-lostrsn-'+id)?.value||'',
-      projectType : document.getElementById('lb-ptype-'+id)?.value||'',
-      location    : (document.getElementById('lb-loc-'+id)?.value||'').trim(),
-      plotSize    : (document.getElementById('lb-size-'+id)?.value||'').trim(),
-      budget      : (document.getElementById('lb-budget-'+id)?.value||'').trim(),
-      timeline    : (document.getElementById('lb-timeline-'+id)?.value||'').trim(),
-      decisionMaker: document.getElementById('lb-dm-'+id)?.value||'',
     });
   });
   return out;
