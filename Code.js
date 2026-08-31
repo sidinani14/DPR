@@ -8790,7 +8790,28 @@ var LEADS_HEADERS = [
   'Lead Creation Date','Last Contacted','Lead Manager',
   'Remarks','Lost Reasons','24hr Contact Done',
   'Lead Source','Briefing Date','Proposal Date',
+  // ── Lead-tracking expansion (2026-08) — kept open for review until a
+  // lead is Won/Lost/Dormant. Reuses A-P above wherever a field already
+  // existed (Client Name/Contact/Referred By/Lead Source/Lead Creation
+  // Date/Proposal Date/Lost Reasons) rather than duplicating a column.
+  'Project Type','Location','Plot/Built-up Size','Budget Shared',
+  'Desired Start Timeline','Decision Maker Confirmed','First Response At',
+  'Validation Call Date','Qualification Status','Disqualification Reason',
+  'Next Step Offered','Meeting Scheduled Date','Meeting Outcome',
+  'Fee Discussed','Retainer Requested','Follow-Up Log','Conversion Notes',
 ];
+// fieldKey (frontend) -> 1-indexed LEADS column. Used by both new-lead
+// writes and the open-lead partial-update path so every writable field
+// is defined once, not hand-wired per call site.
+var LEADS_FIELD_COLS = {
+  contactNo:3, referredBy:4, validation:5, leadStatus:6, leadManager:10,
+  remarks:11, lostReasons:12, leadSource:14,
+  projectType:17, location:18, plotSize:19, budget:20, timeline:21,
+  decisionMaker:22, firstResponseAt:23, validationCallDate:24,
+  qualification:25, disqualReason:26, nextStep:27, meetingDate:28,
+  meetingOutcome:29, feeDiscussed:30, retainer:31, followUpLog:32,
+  conversionNotes:33,
+};
 function writeLeadsHeaders(sheet) {
   // Matches LMS structure from IDS Google Form (+ source & SLA dates)
   var h = LEADS_HEADERS;
@@ -8798,7 +8819,8 @@ function writeLeadsHeaders(sheet) {
     .setBackground('#1565C0').setFontColor('#FFFFFF')
     .setFontWeight('bold').setFontSize(10);
   sheet.setFrozenRows(1);
-  var widths=[120,200,140,200,120,200,160,130,130,160,300,200,130,150,120,120];
+  var widths=[120,200,140,200,120,200,160,130,130,160,300,200,130,150,120,120,
+              130,140,140,120,150,150,140,140,150,160,150,140,140,130,130,260,220];
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
@@ -8816,6 +8838,40 @@ function migrateLeadsColumns(sheet) {
         .setBackground('#1565C0').setFontColor('#FFFFFF').setFontWeight('bold').setFontSize(10);
     }
   }
+}
+// Writes any of `fields`' keys that are in LEADS_FIELD_COLS to their column
+// on the given 1-based row. Unknown keys and blank/undefined values are
+// skipped (a partial update from the Open Leads panel only sends what the
+// user actually touched -- an empty string here should not stomp existing data).
+function applyLeadFieldUpdates(sheet, rowNum, fields) {
+  if (!fields) return;
+  Object.keys(fields).forEach(function(k) {
+    var col = LEADS_FIELD_COLS[k];
+    if (!col) return;
+    var v = fields[k];
+    if (v === undefined || v === null) return;
+    sheet.getRange(rowNum, col).setValue(v);
+  });
+}
+// Elapsed-time SLA read for the "First response" clock -- 12h target, 48h
+// hard breach. `created` may be a bare date (old rows, pre-timestamp) or a
+// 'YYYY-MM-DD HH:MM' timestamp; treated as start-of-day when no time part.
+function leadResponseSla(created, firstResponseAt) {
+  if (!created) return null;
+  var createdMs = new Date(String(created).length > 10 ? created : created + ' 00:00').getTime();
+  if (isNaN(createdMs)) return null;
+  var responded = !!String(firstResponseAt||'').trim();
+  var refMs = responded ? new Date(firstResponseAt).getTime() : Date.now();
+  if (responded && isNaN(refMs)) return null;
+  var hrs = (refMs - createdMs) / 3600000;
+  if (responded) {
+    if (hrs <= 12) return {tone:'good',  text:'Responded in ' + Math.round(hrs) + 'h'};
+    if (hrs <= 48) return {tone:'warn',  text:'Responded late (' + Math.round(hrs) + 'h)'};
+    return {tone:'bad', text:'Responded very late (' + Math.round(hrs) + 'h)'};
+  }
+  if (hrs <= 12) return {tone:'pending', text:'Awaiting first response (' + Math.round(hrs) + 'h)'};
+  if (hrs <= 48) return {tone:'warn', text:'Past 12h, no response yet (' + Math.round(hrs) + 'h)'};
+  return {tone:'bad', text:'Breaching 48h SLA, no response (' + Math.round(hrs) + 'h)'};
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -9179,31 +9235,57 @@ function getRecentLeads(date) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// getOpenLeads — leads still needing a status decision (early stages).
-// Shown in the CRM form's "Open Leads" panel every day until the lead is
-// advanced to Briefing Meeting Done (→ promoted to a project) or marked
-// Lost/Invalid. Lets the CRM mark: Not Contacted / Contacted / Briefing /
-// Rejected on any open lead, not just yesterday's.
+// getOpenLeads — every lead still "in play": shown in the CRM form's
+// "Open Leads" panel and kept editable until it's Won (Lead Converted),
+// Lost, Invalid or Dormant. Broadened (2026-08) from just the first two
+// pipeline stages -- a lead mid-pipeline (briefing done, proposal shared)
+// still needs its rich field set filled in over time, not just an early
+// status decision.
 // ════════════════════════════════════════════════════════════════
+var LEAD_TERMINAL_STATUSES = ['Lead Converted', 'Lost', 'Invalid', 'Dormant'];
 function getOpenLeads(member) {
   var sheet = db().getSheetByName(LEADS_TAB);
   if (!sheet || sheet.getLastRow() < 2) return {leads:[]};
+  migrateLeadsColumns(sheet);
   var rows = sheet.getDataRange().getValues();
-  var OPEN = ['', 'Not Contacted', 'Contacted over call'];
   var leads = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
     var status = String(r[5] || '').trim();   // F Lead Status
-    if (OPEN.indexOf(status) === -1) continue;
+    if (LEAD_TERMINAL_STATUSES.indexOf(status) > -1) continue;
+    var created = String(r[7] || '');          // H Lead Creation Date (+time)
+    var firstResponseAt = String(r[22] || ''); // W
     leads.push({
       leadId     : String(r[0] || ''),
       clientName : String(r[1] || ''),
       contactNo  : String(r[2] || ''),
       referredBy : String(r[3] || ''),
+      validation : String(r[4] || 'Not checked'),
       leadStatus : status || 'Not Contacted',
       leadManager: String(r[9] || ''),
-      date       : String(r[7] || '').substring(0, 10),  // H Lead Creation Date
+      remarks    : String(r[10]|| ''),
+      lostReasons: String(r[11]|| ''),
+      leadSource : String(r[13]|| ''),
+      date       : created.substring(0, 10),  // H Lead Creation Date
       rowNum     : i + 1,
+      projectType       : String(r[16]||''),
+      location          : String(r[17]||''),
+      plotSize          : String(r[18]||''),
+      budget            : String(r[19]||''),
+      timeline          : String(r[20]||''),
+      decisionMaker     : String(r[21]||''),
+      firstResponseAt   : firstResponseAt,
+      validationCallDate: String(r[23]||''),
+      qualification     : String(r[24]||''),
+      disqualReason     : String(r[25]||''),
+      nextStep          : String(r[26]||''),
+      meetingDate       : String(r[27]||''),
+      meetingOutcome    : String(r[28]||''),
+      feeDiscussed      : String(r[29]||''),
+      retainer          : String(r[30]||''),
+      followUpLog       : (function(){ try { return JSON.parse(r[31]||'[]'); } catch(e){ return []; } })(),
+      conversionNotes   : String(r[32]||''),
+      sla: leadResponseSla(created, firstResponseAt),
     });
   }
   return {leads: leads};
@@ -9288,6 +9370,7 @@ function submitAmanCRM(data) {
       if (!lead.clientName) return;
       var leadId = nextId(leadsSheet, 'LEAD-');
       var st = lead.leadStatus || 'Not Contacted';
+      var contactedNow = st !== 'Not Contacted';
       prependRow(leadsSheet, [
         leadId,
         lead.clientName  || '',
@@ -9296,42 +9379,66 @@ function submitAmanCRM(data) {
         lead.validation  || 'Not checked',
         st,
         member,                    // Contacted By = Aman
-        today,                     // Lead Creation Date
-        st === 'Not Contacted' ? '' : today,  // Last Contacted
+        today + ' ' + now,         // Lead Creation Date (+time -- feeds the 12h/48h SLA clock; every
+                                    // reader keys off substring(0,10) so the date-only comparisons
+                                    // used elsewhere are unaffected)
+        contactedNow ? today : '', // Last Contacted
         lead.leadManager || '',
         lead.remarks     || '',
         lead.lostReasons || '',
-        st === 'Not Contacted' ? 'Pending' : 'Yes',  // 24hr Contact Done
+        contactedNow ? 'Yes' : 'Pending',  // 24hr Contact Done
         lead.leadSource  || '',                       // N Lead Source
         leadReachedBriefing(st) ? today : '',         // O Briefing Date
         leadReachedProposal(st) ? today : '',         // P Proposal Date
+        lead.projectType   || '',
+        lead.location       || '',
+        lead.plotSize       || '',
+        lead.budget         || '',
+        lead.timeline       || '',
+        lead.decisionMaker  || '',
+        contactedNow ? (lead.firstResponseAt || (today+' '+now)) : '',  // W First Response At
+        lead.validationCallDate || '',
+        lead.qualification  || '',
+        lead.disqualReason  || '',
+        lead.nextStep       || '',
+        lead.meetingDate    || '',
+        lead.meetingOutcome || '',
+        lead.feeDiscussed   || '',
+        lead.retainer       || '',
+        lead.followUpLog    || '',
+        lead.conversionNotes|| '',
       ]);
       // Promote serious leads (briefing done or further) to PROJECTS tab
       if (isPromoteLeadStage(st)) promoteLeadToProject(lead.clientName, member);
     });
     Logger.log('Leads written: ' + newLeads.length);
 
-    // ── 3. Update 24hr follow-up status on existing leads ─────
+    // ── 3. Apply edits to existing open leads (Open Leads panel) ──
+    // Each entry sends only the fields the user actually touched, written
+    // generically via LEADS_FIELD_COLS; a status change carries the same
+    // special-case side effects (Last Contacted / 24hr flag / SLA date
+    // stamps / PROJECTS promotion) the old narrow follow-up flow had.
     if (leadFollows.length > 0) {
       var leadsData = leadsSheet.getDataRange().getValues();
       leadFollows.forEach(function(f) {
         if (!f.leadId) return;
         for (var i = 1; i < leadsData.length; i++) {
           if (String(leadsData[i][0] || '') !== f.leadId) continue;
-          leadsSheet.getRange(i+1, 13).setValue(f.contacted ? 'Yes' : 'No'); // M 24hr Contact Done
-          if (f.contacted) {
-            leadsSheet.getRange(i+1, 6).setValue(f.newStatus || '');   // F Lead Status
-            leadsSheet.getRange(i+1, 9).setValue(today);               // I Last Contacted
-            if (f.newStatus === 'Lost' && f.lostReasons)
-              leadsSheet.getRange(i+1, 12).setValue(f.lostReasons);    // L Lost Reasons
-            // Stamp SLA dates when the stage is reached (only if not already set)
-            if (leadReachedBriefing(f.newStatus) && !String(leadsData[i][14]||'').trim())
-              leadsSheet.getRange(i+1, 15).setValue(today);            // O Briefing Date
-            if (leadReachedProposal(f.newStatus) && !String(leadsData[i][15]||'').trim())
-              leadsSheet.getRange(i+1, 16).setValue(today);            // P Proposal Date
-            // Promote to PROJECTS once it reaches briefing-done or further
-            if (isPromoteLeadStage(f.newStatus)) promoteLeadToProject(String(leadsData[i][1]||''), member);
+          var rowNum = i + 1;
+          var fields = f.fields || {};
+          var newStatus = fields.leadStatus;
+          if (newStatus !== undefined) {
+            leadsSheet.getRange(rowNum, 13).setValue('Yes'); // M 24hr Contact Done
+            leadsSheet.getRange(rowNum, 9).setValue(today);  // I Last Contacted
+            if (!String(leadsData[i][22]||'').trim())        // W First Response At (first time only)
+              leadsSheet.getRange(rowNum, 23).setValue(today + ' ' + now);
+            if (leadReachedBriefing(newStatus) && !String(leadsData[i][14]||'').trim())
+              leadsSheet.getRange(rowNum, 15).setValue(today);  // O Briefing Date (SLA)
+            if (leadReachedProposal(newStatus) && !String(leadsData[i][15]||'').trim())
+              leadsSheet.getRange(rowNum, 16).setValue(today);  // P Proposal Date (SLA)
+            if (isPromoteLeadStage(newStatus)) promoteLeadToProject(String(leadsData[i][1]||''), member);
           }
+          applyLeadFieldUpdates(leadsSheet, rowNum, fields);
           break;
         }
       });
