@@ -9255,6 +9255,12 @@ function getOpenLeads(member) {
     if (LEAD_TERMINAL_STATUSES.indexOf(status) > -1) continue;
     var created = String(r[7] || '');          // H Lead Creation Date (+time)
     var firstResponseAt = String(r[22] || ''); // W
+    // Pre-dates this field: a lead already past "Not Contacted" with no W
+    // stamp was still genuinely contacted -- fall back to Last Contacted
+    // (col I) so its SLA badge doesn't read "no response" for old data.
+    // Approximate only (date, no time) -- never written back to col W.
+    var slaResponseAt = firstResponseAt;
+    if (!slaResponseAt && status !== 'Not Contacted') slaResponseAt = String(r[8] || '');
     leads.push({
       leadId     : String(r[0] || ''),
       clientName : String(r[1] || ''),
@@ -9285,7 +9291,7 @@ function getOpenLeads(member) {
       retainer          : String(r[30]||''),
       followUpLog       : (function(){ try { return JSON.parse(r[31]||'[]'); } catch(e){ return []; } })(),
       conversionNotes   : String(r[32]||''),
-      sla: leadResponseSla(created, firstResponseAt),
+      sla: leadResponseSla(created, slaResponseAt),
     });
   }
   return {leads: leads};
