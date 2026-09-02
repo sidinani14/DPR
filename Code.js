@@ -1361,6 +1361,23 @@ function authorizeNow() {
   Logger.log('External-request permission granted. tokeninfo HTTP ' + r.getResponseCode());
   return r.getResponseCode();
 }
+// NOTIFICATIONS (2026-09) — run this ONCE from the editor (select
+// authorizeMail -> Run, approve the "Send email as you" consent screen) so
+// the web app (deployed executeAs: USER_DEPLOYING) can actually call
+// MailApp.sendEmail. appsscript.json already lists the send_mail scope, but
+// adding a scope to the manifest doesn't retroactively re-consent an
+// existing deployment's stored grant -- the web app and any time-driven
+// triggers each need their own authorization, and until this runs once,
+// every notifyMember()/sendPrivateDirectorNote() call fails with
+// "You do not have permission to call MailApp.sendEmail." Sends a real
+// (harmless) email to yourself so success is unambiguous.
+function authorizeMail() {
+  var me = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail();
+  MailApp.sendEmail({ to: me, subject: '[IDS] Mail authorization OK',
+    body: 'If you got this, MailApp is authorized for the web app — task/form notifications will now send.' });
+  Logger.log('Mail authorization granted, test email sent to ' + me);
+  return me;
+}
 // EPIC K — run ONCE from the editor (select authorizeEpicK → Run, approve the
 // Drive + external-request consent screen) so the Meeting Log can write to Drive
 // and call the Anthropic API. Also reports whether the API key is set.
