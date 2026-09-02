@@ -853,6 +853,100 @@ var MANAGER_EMAILS = { 'sidinani14@gmail.com':1, 'siddharth@ideaform.in':1, 'ast
 // with no approval gate — see completeDirectorItem.
 var DIRECTOR_NAMES = { 'Siddharth Inani':1, 'Astha Inani':1 };
 function isManager(email){ return !!MANAGER_EMAILS[String(email||'').toLowerCase()]; }
+
+// ════════════════════════════════════════════════════════════════
+// NOTIFICATIONS (2026-09) — one central send point so a future WhatsApp
+// channel is a single function swap, not a rebuild of every call site.
+// Email today, via MailApp -- the same mechanism already used by
+// notifyMissedVisits. A notification is a courtesy, never something that
+// should break the actual submission it's attached to: every call site
+// wraps this in try/catch and swallows failures silently (logged only).
+// ════════════════════════════════════════════════════════════════
+function getTeamEmailMap() {
+  var map = {};
+  var tSheet = db().getSheetByName(TEAM_TAB);
+  if (tSheet && tSheet.getLastRow() > 1) {
+    var rows = tSheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      var name  = String(rows[i][0] || '').trim();  // A Name
+      var email = String(rows[i][4] || '').trim();   // E Email
+      if (name && email) map[name] = email;
+    }
+  }
+  return map;
+}
+// Directors aren't in the TEAM tab (excluded from scoring/dashboard), so
+// they need their own lookup — each has two addresses on file; mailed to
+// both since which one gets checked varies day to day.
+var DIRECTOR_RECIPIENT_EMAILS = {
+  'Siddharth Inani': ['sidinani14@gmail.com', 'siddharth@ideaform.in'],
+  'Astha Inani':      ['astha@ideaform.in', 'astha.uch@gmail.com'],
+};
+function notifyMember(name, subject, lines) {
+  try {
+    var to = DIRECTOR_RECIPIENT_EMAILS[name]
+      ? DIRECTOR_RECIPIENT_EMAILS[name].join(',')
+      : getTeamEmailMap()[name];
+    if (!to) { Logger.log('notifyMember: no email on file for ' + name); return; }
+    var body = (lines || []).filter(function(l){ return l; }).join('\n');
+    MailApp.sendEmail({ to: to, subject: '[IDS] ' + subject, body: body });
+  } catch (e) { Logger.log('notifyMember failed for ' + name + ': ' + e); }
+}
+// taskList: [{taskType, description, targetDate}, ...] — one email per
+// project+assignee "block", not one per task, so a bulk-planning session
+// assigning 8 tasks to one person sends one email, not 8.
+function notifyTaskAssigned(member, project, taskList) {
+  if (!member || !taskList || !taskList.length) return;
+  var lines = taskList.map(function(t) {
+    var desc = t.description || t.area || '';
+    return '• ' + (t.taskType || 'Task') + (desc ? ' — ' + desc : '') +
+           ' (deadline: ' + (t.targetDate || 'none set') + ')';
+  });
+  var subject = taskList.length === 1
+    ? 'New task — ' + (taskList[0].taskType || 'Task') + ' (' + project + ')'
+    : taskList.length + ' new tasks — ' + project;
+  notifyMember(member, subject, ['Project: ' + project, ''].concat(lines));
+}
+// Confirmation that a form/log was actually recorded server-side -- distinct
+// from the browser's own success screen, which can't prove the write landed
+// (the whole point, given this session's earlier "submission looked fine but
+// nothing saved" incidents).
+function notifySubmissionRecorded(member, formLabel, forDate, summaryLines) {
+  if (!member) return;
+  notifyMember(member, formLabel + ' recorded — ' + forDate,
+    [formLabel + ' for ' + forDate + ' was recorded.', ''].concat(summaryLines || []));
+}
+
+// Private Siddharth <-> Astha task note (2026-09): email only, no persistence
+// by design — not written to any sheet, not tracked/completable in-app.
+// Restricted to the two directors messaging each other; who's sending is
+// derived from their verified authEmail (not a client-supplied field), so
+// this can't be spoofed to send "from" the other director.
+function sendPrivateDirectorNote(data, authEmail) {
+  var email = String(authEmail || '').toLowerCase();
+  var senderName = DIRECTOR_RECIPIENT_EMAILS['Siddharth Inani'].indexOf(email) > -1 ? 'Siddharth Inani'
+                  : DIRECTOR_RECIPIENT_EMAILS['Astha Inani'].indexOf(email) > -1 ? 'Astha Inani'
+                  : null;
+  if (!senderName) return {status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.'};
+  var recipientName = senderName === 'Siddharth Inani' ? 'Astha Inani' : 'Siddharth Inani';
+  var subjectLine = String(data.subject || '').trim() || 'A task for you';
+  var body = [
+    'From ' + senderName + ':',
+    data.project  ? 'Project: '  + data.project  : '',
+    data.deadline ? 'Deadline: ' + data.deadline : '',
+    '',
+    String(data.description || '').trim(),
+  ].filter(function(l){ return l !== ''; }).join('\n');
+  try {
+    MailApp.sendEmail({
+      to: DIRECTOR_RECIPIENT_EMAILS[recipientName].join(','),
+      subject: '[IDS] ' + subjectLine,
+      body: body,
+      replyTo: email,
+    });
+  } catch (e) { return {status:'error', message:String(e)}; }
+  return {status:'ok', to:recipientName};
+}
 // Actions used ONLY by the approval form / weekly report (verified not shared
 // with the dashboard) — callable by managers only.
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
@@ -1518,6 +1612,7 @@ function doPost(e) {
     if (data.action === 'createSelfTask')    return respond(withLock(function(){ return createSelfAssignedTask(data); }));
     if (data.action === 'createDoneTask')    return respond(withLock(function(){ return createDoneTask(data); }));
     if (data.action === 'createSiddharthTask') return respond(createSiddharthTask(data));
+    if (data.action === 'sendPrivateDirectorNote') return respond(sendPrivateDirectorNote(data, authEmail));
     // Default: DPR submission
     var cfg = readConfig();
     var vPts = {};
@@ -1578,6 +1673,11 @@ function doPost(e) {
       }
     });
 
+    notifySubmissionRecorded(data['Member'], 'DPR', data['Report Date'] || dateStr(), [
+      'Weighted pts: ' + (data['Total Weighted Pts']||0),
+      'Task units: ' + (data['Total Task Units']||0),
+      'Projects touched: ' + (data['Projects Count']||0),
+    ]);
     return respond(submissionErrors.length
       ? {status:'partial', message:'Some items did not save — see errors.', errors: submissionErrors}
       : {status: 'ok'});
@@ -1842,6 +1942,7 @@ function assignTasks(data) {
     return r;
   });
   sheet.getRange(sheet.getLastRow()+1, 1, rows.length, W).setValues(rows);
+  if (!isStalled) notifyTaskAssigned(data.assignedTo, data.project, tasks);
   return {status:'ok', written:rows.length};
 }
 
@@ -6255,6 +6356,8 @@ function createSiddharthTask(data) {
     'High',                      // W Priority
   ]);
 
+  notifyTaskAssigned('Siddharth Inani', data.project, [{taskType:'Pending Discussion', description:data.description||'', targetDate:deadline}]);
+
   Logger.log('Siddharth task created for '+data.project+': '+newId);
   return {status:'ok', taskId:newId};
 }
@@ -7011,6 +7114,11 @@ function handleDPERSubmission(data) {
     } catch (vErr) { Logger.log('DPER visit-task error: ' + vErr); }
 
     Logger.log('DPER submitted: ' + subId + ' / ' + (data.project||''));
+    notifySubmissionRecorded(data.lead, 'DPER — ' + (data.project||''), data.date || dateStr(), [
+      'On track: ' + (data.onTrack||'—'),
+      issues.length ? 'Issues logged: ' + issues.length : '',
+      visitPts ? 'Visit points: ' + visitPts : '',
+    ]);
     return {
       status           : 'ok',
       subId            : subId,
@@ -7263,6 +7371,7 @@ function createIssueTask(iss, project, date, onTrack) {
     priority,                 // W Priority
   ]);
   parkRowIfStalled(sheet, project || '');  // stalled project → auto-park
+  notifyTaskAssigned(assignee, project, [{taskType: taskType, description: description, targetDate: iss.targetDate || addDaysToStr(today,2)}]);
 
   Logger.log('Issue task created: ' + newId + ' → ' + assignee + ' / ' + taskType);
   return newId;
@@ -9510,6 +9619,11 @@ function submitAmanCRM(data) {
     // ── 7. Auto-create Site Visit / Meeting tasks for attendees ──
     createMeetingTasks(agendas, member, today);
 
+    notifySubmissionRecorded(member, 'CRM Daily Report', realToday, [
+      newLeads.length ? 'New leads: ' + newLeads.length : '',
+      contacts.length ? 'Client connections: ' + contacts.length : '',
+      newIssues.length ? 'Issues/deliverables: ' + newIssues.length : '',
+    ]);
     Logger.log('submitAmanCRM complete: ' + subId);
     return {status:'ok', subId:subId};
 
@@ -9721,6 +9835,7 @@ function createMeetingTasks(agendas, member, today) {
         'CRM — ' + member,            // V AssignedBy
         'Medium',                     // W Priority
       ]);
+      notifyTaskAssigned(person, ag.project || '', [{taskType: type, description: (ag.agenda || ag.purpose || ''), targetDate: ag.date || today}]);
       count++;
     });
   });

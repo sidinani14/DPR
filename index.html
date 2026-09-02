@@ -60,6 +60,7 @@ const TOOLS=[
   {t:'Weekly Report', d:'Team performance scorecards', u:'weeklyreport.html', i:'📈', g:'manager'},
   {t:'Project Digest', d:'Weekly per-project activity (PDF)', u:'weeklydigest.html', i:'📑', g:'manager'},
   {t:'Logs Manager', d:'Review & delete stale/repeat logs', u:'logs.html', i:'🗂️', g:'manager'},
+  {t:'Private Note', d:'Send a task directly to Astha or Siddharth', u:'dirnote.html', i:'✉️', g:'manager'},
 ];
 function esc(s){return String(s==null?'':s).replace(/</g,'&lt;')}
 function tileHtml(x){return `<a class="tile" href="${x.u}"><div class="tile-ic">${x.i}</div><div><div class="tile-t">${esc(x.t)}</div><div class="tile-d">${esc(x.d)}</div></div></a>`}

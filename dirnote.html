@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IDS · Private Note</title>
+<script src="auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#FFFFFF;--surface2:#F9F8F5;
+  --border:#E2DFD8;--border2:#CBC7BC;
+  --text:#1A1917;--text2:#6B6860;--text3:#9E9B94;
+  --accent:#1F3A5F;--accent-light:#E8EDF4;
+  --green:#2D6A2D;--green-light:#EAF3EA;
+  --red:#8B2020;--red-light:#FDEAEA;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px}
+.app-header{background:var(--accent);padding:18px 20px 16px;position:sticky;top:0;z-index:100}
+.app-header-inner{max-width:480px;margin:0 auto}
+.logo-text{font-size:13px;font-weight:500;color:rgba(255,255,255,.9)}
+.logo-sub{font-size:10px;color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;margin-top:2px}
+.page{max-width:480px;margin:0 auto;padding:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+.card-head{padding:13px 18px;border-bottom:1px solid var(--border)}
+.card-title{font-size:13px;font-weight:500;color:var(--text)}
+.card-body{padding:16px 18px}
+.lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block}
+.field{margin-bottom:14px}
+input[type=text],input[type=date],textarea{
+  width:100%;font-family:'DM Sans',sans-serif;font-size:14px;
+  color:var(--text);background:var(--surface2);
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 12px;outline:none;transition:border-color .15s;
+}
+input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:90px;line-height:1.5;font-family:inherit}
+.to-badge{display:inline-flex;align-items:center;gap:8px;background:var(--accent-light);color:var(--accent);
+  padding:8px 14px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:4px}
+.hint{font-size:11px;color:var(--text3);margin-top:6px;line-height:1.5}
+.submit-btn{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);
+  font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s}
+.submit-btn:hover{background:#162d4a}
+.submit-btn:disabled{background:var(--border2);cursor:not-allowed}
+.status-msg{font-size:12px;margin-top:10px;text-align:center}
+.status-msg.ok{color:var(--green)}
+.status-msg.err{color:var(--red)}
+.back-link{display:block;text-align:center;margin-top:16px;font-size:12px;color:var(--text3);text-decoration:none}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="logo-text">Ideaform Design Studio</div>
+    <div class="logo-sub">Private Note — Siddharth ⇄ Astha</div>
+  </div>
+</header>
+
+<div class="page">
+  <div class="card">
+    <div class="card-head"><div class="card-title">This goes only to the other director</div></div>
+    <div class="card-body">
+      <p class="hint" style="margin-bottom:14px">Not visible anywhere else in the app — no task board, no dashboard, no record kept here. Sent straight to their email the moment you hit send.</p>
+      <div id="to-line"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="field">
+        <span class="lbl">Subject</span>
+        <input type="text" id="f-subject" placeholder="What's this about?">
+      </div>
+      <div class="field">
+        <span class="lbl">Project <span style="text-transform:none;font-weight:400">(optional)</span></span>
+        <input type="text" id="f-project" placeholder="Project name…">
+      </div>
+      <div class="field">
+        <span class="lbl">Deadline <span style="text-transform:none;font-weight:400">(optional)</span></span>
+        <input type="date" id="f-deadline">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <span class="lbl">Description</span>
+        <textarea id="f-description" placeholder="What you need them to do…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="sendNote()" disabled>Sign in first</button>
+  <div class="status-msg" id="status-msg"></div>
+  <a class="back-link" href="index.html">← Back to workspace</a>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
+const DIRECTOR_PAIR = {
+  'siddharth@ideaform.in':'Astha Inani', 'sidinani14@gmail.com':'Astha Inani',
+  'astha@ideaform.in':'Siddharth Inani', 'astha.uch@gmail.com':'Siddharth Inani',
+};
+let recipientName = '';
+
+function denyAccess(){
+  document.body.innerHTML='<div style="max-width:430px;margin:16vh auto;text-align:center;font-family:system-ui,sans-serif;color:#444;padding:20px"><div style="font-size:42px">🔒</div><h2 style="color:#C0392B;margin:12px 0 6px">Access restricted</h2><p style="color:#666;font-size:14px">This is a private channel between <b>Siddharth &amp; Astha</b> only.</p><a href="index.html" style="color:#1F3A5F;font-size:13px;text-decoration:none">← Back to workspace</a></div>';
+}
+
+document.addEventListener('ids-auth', () => {
+  const email = String((window.IDS_USER && window.IDS_USER.email)||'').toLowerCase();
+  recipientName = DIRECTOR_PAIR[email];
+  if (!recipientName) { denyAccess(); return; }
+  document.getElementById('to-line').innerHTML =
+    '<span class="to-badge">✉️ Sending to ' + recipientName + '</span>';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = 'Send to ' + recipientName;
+});
+
+async function sendNote(){
+  const btn = document.getElementById('submit-btn');
+  const msg = document.getElementById('status-msg');
+  const subject = document.getElementById('f-subject').value.trim();
+  const description = document.getElementById('f-description').value.trim();
+  if (!subject && !description) {
+    msg.textContent = 'Add at least a subject or description.';
+    msg.className = 'status-msg err';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  msg.textContent = ''; msg.className = 'status-msg';
+  try {
+    const r = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({
+        action: 'sendPrivateDirectorNote',
+        idToken: window.IDS_TOKEN,
+        subject, description,
+        project: document.getElementById('f-project').value.trim(),
+        deadline: document.getElementById('f-deadline').value || '',
+      })});
+    const j = await r.json();
+    if (j.status === 'ok') {
+      msg.textContent = '✓ Sent to ' + recipientName + '.';
+      msg.className = 'status-msg ok';
+      document.getElementById('f-subject').value = '';
+      document.getElementById('f-project').value = '';
+      document.getElementById('f-deadline').value = '';
+      document.getElementById('f-description').value = '';
+    } else {
+      msg.textContent = '✗ ' + (j.message || 'Failed to send — try again.');
+      msg.className = 'status-msg err';
+    }
+  } catch(e) {
+    msg.textContent = '✗ Network error — try again.';
+    msg.className = 'status-msg err';
+  }
+  btn.disabled = false; btn.textContent = 'Send to ' + recipientName;
+}
+</script>
+</body>
+</html>
