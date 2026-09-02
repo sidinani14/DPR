@@ -33,11 +33,57 @@
 
   // ── 2. Patch fetch so every backend call carries the ID token, and so an
   //       "unauthorized" reply surfaces as a clear access-denied screen ──
+  //
+  // Root cause of the recurring "access denied"/broken-form reports (found
+  // 2026-09 by decoding a live stuck token): the Google ID token itself only
+  // lives ~1 hour, but the app's own "session" (SESSION_MS) is 12 hours.
+  // boot() correctly checks the stored token's freshness, but ONLY ONCE, at
+  // page load -- nothing re-checked it again for a tab left open past that
+  // first hour. window.IDS_TOKEN just sat there going stale in memory, and
+  // every fetch after that point silently sent an expired token, which the
+  // backend correctly rejected -- with no page reload, nothing on the client
+  // ever noticed or tried to fix it. ensureFreshToken() closes that gap: it
+  // runs before every backend call and, if the token is within 2 minutes of
+  // its own expiry, silently re-authenticates (same FedCM continue-as path
+  // boot() already uses) before the request goes out, so the request itself
+  // always carries a live token instead of reacting after the fact.
+  function tokenExpired(bufferMs) {
+    if (!window.IDS_TOKEN) return true;
+    var p = parseJwt(window.IDS_TOKEN);
+    return !p || !p.exp || (p.exp * 1000) < (Date.now() + (bufferMs || 60000));
+  }
+  var _refreshing = null;
+  function ensureFreshToken() {
+    if (!window.IDS_TOKEN || !tokenExpired(120000)) return Promise.resolve(true);
+    if (_refreshing) return _refreshing;
+    _refreshing = new Promise(function (resolve) {
+      if (!(window.google && google.accounts && google.accounts.id)) { resolve(false); return; }
+      try {
+        var hint = storeGet(HINT_KEY) || '';
+        var opts = { client_id: CLIENT_ID, auto_select: true, use_fedcm_for_prompt: true,
+          callback: function (resp) {
+            var token = resp && resp.credential;
+            var p = token ? parseJwt(token) : null;
+            if (p) { grant(token, p); resolve(true); } else resolve(false);
+          } };
+        if (hint) opts.login_hint = hint;
+        google.accounts.id.initialize(opts);
+        _inited = true; // the gate's own init state, so a later boot()/showSignin() re-initializes cleanly rather than trusting this one-off config
+        google.accounts.id.prompt(function (n) {
+          if (n.isNotDisplayed() || n.isSkippedMoment()) resolve(false); // couldn't refresh silently -- caller proceeds with the stale token, same as before this fix existed
+        });
+      } catch (e) { resolve(false); }
+    }).finally(function () { _refreshing = null; });
+    return _refreshing;
+  }
+
   var _fetch = window.fetch;
-  window.fetch = function (url, opts) {
+  window.fetch = async function (url, opts) {
     opts = opts || {};
+    var isBackendEarly = typeof url === 'string' && url.indexOf(API_HOST) > -1;
+    if (isBackendEarly) { try { await ensureFreshToken(); } catch (e) {} }
     var tok = window.IDS_TOKEN;
-    var isBackend = typeof url === 'string' && url.indexOf(API_HOST) > -1;
+    var isBackend = isBackendEarly;
     if (isBackend && tok) {
       var m = (opts.method || 'GET').toUpperCase();
       if (m === 'GET') {
