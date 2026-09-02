@@ -911,6 +911,19 @@ function toggleMtEdit(i, link){
   box.style.display = open ? 'none' : 'block';
   if (link) link.textContent = open ? '✎ Task changed? Edit units / drawing / notes' : '✎ Hide edit fields';
 }
+// Hours taken was already labelled required (*) on Your Open Tasks but
+// nothing blocked submission if left blank. Only checked for tasks marked
+// Done here.
+function flagMissingHoursCRM() {
+  let firstBad = null;
+  myTasks.forEach((t,i)=>{
+    const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value;
+    if (status !== 'Done') return;
+    const el = document.querySelector(`.mt-hrstaken-${i}`);
+    if (!firstBad && !(parseFloat(el?.value) > 0)) firstBad = el;
+  });
+  return firstBad;
+}
 function collectTaskStatuses(){
   const today=new Date().toISOString().substring(0,10);
   return myTasks.map((t,i)=>{
@@ -2104,6 +2117,13 @@ function clearDraft(){
 
 async function submitAll() {
   if(!googleUser){ toast('Sign in first'); return; }
+  const missingHours = flagMissingHoursCRM();
+  if (missingHours) {
+    missingHours.scrollIntoView({behavior:'smooth', block:'center'});
+    missingHours.focus();
+    toast('Enter the hours taken for every task marked Done before submitting.', 5500);
+    return;
+  }
   const date=document.getElementById('f-date')?.value||'';
 
   document.getElementById('submit-btn').disabled=true;

@@ -496,6 +496,22 @@ async function rejectMeeting(row){
   }catch(e){}
 }
 
+// t.date is the (reported) SelfStatusDate/ActualCompletionDate — for
+// self-logged work with a backdated "Report Date" (a site visit filed a
+// few days late, say) this reflects the CLAIMED date, not necessarily when
+// it was actually submitted. t.submittedAt is the real moment createDoneTask/
+// updateTaskStatuses wrote this row Done, which never backdates — comparing
+// the two is exactly how a lead cross-checks a reported site-visit date.
+function submittedAtLine(t) {
+  if (!t.submittedAt) return '<div style="font-size:10px;color:var(--text3);margin-bottom:6px">Marked done: — (submitted before this was tracked)</div>';
+  const subDate = t.submittedAt.substring(0,10);
+  const gapDays = t.date ? Math.round((new Date(subDate) - new Date(t.date)) / 86400000) : 0;
+  const flagged = gapDays > 1;
+  return `<div style="font-size:10px;margin-bottom:6px;color:${flagged?'#C0392B':'var(--text3)'};font-weight:${flagged?'600':'400'}">
+    Marked done: ${t.submittedAt}${flagged ? ` — ⚠ ${gapDays}d after the reported date (${t.date}), worth a look` : ''}
+  </div>`;
+}
+
 // ── Render task cards ──────────────────────────────────────────
 function renderTasks() {
   const count = tasks.length;
@@ -557,6 +573,7 @@ function renderTasks() {
           <div class="task-pts">${t.pts} pts${t.hoursTaken ? ` <span style="font-size:11px;font-weight:600;color:var(--text3);margin-left:6px">· ${t.hoursTaken}h taken</span>` : ''}</div>
         </div>
         ${t.hoursTaken ? `<div style="font-size:10px;color:var(--text3);margin-bottom:4px">${(t.pts/t.hoursTaken).toFixed(1)} pts/hr — compare against what this task type normally pays</div>` : ''}
+        ${submittedAtLine(t)}
         ${t.area||t.drawing ? `<div style="font-size:11px;color:var(--accent);margin-bottom:6px;font-family:'DM Mono',monospace">${t.area||''}${t.area&&t.drawing?' · ':''}${t.drawing||''}</div>` : ''}
         <div style="margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border)">
           <div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:'DM Mono',monospace;text-transform:uppercase">Lead correction (optional)</div>

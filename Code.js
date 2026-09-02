@@ -730,6 +730,20 @@ function writeHoursTaken(sheet, row, hours) {
   }
   sheet.getRange(row, COL_HOURS_TAKEN).setValue(parseFloat(hours));
 }
+var COL_SUBMITTED_AT=30;  // AD — the REAL moment this row was marked Done (2026-08). Distinct
+                           // from SelfStatusDate/ActualCompletionDate, which both honor a backdated
+                           // "Report Date" for late-filed self-logged work (site visits especially) --
+                           // so a visit reported for 3 days ago and one actually submitted 3 days late
+                           // look identical in every other date column. This one never backdates,
+                           // letting a lead in approval.html compare "reported for" vs "actually
+                           // submitted" and catch a mismatch, which is the whole point of tracking it.
+function stampSubmittedAt(sheet, row) {
+  ensureCols(sheet, COL_SUBMITTED_AT);
+  if (!String(sheet.getRange(1, COL_SUBMITTED_AT).getValue()||'').trim()) {
+    sheet.getRange(1, COL_SUBMITTED_AT).setValue('Submitted At');
+  }
+  sheet.getRange(row, COL_SUBMITTED_AT).setValue(dateStr() + ' ' + new Date().toTimeString().substring(0,5));
+}
 
 // ── Safety net for direct edits on TASK_ASSIGNMENTS ─────────────────────
 // A bare edit typed straight into the sheet (reassigning by overwriting
@@ -2187,6 +2201,7 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
               ? a.hoursTaken
               : (isVisitTask(taskType) ? a.visitHours : null);
             writeHoursTaken(sheet, i+1, doneHoursTaken);
+            stampSubmittedAt(sheet, i+1);
           }
         }
 
@@ -2273,6 +2288,7 @@ function getPendingTasks() {
         units        : parseFloat(asRows[j][7]) || 1, // H Units
         pts          : parseFloat(asRows[j][8]) || 0, // I WeightedPts
         hoursTaken   : asRows[j][COL_HOURS_TAKEN-1] != null ? (parseFloat(asRows[j][COL_HOURS_TAKEN-1]) || null) : null, // AC
+        submittedAt  : String(asRows[j][COL_SUBMITTED_AT-1] || ''), // AD — real "marked Done" moment, never backdated
         taskAssignRow: j + 1,
         revisionTag  : String(asRows[j][AS_REVTAG] || ''),
         notes        : String(asRows[j][AS_NOTES]  || ''),
@@ -6087,6 +6103,7 @@ function createDoneTask(data) {
     sheet.getRange(matchRow, 16).setValue(actualDate);   // P ActualCompletionDate
     sheet.getRange(matchRow, 17).setValue('Pending');    // Q LeadApproved (reset for re-approval)
     writeHoursTaken(sheet, matchRow, hoursTaken);
+    stampSubmittedAt(sheet, matchRow);
     var existingId = String(rows[matchRow-1][0]||'');
     Logger.log('Done task updated existing: '+member+' / '+data.taskType+' row '+matchRow+' ('+existingId+')');
     return {status:'ok', taskId:existingId, updated:true};
@@ -6125,6 +6142,7 @@ function createDoneTask(data) {
     'Medium',                  // W Priority
   ]);
   writeHoursTaken(sheet, sheet.getLastRow(), hoursTaken);
+  stampSubmittedAt(sheet, sheet.getLastRow());
 
   Logger.log('Done task created (new): '+member+' / '+data.taskType+' = '+weightedPts+'pts → '+newId);
   return {status:'ok', taskId:newId};
@@ -9300,7 +9318,18 @@ function getOpenLeads(member) {
 // ════════════════════════════════════════════════════════════════
 function submitAmanCRM(data) {
   try {
-    var today   = data.date || dateStr();
+    // `today` here honors the CRM form's editable Report Date -- legitimate
+    // for backdating late-filed WORK (a lead/issue/bill logged for a day or
+    // two ago), same as DPR/DPER's Report Date field. `realToday` is the
+    // actual day this form was submitted and must NEVER backdate -- used
+    // only for the attendance/check-in row (DAILY_SUMMARY), which drives
+    // Punctuality/DPR-Consistency scoring. Using the backdatable `today` for
+    // that row (the bug, until now) meant backdating a report to log a late
+    // site visit silently also backdated that day's attendance, with today's
+    // own attendance never recorded at all -- dpr.html's writeDailySummary
+    // already gets this right via the Timestamp, not the Report Date.
+    var today     = data.date || dateStr();
+    var realToday = dateStr();
     var member  = data.member || 'Aman Raghuwanshi';
     var now     = data.time  || new Date().toTimeString().substring(0, 5);
 
@@ -9342,7 +9371,7 @@ function submitAmanCRM(data) {
     // no longer duplicated as a redundant boolean index. ──
     var subId = 'CRM-' + Utilities.getUuid().substring(0,8).toUpperCase();
     var summarySheet = getOrCreate(SUMMARY_TAB, writeSummaryHeaders);
-    prependRow(summarySheet, [ today, now, member, data.email || '', data.arrivedOnTime || '', '', '', '' ]);
+    prependRow(summarySheet, [ realToday, now, member, data.email || '', data.arrivedOnTime || '', '', '', '' ]);
     Logger.log('DAILY_SUMMARY written for Aman: ' + subId);
 
     // ── 1a. Client connections + activities → CRM_LOG (one row each) ──

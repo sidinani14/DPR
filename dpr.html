@@ -1658,11 +1658,56 @@ function countLoggedWorkItems(d) {
   return n;
 }
 
+// Hours-taken/visit-hours were already labelled required (*) on both Section 2
+// (assigned tasks) and Section 3 (self-logged tasks) but nothing actually
+// blocked submission if left blank -- the field just silently went in as
+// null. This is what lets a lead cross-check a task's points/hr in
+// approval.html and, for site visits, sanity-check the reported hours at all.
+// Only checked for rows marked Done -- Ongoing/Blocked/Not Started tasks
+// don't have "hours taken" yet.
+function flagMissingHours() {
+  let firstBad = null;
+  const bad = (el) => { if (el && !firstBad) firstBad = el; };
+  assignedTasks.forEach((t,i)=>{
+    const status = document.querySelector(`input[name="atc-${i}"]:checked`)?.value;
+    if (status !== 'Done') return;
+    if (isVisitType(t.taskType)) {
+      const el = document.querySelector(`.atc-visit-hrs-${i}`);
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    } else {
+      const el = document.querySelector(`.atc-hrs-taken-${i}`);
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    }
+  });
+  document.querySelectorAll('.task-entry').forEach(tr=>{
+    const idx = parseInt(tr.querySelector('.t-type')?.value);
+    const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
+    if (!stage) return; // empty row, ignored elsewhere too
+    const status = tr.querySelector('.t-status:checked')?.value || 'Done';
+    if (status !== 'Done') return;
+    if (isVisitType(stage.label)) {
+      const el = tr.querySelector('.t-visit-hrs');
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    } else {
+      const el = tr.querySelector('.t-hrs-taken');
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    }
+  });
+  return firstBad;
+}
+
 function validate(d) {
   const incompleteBlock = flagIncompleteUnplannedBlocks();
   if (incompleteBlock) {
     incompleteBlock.scrollIntoView({behavior:'smooth', block:'center'});
     toast('Section 3: pick a project for the unplanned work you added below — without it, that entry won\'t be saved.', 6000);
+    return false;
+  }
+  const missingHours = flagMissingHours();
+  if (missingHours) {
+    missingHours.scrollIntoView({behavior:'smooth', block:'center'});
+    missingHours.focus();
+    toast('Enter the hours taken for every task marked Done before submitting.', 5500);
     return false;
   }
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }

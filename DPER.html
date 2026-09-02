@@ -515,6 +515,42 @@ function flagIncompleteUnpBlocks() {
   return firstBad;
 }
 
+// Hours-taken/visit-timing were already labelled required (*) in both the
+// Unplanned Work rows and the Your Open Tasks mark-done cards, but nothing
+// actually blocked submission if left blank -- it just went in as null,
+// which for a visit task means calcVisitPts sees no hours and silently
+// scores it 0. Only checked for entries marked Done.
+function flagMissingHoursDPER() {
+  let firstBad = null;
+  const bad = (el) => { if (el && !firstBad) firstBad = el; };
+  document.querySelectorAll('.unp-task-entry').forEach(tr=>{
+    const idx = parseInt(tr.querySelector('.unp-type')?.value);
+    const stage = (!isNaN(idx) && CFG_STAGES[idx]) ? CFG_STAGES[idx] : null;
+    if (!stage) return; // empty row, ignored elsewhere too
+    const status = tr.querySelector('.unp-status:checked')?.value || 'Done';
+    if (status !== 'Done') return;
+    if (isVisitType(stage.label)) {
+      const el = tr.querySelector('.unp-visit-hrs');
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    } else {
+      const el = tr.querySelector('.unp-hrstaken');
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    }
+  });
+  myTasks.forEach((t,i)=>{
+    const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value;
+    if (status !== 'Done') return;
+    if (isVisitType(t.taskType)) {
+      const s = document.querySelector(`.mt-vstart-${i}`), e = document.querySelector(`.mt-vend-${i}`);
+      if (!s?.value) bad(s); else if (!e?.value) bad(e);
+    } else {
+      const el = document.querySelector(`.mt-hrstaken-${i}`);
+      if (!(parseFloat(el?.value) > 0)) bad(el);
+    }
+  });
+  return firstBad;
+}
+
 function collectUnplanned(){
   const done=[], ongoing=[];
   document.querySelectorAll('.unp-proj-block').forEach(pb=>{
@@ -1175,6 +1211,13 @@ async function submitAll(){
   if (incompleteUnp) {
     incompleteUnp.scrollIntoView({behavior:'smooth', block:'center'});
     toast('Unplanned work: pick a project for the task you added below — without it, that entry won\'t be saved.', 6000);
+    return;
+  }
+  const missingHours = flagMissingHoursDPER();
+  if (missingHours) {
+    missingHours.scrollIntoView({behavior:'smooth', block:'center'});
+    missingHours.focus();
+    toast('Enter the hours taken for every task marked Done before submitting.', 5500);
     return;
   }
   const projs=collectProjects();
