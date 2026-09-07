@@ -1456,6 +1456,10 @@ function doGet(e) {
   if (action === 'getMeetingApprovals')      return safeRespond(getMeetingApprovals);
   if (action === 'getMeetingTimeline')       return safeRespond(function(){ return getMeetingTimeline(p.project||''); });
   if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
+  if (action === 'syncVisitSchedule')        return safeRespond(function(){ syncVisitSchedule(); return {status:'ok'}; });
+  if (action === 'debugVisitPlanner')        return safeRespond(debugVisitPlanner);
+  if (action === 'getLastPushVisitTasksTrace') return safeRespond(getLastPushVisitTasksTrace);
+  if (action === 'debugRawTaskRows')         return safeRespond(function(){ return debugRawTaskRows(p.project||''); });
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
   if (action === 'getWeeklyProjectDigest')   return safeRespond(function(){ return getWeeklyProjectDigest(p.weekStart||''); });
   if (action === 'getAllMeetingLogs')        return safeRespond(getAllMeetingLogs);
@@ -1580,6 +1584,7 @@ function doPost(e) {
     if (data.action === 'parkTask')               return respond(parkTask(data, authEmail));
     if (data.action === 'unparkTask')             return respond(unparkTask(data, authEmail));
     if (data.action === 'reconcileStalled')       return respond(reconcileStalledParks());
+    if (data.action === 'syncVisitSchedule')      return respond((function(){ syncVisitSchedule(); return {status:'ok'}; })());
     if (data.action === 'getBillRequests')        return respond(getBillRequests());
     if (data.action === 'disposeBillRequest')     return respond(disposeBillRequest(data));
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
@@ -5449,14 +5454,21 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
     }
   }
 
+  // TEMP trace (2026-09): investigating cadence entries that pass every
+  // calcNextVisitDate check yet never land in TASK_ASSIGNMENTS. Records
+  // every push/skip decision this actual run makes -- not a parallel
+  // re-implementation like debugVisitPlanner, the real thing -- so
+  // getLastPushVisitTasksTrace can show exactly what happened, not what
+  // should have happened.
+  var trace = [];
   cadence.forEach(function(entry) {
     var lastDate = getEffectiveLastVisitDate(entry, history);
     var hist     = (history[entry.project]||{})[entry.visitType]||[];
     var nextInfo = calcNextVisitDate(entry, lastDate, openTasks);
     var nextDate = nextInfo.date;
 
-    if (!nextDate) return;
-    if (nextDate > threshold) return;
+    if (!nextDate) { trace.push({project:entry.project, visitType:entry.visitType, skip:'no nextDate'}); return; }
+    if (nextDate > threshold) { trace.push({project:entry.project, visitType:entry.visitType, nextDate:nextDate, skip:'after threshold '+threshold}); return; }
 
     var isOverdue = nextDate < today;
     var pd        = projMap[entry.project] || {disc:'',mult:1.0};
@@ -5467,11 +5479,12 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
     var ai;
     for (ai = 0; ai < parts.length; ai++) {
       var assignee = parts[ai].trim();
-      if (!assignee) continue;
+      if (!assignee) { trace.push({project:entry.project, visitType:entry.visitType, part:parts[ai], skip:'blank assignee after trim'}); continue; }
 
       // Per-assignee dedup key
       var key = entry.project + '||' + entry.visitType + '||' + assignee;
-      if (openTasks[key]) continue;
+      if (openTasks[key]) { trace.push({project:entry.project, visitType:entry.visitType, assignee:assignee, nextDate:nextDate, skip:'openTasks blocked', blockedBy:openTasks[key]}); continue; }
+      trace.push({project:entry.project, visitType:entry.visitType, assignee:assignee, nextDate:nextDate, action:'WILL PUSH'});
 
       var newId   = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
       var isVisit = VISIT_TYPES_ARCH.indexOf(entry.visitType) > -1 ||
@@ -5501,6 +5514,7 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
         'Auto-scheduled',         // V AssignedBy
         isOverdue ? 'High' : 'Medium', // W Priority
       ]);
+      trace[trace.length-1].taskId = newId;
 
       pushed++;
       Logger.log('Visit task: '+entry.project+' / '+entry.visitType+' / '+assignee+' due '+nextDate);
@@ -5512,7 +5526,28 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
   }); // end cadence.forEach
 
   Logger.log('Pushed '+pushed+' visit tasks');
+  try { CacheService.getScriptCache().put('last_push_visit_trace', JSON.stringify(trace), 1800); } catch (e) {}
   return pushed;
+}
+function getLastPushVisitTasksTrace() {
+  var t = CacheService.getScriptCache().get('last_push_visit_trace');
+  return { trace: t ? JSON.parse(t) : null };
+}
+// TEMP diagnostic (2026-09): raw TASK_ASSIGNMENTS rows for one project, no
+// getAllTasks-style status/date derivation in the way -- is the row actually
+// in the sheet at all, or does it only look that way in a computed view.
+function debugRawTaskRows(project) {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return { rowCount: 0, rows: [] };
+  var rows = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][2]||'').trim() !== project) continue;
+    out.push({ row:i+1, taskId:rows[i][0], assignedTo:rows[i][3], taskType:rows[i][4],
+      assignedDate:String(rows[i][9]), deadline:String(rows[i][10]), selfStatus:rows[i][13],
+      assignedBy:rows[i][21] });
+  }
+  return { sheetLastRow: sheet.getLastRow(), rowCount: out.length, rows: out };
 }
 
 // ── Flag missed visits in VISIT_SCHEDULE ─────────────────────
@@ -5869,6 +5904,39 @@ function cleanupPendingVisitTasksAndResync(){
 
   Logger.log('cleanupPendingVisitTasksAndResync complete: removed '+removed.length+', schedule resynced.');
   return { status:'ok', removedCount:removed.length, removed:removed };
+}
+
+// TEMP diagnostic (2026-09): why did newly-added VISIT_PLANNER rows not push
+// a TASK_ASSIGNMENTS task after a sync? Shows exactly what loadCadence()
+// picked up and what calcNextVisitDate() computed for each entry, plus the
+// threshold pushVisitTasks() checks against -- lets you tell "not due until
+// later" (correct, no bug) apart from "silently dropped" (a real bug) at a
+// glance instead of guessing from the sheet UI.
+function debugVisitPlanner() {
+  var planSheet = getOrMakeTab(PLANNER_TAB, setupPlannerTab);
+  var cadence   = loadCadence(planSheet);
+  var history   = loadVisitHistory();
+  var openTasks = loadOpenVisitTasks();
+  var today     = todayStr();
+  var todayDate = new Date();
+  var dow       = todayDate.getDay();
+  var daysToSat = dow === 0 ? 6 : 6 - dow;
+  var threshold = addDaysToStr(today, daysToSat);
+
+  var rows = cadence.map(function(entry) {
+    var lastDate = getEffectiveLastVisitDate(entry, history);
+    var nextInfo = calcNextVisitDate(entry, lastDate, openTasks);
+    var willPush = !!nextInfo.date && nextInfo.date <= threshold;
+    return {
+      project: entry.project, visitType: entry.visitType, assignee: entry.assignee,
+      frequency: entry.frequency, fixedDay: entry.fixedDay, manualLastDate: entry.manualLastDate,
+      effectiveLastDate: lastDate, computedNextDate: nextInfo.date, nextDateSource: nextInfo.source,
+      wouldPushThisSync: willPush,
+      reasonSkipped: nextInfo.date ? (willPush ? '' : 'next date ' + nextInfo.date + ' is after this week\'s threshold (' + threshold + ')')
+                                    : 'no computable next date (no frequency match / no last-visit history)',
+    };
+  });
+  return { today: today, threshold: threshold, cadenceCount: cadence.length, rows: rows };
 }
 
 function syncVisitSchedule() {
