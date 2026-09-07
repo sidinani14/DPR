@@ -125,6 +125,23 @@ function visitFamily(taskType) {
   if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting') return 'meeting';
   return null;
 }
+// Placeholder points for a visit/meeting task at ASSIGNMENT time, before
+// anyone has logged real hours (2026-09, explicit request). Visit/meeting
+// tasks are normally created at 0 pts with a comment like "updated when
+// hours entered" -- correct once someone actually reports it, but a 0-pt
+// task doesn't show up meaningfully on the dashboard/workload heatmap in
+// the meantime, so a newly-assigned site visit or meeting looked invisible
+// even though it's real, real work someone owes. This default gets fully
+// overwritten by the real hours × rate calculation the moment the assignee
+// reports it (same code path as always -- see updateTaskStatusesFromDPR /
+// createDoneTask's visit-pts recalculation) -- it's only ever the number
+// shown before that happens.
+function defaultVisitPts(taskType) {
+  var fam = visitFamily(taskType);
+  if (fam === 'site') return 3;
+  if (fam === 'meeting') return 1;
+  return 0;
+}
 
 // Aman's Client Satisfaction /MAX (2026-08 explicit rule) — count of
 // FEEDBACK entries he recorded this week (any project), not an averaged
@@ -1458,6 +1475,7 @@ function doGet(e) {
   if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
   if (action === 'syncVisitSchedule')        return safeRespond(function(){ syncVisitSchedule(); return {status:'ok'}; });
   if (action === 'debugVisitPlanner')        return safeRespond(debugVisitPlanner);
+  if (action === 'backfillVisitDefaultPts')  { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return safeRespond(backfillVisitDefaultPts); }
   if (action === 'getLastPushVisitTasksTrace') return safeRespond(getLastPushVisitTasksTrace);
   if (action === 'debugRawTaskRows')         return safeRespond(function(){ return debugRawTaskRows(p.project||''); });
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
@@ -5515,6 +5533,7 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
       var newId   = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
       var isVisit = VISIT_TYPES_ARCH.indexOf(entry.visitType) > -1 ||
                     (entry.visitType||'').toLowerCase().indexOf('site visit') > -1;
+      var defPts  = defaultVisitPts(entry.visitType);
       asSheet.appendRow([
         newId,                    // A TaskID
         '',                       // B ProjectID
@@ -5522,9 +5541,9 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
         assignee,                 // D AssignedTo
         entry.visitType,          // E Stage/TaskType
         pd.mult,                  // F Disc. Multiplier (number)
-        0,                        // G Stage Base Pts (0 — visit pts based on hours)
+        defPts,                   // G Stage Base Pts (placeholder — real hours × rate replaces this once logged)
         1,                        // H Units (always 1 visit unit)
-        0,                        // I Weighted Pts (0 placeholder — updated when hours entered on DPR)
+        defPts,                   // I Weighted Pts (placeholder so it's visible on dashboard/heatmap before hours are logged)
         today,                    // J AssignedDate
         nextDate,                 // K Deadline
         '',                       // L Area
@@ -5895,6 +5914,36 @@ function sendVisitNotification(entry, nextDate, hist, isOverdue, email) {
   } catch(e) {
     Logger.log('Email failed for '+entry.assignee+': '+e);
   }
+}
+
+// ONE-OFF (2026-09): backfills the default visit/meeting placeholder points
+// (defaultVisitPts) onto tasks that were auto-created BEFORE that default
+// existed, so they don't stay stuck showing 0 on the dashboard/heatmap
+// until someone happens to log hours. Only touches 'Not Started' rows
+// (never anything with real progress or a resolution) whose current
+// weighted points are still exactly 0 -- a task that already has real
+// hours-based points, or a manually-corrected value, is left alone.
+function backfillVisitDefaultPts(){
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {status:'ok', updated:0};
+  var rows = sheet.getDataRange().getValues();
+  var updated = 0, details = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var taskType = String(r[4]||'').trim();
+    var fam = visitFamily(taskType);
+    if (!fam) continue;
+    var selfStatus = String(r[13]||'').trim();
+    if (selfStatus !== 'Not Started') continue;
+    var curPts = parseFloat(r[8]) || 0;
+    if (curPts !== 0) continue;
+    var defPts = defaultVisitPts(taskType);
+    sheet.getRange(i+1, 7).setValue(defPts); // G Stage Base Pts
+    sheet.getRange(i+1, 9).setValue(defPts); // I Weighted Pts
+    updated++;
+    details.push({row:i+1, project:String(r[2]||''), taskType:taskType, assignedTo:String(r[3]||''), newPts:defPts});
+  }
+  return {status:'ok', updated:updated, details:details};
 }
 
 // ONE-OFF (2026-08): VISIT_PLANNER was just corrected (project names, team,
@@ -9934,6 +9983,7 @@ function createMeetingTasks(agendas, member, today) {
                         (ag.time ? ' @ ' + ag.time : '') +
                         (ag.project ? ' — ' + ag.project : '');
       var metaNotes = '[Auto: pts = hours logged in DPR — Site Visit ×2/hr, Meeting ×1/hr]';
+      var defPts = defaultVisitPts(type);
       sheet.appendRow([
         newId,                        // A TaskID
         '',                           // B ProjectID
@@ -9941,9 +9991,9 @@ function createMeetingTasks(agendas, member, today) {
         person,                       // D AssignedTo
         type,                         // E Stage/Type
         1,                            // F Disc Multiplier
-        0,                            // G Base Pts (0 — visit pts come from hours)
+        defPts,                       // G Base Pts (placeholder — real hours × rate replaces this once logged)
         1,                            // H Units
-        0,                            // I Weighted Pts (0 until Done w/ hours → hours × rate)
+        defPts,                       // I Weighted Pts (placeholder so it's visible on dashboard/heatmap before hours are logged)
         today,                        // J AssignedDate
         ag.date || today,             // K Deadline (meeting/visit date)
         description,                  // L Description (agenda/purpose)
