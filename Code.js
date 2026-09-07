@@ -2656,7 +2656,22 @@ function parkRowIfStalled(sheet, projectName, stalledSet){
 }
 // Reconcile every task against the current stalled-project list (park new,
 // revive un-stalled). Runs from the Monday trigger + callable on demand.
+// 2026-09 fix: this writes to TASK_ASSIGNMENTS row-by-row and used to run
+// completely unlocked -- including from onProjectsStageEdit, an installable
+// trigger that fires on every real edit to PROJECTS' Stage column. On an
+// active day that trigger can fire several times in under a minute (real
+// usage, not a bug) -- each unlocked run racing whatever else happened to be
+// mid-write to the SAME sheet (e.g. pushVisitTasks' own withLock'd appendRow
+// calls) and silently discarding them, with neither side throwing an error.
+// Confirmed live: pushVisitTasks reached its append line for a real new
+// VISIT_PLANNER entry, "succeeded" with no exception, yet the row never
+// existed on read-back -- exactly this class of silent clobber. Wrapping
+// the whole reconcile in the SAME withLock used elsewhere for
+// TASK_ASSIGNMENTS writes makes the two mutually exclusive instead of racing.
 function reconcileStalledParks(){
+  return withLock(reconcileStalledParksLocked);
+}
+function reconcileStalledParksLocked(){
   var sheet = db().getSheetByName(ASSIGN_TAB);
   if (!sheet || sheet.getLastRow() < 2) return {status:'ok', parked:0, unparked:0};
   ensureCols(sheet, COL_PARK_REASON);
@@ -5461,6 +5476,17 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
   // getLastPushVisitTasksTrace can show exactly what happened, not what
   // should have happened.
   var trace = [];
+  // Notification emails are queued here and sent in ONE separate pass AFTER
+  // every appendRow below and its trailing SpreadsheetApp.flush() -- 2026-09
+  // fix. Confirmed live (A/B, same real cadence data, twice): with
+  // sendVisitNotification firing inline right after each appendRow, 0/18
+  // pushes persisted; with it removed from the loop, 18/18 persisted. The
+  // exact mechanism is still unclear (a MailApp call -- especially one
+  // failing on a pending auth grant -- interleaved with a not-yet-flushed
+  // Spreadsheet write appears able to make Apps Script silently drop the
+  // write), but the fix holds regardless of mechanism: never call MailApp
+  // while a Sheets write from the same loop hasn't been flushed yet.
+  var pendingNotifications = [];
   cadence.forEach(function(entry) {
     var lastDate = getEffectiveLastVisitDate(entry, history);
     var hist     = (history[entry.project]||{})[entry.visitType]||[];
@@ -5520,10 +5546,20 @@ function pushVisitTasks(cadence, history, openTasks, schedRows) {
       Logger.log('Visit task: '+entry.project+' / '+entry.visitType+' / '+assignee+' due '+nextDate);
 
       if (emailMap[assignee]) {
-        sendVisitNotification(entry, nextDate, hist, isOverdue, emailMap[assignee]);
+        pendingNotifications.push({entry:entry, nextDate:nextDate, hist:hist, isOverdue:isOverdue, email:emailMap[assignee]});
       }
     } // end for assignees
   }); // end cadence.forEach
+
+  // All Sheets writes are done and flushed -- safe to start making MailApp
+  // calls now. Each is still individually try/caught inside
+  // sendVisitNotification, so one bad address can't skip the rest.
+  if (pendingNotifications.length) {
+    try { SpreadsheetApp.flush(); } catch (e) {}
+    pendingNotifications.forEach(function(n) {
+      sendVisitNotification(n.entry, n.nextDate, n.hist, n.isOverdue, n.email);
+    });
+  }
 
   Logger.log('Pushed '+pushed+' visit tasks');
   try { CacheService.getScriptCache().put('last_push_visit_trace', JSON.stringify(trace), 1800); } catch (e) {}
