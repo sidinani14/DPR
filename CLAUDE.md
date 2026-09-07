@@ -33,6 +33,30 @@
   of manualDate+frequency, silently missing the current week's threshold
   for Monthly/Fortnightly cadences. Fixed via a shared
   `getEffectiveLastVisitDate(entry, history)` used by all three functions.
+- **Bug fixed 2026-09 — MailApp calls can silently eat a not-yet-flushed
+  Sheets write**: newly-added VISIT_PLANNER rows (a fresh client meeting,
+  say) stopped producing tasks in TASK_ASSIGNMENTS entirely, with no
+  error anywhere. Root cause, confirmed via a clean A/B test on real data:
+  `pushVisitTasks` called `sendVisitNotification` (`MailApp.sendEmail`)
+  immediately after each `appendRow`, inside the same loop. With that
+  call present, 0/18 pending visit tasks persisted despite `appendRow`
+  reporting success; with it removed from the loop, 18/18 persisted,
+  twice in a row on identical input. The exact Apps Script internals
+  are still unclear, but the practical rule is confirmed: a MailApp call
+  — especially one hitting a still-pending OAuth scope gap like
+  `authorizeMail` below — interleaved with a Spreadsheet write that
+  hasn't been flushed yet can make the write silently vanish, with
+  `appendRow` itself never throwing. Fixed by collecting all visit
+  notifications during the loop and sending them in one pass AFTER the
+  whole loop finishes and flushes — **never call MailApp (or likely any
+  other Advanced Service) between a Sheets write and its flush,
+  anywhere in this codebase.** Also added `action=syncVisitSchedule`
+  (unrestricted, mirrors the existing `reconcileStalled` action) so new
+  planner rows don't have to wait for the 7am trigger to get pushed, and
+  locked `reconcileStalledParks()` (it writes to TASK_ASSIGNMENTS
+  row-by-row and was fully unlocked before, including from the
+  `onProjectsStageEdit` installable trigger — not what caused this
+  specific bug, but a real latent race worth having closed regardless).
 - Frequency **"None"** (a documented, valid VISIT_PLANNER option) means no
   automatic scheduling for that row — not a bug if a project shows no
   visit task and its Frequency is set to None.
@@ -242,6 +266,39 @@ quota-exceeded failure — don't keep guessing in code without that signal.
 - DPER site visit auto-publishes a Site Visit Log (skipTasks=true; DPER already tasks issues).
 - One-time: paste ANTHROPIC_API_KEY in Script Properties; run authorizeEpicK() for
   Drive + Anthropic scopes.
+
+## Notifications (2026-09) — email today, WhatsApp-ready later
+- `notifyMember()`/`notifyTaskAssigned()`/`notifySubmissionRecorded()` are the
+  one central send point — every future channel (WhatsApp, once set up) is a
+  single function swap here, not touching every call site.
+- Fires on: real task assignment (`assignTasks`/Bulk Task Planning,
+  `createIssueTask`, `createSiddharthTask`, `createMeetingTasks`) and on DPR/
+  DPER/CRM submission (a receipt independent of the browser's own success
+  screen, which can't prove the write landed server-side). Deliberately NOT
+  wired into `syncVisitSchedule`'s auto-generated recurring visit tasks —
+  that's automated/recurring, not a "someone just assigned you something"
+  moment, and would be spam at that cadence (uses `sendVisitNotification`
+  instead, a separate, older path).
+- **One-time setup required**: `authorizeMail()` — run once from the Apps
+  Script editor (Allow the "Send email as you" consent) so the WEB APP
+  deployment (`executeAs: USER_DEPLOYING`) can call `MailApp.sendEmail`.
+  Adding `script.send_mail` to appsscript.json's oauthScopes does NOT
+  retroactively re-consent an existing deployment's stored grant — until
+  this runs, every notification call fails with "You do not have
+  permission to call MailApp.sendEmail," silently (caught, logged only,
+  never breaks the actual submission it's attached to).
+- **Critical ordering rule, learned the hard way** (see Visit planner
+  section above): never call MailApp between a Sheets write and its
+  flush. Interleaving them can make the write silently vanish with no
+  exception from either call. Every write-then-notify path in this
+  codebase should finish ALL its Sheets writes (and let them flush) before
+  making any MailApp call — see `pushVisitTasks`'s `pendingNotifications`
+  pattern for the shape to copy.
+- dirnote.html: a private task-note tool between Siddharth and Astha only
+  (`sendPrivateDirectorNote`) — deliberately NOT tracked anywhere in-app
+  (no sheet row, no task board entry), pure email, per explicit request.
+  Recipient is derived from the sender's own verified auth email, not a
+  client-supplied field.
 
 ## Scoring framework (current)
 - Output: /50 (approvedPts / weeklyTarget × 50)
