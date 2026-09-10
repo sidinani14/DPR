@@ -372,22 +372,30 @@ function buildBioFromAttendance(resp, weekStartOverride){
 }
 // Fetches + populates BIO for every scored member for the current week.
 // Called on load and again after a successful attendance import.
-async function fetchBioFor(name){
+async function fetchBioFor(name, from, to){
   const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'getMemberAttendance', member:name, from:WEEK_START, to:WEEK_END})}).then(x=>x.json());
-  if (r && r.days) BIO[name]=buildBioFromAttendance(r);
+    body:JSON.stringify({action:'getMemberAttendance', member:name, from, to})}).then(x=>x.json());
+  return (r && r.days) ? buildBioFromAttendance(r) : null;
 }
 async function loadBioForWeek(){
   const members=Object.keys(ROLES).concat(['Deepak Soni','Aman Raghuwanshi']);
-  await Promise.all(members.map(name=>fetchBioFor(name).catch(()=>{})));
-  // Firing 11 concurrent requests at the same Apps Script web app can hit its
-  // per-user concurrency limit, silently dropping a few responses (caught
-  // above, leaving BIO[name] unset). Retry any misses sequentially — slower,
-  // but sequential calls don't hit that limit — so a member's card never
-  // silently renders with no attendance when the data actually exists.
+  // One bulk read of the whole ATTENDANCE sheet instead of one
+  // getMemberAttendance request per member — firing 11 (or, on the 5-week
+  // trend, 50+) concurrent requests at the same Apps Script web app used to
+  // hit its per-user concurrent-execution queue hard, either silently
+  // dropping responses or making the page wait a long time for each round
+  // to drain.
+  try {
+    const bulk = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'getBulkAttendance', from:WEEK_START, to:WEEK_END})}).then(x=>x.json());
+    members.forEach(name => { if (bulk[name] && bulk[name].days) BIO[name]=buildBioFromAttendance(bulk[name]); });
+  } catch(e) {}
+  // Retry any still-missing member individually (bulk call itself failing,
+  // or a genuine data gap) so a member's card never silently renders blank
+  // when the data actually exists.
   const missing = members.filter(name => !BIO[name]);
   for (const name of missing) {
-    try { await fetchBioFor(name); } catch(e) {}
+    try { const b = await fetchBioFor(name, WEEK_START, WEEK_END); if (b) BIO[name]=b; } catch(e) {}
   }
 }
 
@@ -503,20 +511,21 @@ async function computeWeekScores(weekStart){
   const weekEnd = trendDateStr(new Date(new Date(weekStart+'T00:00:00').getTime()+5*86400000));
   const allNames = Object.keys(ROLES).concat(['Deepak Soni','Aman Raghuwanshi']);
   const post = (body)=>fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
-  const [statsData, dData, aData, bioEntries] = await Promise.all([
+  const [statsData, dData, aData, bulk] = await Promise.all([
     post({action:'getWeeklyStats', weekStart}),
     post({action:'getDeepakWeeklyStats', weekStart}),
     post({action:'getAmanWeeklyStats', weekStart}),
-    mapLimit(allNames, 4, name=>
-      post({action:'getMemberAttendance', member:name, from:weekStart, to:weekEnd})
-        // r.days is always an array — an EMPTY one (no ATTENDANCE rows at all
-        // for this week, e.g. a week that predates attendance tracking) must
-        // resolve to null, not to buildBioFromAttendance's "no row → Absent"
-        // fallback, or a genuine data gap gets fabricated into a 6-day absence.
-        .then(r=>[name, r && r.days && r.days.length ? buildBioFromAttendance(r, weekStart) : null])
-    ),
+    post({action:'getBulkAttendance', from:weekStart, to:weekEnd}),
   ]);
-  const bioMap = Object.fromEntries(bioEntries);
+  // r.days is always an array — an EMPTY one (no ATTENDANCE rows at all for
+  // this week, e.g. a week that predates attendance tracking) must resolve
+  // to null, not to buildBioFromAttendance's "no row → Absent" fallback, or
+  // a genuine data gap gets fabricated into a 6-day absence.
+  const bioMap = {};
+  allNames.forEach(name => {
+    const r = bulk && bulk[name];
+    bioMap[name] = (r && r.days && r.days.length) ? buildBioFromAttendance(r, weekStart) : null;
+  });
   const statsMap = {}; (statsData.stats||[]).forEach(s=>{ statsMap[s.name]=s; });
 
   const out = {};
