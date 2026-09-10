@@ -369,7 +369,14 @@ function buildBioFromAttendance(resp, weekStartOverride){
   });
   const presentCount=att.filter(x=>x.s!=='A' && x.s!=='H' && x.s!=='L').length;
   const lateCount=att.filter(x=>x.l).length;
-  const avgHrs=(resp.summary && resp.summary.avgHrs) || 0;
+  // Average hours from the actual per-day biometric rows (real Total Hrs
+  // from the imported Excel/Paytime sheet), not resp.summary.avgHrs —
+  // getBulkAttendance (the current week's fast bulk load, and every week
+  // the 5-week trend fetches) never computed a summary at all, so trusting
+  // it silently zeroed everyone's Hours score down to the lowest bucket.
+  // Computing it directly from `days` here works for both endpoints.
+  const workedDays=(resp.days||[]).filter(d=>d.status!=='Absent' && d.status!=='Holiday' && d.status!=='Leave');
+  const avgHrs=workedDays.length ? workedDays.reduce((s,d)=>s+(d.hrs||0),0)/workedDays.length : 0;
   return {days:presentCount, lateCount, avgHrs:fmtHM(avgHrs), hrsScore:computeHrsScore(avgHrs), punctScore:computePunctScore(lateCount), att};
 }
 // Fetches + populates BIO for every scored member for the current week.
