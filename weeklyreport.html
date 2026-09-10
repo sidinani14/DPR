@@ -370,15 +370,23 @@ function buildBioFromAttendance(resp, weekStartOverride){
 }
 // Fetches + populates BIO for every scored member for the current week.
 // Called on load and again after a successful attendance import.
+async function fetchBioFor(name){
+  const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'getMemberAttendance', member:name, from:WEEK_START, to:WEEK_END})}).then(x=>x.json());
+  if (r && r.days) BIO[name]=buildBioFromAttendance(r);
+}
 async function loadBioForWeek(){
   const members=Object.keys(ROLES).concat(['Deepak Soni','Aman Raghuwanshi']);
-  await Promise.all(members.map(async name=>{
-    try{
-      const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({action:'getMemberAttendance', member:name, from:WEEK_START, to:WEEK_END})}).then(x=>x.json());
-      if (r && r.days) BIO[name]=buildBioFromAttendance(r);
-    }catch(e){}
-  }));
+  await Promise.all(members.map(name=>fetchBioFor(name).catch(()=>{})));
+  // Firing 11 concurrent requests at the same Apps Script web app can hit its
+  // per-user concurrency limit, silently dropping a few responses (caught
+  // above, leaving BIO[name] unset). Retry any misses sequentially — slower,
+  // but sequential calls don't hit that limit — so a member's card never
+  // silently renders with no attendance when the data actually exists.
+  const missing = members.filter(name => !BIO[name]);
+  for (const name of missing) {
+    try { await fetchBioFor(name); } catch(e) {}
+  }
 }
 
 // ── Score calculation ─────────────────────────────────────
