@@ -610,6 +610,16 @@ function trendCard(label, vals, max){
 }
 function buildTrendSection(name, series){
   // series: TREND_WEEKS entries (oldest→current), each a scores object or null
+  // Attendance import only started the week this report covers — every week
+  // before that genuinely has no ATTENDANCE rows (not a bug: checked the raw
+  // sheet directly, nothing exists before it), so most of the window is null
+  // by design right now. A "trend" built from 1 real week dressed up with 4
+  // grey placeholder weeks reads as broken rather than as no-history-yet, so
+  // show a plain message instead until there's enough to actually trend.
+  const realWeeks = series.filter(s => s != null).length;
+  if (realWeeks < 2) {
+    return `<div class="loading" style="padding:4px;font-size:8.5px;grid-column:1/-1;text-align:left">Not enough attendance history yet — the trend fills in as more weeks are imported (currently ${realWeeks} of ${series.length}).</div>`;
+  }
   const pick=(k)=>series.map(s=>s ? s[k] : null);
   // dprNA is per-week (a member can cross their DPR_NA_UNTIL cutoff partway
   // through the 5-week window), not a blanket flag for the whole trend.
