@@ -282,12 +282,14 @@ const ROLES = {
   'Poorvi Goyal'    : 'Junior Architect',
   'Sahil Maurya'    : 'Junior ID',
   'Kritika Kaushik' : 'Junior Interior Designer',
+  'Shreyas Chourasia': 'Junior Architect',
 };
 
 const TARGETS = {
   'Aaditya Koshti':48, 'Aashi Agrawal':48, 'Achal Rathore':72,
   'Bhavesh Bhagwat':60, 'Himanshu Malviya':72,
   'Poorvi Goyal':48, 'Sahil Maurya':48, 'Kritika Kaushik':30,
+  'Shreyas Chourasia':48,
 };
 
 // Members exempt from DPR Consistency scoring for weeks before they started
@@ -476,6 +478,24 @@ function trendRangeLabel(){
   return `Weeks of ${fmt(weeks[0])} – ${fmt(weeks[weeks.length-1])} (current)`;
 }
 
+// Runs async fn(item) over items with at most `limit` in flight at once —
+// Apps Script enforces a per-user concurrent-execution cap, and the trend
+// view fetches attendance for ~10 members × 4 historical weeks; firing all
+// of that via Promise.all (40+ simultaneous requests) blew past the cap and
+// silently starved most of it, leaving the trend stuck on "Loading trend…"
+// far longer than a real fetch should take (and sometimes not resolving in
+// any reasonable time). Bounded concurrency keeps requests flowing without
+// overwhelming the backend.
+async function mapLimit(items, limit, fn){
+  const out = new Array(items.length);
+  let i = 0;
+  async function worker(){
+    while (i < items.length){ const idx = i++; out[idx] = await fn(items[idx], idx); }
+  }
+  await Promise.all(Array.from({length: Math.min(limit, items.length)}, worker));
+  return out;
+}
+
 // Fetches + scores one historical week for every team member + Deepak + Aman,
 // mirroring the same bio-adjustment logic loadAndRender applies for the
 // current week, so trend values stay directly comparable week-to-week.
@@ -487,14 +507,14 @@ async function computeWeekScores(weekStart){
     post({action:'getWeeklyStats', weekStart}),
     post({action:'getDeepakWeeklyStats', weekStart}),
     post({action:'getAmanWeeklyStats', weekStart}),
-    Promise.all(allNames.map(name=>
+    mapLimit(allNames, 4, name=>
       post({action:'getMemberAttendance', member:name, from:weekStart, to:weekEnd})
         // r.days is always an array — an EMPTY one (no ATTENDANCE rows at all
         // for this week, e.g. a week that predates attendance tracking) must
         // resolve to null, not to buildBioFromAttendance's "no row → Absent"
         // fallback, or a genuine data gap gets fabricated into a 6-day absence.
         .then(r=>[name, r && r.days && r.days.length ? buildBioFromAttendance(r, weekStart) : null])
-    )),
+    ),
   ]);
   const bioMap = Object.fromEntries(bioEntries);
   const statsMap = {}; (statsData.stats||[]).forEach(s=>{ statsMap[s.name]=s; });
@@ -599,7 +619,10 @@ function buildTrendSection(name, series){
 async function loadTrends(currentScMap){
   const weeks = trendWeekStarts();          // 5 asc, last = WEEK_START (current)
   const priorWeeks = weeks.slice(0, -1);    // 4 historical weeks to fetch
-  const priorScores = await Promise.all(priorWeeks.map(computeWeekScores));
+  // One week at a time — each already fires ~13 requests internally (via
+  // mapLimit above); running all 4 weeks concurrently on top of that is what
+  // used to blow past Apps Script's per-user concurrency cap.
+  const priorScores = await mapLimit(priorWeeks, 1, computeWeekScores);
   const allNames = Object.keys(ROLES).concat(['Deepak Soni','Aman Raghuwanshi']);
   allNames.forEach(name=>{
     const series = priorScores.map(w=>w[name]||null).concat([currentScMap[name]||null]);
