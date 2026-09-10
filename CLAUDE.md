@@ -266,6 +266,24 @@ quota-exceeded failure — don't keep guessing in code without that signal.
 - DPER site visit auto-publishes a Site Visit Log (skipTasks=true; DPER already tasks issues).
 - One-time: paste ANTHROPIC_API_KEY in Script Properties; run authorizeEpicK() for
   Drive + Anthropic scopes.
+- **My Logs (2026-09)** — meetlog.html has a team-facing status/edit view
+  (link above the form), separate from logs.html's Logs Manager (director-
+  only: sees everyone, can delete). getMyMeetingLogs(member) lists just that
+  member's own logs; getMyMeetingLogForEdit/finalizeMyMeetingLog mirror the
+  manager-only originals but with an ownership check (loggedBy must match
+  the requesting member — logIds are sequential/guessable, so this needed
+  its own check). Reuses the SAME review/edit screen Logs Manager's `?edit=`
+  links already drive.
+  - **Editing an already-Final/Approved (published) log is explicitly
+    allowed** — a deliberate 2026-09 decision, not an oversight. It was
+    blocked outright at first; changed because the team needed to be able
+    to fix their own published logs without waiting on a director. The
+    tradeoff (a client-facing record can change after being sent) is
+    covered by finalizeMyMeetingLog emailing BOTH Siddharth and Astha the
+    moment a published log is edited this way — no approval gate, no
+    delay, just guaranteed visibility so a correction is never silent.
+    meetlog.html shows a confirm() warning before loading the edit screen
+    for a published log, mentioning the notification.
 
 ## Notifications (2026-09) — email today, WhatsApp-ready later
 - `notifyMember()`/`notifyTaskAssigned()`/`notifySubmissionRecorded()` are the
