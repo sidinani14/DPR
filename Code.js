@@ -3848,14 +3848,30 @@ function finalizeMyMeetingLog(data, member){
   if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
   var logId = String(data.logId||'').trim();
   var rows = sheet.getDataRange().getValues();
-  var owner = null, status = '';
-  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===logId){ owner=String(rows[i][5]||'').trim(); status=String(rows[i][15]||'').trim(); break; } }
+  var owner = null, priorStatus = '', project = '';
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===logId){ owner=String(rows[i][5]||'').trim(); priorStatus=String(rows[i][15]||'').trim(); project=String(rows[i][4]||'').trim(); break; } }
   if (owner === null) return {status:'error', message:'Log not found'};
   if (owner.toLowerCase() !== String(member||'').trim().toLowerCase())
     return {status:'error', code:'forbidden', message:'That log belongs to someone else.'};
-  if (status === 'Final' || status === 'Approved')
-    return {status:'error', code:'forbidden', message:'This log is already published — ask Siddharth or Astha to correct it.'};
-  return finalizeMeetingLog(data, member);
+  var result = finalizeMeetingLog(data, member);
+  // 2026-09 (explicit request): editing an ALREADY-PUBLISHED log is allowed
+  // (was blocked outright before) -- self-service, no approval wait -- but
+  // since it silently changes a record that may already be in a client's
+  // hands, Siddharth/Astha get an email the moment it happens, so a
+  // correction is never invisible even though it's not gated.
+  if (result && result.status === 'ok' && (priorStatus === 'Final' || priorStatus === 'Approved')) {
+    notifyMember('Siddharth Inani', 'Published log edited — ' + project, [
+      member + ' edited an already-published ' + priorStatus.toLowerCase() + ' log for ' + project + '.',
+      'Log ID: ' + logId,
+      result.pdfUrl ? 'Updated PDF: ' + result.pdfUrl : 'PDF regeneration: ' + (result.pdfError ? 'failed — check Logs Manager' : 'ok'),
+    ]);
+    notifyMember('Astha Inani', 'Published log edited — ' + project, [
+      member + ' edited an already-published ' + priorStatus.toLowerCase() + ' log for ' + project + '.',
+      'Log ID: ' + logId,
+      result.pdfUrl ? 'Updated PDF: ' + result.pdfUrl : 'PDF regeneration: ' + (result.pdfError ? 'failed — check Logs Manager' : 'ok'),
+    ]);
+  }
+  return result;
 }
 
 // ════════════════════════════════════════════════════════════════
