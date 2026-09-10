@@ -34,9 +34,17 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 .draft-banner-btns{display:flex;gap:8px}
 .draft-resume{background:#1F3A5F;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
 .draft-discard{background:none;border:1px solid #CBC7BC;border-radius:7px;padding:7px 14px;font-size:12px;color:#6B6860;cursor:pointer}
+.mylogs-link{font-size:12px;color:#1F3A5F;text-decoration:underline;cursor:pointer;display:inline-block;margin-bottom:14px}
+.ml-row{border:1px solid #E2DFD8;border-radius:10px;padding:11px 13px;margin-bottom:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ml-info{flex:1;min-width:180px}.ml-proj{font-size:13px;font-weight:600}.ml-meta{font-size:11px;color:#6B6860;margin-top:2px}
+.ml-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:11px;text-transform:uppercase;letter-spacing:.3px}
+.ml-badge.draft{background:#FFF3E0;color:#7A5000}.ml-badge.final,.ml-badge.approved{background:#E8F5EE;color:#1B7A3E}
+.ml-badge.pending{background:#E3F2FD;color:#1565C0}.ml-badge.rejected{background:#FFEBEE;color:#8B2020}
+.ml-btn{font-size:12px;font-weight:600;color:#fff;background:#1F3A5F;border:none;border-radius:7px;padding:7px 12px;cursor:pointer}
 </style></head><body>
 <h1>Site Visit / Meeting Log</h1>
 <div class="sub">Ideaform Design Studio · replaces the Google Forms · sign in to begin.</div>
+<div class="mylogs-link" id="mylogs-link" onclick="showMyLogs()" style="display:none">📋 My Logs — check status or finish a draft</div>
 <div class="draft-banner" id="draft-banner">
   <div class="draft-banner-title">📋 Unsaved draft found</div>
   <div class="draft-banner-sub" id="draft-banner-sub">Resume where you left off?</div>
@@ -87,6 +95,7 @@ window.idsOnAuth = async function(){
       return;
     }
   }
+  const mlLink = document.getElementById('mylogs-link'); if (mlLink) mlLink.style.display = 'inline-block';
   render();
 };
 function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
@@ -366,6 +375,60 @@ async function submitLog(){
 }
 let REVIEW=null;
 const qattr=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
+// ── My Logs (2026-09) — status + resume-editing for the log's own author.
+// Logs Manager (logs.html) is director-only by design; this gives a team
+// member the same "is it still a draft / was it published" visibility for
+// just their own logs, using the same getMeetingLogForEdit + review screen
+// Logs Manager's own edit links already use, just ownership-checked.
+async function showMyLogs(){
+  const member = (document.getElementById('loggedBy')?.value) || (window.IDS_USER&&window.IDS_USER.name) || '';
+  document.getElementById('app').innerHTML = '<div class="card"><div class="sub">Loading your logs…</div></div>';
+  try{
+    const r = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyMeetingLogs', member})}).then(x=>x.json());
+    renderMyLogs(member, r.logs||[]);
+  }catch(e){
+    document.getElementById('app').innerHTML = '<div class="card"><h1 style="color:#C0392B">Network error</h1><a href="javascript:void(0)" onclick="render()" style="color:#1F3A5F">← Back to form</a></div>';
+  }
+}
+function renderMyLogs(member, logs){
+  const rows = logs.length ? logs.map(l=>{
+    const st = (l.status||'Draft').toLowerCase();
+    const canEdit = st!=='final' && st!=='approved';
+    return `<div class="ml-row">
+      <div class="ml-info">
+        <div class="ml-proj">${esc(l.project)} <span class="ml-badge ${st}">${esc(l.status)}</span></div>
+        <div class="ml-meta">${esc(l.date)} · ${esc(l.type)}${l.clients?' · '+esc(l.clients):''}</div>
+      </div>
+      ${canEdit ? `<button class="ml-btn" onclick="continueMyLog('${l.logId}','${qattr(member)}')">${st==='draft'?'Finish &amp; publish':'Edit &amp; resubmit'}</button>`
+                : (l.pdfId ? `<a href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank" style="font-size:12px;color:#1F3A5F">Open PDF ↗</a>` : '<span style="font-size:11px;color:#9E9B94">Published</span>')}
+    </div>`;
+  }).join('') : `<div class="sub">No logs found for <b>${esc(member)}</b> yet.</div>`;
+  document.getElementById('app').innerHTML = `<div class="card">
+    <h1>My Logs — ${esc(member)}</h1>
+    <div class="sub">Status of everything you've submitted. Drafts and rejected logs can be finished or fixed here — once a log is <b>Final</b> (published to the client), ask Siddharth or Astha to correct it.</div>
+    ${rows}
+    <a href="javascript:void(0)" onclick="render()" style="display:inline-block;margin-top:8px;color:#1F3A5F;font-size:12px">← Back to form</a>
+  </div>`;
+}
+async function continueMyLog(logId, member){
+  document.getElementById('app').innerHTML = '<div class="card"><div class="sub">Loading log…</div></div>';
+  try{
+    const d = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyMeetingLogForEdit', logId, member})}).then(x=>x.json());
+    if (d.status==='ok'){
+      REVIEW = {logId:d.logId, project:d.project, date:d.date, type:d.type,
+        body:d.body||'', items:d.items||[], teamAttendees:d.teamAttendees||[],
+        clientAttendees:d.clientAttendees||'', purpose:d.purpose||[],
+        photoIds:d.photoIds||[], folderId:d.folderId||'', selfMember:member};
+      renderReview();
+      return;
+    }
+    document.getElementById('app').innerHTML = `<div class="card"><h1 style="color:#C0392B">Could not load this log</h1><div class="sub">${esc(d.message||'Unknown error')}</div><a href="javascript:void(0)" onclick="showMyLogs()" style="color:#1F3A5F">← Back to My Logs</a></div>`;
+  }catch(e){
+    document.getElementById('app').innerHTML = `<div class="card"><h1 style="color:#C0392B">Network error</h1><a href="javascript:void(0)" onclick="showMyLogs()" style="color:#1F3A5F">← Back to My Logs</a></div>`;
+  }
+}
+
 function showReview(res, payload){
   REVIEW={logId:res.logId, project:payload.project, date:payload.date, type:payload.type,
     body:res.bodyPolished||'', items:(res.items||[]).map(it=>({id:it.id,cat:it.cat,owner:it.owner,text:it.text})),
@@ -447,8 +510,16 @@ async function finalizeLog(){
   const gb=document.getElementById('genbtn'); gb.disabled=true; msg('Generating the report PDF…');
   captureReview();
   const items={}; (REVIEW.items||[]).forEach(it=>{ items[it.id]=it.text; });
+  // A session resumed from My Logs (REVIEW.selfMember set) goes through the
+  // ownership-checked action instead -- the plain finalizeMeetingLog has no
+  // owner check at all (fine for the immediate post-submit flow, since only
+  // the author is ever in that state to call it; not fine for a route
+  // reachable later, by logId, from a list).
+  const action = REVIEW.selfMember ? 'finalizeMyMeetingLog' : 'finalizeMeetingLog';
+  const payload = {action,logId:REVIEW.logId,bodyPolished:REVIEW.body,items,teamAttendees:REVIEW.teamAttendees,clientAttendees:REVIEW.clientAttendees,purpose:REVIEW.purpose,photoIds:REVIEW.photoIds};
+  if (REVIEW.selfMember) payload.member = REVIEW.selfMember;
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'finalizeMeetingLog',logId:REVIEW.logId,bodyPolished:REVIEW.body,items,teamAttendees:REVIEW.teamAttendees,clientAttendees:REVIEW.clientAttendees,purpose:REVIEW.purpose,photoIds:REVIEW.photoIds})}).then(x=>x.json());
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
     if(res.status==='ok'){
       const link=res.pdfError
         ? `<span style="color:#C0392B">⚠ ${esc(res.pdfError)}</span>`

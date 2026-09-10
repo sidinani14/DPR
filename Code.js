@@ -1476,6 +1476,7 @@ function doGet(e) {
   if (action === 'syncVisitSchedule')        return safeRespond(function(){ syncVisitSchedule(); return {status:'ok'}; });
   if (action === 'debugVisitPlanner')        return safeRespond(debugVisitPlanner);
   if (action === 'backfillVisitDefaultPts')  { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return safeRespond(backfillVisitDefaultPts); }
+  if (action === 'getPlanDraftForMember')    { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return safeRespond(function(){ return getPlanDraftForMember(p.email||'', p.formType||''); }); }
   if (action === 'getLastPushVisitTasksTrace') return safeRespond(getLastPushVisitTasksTrace);
   if (action === 'debugRawTaskRows')         return safeRespond(function(){ return debugRawTaskRows(p.project||''); });
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
@@ -1633,6 +1634,9 @@ function doPost(e) {
     if (data.action === 'getMeetingApprovals') return respond(getMeetingApprovals());
     if (data.action === 'approveMeetingLog')   return respond(approveMeetingLog(data, authEmail));
     if (data.action === 'finalizeMeetingLog')  return respond(finalizeMeetingLog(data, authEmail));
+    if (data.action === 'getMyMeetingLogs')        return respond(getMyMeetingLogs(data.member||''));
+    if (data.action === 'getMyMeetingLogForEdit')  return respond(getMyMeetingLogForEdit(data.logId||'', data.member||''));
+    if (data.action === 'finalizeMyMeetingLog')    return respond(finalizeMyMeetingLog(data, data.member||''));
     if (data.action === 'deleteMeetingLog')    return respond(deleteMeetingLog(data, authEmail));
     if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
@@ -3790,6 +3794,68 @@ function getMeetingLogForEdit(logId){
     };
   }
   return {status:'error', message:'Log not found'};
+}
+
+// ── Team-facing "My Logs" (2026-09) — logs.html (Logs Manager) is director-
+// only by design (it can delete anything, sees the whole team). A regular
+// team member had NO way to check whether their own submission is Draft
+// (submitted but never finished the review-then-publish step -- see
+// logs.html's pdfCell comment), Final (published), or check its status at
+// all, short of asking Siddharth/Astha to look it up. These three give a
+// member the same visibility + edit ability, scoped to logs they authored.
+function getMyMeetingLogs(member){
+  var m = String(member||'').trim();
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet || sheet.getLastRow() < 2 || !m) return {logs:[]};
+  var rows = sheet.getDataRange().getValues();
+  var out = [];
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][5]||'').trim().toLowerCase() !== m.toLowerCase()) continue;
+    var status = String(rows[i][15]||'').trim() || 'Draft';
+    if (status === 'Deleted') continue;
+    out.push({
+      logId: String(rows[i][0]||''), date: cellDate(rows[i][1]), type: String(rows[i][3]||''),
+      project: String(rows[i][4]||''), status: status, clients: String(rows[i][7]||''),
+      pdfId: String(rows[i][19]||''),
+    });
+  }
+  out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return {logs: out};
+}
+// Same shape as (manager-only) getMeetingLogForEdit, but only for the log's
+// own author -- logIds are sequential/guessable, so this needs its own
+// ownership check rather than just being thrown open to any signed-in user.
+function getMyMeetingLogForEdit(logId, member){
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
+  var id = String(logId||'').trim();
+  var rows = sheet.getDataRange().getValues();
+  var owner = null;
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===id){ owner=String(rows[i][5]||'').trim(); break; } }
+  if (owner === null) return {status:'error', message:'Log not found'};
+  if (owner.toLowerCase() !== String(member||'').trim().toLowerCase())
+    return {status:'error', code:'forbidden', message:'That log belongs to someone else.'};
+  return getMeetingLogForEdit(id);
+}
+// Same ownership check, then defers to the existing finalizeMeetingLog --
+// only for logs not yet Final/Approved (published + client-facing).
+// Correcting something after that point goes through Siddharth/Astha
+// (Logs Manager can delete + the project PDF regenerates), same as any
+// other already-shipped record in this system -- self-service editing
+// stops at "not sent to the client yet" on purpose.
+function finalizeMyMeetingLog(data, member){
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
+  var logId = String(data.logId||'').trim();
+  var rows = sheet.getDataRange().getValues();
+  var owner = null, status = '';
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===logId){ owner=String(rows[i][5]||'').trim(); status=String(rows[i][15]||'').trim(); break; } }
+  if (owner === null) return {status:'error', message:'Log not found'};
+  if (owner.toLowerCase() !== String(member||'').trim().toLowerCase())
+    return {status:'error', code:'forbidden', message:'That log belongs to someone else.'};
+  if (status === 'Final' || status === 'Approved')
+    return {status:'error', code:'forbidden', message:'This log is already published — ask Siddharth or Astha to correct it.'};
+  return finalizeMeetingLog(data, member);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -8002,6 +8068,14 @@ function getPlanDraft(email, formType){
       return {draft:String(rows[i][1]||''), updated: rows[i][2]? new Date(rows[i][2]).getTime() : 0};
   }
   return {draft:''};
+}
+// Manager-only recovery tool (2026-09): a team member's own getPlanDraft
+// only ever returns THEIR OWN draft (keyed off their verified authEmail),
+// by design -- there was no way for a lead to check whether someone else's
+// failed submission left an unsent draft sitting server-side. Same lookup,
+// just parameterized by whatever email/formType the manager asks for.
+function getPlanDraftForMember(email, formType){
+  return getPlanDraft(email, formType);
 }
 
 // ════════════════════════════════════════════════════════════════
