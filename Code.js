@@ -610,6 +610,13 @@ function getHolidays(fromStr, toStr) {
   return {dates:out};
 }
 
+// `upperBoundDate` strictly before today means the requested range is a
+// closed week — data.js's cachedSafeRespond is safe to use for it (see call
+// sites in weeklyreport.html's report endpoints below). The currently-open
+// week must never be cached this way, since that's exactly the one being
+// actively edited (imports, approvals, DPR filing) and needs to stay fresh.
+function isPastDate(d) { return !!d && d < dateStr(); }
+
 // One member's attendance, already decided at import time — straight read
 // from ATTENDANCE plus the monthly OT/UT rollup. Undertime/overtime are
 // fractions of an 8-hour day (e.g. 15 min short = 0.03125), matching the
@@ -692,6 +699,36 @@ function getMemberAttendance(member, fromStr, toStr) {
   }
 
   return {member:member, from:from, to:to, days:days, summary:summary};
+}
+
+// getBulkAttendance — one ATTENDANCE sheet read for every member at once,
+// grouped by name → {days:[...]} in the same per-day shape getMemberAttendance
+// returns. Built for weeklyreport.html's bio loader and 5-week trend, which
+// used to call getMemberAttendance once PER MEMBER (11 requests for the
+// current week, ~50+ for the 5-week trend) — each a full round trip into
+// Apps Script's per-user concurrent-execution queue, so most of that fan-out
+// either queued for a long time or silently dropped (caught client-side,
+// leaving that member's attendance blank). One bulk read replaces all of it.
+function getBulkAttendance(from, to) {
+  var s = db();
+  var out = {};
+  var aSheet = s.getSheetByName(ATTENDANCE_TAB);
+  if (!aSheet || aSheet.getLastRow() <= 1) return out;
+  var ar = aSheet.getDataRange().getValues();
+  for (var i = 1; i < ar.length; i++) {
+    var d = cellDate(ar[i][0]);
+    if (!d || d < from || d > to) continue;
+    var member = String(ar[i][1]||'').trim();
+    if (!member) continue;
+    if (!out[member]) out[member] = { days: [] };
+    out[member].days.push({
+      date:d, firstIn:cellTime(ar[i][3]), lastOut:cellTime(ar[i][4]), hrs:parseFloat(ar[i][5])||0,
+      status:String(ar[i][6]||''), late:!!ar[i][7], lateApproved:!!ar[i][8],
+      undertime:parseFloat(ar[i][9])||0, overtime:parseFloat(ar[i][10])||0, fieldHours:parseFloat(ar[i][11])||0,
+    });
+  }
+  Object.keys(out).forEach(function(m){ out[m].days.sort(function(a,b){ return a.date.localeCompare(b.date); }); });
+  return out;
 }
 
 // Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
@@ -969,11 +1006,12 @@ function sendPrivateDirectorNote(data, authEmail) {
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1, getMeetingLogForEdit:1,
-  getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getFieldWorkForRange:1,
+  getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getBulkAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
   backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1, fixBackfillUnplannedTag:1,
-  saveConfidentialReview:1, getConfidentialReview:1, getSocialMediaLog:1, debugCleanupFieldWork:1 };
+  saveConfidentialReview:1, getConfidentialReview:1, getSocialMediaLog:1, debugCleanupFieldWork:1,
+  debugMemberWeek:1, debugListTriggers:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -1479,6 +1517,8 @@ function doGet(e) {
   if (action === 'getPlanDraftForMember')    { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return safeRespond(function(){ return getPlanDraftForMember(p.email||'', p.formType||''); }); }
   if (action === 'getLastPushVisitTasksTrace') return safeRespond(getLastPushVisitTasksTrace);
   if (action === 'debugRawTaskRows')         return safeRespond(function(){ return debugRawTaskRows(p.project||''); });
+  if (action === 'debugMemberWeek')          return safeRespond(function(){ return debugMemberWeek(p.member||'', p.mon||'', p.sat||''); });
+  if (action === 'debugListTriggers')        return safeRespond(function(){ return ScriptApp.getProjectTriggers().map(function(t){ return {handler:t.getHandlerFunction(), type:String(t.getEventType()), source:String(t.getTriggerSource())}; }); });
   if (action === 'getProjectsHealth')        return safeRespond(getProjectsHealth);
   if (action === 'getWeeklyProjectDigest')   return safeRespond(function(){ return getWeeklyProjectDigest(p.weekStart||''); });
   if (action === 'getAllMeetingLogs')        return safeRespond(getAllMeetingLogs);
@@ -1510,7 +1550,12 @@ function doPost(e) {
     if (data.action === 'getPendingTasks')     return respond(getPendingTasks());
     if (data.action === 'getOpenTasksForMember') return respond(getOpenTasksForMember(data.member||''));
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
-    if (data.action === 'getWeeklyStats')         return respond(getWeeklyStats(data.weekStart||''));
+    if (data.action === 'getWeeklyStats') {
+      var wsSat = addDaysToStr(data.weekStart||'', 5);
+      return isPastDate(wsSat)
+        ? cachedSafeRespond('wr_ws_'+(data.weekStart||''), 21600, function(){ return getWeeklyStats(data.weekStart||''); })
+        : respond(getWeeklyStats(data.weekStart||''));
+    }
     if (data.action === 'getMemberReview')        return respond(getMemberReview(data.member||'', data.from||'', data.to||''));
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
@@ -1541,6 +1586,11 @@ function doPost(e) {
       return respond({ checkEmail: checkEmail, inAllowlist: !!allowSet[checkEmail], allowlistSize: Object.keys(allowSet).length, teamRows: teamEmails });
     }
     if (data.action === 'getMemberAttendance')    return respond(getMemberAttendance(data.member||'', data.from||'', data.to||''));
+    if (data.action === 'getBulkAttendance') {
+      return isPastDate(data.to||'')
+        ? cachedSafeRespond('wr_bulk_'+(data.from||'')+'_'+(data.to||''), 21600, function(){ return getBulkAttendance(data.from||'', data.to||''); })
+        : respond(getBulkAttendance(data.from||'', data.to||''));
+    }
     if (data.action === 'importAttendance')       return respond(importAttendance(data));
     if (data.action === 'submitLateRequest')      return respond(submitLateRequest(data));
     if (data.action === 'getLateRequests')        return respond(getLateRequests(data.from||'', data.to||''));
@@ -1579,8 +1629,18 @@ function doPost(e) {
     // filed via DAILY_SUMMARY despite 4 real DPER submissions that week.
     if (data.action === 'submitDailySummary')     { withLock(function(){ writeDailySummary(data); }); return respond({status:'ok'}); }
     if (data.action === 'submitFieldWorkBatch')   return respond(withLock(function(){ return submitFieldWorkBatch(data); }));
-    if (data.action === 'getDeepakWeeklyStats')   return respond(getDeepakWeeklyStats(data.weekStart||''));
-    if (data.action === 'getAmanWeeklyStats')     return respond(getAmanWeeklyStats(data.weekStart||''));
+    if (data.action === 'getDeepakWeeklyStats') {
+      var dwsSat = addDaysToStr(data.weekStart||'', 5);
+      return isPastDate(dwsSat)
+        ? cachedSafeRespond('wr_dws_'+(data.weekStart||''), 21600, function(){ return getDeepakWeeklyStats(data.weekStart||''); })
+        : respond(getDeepakWeeklyStats(data.weekStart||''));
+    }
+    if (data.action === 'getAmanWeeklyStats') {
+      var awsSat = addDaysToStr(data.weekStart||'', 5);
+      return isPastDate(awsSat)
+        ? cachedSafeRespond('wr_aws_'+(data.weekStart||''), 21600, function(){ return getAmanWeeklyStats(data.weekStart||''); })
+        : respond(getAmanWeeklyStats(data.weekStart||''));
+    }
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
     if (data.action === 'getFeedbackAnalytics')   return respond(getFeedbackAnalytics(data.month||''));
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
@@ -5035,7 +5095,6 @@ var PLANNER_TAB      = 'VISIT_PLANNER';
 var SITE_EXEC_TAB    = 'SITE_EXECUTION';
 var SITE_ISSUES_TAB  = 'SITE_ISSUES';
 var SITE_WA_TAB      = 'SITE_WA_MESSAGES';
-var VSCHED_TAB   = 'VISIT_SCHEDULE';
 var PHEALTH_TAB  = 'PROJECT_HEALTH';
 
 var VISIT_FREQ_DAYS = {'Weekly':7,'Fortnightly':14,'Monthly':30};
@@ -5152,21 +5211,6 @@ function setupPlannerTab(sheet) {
   [200,180,140,100,100,90,70,130,220]
     .forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
   sheet.setRowHeight(1,28); sheet.setRowHeight(3,20);
-}
-
-function setupScheduleTab(sheet) {
-  sheet.getRange(1,1).setValue(
-    'VISIT SCHEDULE — Auto-generated daily at 7 AM. ' +
-    'You may override Next Visit Date (col F) manually if needed.')
-    .setFontWeight('bold').setFontSize(11).setFontColor('#1F3A5F');
-  sheet.getRange(1,1,1,10).merge();
-  var h = ['Project','Visit Type','Assignee','Last Visit Date','Last Visit By',
-           'Next Visit Date','Status','Task ID','Days Until / Overdue','Priority'];
-  var hr = sheet.getRange(2,1,1,h.length);
-  hr.setValues([h]); styleHeader(hr); sheet.setFrozenRows(2);
-  [200,180,140,120,140,120,90,120,120,80]
-    .forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
-  sheet.setRowHeight(1,28);
 }
 
 function setupHealthTab(sheet) {
@@ -5452,91 +5496,8 @@ function calcNextVisitDate(entry, lastVisitDate, openTasks) {
   return {date:'', taskId:'', source:'none'};
 }
 
-// ── Build VISIT_SCHEDULE tab ──────────────────────────────────
-function buildVisitSchedule(cadence, history, openTasks) {
-  var sheet   = getOrMakeTab(VSCHED_TAB, setupScheduleTab);
-  var today   = todayStr();
-  var dataRows= [];
-
-  cadence.forEach(function(entry) {
-    var hist = (history[entry.project] || {})[entry.visitType] || [];
-    var lastVisit   = hist.length > 0 ? hist[0] : null;
-    var lastDate    = getEffectiveLastVisitDate(entry, history);
-    var lastMember  = lastVisit ? lastVisit.member : (entry.manualLastDate ? 'Pre-system record' : '');
-    var nextInfo    = calcNextVisitDate(entry, lastDate, openTasks);
-    var nextDate    = nextInfo.date;
-    var taskId      = nextInfo.taskId;
-
-    // Status
-    var status = 'Scheduled';
-    var daysUntil = nextDate ? daysDiff(today, nextDate) : null;
-    if (!nextDate) {
-      status = 'Not scheduled';
-    } else if (daysUntil < -VISIT_FREQ_DAYS[entry.frequency]) {
-      status = 'Missed';
-    } else if (daysUntil < 0) {
-      status = 'Overdue';
-    }
-
-    var priority = (status === 'Missed' || status === 'Overdue') ? 'High' : 'Medium';
-
-    dataRows.push([
-      entry.project,
-      entry.visitType,
-      entry.assignee,
-      lastDate,
-      lastMember,
-      nextDate,
-      status,
-      taskId,
-      daysUntil !== null ? daysUntil : '—',
-      priority,
-    ]);
-  });
-
-  // Write all rows
-  var startRow = 3;
-  // Clear old data
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= startRow) {
-    sheet.getRange(startRow, 1, lastRow-startRow+1, 10).clearContent()
-      .setBackground('#FFFFFF').setFontColor('#000000').setFontWeight('normal');
-  }
-  if (dataRows.length === 0) { Logger.log('No cadence rows to write'); return; }
-
-  var range = sheet.getRange(startRow, 1, dataRows.length, 10);
-  range.setValues(dataRows);
-
-  // Format date cols
-  sheet.getRange(startRow,4,dataRows.length,1).setNumberFormat('dd-mmm-yyyy');
-  sheet.getRange(startRow,6,dataRows.length,1).setNumberFormat('dd-mmm-yyyy');
-
-  // Style each row
-  dataRows.forEach(function(row, i) {
-    var r      = startRow + i;
-    var status = row[6];
-    altRow(sheet, r, 10);
-    // Status cell colour
-    var statusCol = 7;
-    if      (status === 'Scheduled')     { sheet.getRange(r,statusCol).setBackground('#EAF3EA').setFontColor('#2D6A2D'); }
-    else if (status === 'Overdue')       { sheet.getRange(r,statusCol).setBackground('#FDF3E3').setFontColor('#7A4F0A').setFontWeight('bold'); }
-    else if (status === 'Missed')        { sheet.getRange(r,statusCol).setBackground('#FDEAEA').setFontColor('#8B2020').setFontWeight('bold'); }
-    else if (status === 'Not scheduled') { sheet.getRange(r,statusCol).setBackground('#F1F1F1').setFontColor('#888888'); }
-    // Days until — colour based on urgency
-    var days = row[8];
-    if (typeof days === 'number') {
-      if      (days < 0)  { sheet.getRange(r,9).setFontColor('#8B2020').setFontWeight('bold'); }
-      else if (days <= 3) { sheet.getRange(r,9).setFontColor('#7A4F0A').setFontWeight('bold'); }
-      else                { sheet.getRange(r,9).setFontColor('#2D6A2D'); }
-    }
-  });
-
-  Logger.log('VISIT_SCHEDULE written: '+dataRows.length+' rows');
-  return dataRows;
-}
-
 // ── Push visit tasks to TASK_ASSIGNMENTS (3 days before) ──────
-function pushVisitTasks(cadence, history, openTasks, schedRows) {
+function pushVisitTasks(cadence, history, openTasks) {
   var asSheet  = getOrMakeTab(ASSIGN_TAB, writeAssignHeaders);
   var projSheet= db().getSheetByName(PROJECTS_TAB);
   var teamSheet= db().getSheetByName(TEAM_TAB);
@@ -5673,6 +5634,59 @@ function getLastPushVisitTasksTrace() {
 // TEMP diagnostic (2026-09): raw TASK_ASSIGNMENTS rows for one project, no
 // getAllTasks-style status/date derivation in the way -- is the row actually
 // in the sheet at all, or does it only look that way in a computed view.
+// TEMPORARY diagnostic (2026-09) — dumps raw DAILY_SUMMARY, SITE_EXECUTION and
+// TASK_ASSIGNMENTS rows for one member, to explain report numbers that look
+// surprising (output vs DPR mismatch, missing DPER days, etc). Remove after use.
+function debugMemberWeek(member, mon, sat) {
+  var s = db();
+  var nameLower = String(member||'').trim().toLowerCase();
+  var out = { member: member, mon: mon, sat: sat };
+
+  var sumSheet = s.getSheetByName(SUMMARY_TAB);
+  out.dailySummaryRows = [];
+  if (sumSheet && sumSheet.getLastRow() > 1) {
+    var sRows = sumSheet.getDataRange().getValues();
+    for (var i = 1; i < sRows.length; i++) {
+      var rName = String(sRows[i][2]||'').trim();
+      if (rName.toLowerCase() !== nameLower) continue;
+      out.dailySummaryRows.push({ row:i+1, date:String(sRows[i][0]), time:sRows[i][1], name:rName, email:sRows[i][3] });
+    }
+  }
+
+  var exSheet = s.getSheetByName(SITE_EXEC_TAB);
+  out.siteExecRows = [];
+  if (exSheet && exSheet.getLastRow() > 1) {
+    var eRows = exSheet.getDataRange().getValues();
+    for (var j = 1; j < eRows.length; j++) {
+      var lead = String(eRows[j][4]||'').trim();
+      if (lead.toLowerCase().indexOf(nameLower.split(' ')[0]) === -1) continue;
+      out.siteExecRows.push({ row:j+1, date:String(eRows[j][1]), project:eRows[j][3], lead:lead,
+        visitDone:eRows[j][5], clientUpdated:eRows[j][17] });
+    }
+  }
+
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  out.taskRows = [];
+  if (asSheet && asSheet.getLastRow() > 1) {
+    var aRows = asSheet.getDataRange().getValues();
+    var aHdrs = aRows[0] ? aRows[0].map(function(h){ return String(h||'').trim(); }) : [];
+    var is23  = aHdrs.length >= 23 || aHdrs.indexOf('Actual Completion Date') > -1;
+    var C_ACT = is23 ? 15 : -1, C_STAT = 14, C_APPR = is23 ? 16 : 15, C_NOTES = is23 ? 20 : 19;
+    for (var k = 1; k < aRows.length; k++) {
+      var to = String(aRows[k][3]||'').trim();
+      if (to.toLowerCase() !== nameLower) continue;
+      var doneDate = (C_ACT > -1 ? cellDate(aRows[k][C_ACT]) : '') || cellDate(aRows[k][C_STAT]);
+      var appr = String(aRows[k][C_APPR]||'').trim();
+      var selfStatus = String(aRows[k][13]||'').trim();
+      out.taskRows.push({ row:k+1, project:aRows[k][2], taskType:aRows[k][4], pts:aRows[k][8],
+        assignedDate:String(aRows[k][9]), deadline:String(aRows[k][10]), selfStatus:selfStatus,
+        doneDate:doneDate, leadApproved:appr, notes:String(aRows[k][C_NOTES]||'') });
+    }
+  }
+
+  return out;
+}
+
 function debugRawTaskRows(project) {
   var sheet = db().getSheetByName(ASSIGN_TAB);
   if (!sheet) return { rowCount: 0, rows: [] };
@@ -5691,7 +5705,7 @@ function debugRawTaskRows(project) {
 // Returns the list of missed entries (2026-08: previously only Logger.log'd,
 // invisible to anyone not reading Apps Script execution logs -- now returned
 // so syncVisitSchedule can email a digest to the owner/managers).
-function flagMissedVisits(schedSheet, cadence, history, openTasks) {
+function flagMissedVisits(cadence, history, openTasks) {
   var asSheet = db().getSheetByName(ASSIGN_TAB);
   var today   = todayStr();
   var missed  = 0;
@@ -5790,7 +5804,7 @@ function notifyMissedVisits(missedList){
 }
 
 // ── Build PROJECT_HEALTH tab ──────────────────────────────────
-function buildProjectHealth(cadence, history) {
+function buildProjectHealth(cadence, history, openTasks) {
   var sheet     = getOrMakeTab(PHEALTH_TAB, setupHealthTab);
   var projSheet = db().getSheetByName(PROJECTS_TAB);
   var today     = todayStr();
@@ -5815,17 +5829,15 @@ function buildProjectHealth(cadence, history) {
     cadByProj[e.project].push(e);
   });
 
-  // Build next visit map from VISIT_SCHEDULE
-  var schedSheet  = db().getSheetByName(VSCHED_TAB);
-  var nextVisitMap= {}; // project+type → next date
-  if (schedSheet && schedSheet.getLastRow() >= 3) {
-    var sRows=schedSheet.getRange(3,1,schedSheet.getLastRow()-2,6).getValues();
-    sRows.forEach(function(r) {
-      var p=String(r[0]||'').trim(), vt=String(r[1]||'').trim();
-      var nd=cellDate(r[5]);
-      if (p && vt && nd) nextVisitMap[p+'||'+vt]=nd;
-    });
-  }
+  // Next visit map — computed directly from cadence + history (this used to
+  // be read back from the now-removed VISIT_SCHEDULE tab, which just
+  // pre-computed the same numbers buildVisitSchedule derived here anyway).
+  var nextVisitMap = {}; // project+type → next date
+  cadence.forEach(function(e) {
+    var lastDate = getEffectiveLastVisitDate(e, history);
+    var nextInfo = calcNextVisitDate(e, lastDate, openTasks);
+    if (nextInfo.date) nextVisitMap[e.project+'||'+e.visitType] = nextInfo.date;
+  });
 
   var dataRows = [];
 
@@ -6120,26 +6132,6 @@ function syncVisitSchedule() {
   var history   = loadVisitHistory();
   var openTasks = loadOpenVisitTasks();
 
-  // 1b. Load manual next dates from VISIT_SCHEDULE col F (user-editable)
-  var schedSheet2 = db().getSheetByName(VSCHED_TAB);
-  var manualDates = {};
-  if (schedSheet2 && schedSheet2.getLastRow() > 2) {
-    var sRows = schedSheet2.getDataRange().getValues();
-    for (var si=2; si<sRows.length; si++) { // data starts row 3 (index 2)
-      var sPrj  = String(sRows[si][0]||'').trim(); // A Project
-      var sType = String(sRows[si][1]||'').trim(); // B Visit Type
-      var sNext = cellDate(sRows[si][5]);           // F Next Visit Date (manual)
-      if (sPrj && sType && sNext) {
-        manualDates[sPrj + '||' + sType] = sNext;
-      }
-    }
-  }
-  // Inject manual next dates into cadence entries
-  cadence.forEach(function(e) {
-    var mk = e.project + '||' + e.visitType;
-    if (manualDates[mk]) e.manualNextDate = manualDates[mk];
-  });
-
   Logger.log('Cadence entries: '+cadence.length);
 
   if (cadence.length === 0) {
@@ -6147,10 +6139,14 @@ function syncVisitSchedule() {
     return;
   }
 
-  // 2. Build VISIT_SCHEDULE tab
-  buildVisitSchedule(cadence, history, openTasks);
+  // VISIT_SCHEDULE removed (2026-09) — it was a fully-derived status board
+  // (next date/overdue/days-overdue/linked task) that nothing in the app
+  // ever displayed, plus a col-F manual-override that nobody used either
+  // (confirmed: dropped by explicit choice, not just unused-so-far). Every
+  // number it used to compute is derived straight from VISIT_PLANNER +
+  // visit history below — removing the tab changes no scheduling behavior.
 
-  // 3+4. Push tasks for visits due within 3 days + flag missed visits/create
+  // 2+3. Push tasks for visits due within 3 days + flag missed visits/create
   // overdue tasks — both append rows to TASK_ASSIGNMENTS via plain appendRow.
   // 2026-08 fix: this ran unlocked (syncVisitSchedule fires from a daily 7am
   // trigger, and was also run manually mid-week), while every doPost form
@@ -6165,13 +6161,12 @@ function syncVisitSchedule() {
   var missedList = [];
   withLock(function(){
     pushVisitTasks(cadence, history, openTasks);
-    var schedSheet = db().getSheetByName(VSCHED_TAB);
-    missedList = flagMissedVisits(schedSheet, cadence, history, openTasks);
+    missedList = flagMissedVisits(cadence, history, openTasks);
   });
   try { notifyMissedVisits(missedList); } catch(e) { Logger.log('notifyMissedVisits error: '+e); }
 
-  // 5. Build PROJECT_HEALTH tab
-  buildProjectHealth(cadence, history);
+  // 4. Build PROJECT_HEALTH tab
+  buildProjectHealth(cadence, history, openTasks);
 
   Logger.log('=== syncVisitSchedule complete ===');
 }
@@ -7035,20 +7030,18 @@ function getMemberReview(name, fromStr, toStr) {
 
 // ════════════════════════════════════════════════════════════════
 // getProjectStats — for projects dashboard
-// Returns per-project task stats, team members, visit schedule
+// Returns per-project task stats, team members
 // ════════════════════════════════════════════════════════════════
 function getProjectStats() {
   var s         = db();
   var asSheet   = s.getSheetByName(ASSIGN_TAB);
   var projSheet = s.getSheetByName(PROJECTS_TAB);
-  var vsSheet   = s.getSheetByName(VSCHED_TAB);
   var teamSheet = s.getSheetByName(TEAM_TAB);
 
   if (!asSheet || !projSheet) return {projects:[]};
 
   var asRows   = asSheet.getDataRange().getValues();
   var projRows = projSheet.getDataRange().getValues();
-  var vsRows   = vsSheet   ? vsSheet.getDataRange().getValues()   : [];
   var teamRows = teamSheet ? teamSheet.getDataRange().getValues() : [];
 
   // Auto-detect columns
@@ -7169,27 +7162,6 @@ function getProjectStats() {
     });
   }
 
-  // Build visit schedule per project
-  var visitMap = {}; // key = project name
-  for (var vi = 1; vi < vsRows.length; vi++) {
-    var vr      = vsRows[vi];
-    var vproj   = String(vr[0]||'').trim(); // A Project
-    var vtype   = String(vr[1]||'').trim(); // B VisitType
-    var vassign = String(vr[2]||'').trim(); // C Assignee
-    var vlast   = cellDate(vr[3]);          // D LastVisitDate
-    var vnext   = cellDate(vr[5]);          // F NextVisitDate
-    var vstatus = String(vr[6]||'').trim(); // G Status
-    if (!vproj) continue;
-    if (!visitMap[vproj]) visitMap[vproj] = [];
-    visitMap[vproj].push({
-      type    : vtype,
-      assignee: vassign,
-      lastDate: vlast,
-      nextDate: vnext,
-      status  : vstatus,
-    });
-  }
-
   // Combine and return
   var result = [];
   Object.keys(stats).forEach(function(pname) {
@@ -7218,7 +7190,6 @@ function getProjectStats() {
                         ? Math.round(st.onTimeTasks/(st.completedTasks+st.lateTasks)*100) : 0,
       members        : Object.keys(st.members),
       tasks          : st.tasks,
-      visits         : visitMap[pname] || [],
     });
   });
 
