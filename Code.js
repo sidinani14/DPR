@@ -5095,7 +5095,6 @@ var PLANNER_TAB      = 'VISIT_PLANNER';
 var SITE_EXEC_TAB    = 'SITE_EXECUTION';
 var SITE_ISSUES_TAB  = 'SITE_ISSUES';
 var SITE_WA_TAB      = 'SITE_WA_MESSAGES';
-var PHEALTH_TAB  = 'PROJECT_HEALTH';
 
 var VISIT_FREQ_DAYS = {'Weekly':7,'Fortnightly':14,'Monthly':30};
 var DAY_INDEX = {
@@ -5108,14 +5107,6 @@ var VT_ARCH    = 'Site Visit (Architecture)';
 var VT_ID      = 'Site Visit (Interiors)';
 var VT_MEETING = 'Client Meeting (Regular)';
 var VT_SPECIAL = 'Client Meeting (Special)';
-
-// Health thresholds by frequency
-var HEALTH_THRESH = {
-  'Weekly'      : {green:7,  amber:14},
-  'Fortnightly' : {green:14, amber:28},
-  'Monthly'     : {green:30, amber:45},
-};
-var MEETING_THRESH = {green:7, amber:21};
 
 // ── Low-level helpers ─────────────────────────────────────────
 function isVisitType(taskType) {
@@ -5172,20 +5163,6 @@ function styleHeader(range) {
   return range;
 }
 
-function healthColour(sheet, row, col, status) {
-  var colours = {
-    'Green':  {bg:'#EAF3EA', fg:'#2D6A2D'},
-    'Amber':  {bg:'#FDF3E3', fg:'#7A4F0A'},
-    'Red':    {bg:'#FDEAEA', fg:'#8B2020'},
-    'Grey':   {bg:'#F1F1F1', fg:'#888888'},
-    'Missed': {bg:'#FDEAEA', fg:'#8B2020'},
-    'Overdue':{bg:'#FDF3E3', fg:'#7A4F0A'},
-  };
-  var c = colours[status] || {bg:'#FFFFFF', fg:'#000000'};
-  sheet.getRange(row, col)
-    .setBackground(c.bg).setFontColor(c.fg).setFontWeight('bold');
-}
-
 function altRow(sheet, row, cols) {
   var bg = (row % 2 === 0) ? '#F9F8F5' : '#FFFFFF';
   sheet.getRange(row, 1, 1, cols).setBackground(bg).setFontSize(10);
@@ -5211,29 +5188,6 @@ function setupPlannerTab(sheet) {
   [200,180,140,100,100,90,70,130,220]
     .forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
   sheet.setRowHeight(1,28); sheet.setRowHeight(3,20);
-}
-
-function setupHealthTab(sheet) {
-  sheet.getRange(1,1).setValue(
-    'PROJECT HEALTH — Auto-refreshed daily. Read only. ' +
-    'Shows visit frequency, recency, and health per project.')
-    .setFontWeight('bold').setFontSize(11).setFontColor('#1F3A5F');
-  sheet.getRange(1,1,1,18).merge();
-  var h = [
-    'Project','Lead','Active Visit Types',
-    'Last Site Visit (Arch)','Days Since',
-    'Last Site Visit (ID)','Days Since',
-    'Last Client Meeting','Days Since',
-    'Visits This Month','Meetings This Month',
-    'Next Planned Visit','Next Planned Meeting',
-    'Missed Visits (30d)',
-    'Arch Health','ID Health','Meeting Health','Overall Health'
-  ];
-  var hr = sheet.getRange(2,1,1,h.length);
-  hr.setValues([h]); styleHeader(hr); sheet.setFrozenRows(2);
-  [200,130,160,130,80,130,80,130,80,100,110,130,130,100,90,80,100,110]
-    .forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
-  sheet.setRowHeight(1,28);
 }
 
 // ── Load VISIT_PLANNER cadence ────────────────────────────────
@@ -5803,168 +5757,6 @@ function notifyMissedVisits(missedList){
   } catch(e) { Logger.log('Missed-visit digest failed: '+e); }
 }
 
-// ── Build PROJECT_HEALTH tab ──────────────────────────────────
-function buildProjectHealth(cadence, history, openTasks) {
-  var sheet     = getOrMakeTab(PHEALTH_TAB, setupHealthTab);
-  var projSheet = db().getSheetByName(PROJECTS_TAB);
-  var today     = todayStr();
-  var monthStart= cellDate(new Date(
-    new Date().getFullYear(), new Date().getMonth(), 1));
-
-  // Get all projects
-  var projects = [];
-  if (projSheet) {
-    var pRows = projSheet.getDataRange().getValues();
-    for (var pi=1; pi<pRows.length; pi++) {
-      var pn = String(pRows[pi][1]||'').trim();
-      var pl = String(pRows[pi][5]||'').trim(); // col F = Lead
-      if (pn) projects.push({name:pn, lead:pl});
-    }
-  }
-
-  // Build cadence lookup: project → [entries]
-  var cadByProj = {};
-  cadence.forEach(function(e) {
-    if (!cadByProj[e.project]) cadByProj[e.project] = [];
-    cadByProj[e.project].push(e);
-  });
-
-  // Next visit map — computed directly from cadence + history (this used to
-  // be read back from the now-removed VISIT_SCHEDULE tab, which just
-  // pre-computed the same numbers buildVisitSchedule derived here anyway).
-  var nextVisitMap = {}; // project+type → next date
-  cadence.forEach(function(e) {
-    var lastDate = getEffectiveLastVisitDate(e, history);
-    var nextInfo = calcNextVisitDate(e, lastDate, openTasks);
-    if (nextInfo.date) nextVisitMap[e.project+'||'+e.visitType] = nextInfo.date;
-  });
-
-  var dataRows = [];
-
-  projects.forEach(function(proj) {
-    var pHist     = history[proj.name] || {};
-    var pCadence  = cadByProj[proj.name] || [];
-    var activeTypes= pCadence.map(function(e){ return e.visitType; }).join(', ');
-
-    // Last visits by type
-    var archVisits= pHist[VT_ARCH]    || [];
-    var idVisits  = pHist[VT_ID]      || [];
-    var mtVisits  = pHist[VT_MEETING] || [];
-    var spVisits  = pHist[VT_SPECIAL] || [];
-    var allMeetings= mtVisits.concat(spVisits).sort(function(a,b){
-      return b.date.localeCompare(a.date);
-    });
-
-    var lastArch = archVisits.length>0 ? archVisits[0].date : '';
-    var lastID   = idVisits.length>0   ? idVisits[0].date   : '';
-    var lastMeet = allMeetings.length>0 ? allMeetings[0].date: '';
-
-    var daySinceArch = lastArch ? daysDiff(lastArch,today) : null;
-    var daySinceID   = lastID   ? daysDiff(lastID,today)   : null;
-    var daySinceMeet = lastMeet ? daysDiff(lastMeet,today) : null;
-
-    // This month counts
-    var visitsMonth  = archVisits.filter(function(v){ return v.date>=monthStart; }).length
-                     + idVisits.filter(function(v){ return v.date>=monthStart; }).length;
-    var meetingsMonth= allMeetings.filter(function(v){ return v.date>=monthStart; }).length;
-
-    // Next planned
-    var nextVisit  = nextVisitMap[proj.name+'||'+VT_ARCH]
-                  || nextVisitMap[proj.name+'||'+VT_ID] || '';
-    var nextMeeting= nextVisitMap[proj.name+'||'+VT_MEETING]
-                  || nextVisitMap[proj.name+'||'+VT_SPECIAL] || '';
-
-    // Missed visits in last 30 days
-    var missed30 = 0;
-    pCadence.forEach(function(e) {
-      var freqDays = VISIT_FREQ_DAYS[e.frequency]||14;
-      var hist2 = pHist[e.visitType]||[];
-      // Count expected visits in last 30 days vs actual
-      var expected = Math.floor(30/freqDays);
-      var actual   = hist2.filter(function(v){
-        return daysDiff(v.date,today)<=30 && daysDiff(v.date,today)>=0;
-      }).length;
-      missed30 += Math.max(0, expected-actual);
-    });
-
-    // Health per type — find cadence entry to get frequency
-    function getFreq(vType) {
-      var e = pCadence.find(function(c){ return c.visitType===vType; });
-      return e ? e.frequency : null;
-    }
-
-    function calcHealth(daysSince, freq, threshMap) {
-      if (daysSince === null) return 'Grey';
-      var th = threshMap || HEALTH_THRESH[freq] || HEALTH_THRESH['Fortnightly'];
-      if (daysSince <= th.green) return 'Green';
-      if (daysSince <= th.amber) return 'Amber';
-      return 'Red';
-    }
-
-    var archFreq   = getFreq(VT_ARCH);
-    var idFreq     = getFreq(VT_ID);
-    var archHealth = calcHealth(daySinceArch, archFreq, HEALTH_THRESH[archFreq]);
-    var idHealth   = calcHealth(daySinceID,   idFreq,   HEALTH_THRESH[idFreq]);
-    var meetHealth = calcHealth(daySinceMeet, null,     MEETING_THRESH);
-
-    // Overall = worst
-    var healthOrder= {'Red':3,'Amber':2,'Green':1,'Grey':0};
-    var allHealths = [archHealth,idHealth,meetHealth];
-    var overall    = allHealths.reduce(function(worst,h){
-      return (healthOrder[h]||0) > (healthOrder[worst]||0) ? h : worst;
-    },'Grey');
-
-    dataRows.push([
-      proj.name, proj.lead, activeTypes||'—',
-      lastArch,  daySinceArch!==null ? daySinceArch : '—',
-      lastID,    daySinceID!==null   ? daySinceID   : '—',
-      lastMeet,  daySinceMeet!==null ? daySinceMeet : '—',
-      visitsMonth, meetingsMonth,
-      nextVisit, nextMeeting,
-      missed30,
-      archHealth, idHealth, meetHealth, overall,
-    ]);
-  });
-
-  // Write data
-  var startRow=3;
-  var lastRow=sheet.getLastRow();
-  if (lastRow>=startRow)
-    sheet.getRange(startRow,1,lastRow-startRow+1,18)
-      .clearContent().setBackground('#FFFFFF')
-      .setFontColor('#000000').setFontWeight('normal');
-
-  if (dataRows.length===0) return;
-
-  sheet.getRange(startRow,1,dataRows.length,18).setValues(dataRows);
-
-  // Format date cols
-  [4,6,8].forEach(function(col){
-    sheet.getRange(startRow,col,dataRows.length,1).setNumberFormat('dd-mmm-yyyy');
-  });
-
-  // Style rows and health cells
-  dataRows.forEach(function(row,i) {
-    var r=startRow+i;
-    altRow(sheet,r,18);
-    // Health cols: O=15, P=16, Q=17, R=18
-    healthColour(sheet,r,15,row[14]);
-    healthColour(sheet,r,16,row[15]);
-    healthColour(sheet,r,17,row[16]);
-    healthColour(sheet,r,18,row[17]);
-    // Missed visits col: red if >0
-    if (parseInt(row[13])>0) {
-      sheet.getRange(r,14).setBackground('#FDEAEA').setFontColor('#8B2020').setFontWeight('bold');
-    }
-  });
-
-  // Timestamp
-  sheet.getRange(1,16).setValue('Updated: '+nowStr())
-    .setFontSize(9).setFontColor('#888888').setHorizontalAlignment('right');
-
-  Logger.log('PROJECT_HEALTH written: '+dataRows.length+' projects');
-}
-
 // ── Send email notification to assignee ───────────────────────
 function sendVisitNotification(entry, nextDate, hist, isOverdue, email) {
   var lastVisit  = hist.length>0 ? hist[0] : null;
@@ -6164,9 +5956,6 @@ function syncVisitSchedule() {
     missedList = flagMissedVisits(cadence, history, openTasks);
   });
   try { notifyMissedVisits(missedList); } catch(e) { Logger.log('notifyMissedVisits error: '+e); }
-
-  // 4. Build PROJECT_HEALTH tab
-  buildProjectHealth(cadence, history, openTasks);
 
   Logger.log('=== syncVisitSchedule complete ===');
 }
