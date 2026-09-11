@@ -1005,7 +1005,7 @@ function sendPrivateDirectorNote(data, authEmail) {
 // with the dashboard) — callable by managers only.
 var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
-  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1, getMeetingLogForEdit:1,
+  submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getBillRequestsWithBilling:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1, getMeetingLogForEdit:1,
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getBulkAttendance:1, getFieldWorkForRange:1,
   saveMonthlyAdjustments:1, getMonthlyAdjustments:1, saveHolidays:1, getHolidays:1,
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
@@ -1666,6 +1666,8 @@ function doPost(e) {
     if (data.action === 'syncVisitSchedule')      return respond((function(){ syncVisitSchedule(); return {status:'ok'}; })());
     if (data.action === 'getBillRequests')        return respond(getBillRequests());
     if (data.action === 'disposeBillRequest')     return respond(disposeBillRequest(data));
+    if (data.action === 'getApprovedBillRequests') return respond(getApprovedBillRequests());
+    if (data.action === 'getBillRequestsWithBilling') return respond(getBillRequestsWithBilling());
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -2958,7 +2960,7 @@ function getSocialMediaLog(member, fromStr, toStr){
 // ════════════════════════════════════════════════════════════════
 function writeBillReqHeaders(sheet){
   var h = ['Request ID','Date','Raised By','Project','Discipline','Stage',
-           'Status','Approved By','Approval Date','Task ID','Note'];
+           'Status','Approved By','Approval Date','Task ID','Note','Bill ID'];
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
 }
@@ -3018,6 +3020,69 @@ function disposeBillRequest(data){
     return {status:'ok', disposition:'Approved', taskId:taskId};
   }
   return {status:'error', message:'unknown disposition: '+action};
+}
+
+// Col L (Bill ID) was added 2026-09 to an already-live sheet — make sure it
+// exists (header + column) whether the tab was created before or after
+// that change, so setting/reading col 12 never silently lands past the
+// sheet's actual width or under a blank header.
+function ensureBillReqBillIdCol(sheet){
+  ensureCols(sheet, 12);
+  if (!String(sheet.getRange(1,12).getValue()||'').trim()){
+    sheet.getRange(1,12).setValue('Bill ID').setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
+  }
+}
+
+// Approved-but-not-yet-raised requests, for CRM.html's "Fulfills request"
+// picker when Aman raises a bill — lets writeBilling() link the two records
+// exactly instead of the two tabs only ever sharing a project name.
+function getApprovedBillRequests(){
+  var sheet = db().getSheetByName(BILL_REQ_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return {requests:[]};
+  ensureBillReqBillIdCol(sheet);
+  var rows = sheet.getDataRange().getValues(), out = [];
+  for (var i=1;i<rows.length;i++){
+    if (String(rows[i][6]||'').trim() !== 'Approved') continue;
+    if (String(rows[i][11]||'').trim()) continue; // already linked to a raised bill
+    out.push({ reqId:String(rows[i][0]||''), project:String(rows[i][3]||''),
+      discipline:String(rows[i][4]||''), stage:String(rows[i][5]||'') });
+  }
+  return {requests:out};
+}
+
+// Full lifecycle of every bill request — Pending/Approved/Rejected, and for
+// ones that have been raised, the actual invoice/amount/payment status
+// joined in from BILLING via the linked Bill ID. This is the combined view:
+// "did the bill we approved actually get raised" in one place, manager-only.
+function getBillRequestsWithBilling(){
+  var s = db();
+  var reqSheet = s.getSheetByName(BILL_REQ_TAB);
+  if (!reqSheet || reqSheet.getLastRow() < 2) return {requests:[]};
+  ensureBillReqBillIdCol(reqSheet);
+  var billSheet = s.getSheetByName(BILLING_TAB);
+  var billByI = {};
+  if (billSheet && billSheet.getLastRow() >= 2){
+    var bRows = billSheet.getDataRange().getValues();
+    for (var bi=1; bi<bRows.length; bi++){
+      billByI[String(bRows[bi][0]||'')] = { invoice:String(bRows[bi][1]||''),
+        amount:parseFloat(bRows[bi][4])||0, received:parseFloat(bRows[bi][5])||0,
+        status:String(bRows[bi][8]||'') };
+    }
+  }
+  var rows = reqSheet.getDataRange().getValues(), out = [];
+  for (var i=1;i<rows.length;i++){
+    var reqId = String(rows[i][0]||'');
+    if (!reqId) continue;
+    var billId = String(rows[i][11]||'');
+    out.push({
+      row:i+1, reqId:reqId, date:cellDate(rows[i][1]), raisedBy:String(rows[i][2]||''),
+      project:String(rows[i][3]||''), discipline:String(rows[i][4]||''), stage:String(rows[i][5]||''),
+      status:String(rows[i][6]||''), approvedBy:String(rows[i][7]||''), approvalDate:cellDate(rows[i][8]),
+      billId:billId, billing: billId ? (billByI[billId]||null) : null,
+    });
+  }
+  out.sort(function(a,b){ return b.date.localeCompare(a.date); });
+  return {requests:out};
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -9756,6 +9821,26 @@ function writeBilling(subId, today, finance) {
       billId, b.invoice || '', b.project || '', today, parseFloat(b.amount) || 0,
       '', '', '', 'Pending', subId,
     ]);
+    // Optional link back to the BILL_REQUESTS row this bill fulfills — set
+    // when Aman picked one in the "Fulfills request" dropdown. Marks that
+    // request Raised and stamps this bill's own ID onto it, so the combined
+    // view (getBillRequestsWithBilling) can join the two records exactly
+    // instead of only ever matching by project name.
+    if (b.reqId) {
+      try {
+        var reqSheet = db().getSheetByName(BILL_REQ_TAB);
+        if (reqSheet) {
+          ensureBillReqBillIdCol(reqSheet);
+          var reqRows = reqSheet.getDataRange().getValues();
+          for (var ri=1; ri<reqRows.length; ri++){
+            if (String(reqRows[ri][0]||'') !== String(b.reqId)) continue;
+            reqSheet.getRange(ri+1,7).setValue('Raised');
+            reqSheet.getRange(ri+1,12).setValue(billId);
+            break;
+          }
+        }
+      } catch(e){ Logger.log('Bill request link error: '+e); }
+    }
   });
 
   // Re-read after appends so matching sees today's bills too

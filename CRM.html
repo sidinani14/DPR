@@ -696,6 +696,22 @@ function onGoogleSignIn(resp) {
   loadOpenLeads();
   fetchMyTasks();
   loadDraftAndCheck();
+  loadApprovedBillRequests();
+}
+
+// Approved-but-not-yet-raised billing requests, so a bill entered in the
+// Finance section can be linked to the specific request it fulfills
+// instead of only ever sharing a project name with it.
+let approvedBillRequests = [];
+async function loadApprovedBillRequests(){
+  try {
+    const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getApprovedBillRequests'})}).then(x=>x.json());
+    approvedBillRequests = r.requests || [];
+  } catch(e){ approvedBillRequests = []; }
+}
+function billReqOptionsHtml(){
+  return '<option value="">— not linked to a request —</option>' +
+    approvedBillRequests.map(r=>`<option value="${r.reqId}">${esc(r.project)} — ${esc(r.discipline||'—')} — ${esc(r.stage)} (${r.reqId})</option>`).join('');
 }
 
 // ════════════════════════════════════════
@@ -1520,7 +1536,8 @@ function addBill(){
     <div style="display:flex;gap:8px">
       <input type="text" id="bill-inv-${id}" placeholder="Invoice no." style="flex:1">
       <div class="rupee-wrap" style="max-width:150px"><input type="number" class="pay-amt" id="bill-amt-${id}" min="0" placeholder="Bill amount"></div>
-    </div>`;
+    </div>
+    <select id="bill-req-${id}" style="margin-top:6px;font-size:11px">${billReqOptionsHtml()}</select>`;
   document.getElementById('bills-entries').appendChild(div);
 }
 function collectBills(){
@@ -1530,7 +1547,8 @@ function collectBills(){
     const proj=document.getElementById('bill-proj-'+id)?.value||'';
     const inv=(document.getElementById('bill-inv-'+id)?.value||'').trim();
     const amt=parseFloat(document.getElementById('bill-amt-'+id)?.value)||0;
-    if(proj||amt||inv) out.push({project:proj, invoice:inv, amount:amt});
+    const reqId=document.getElementById('bill-req-'+id)?.value||'';
+    if(proj||amt||inv) out.push({project:proj, invoice:inv, amount:amt, reqId:reqId});
   });
   return out;
 }

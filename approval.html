@@ -188,6 +188,7 @@ textarea{resize:vertical;min-height:52px;line-height:1.5}
   <div id="director-section"></div>
   <div id="block-section"></div>
   <div id="bill-section"></div>
+  <div id="bill-tracker-section"></div>
   <div id="meeting-section"></div>
 
   <!-- Task list -->
@@ -262,12 +263,13 @@ async function fetchAll() {
         {row:7, subId:'G7H8I9', date:'2026-05-01', member:'Bhavesh Bhagwat',project:'Narmada Township',   discipline:'Township / Plotted',   taskType:'Coordination / Approvals',         units:3, pts:10.8, visit:false},
       ];
     } else {
-      const [taskRes, configRes, blockRes, listRes, billRes, meetRes, dirRes] = await Promise.all([
+      const [taskRes, configRes, blockRes, listRes, billRes, billTrackRes, meetRes, dirRes] = await Promise.all([
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getPendingTasks'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getConfig'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBlockRequests'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getLists'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBillRequests'})}),
+        fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getBillRequestsWithBilling'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getMeetingApprovals'})}),
         fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'getDirectorPendingItems'})})
       ]);
@@ -275,6 +277,7 @@ async function fetchAll() {
       const configData = await configRes.json();
       try { window.blockRequests = (await blockRes.json()).requests || []; } catch(e){ window.blockRequests = []; }
       try { window.billRequests = (await billRes.json()).requests || []; } catch(e){ window.billRequests = []; }
+      try { window.billTracker = (await billTrackRes.json()).requests || []; } catch(e){ window.billTracker = []; }
       try { window.meetingApprovals = (await meetRes.json()).logs || []; } catch(e){ window.meetingApprovals = []; }
       try { window.directorItems = (await dirRes.json()).items || []; } catch(e){ window.directorItems = []; }
       try { window.ALL_MEMBERS = (await listRes.json()).allMembers || []; } catch(e){ window.ALL_MEMBERS = []; }
@@ -309,6 +312,7 @@ async function fetchAll() {
     renderDirectorItems();
     renderBlockRequests();
     renderBillRequests();
+    renderBillTracker();
     renderMeetingApprovals();
 
   } catch(err) {
@@ -400,6 +404,51 @@ async function disposeBillAction(row, disposition){
       card.innerHTML='<div style="color:var(--green);font-weight:600;font-size:12px">✓ '+j.disposition+(j.taskId?' — CRM task created':'')+'</div>'; } }
     else if(msg){ msg.textContent='✗ '+(j.message||'failed'); msg.style.color='#C0392B'; }
   }catch(e){ if(msg){ msg.textContent='✗ network error'; msg.style.color='#C0392B'; } }
+}
+
+// ── Billing tracker — every request's full lifecycle, cross-referenced
+// against the actual BILLING ledger via the link writeBilling() sets when
+// Aman picks "Fulfills request" while raising a bill in CRM.html. This is
+// the answer to "did the bill we approved actually get raised" in one place. ──
+function renderBillTracker(){
+  const host=document.getElementById('bill-tracker-section');
+  if(!host) return;
+  const reqs=window.billTracker||[];
+  if(!reqs.length){ host.innerHTML=''; return; }
+  function esc(s){return String(s==null?'':s).replace(/</g,'&lt;');}
+  function statusChip(r){
+    if(r.status==='Rejected') return `<span style="background:#EDEDED;color:#666;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">Rejected</span>`;
+    if(r.status==='Pending')  return `<span style="background:#FFF3D6;color:#8A6408;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">Pending approval</span>`;
+    if(r.status==='Approved') return `<span style="background:#FDEAEA;color:#8B2020;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">⏳ Approved — not raised yet</span>`;
+    if(r.status==='Raised')   return `<span style="background:#EAF3EA;color:#1B5E20;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700">✓ Raised</span>`;
+    return '';
+  }
+  const notRaisedCount = reqs.filter(r=>r.status==='Approved').length;
+  host.innerHTML=`<div class="card" style="border:1px solid rgba(31,58,95,.35)">
+    <div class="card-head">
+      <div class="card-title" style="color:#1F3A5F">📋 Billing tracker (${reqs.length})</div>
+      <div class="card-sub">${notRaisedCount ? notRaisedCount+' approved but not yet raised' : 'all approved requests have been raised'}</div>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto">`
+    + reqs.map(r=>`
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:600;font-size:13px">${esc(r.project)}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:1px">${esc(r.discipline||'—')} · <b>${esc(r.stage)}</b></div>
+          </div>
+          ${statusChip(r)}
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:5px;font-family:'DM Mono',monospace">
+          requested by ${esc(r.raisedBy||'—')} · ${esc(r.date||'—')}${r.approvedBy?' · approved by '+esc(r.approvedBy)+' '+esc(r.approvalDate||''):''}
+        </div>
+        ${r.status==='Raised' && r.billing ? `
+        <div style="font-size:11.5px;color:#1B5E20;margin-top:6px;background:#F3F9F3;border-radius:6px;padding:6px 9px">
+          Invoice ${esc(r.billing.invoice||'—')} · ₹${(r.billing.amount||0).toLocaleString('en-IN')} billed
+          ${r.billing.received ? ' · ₹'+r.billing.received.toLocaleString('en-IN')+' received' : ''} · ${esc(r.billing.status||'')}
+        </div>` : ''}
+      </div>`).join('')
+    + `</div></div>`;
 }
 
 // ── Siddharth/Astha's own pending items (e.g. "Pending Discussion" raised
