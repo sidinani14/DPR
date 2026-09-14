@@ -1487,8 +1487,8 @@ function doGet(e) {
   // Lightweight access check used by the sign-in gate (auth.js)
   if (action === 'checkAccess') return respond({ allowed: true, email: authEmail });
   if (action === 'getLists')              return cachedSafeRespond('c_getLists', 30, getLists);
-  if (action === 'getConfig')             return safeRespond(readConfig);
-  if (action === 'getPendingTasks')       return safeRespond(getPendingTasks);
+  if (action === 'getConfig')             return cachedSafeRespond('c_getConfig', 20, readConfig);
+  if (action === 'getPendingTasks')       return cachedSafeRespond('c_getPendingTasks', 15, getPendingTasks);
   if (action === 'getAllTasks')           return cachedSafeRespond('c_getAllTasks', 30, getAllTasks);
   if (action === 'getOpenTasksForMember')    return safeRespond(function() { return getOpenTasksForMember(member); });
   if (action === 'getNotifications')         return safeRespond(function() { return getNotificationsForMember(member); });
@@ -1507,9 +1507,9 @@ function doGet(e) {
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
   if (action === 'getFeedbackAnalytics')     return safeRespond(function(){ return getFeedbackAnalytics(p.month||''); });
   if (action === 'getBlockersThisWeek')      return safeRespond(getBlockersThisWeek);
-  if (action === 'getBlockRequests')         return safeRespond(getBlockRequests);
-  if (action === 'getBillRequests')          return safeRespond(getBillRequests);
-  if (action === 'getMeetingApprovals')      return safeRespond(getMeetingApprovals);
+  if (action === 'getBlockRequests')         return cachedSafeRespond('c_getBlockRequests', 15, getBlockRequests);
+  if (action === 'getBillRequests')          return cachedSafeRespond('c_getBillRequests', 15, getBillRequests);
+  if (action === 'getMeetingApprovals')      return cachedSafeRespond('c_getMeetingApprovals', 15, getMeetingApprovals);
   if (action === 'getMeetingTimeline')       return safeRespond(function(){ return getMeetingTimeline(p.project||''); });
   if (action === 'reconcileStalled')         return safeRespond(reconcileStalledParks);
   if (action === 'syncVisitSchedule')        return safeRespond(function(){ syncVisitSchedule(); return {status:'ok'}; });
@@ -1546,8 +1546,8 @@ function doPost(e) {
     // GET-style actions sent via POST to bypass CORS
     if (data.action === 'getAllTasks')         return cachedSafeRespond('c_getAllTasks', 30, getAllTasks);
     if (data.action === 'getLists')            return cachedSafeRespond('c_getLists', 30, getLists);
-    if (data.action === 'getConfig')           return respond(readConfig());
-    if (data.action === 'getPendingTasks')     return respond(getPendingTasks());
+    if (data.action === 'getConfig')           return cachedSafeRespond('c_getConfig', 20, readConfig);
+    if (data.action === 'getPendingTasks')     return cachedSafeRespond('c_getPendingTasks', 15, getPendingTasks);
     if (data.action === 'getOpenTasksForMember') return respond(getOpenTasksForMember(data.member||''));
     if (data.action === 'getNotifications')    return respond(getNotificationsForMember(data.member||''));
     if (data.action === 'getWeeklyStats') {
@@ -1616,7 +1616,7 @@ function doPost(e) {
     if (data.action === 'getMonthlyAdjustments')  return respond(getMonthlyAdjustments(data.month||''));
     if (data.action === 'saveHolidays')           return respond(saveHolidays(data.dates||[]));
     if (data.action === 'getHolidays')            return respond(getHolidays(data.from||'', data.to||''));
-    if (data.action === 'getDirectorPendingItems') return respond(getDirectorPendingItems());
+    if (data.action === 'getDirectorPendingItems') return cachedSafeRespond('c_getDirectorPendingItems', 15, getDirectorPendingItems);
     if (data.action === 'completeDirectorItem')   return respond(completeDirectorItem(data, authEmail));
     if (data.action === 'submitDelayReason')      return respond(submitDelayReason(data));
     // 2026-08 fix: this used to call writeDailySummary() unlocked — the main
@@ -1644,7 +1644,7 @@ function doPost(e) {
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
     if (data.action === 'getFeedbackAnalytics')   return respond(getFeedbackAnalytics(data.month||''));
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
-    if (data.action === 'getBlockRequests')       return respond(getBlockRequests());
+    if (data.action === 'getBlockRequests')       return cachedSafeRespond('c_getBlockRequests', 15, getBlockRequests);
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
     if (data.action === 'getWeeklyProjectDigest') return respond(getWeeklyProjectDigest(data.weekStart||''));
     if (data.action === 'getAllMeetingLogs')      return respond(getAllMeetingLogs(!!data.includeDeleted));
@@ -1664,10 +1664,10 @@ function doPost(e) {
     if (data.action === 'unparkTask')             return respond(unparkTask(data, authEmail));
     if (data.action === 'reconcileStalled')       return respond(reconcileStalledParks());
     if (data.action === 'syncVisitSchedule')      return respond((function(){ syncVisitSchedule(); return {status:'ok'}; })());
-    if (data.action === 'getBillRequests')        return respond(getBillRequests());
+    if (data.action === 'getBillRequests')        return cachedSafeRespond('c_getBillRequests', 15, getBillRequests);
     if (data.action === 'disposeBillRequest')     return respond(disposeBillRequest(data));
     if (data.action === 'getApprovedBillRequests') return respond(getApprovedBillRequests());
-    if (data.action === 'getBillRequestsWithBilling') return respond(getBillRequestsWithBilling());
+    if (data.action === 'getBillRequestsWithBilling') return cachedSafeRespond('c_getBillRequestsWithBilling', 15, getBillRequestsWithBilling);
     if (data.action === 'getProjectStats')        return respond(getProjectStats());
     if (data.action === 'getDeepakVisitSummary')  return respond(getDeepakVisitSummary(data.weekStart||''));
     if (data.action === 'getSiteIssues')       return respond(getSiteIssues(data.project||''));
@@ -1693,7 +1693,7 @@ function doPost(e) {
     if (data.action === 'getSocialMediaLog')    return respond(getSocialMediaLog(data.member||'', data.from||'', data.to||''));
     if (data.action === 'uploadMeetingPhoto')  return respond(uploadMeetingPhoto(data));
     if (data.action === 'submitMeetingLog')    return respond(submitMeetingLog(data, authEmail));
-    if (data.action === 'getMeetingApprovals') return respond(getMeetingApprovals());
+    if (data.action === 'getMeetingApprovals') return cachedSafeRespond('c_getMeetingApprovals', 15, getMeetingApprovals);
     if (data.action === 'approveMeetingLog')   return respond(approveMeetingLog(data, authEmail));
     if (data.action === 'finalizeMeetingLog')  return respond(finalizeMeetingLog(data, authEmail));
     if (data.action === 'getMyMeetingLogs')        return respond(getMyMeetingLogs(data.member||''));
@@ -2605,6 +2605,7 @@ function disposeBlock(data){
     sheet.getRange(row,21).setValue(ex ? ex+' | '+today+' (lead): '+note : today+' (lead): '+note);
   }
   updateBlockLog(String(r[0]||''), label, reviewedBy, today, note);
+  try { CacheService.getScriptCache().remove('c_getBlockRequests'); } catch(e) {}
   return {status:'ok', disposition:label};
 }
 // Reliability penalty: rejected blocks this week, per member (−1 each)
@@ -3003,6 +3004,7 @@ function disposeBillRequest(data){
     sheet.getRange(row,8).setValue(data.reviewedBy||'');
     sheet.getRange(row,9).setValue(today);
     if (data.note) sheet.getRange(row,11).setValue(data.note);
+    try { var bc1=CacheService.getScriptCache(); bc1.remove('c_getBillRequests'); bc1.remove('c_getBillRequestsWithBilling'); } catch(e) {}
     return {status:'ok', disposition:'Rejected'};
   }
   if (action === 'approve'){
@@ -3017,6 +3019,7 @@ function disposeBillRequest(data){
     sheet.getRange(row,8).setValue(data.reviewedBy||'');
     sheet.getRange(row,9).setValue(today);
     sheet.getRange(row,10).setValue(taskId);
+    try { var bc2=CacheService.getScriptCache(); bc2.remove('c_getBillRequests'); bc2.remove('c_getBillRequestsWithBilling'); bc2.remove('c_getPendingTasks'); } catch(e) {}
     return {status:'ok', disposition:'Approved', taskId:taskId};
   }
   return {status:'error', message:'unknown disposition: '+action};
@@ -3378,6 +3381,7 @@ function approveMeetingLog(data, authEmail){
   var today = dateStr();
   if (data.disposition === 'reject'){
     sheet.getRange(row,16).setValue('Rejected'); sheet.getRange(row,17).setValue(data.reviewedBy||authEmail||''); sheet.getRange(row,18).setValue(today);
+    try { CacheService.getScriptCache().remove('c_getMeetingApprovals'); } catch(e) {}
     return {status:'ok', disposition:'Rejected'};
   }
   if (typeof data.bodyPolished === 'string' && data.bodyPolished.trim()) sheet.getRange(row,11).setValue(data.bodyPolished);
@@ -3385,6 +3389,7 @@ function approveMeetingLog(data, authEmail){
   var project = String(sheet.getRange(row,5).getValue()||'').trim();
   var pdf = safeGenerateProjectReportPDF(project, authEmail);
   if (pdf && pdf.fileId) sheet.getRange(row,20).setValue(pdf.fileId);
+  try { CacheService.getScriptCache().remove('c_getMeetingApprovals'); } catch(e) {}
   return {status:'ok', disposition:'Approved', pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId,
           pdfError: pdf && pdf.error ? 'Log approved, but the PDF could not be regenerated — check the project\'s log history.' : null };
 }
@@ -4151,6 +4156,7 @@ function submitApprovals(data) {
     }
   }
 
+  try { CacheService.getScriptCache().remove('c_getPendingTasks'); } catch(e) {}
   return {status:'ok', approved:approved, rejected:rejected};
 }
 
@@ -5531,6 +5537,7 @@ function completeDirectorItem(data, authEmail) {
     sheet.getRange(row, 21).setValue(existing ? existing + ' | ' + remarks : remarks);
   }
   Logger.log('Director item completed: row ' + row + ' (' + who + ') by ' + authEmail);
+  try { CacheService.getScriptCache().remove('c_getDirectorPendingItems'); } catch(e) {}
   return {status:'ok'};
 }
 

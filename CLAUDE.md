@@ -121,6 +121,23 @@ logged via DPR/DPER/CRM is created `Pending`, not auto-approved. Any lag
 approving tasks meant the planner silently didn't know a visit had happened.
 Fixed to count any self-reported Done visit unless explicitly `Rejected`.
 
+**Follow-up 2026-09-14 — approval.html hung indefinitely, reported as "access
+denied"**: `fetchAll()` in approval.html fires 8 concurrent manager-only
+backend calls in one `Promise.all` on every load (getPendingTasks, getConfig,
+getBlockRequests, getLists, getBillRequests, getBillRequestsWithBilling,
+getMeetingApprovals, getDirectorPendingItems) — none cached, far heavier than
+any other page. Live-tested signed in as a real manager: the auth gate was
+fine (no denial), the page just hung forever on "loading leads..." — which
+reads exactly like "access denied" to a non-technical user. Same quota
+mechanism as the "Unexpected token '<'" issue below, just manifesting as a
+hang instead of a JSON-parse error. Fixed **@359**: all 8 actions now go
+through `cachedSafeRespond` (15s TTL, 20s for getConfig) in both doGet/doPost;
+every write that mutates one of these lists (disposeBlock, disposeBillRequest,
+approveMeetingLog, submitApprovals, completeDirectorItem) evicts the matching
+cache key so an approve/reject is never masked by a stale read. Any future
+admin-style page firing several manager-only/whole-team reads in one burst
+should get the same treatment.
+
 **Follow-up same day — "Unexpected token '<'" on dashboard/form loads**: this
 is `res.json()` choking on an HTML response. Every path in this script goes
 through `respond()`, which only ever emits valid JSON — HTML can only mean
