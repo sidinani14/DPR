@@ -52,6 +52,23 @@
     var p = parseJwt(window.IDS_TOKEN);
     return !p || !p.exp || (p.exp * 1000) < (Date.now() + (bufferMs || 60000));
   }
+  // Shared by both denial paths below (a real backend "unauthorized" reply,
+  // and a silent-refresh failure caught before the request even goes out):
+  // flush whatever draft-save the current page defines, tear down the dead
+  // session, and show one actionable gate. window.__idsDenied guards
+  // against building it twice for the same episode (e.g. the silent-refresh
+  // path fires this, then the doomed request that still went out on the
+  // stale token comes back 'unauthorized' too — only the first call to
+  // this function should do anything).
+  function showExpiredGate(msg, who) {
+    if (window.__idsDenied) return;
+    window.__idsDenied = true;
+    try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e) {}
+    window.IDS_TOKEN = null;
+    try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
+    buildGate('denied', msg, who || '');
+  }
+
   var _refreshing = null;
   function ensureFreshToken() {
     if (!window.IDS_TOKEN || !tokenExpired(120000)) return Promise.resolve(true);
@@ -70,7 +87,21 @@
         google.accounts.id.initialize(opts);
         _inited = true; // the gate's own init state, so a later boot()/showSignin() re-initializes cleanly rather than trusting this one-off config
         google.accounts.id.prompt(function (n) {
-          if (n.isNotDisplayed() || n.isSkippedMoment()) resolve(false); // couldn't refresh silently -- caller proceeds with the stale token, same as before this fix existed
+          if (n.isNotDisplayed() || n.isSkippedMoment()) {
+            // Silent refresh failed and the token really is stale (we only
+            // got here because tokenExpired() said so) -- sending the
+            // request anyway is a guaranteed round trip to Google's
+            // tokeninfo flatly rejecting it, surfacing as a "Temporary
+            // issue... please retry" that retries into the exact same
+            // silent-refresh failure forever, with no way out for the user
+            // short of guessing they should manually sign out and back in.
+            // Show the same actionable gate a real denial uses, immediately,
+            // instead of wasting that round trip on a doomed request.
+            showExpiredGate('Your sign-in has expired. Your progress on this page has been saved — ' +
+              'tap below and sign in again with your Ideaform account to continue where you left off.',
+              (window.IDS_USER && window.IDS_USER.email) || '');
+            resolve(false);
+          }
         });
       } catch (e) { resolve(false); }
     }).finally(function () { _refreshing = null; });
@@ -97,19 +128,8 @@
         try {
           resp.clone().json().then(function (j) {
             if (j && j.code === 'unauthorized') {
-              // Flush the page's own draft-save (dpr/DPER/CRM/meetlog/tasks
-              // all define this) BEFORE anything else — whatever the user
-              // typed is in localStorage the instant this fires, independent
-              // of this gate or a later reload. The gate below covers the
-              // page but never touches the DOM/localStorage underneath it,
-              // so a correct re-sign-in (same account) always finds the
-              // draft again via that page's own loadDraftAndCheck().
-              try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e) {}
-              window.__idsDenied = true;
-              window.IDS_TOKEN = null;
               var who = (window.IDS_USER && window.IDS_USER.email) || '';
-              try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
-              buildGate('denied',
+              showExpiredGate(
                 'Your progress on this page has been saved. ' +
                 'The signed-in account (' + (who || 'unknown') + ') is not on the authorised team list — ' +
                 'this can also happen briefly after a server hiccup and clears up within seconds. ' +
