@@ -1251,6 +1251,16 @@ function getAllowedEmails() {
   if (cached) { try { return JSON.parse(cached); } catch (e) {} }
   var set = {};
   for (var k in AUTH_ALLOWED) set[k] = 1;            // directors fallback
+  // Same anti-pattern as the 2026-08 tokeninfo-transient fix, just in the
+  // TEAM-tab read instead: if this throws (a passing Apps Script quota/
+  // read hiccup -- documented risk on this account's tier), the old code
+  // silently caught it and cached the directors-only fallback for the FULL
+  // 5 minutes, hard-"access denied"-ing every non-director team member for
+  // up to 5 min on a blip that had nothing to do with their own account.
+  // Track whether the read actually succeeded and only cache the full 5
+  // min when it did; a failed read gets a 15s cache instead, so it
+  // self-heals almost immediately like the tokeninfo-transient path does.
+  var readOk = false;
   try {
     var tSheet = db().getSheetByName(TEAM_TAB);       // TEAM cols: …Email(E,4) Active(F,5)
     if (tSheet && tSheet.getLastRow() > 1) {
@@ -1261,8 +1271,9 @@ function getAllowedEmails() {
         if (email && active !== 'no') set[email] = 1;
       }
     }
-  } catch (e) {}
-  cache.put('allowed_emails', JSON.stringify(set), 300);
+    readOk = true;
+  } catch (e) { logTransientAuth('team-read-error', String(e), e && e.stack); }
+  cache.put('allowed_emails', JSON.stringify(set), readOk ? 300 : 15);
   return set;
 }
 // Returns the verified allowlisted email, or null. Caches results (token is
@@ -4691,8 +4702,26 @@ function debugMemberWeek(member, mon, sat) {
     for (var j = 1; j < eRows.length; j++) {
       var lead = String(eRows[j][4]||'').trim();
       if (lead.toLowerCase().indexOf(nameLower.split(' ')[0]) === -1) continue;
-      out.siteExecRows.push({ row:j+1, date:String(eRows[j][1]), project:eRows[j][3], lead:lead,
-        visitDone:eRows[j][5], clientUpdated:eRows[j][17] });
+      out.siteExecRows.push({ row:j+1, date:String(eRows[j][1]), time:String(eRows[j][2]||''),
+        project:eRows[j][3], lead:lead, visitDone:eRows[j][5], clientUpdated:eRows[j][17] });
+    }
+  }
+
+  // MEETING_LOG entries of type "Site Visit" this member logged or attended
+  // (a DPER site visit auto-publishes one of these too — cross-check the two).
+  var mlSheet = s.getSheetByName(MEETING_LOG_TAB);
+  out.meetingLogRows = [];
+  if (mlSheet && mlSheet.getLastRow() > 1) {
+    var mRows = mlSheet.getDataRange().getValues();
+    for (var m = 1; m < mRows.length; m++) {
+      if (String(mRows[m][15]||'').trim() === 'Deleted') continue;
+      var mType = String(mRows[m][3]||'').trim();
+      if (mType.toLowerCase().indexOf('site visit') === -1) continue;
+      var who = (String(mRows[m][5]||'')+','+String(mRows[m][6]||'')).toLowerCase();
+      if (who.indexOf(nameLower.split(' ')[0]) === -1) continue;
+      out.meetingLogRows.push({ row:m+1, date:String(mRows[m][1]), time:String(mRows[m][2]||''),
+        project:mRows[m][4], loggedBy:mRows[m][5], team:mRows[m][6], durationHrs:mRows[m][11],
+        status:mRows[m][15] });
     }
   }
 

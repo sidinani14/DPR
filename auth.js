@@ -97,13 +97,23 @@
         try {
           resp.clone().json().then(function (j) {
             if (j && j.code === 'unauthorized') {
+              // Flush the page's own draft-save (dpr/DPER/CRM/meetlog/tasks
+              // all define this) BEFORE anything else — whatever the user
+              // typed is in localStorage the instant this fires, independent
+              // of this gate or a later reload. The gate below covers the
+              // page but never touches the DOM/localStorage underneath it,
+              // so a correct re-sign-in (same account) always finds the
+              // draft again via that page's own loadDraftAndCheck().
+              try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e) {}
               window.__idsDenied = true;
               window.IDS_TOKEN = null;
               var who = (window.IDS_USER && window.IDS_USER.email) || '';
               try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
               buildGate('denied',
-                'The signed-in account (' + (who || 'unknown') + ') is not on the authorised team list.' +
-                ' If you have multiple Google accounts in this browser, tap "Try another account" to switch.',
+                'Your progress on this page has been saved. ' +
+                'The signed-in account (' + (who || 'unknown') + ') is not on the authorised team list — ' +
+                'this can also happen briefly after a server hiccup and clears up within seconds. ' +
+                'Tap "Try another account" and sign back in with your own Ideaform account to continue where you left off.',
                 who);
             }
           }).catch(function () {});
