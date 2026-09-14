@@ -6982,7 +6982,50 @@ function getWeeklyProjectDigest(weekStart){
     if(cnt(p)>0) active.push(p); else inactive.push({name:p.name, stage:p.stage||'—', lastActivity:p.lastActivity||''}); });
   active.sort(function(x,y){ return cnt(y)-cnt(x); });
   inactive.sort(function(x,y){ return (x.lastActivity||'').localeCompare(y.lastActivity||''); });
-  return {weekStart:mon, weekEnd:sat, active:active, inactive:inactive, counts:{active:active.length, inactive:inactive.length}};
+
+  // ── Contacted vs not-contacted (client-facing projects only) — same
+  // "ongoing" definition getAmanWeeklyStats uses for Client Connection
+  // Coverage, so this partition lines up with his actual score instead of
+  // inventing a second rule. "Contacted" = at least one CRM_LOG Client
+  // Connection row this week, from ANY team member (not just Aman) — the
+  // digest already collects that into p.connections above.
+  var EXCL_STAGE = ['completed','closed','dead','cancelled','proposal','new lead','hold','on hold','finishing','handover','stalled'];
+  function isExcludedStage(stat){ stat=String(stat||'').toLowerCase();
+    for (var ei=0; ei<EXCL_STAGE.length; ei++){ if (stat.indexOf(EXCL_STAGE[ei])>-1) return true; } return false; }
+  var contacted=[], notContacted=[];
+  order.forEach(function(k){
+    var p=P[k];
+    if (isExcludedStage(p.stage)) return;
+    if (p.connections.length>0){
+      var byWho=[];
+      p.connections.forEach(function(c){ if(c.by && byWho.indexOf(c.by)===-1) byWho.push(c.by); });
+      contacted.push({name:p.name, stage:p.stage||'—', count:p.connections.length,
+        lastContact:p.connections.reduce(function(m,c){ return c.date>m?c.date:m; },''), by:byWho.join(', ')});
+    } else {
+      notContacted.push({name:p.name, stage:p.stage||'—', lastActivity:p.lastActivity||''});
+    }
+  });
+  contacted.sort(function(x,y){ return y.count-x.count; });
+  notContacted.sort(function(x,y){ return (x.lastActivity||'').localeCompare(y.lastActivity||''); });
+
+  // ── New leads this week — LEADS col H (Lead Creation Date) ──────────
+  var newLeads=[];
+  var lSheet=s.getSheetByName(LEADS_TAB);
+  if (lSheet && lSheet.getLastRow()>1){
+    var lr=lSheet.getDataRange().getValues();
+    for (var li=1; li<lr.length; li++){
+      var cdate=String(lr[li][7]||'').substring(0,10);
+      if (!cdate || cdate<mon || cdate>sat) continue;
+      newLeads.push({ name:String(lr[li][1]||''), source:String(lr[li][13]||''),
+        status:String(lr[li][5]||''), contactedBy:String(lr[li][6]||''), date:cdate });
+    }
+  }
+  newLeads.sort(function(x,y){ return x.date.localeCompare(y.date); });
+
+  return {weekStart:mon, weekEnd:sat, active:active, inactive:inactive,
+    contacted:contacted, notContacted:notContacted, newLeads:newLeads,
+    counts:{active:active.length, inactive:inactive.length, contacted:contacted.length,
+      notContacted:notContacted.length, newLeads:newLeads.length}};
 }
 
 // ── getSiteExecutionSummary — per project ──────────────────

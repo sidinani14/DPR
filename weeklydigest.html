@@ -30,9 +30,13 @@ body{font-family:'DM Sans',sans-serif;background:#EEEBE4;color:var(--ink)}
 .li{font-size:12px;line-height:1.55;color:var(--ink);padding-left:2px}
 .li .d{color:var(--ink3);font-family:'DM Mono',monospace;font-size:10.5px}
 .idx h2{font-size:18px;color:var(--char);border-bottom:2px solid var(--orange);padding-bottom:5px;margin-bottom:8px}
+.idx-sub{font-size:11px;color:var(--ink3);margin:-4px 0 10px}
+.idx-sub2{font-size:14px;color:var(--char);font-weight:700;margin:18px 0 6px}
 table.idle{width:100%;border-collapse:collapse;font-size:12px}
 table.idle th{background:var(--char);color:#fff;text-align:left;padding:6px 9px;font-weight:500;font-size:10.5px}
 table.idle td{border-bottom:1px solid var(--line);padding:6px 9px}
+table.idle.orange th{background:var(--orange2)}
+.lead-badge{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:8px;background:#EEF3EA;color:#3E6B2E;white-space:nowrap}
 .foot{margin-top:18px;border-top:1px solid var(--line);padding-top:7px;font-size:9px;color:var(--ink3);text-align:center}
 @media print{.bar{display:none}.page{margin:0;box-shadow:none;width:auto;min-height:auto}@page{size:A4;margin:0}}
 </style></head><body>
@@ -75,6 +79,23 @@ function render(d){
     +'<div class="cv-title">Weekly Project Digest</div>'
     +'<div class="cv-week">'+wk+'</div>'
     +'<div class="cv-sum"><b>'+d.counts.active+'</b> projects active this week · <b>'+d.counts.inactive+'</b> with no movement</div></div></div>';
+
+  // ── Front page 1: projects contacted this week + new leads ──────────
+  let contactedRows=(d.contacted||[]).map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.stage)+'</td><td>'+p.count+'</td><td>'+shortD(p.lastContact)+'</td><td>'+esc(p.by||'—')+'</td></tr>').join('');
+  let leadRows=(d.newLeads||[]).map(l=>'<tr><td>'+esc(l.name)+'</td><td>'+esc(l.source||'—')+'</td><td><span class="lead-badge">'+esc(l.status||'—')+'</span></td><td>'+esc(l.contactedBy||'—')+'</td><td>'+shortD(l.date)+'</td></tr>').join('');
+  html+='<div class="page proj idx"><h2>Projects Contacted &amp; New Leads</h2><div class="idx-sub">'+wk+'</div>'
+    +'<div class="idx-sub2">Projects contacted ('+(d.contacted||[]).length+')</div>'
+    +'<table class="idle"><tr><th>Project</th><th>Stage</th><th>Contacts</th><th>Last contact</th><th>By</th></tr>'+(contactedRows||'<tr><td colspan="5">—</td></tr>')+'</table>'
+    +'<div class="idx-sub2">New leads ('+(d.newLeads||[]).length+')</div>'
+    +'<table class="idle orange"><tr><th>Client</th><th>Source</th><th>Status</th><th>Contacted by</th><th>Date</th></tr>'+(leadRows||'<tr><td colspan="5">—</td></tr>')+'</table>'
+    +'<div class="foot">© Ideaform Design Studio · '+wk+' · Confidential</div></div>';
+
+  // ── Front page 2: projects NOT contacted this week ───────────────────
+  let notContactedRows=(d.notContacted||[]).map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.stage)+'</td><td>'+(p.lastActivity?shortD(p.lastActivity):'—')+'</td></tr>').join('');
+  html+='<div class="page proj idx"><h2>Projects Not Contacted</h2><div class="idx-sub">'+wk+' · client-facing ongoing projects with no logged connection this week</div>'
+    +'<table class="idle"><tr><th>Project</th><th>Stage</th><th>Last activity (any)</th></tr>'+(notContactedRows||'<tr><td colspan="3">All ongoing projects were contacted this week 🎉</td></tr>')+'</table>'
+    +'<div class="foot">© Ideaform Design Studio · '+wk+' · Confidential</div></div>';
+
   (d.active||[]).forEach(function(p){
     html+='<div class="page proj"><div class="ph"><span class="pn">'+esc(p.name)+'</span><span class="pstage">'+esc(p.stage||'—')+'</span></div>';
     html+=block('Meetings &amp; site visits', mergeMV(p), m=>'<div class="li"><span class="d">'+shortD(m.date)+'</span> · '+esc(m.type)+(m.hours?' · '+m.hours+' hr'+(m.hours!==1?'s':''):'')+(m.who?' · '+esc(m.who):'')+'</div>');
