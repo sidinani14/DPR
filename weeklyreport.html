@@ -279,7 +279,7 @@ const ROLES = {
 const TARGETS = {
   'Aaditya Koshti':48, 'Aashi Agrawal':48, 'Achal Rathore':72,
   'Bhavesh Bhagwat':60, 'Himanshu Malviya':72,
-  'Poorvi Goyal':48, 'Sahil Maurya':48, 'Kritika Kaushik':30,
+  'Poorvi Goyal':48, 'Sahil Maurya':60, 'Kritika Kaushik':48,
   'Shreyas Chourasia':48,
 };
 
@@ -1518,8 +1518,19 @@ window.idsOnAuth = async function(u){   // gated by auth.js; weekly report = Sid
   }
   document.getElementById('wk-lbl').textContent = 'Week of ' + WEEK_LABEL;
   wrInitUpload();
-  fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})})
-    .then(r=>r.json()).then(d=>{ WR_ROSTER=(d.allMembers||[]).filter(Boolean); }).catch(()=>{});
+  // TARGETS above is a hardcoded fallback (kept for when this call fails) —
+  // live TEAM tab values always win when they load successfully. Bug fixed
+  // 2026-09: this page never merged live targets at all, so a TEAM-tab
+  // correction (e.g. Kritika's target set to 48) silently never reached this
+  // report — Output kept scoring against the stale hardcoded number
+  // indefinitely. Awaited (not fire-and-forget) so the first render already
+  // has the live numbers, matching dashboard.html's same merge pattern.
+  try {
+    const listsRes = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLists'})});
+    const d = await listsRes.json();
+    WR_ROSTER=(d.allMembers||[]).filter(Boolean);
+    if (d.targets) Object.assign(TARGETS, d.targets);
+  } catch(e){}
   await loadBioForWeek();
   const anyData = Object.keys(BIO).some(n => BIO[n] && BIO[n].days > 0);
   if (!anyData) toggleImportPanel(true);   // nothing imported for this week yet — open the panel
