@@ -60,6 +60,43 @@
 - Frequency **"None"** (a documented, valid VISIT_PLANNER option) means no
   automatic scheduling for that row — not a bug if a project shows no
   visit task and its Frequency is set to None.
+- **Bug fixed 2026-09 — a week's visits/meetings silently never got pushed**:
+  `syncVisitSchedule()` (the trigger handler) had no top-level try/catch —
+  an uncaught exception (most plausibly `withLock()` timing out) aborted
+  the whole run with only Apps Script's own easy-to-miss default failure
+  email. Compounded by `setupMondayTrigger()` only installing a **weekly
+  Monday 8am** trigger, so one bad Monday meant a full week silently
+  unassigned. Fixed **@360**: `syncVisitSchedule()` now wraps everything in
+  try/catch and emails managers a visible failure notice if it throws;
+  `setupMondayTrigger()` now installs a **daily 7am** trigger instead
+  (self-healing — `pushVisitTasks`/`flagMissedVisits` are already
+  idempotent, so a daily rerun never double-pushes or double-emails,
+  it just catches what an earlier run missed).
+- **New 2026-09 — 48h overdue notification**: `checkOverdueAssignedVisits()`
+  runs every `syncVisitSchedule` pass; emails the assignee (grouped, one
+  email per person) plus a manager digest for any visit/meeting task still
+  not marked Done 48h+ past its deadline (col K). Distinct from
+  `flagMissedVisits` above, which is about the *cadence* never getting a
+  task pushed at all (fires after a full frequency cycle) — this is about
+  a task that WAS pushed and is just sitting un-actioned. Not deduped;
+  repeats daily until marked Done, same cadence as `notifyMissedVisits`.
+- **New 2026-09 — VISIT_PLANNER col H auto-sync**: `updateVisitPlannerLastVisitDate()`
+  updates col H (Last Site Visit Date) the moment a matching visit/meeting
+  task is approved (`submitApprovals`) or auto-approved
+  (`completeDirectorItem`) — only ever moves the date forward. Purely for
+  the sheet to be trustworthy to read directly; scheduling itself already
+  preferred real approved history (`loadVisitHistory`) over col H either way.
+- **Diagnostics** (`debugVisitPlanner`, `getLastPushVisitTasksTrace`,
+  `debugListTriggers`, `debugRawTaskRows`, `setupMondayTrigger`) are
+  manager-only actions — make sure any new one is wired into **both**
+  `doGet` and `doPost` (several of these were doGet-only until 2026-09,
+  which made them unreachable from the browser since a raw cross-origin GET
+  fetch to the Apps Script URL fails). Also: immediately after a
+  `clasp deploy`, this web app can serve inconsistent responses from what
+  behave like multiple backend instances for up to ~30s (same POST fired
+  twice back-to-back returning different bodies, occasionally a Google
+  consent-page HTML shell instead of JSON even with a valid token) — don't
+  trust a single post-deploy live check, retry until the result is stable.
 
 ## Reliability fixes (2026-08) — read before touching submission paths
 Root-caused two backend bugs behind reported "sometimes access denied" +

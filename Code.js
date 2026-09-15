@@ -1559,6 +1559,7 @@ function doPost(e) {
     if (data.action === 'getMemberReview')        return respond(getMemberReview(data.member||'', data.from||'', data.to||''));
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
+    if (data.action === 'debugRawTaskRows') return respond(debugRawTaskRows(data.project||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
     // Manager-only: is a specific email in the TEAM tab allowlist right now?
     // For chasing down a real "access denied" report without that person's
@@ -1664,6 +1665,10 @@ function doPost(e) {
     if (data.action === 'unparkTask')             return respond(unparkTask(data, authEmail));
     if (data.action === 'reconcileStalled')       return respond(reconcileStalledParks());
     if (data.action === 'syncVisitSchedule')      return respond((function(){ syncVisitSchedule(); return {status:'ok'}; })());
+    if (data.action === 'debugVisitPlanner')      return respond(debugVisitPlanner());
+    if (data.action === 'getLastPushVisitTasksTrace') return respond(getLastPushVisitTasksTrace());
+    if (data.action === 'debugListTriggers')      return respond(ScriptApp.getProjectTriggers().map(function(t){ return {handler:t.getHandlerFunction(), type:String(t.getEventType()), source:String(t.getTriggerSource())}; }));
+    if (data.action === 'setupMondayTrigger')     { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); setupMondayTrigger(); return respond({status:'ok'}); }
     if (data.action === 'getBillRequests')        return cachedSafeRespond('c_getBillRequests', 15, getBillRequests);
     if (data.action === 'disposeBillRequest')     return respond(disposeBillRequest(data));
     if (data.action === 'getApprovedBillRequests') return respond(getApprovedBillRequests());
@@ -4131,6 +4136,17 @@ function submitApprovals(data) {
         };
         var memberName = String(taskAssn.getRange(ar, 4).getValue()||'');
         // Notification removed — rejections shown in DPR form directly
+      } else if (a.decision === 'Yes') {
+        // Approved -- if this is a visit/meeting task, sync VISIT_PLANNER
+        // col H (Last Site Visit Date) to the date the visit actually
+        // happened (ActualCompletionDate, falling back to SelfStatusDate).
+        var apprTaskType = a.taskType || String(taskAssn.getRange(ar, 5).getValue()||'');
+        if (isVisitTask(apprTaskType)) {
+          var apprProject = a.project || String(taskAssn.getRange(ar, 3).getValue()||'');
+          var visitDate = (WR_ACTUALDT > 0 ? cellDate(taskAssn.getRange(ar, WR_ACTUALDT).getValue()) : '') ||
+                           cellDate(taskAssn.getRange(ar, WR_STATUSDT).getValue()) || today;
+          updateVisitPlannerLastVisitDate(apprProject, apprTaskType, visitDate);
+        }
       }
     }
     if (a.decision === 'Yes') approved++; else rejected++;
@@ -4507,6 +4523,35 @@ function getEffectiveLastVisitDate(entry, history) {
   return lastVisit ? lastVisit.date : (entry.manualLastDate || '');
 }
 
+// Keeps VISIT_PLANNER col H (manual "Last Site Visit Date") in sync the
+// moment a visit/meeting task is approved, instead of only ever being
+// updated by hand. Scheduling itself doesn't strictly depend on this (it
+// already prefers real approved history via loadVisitHistory/
+// getEffectiveLastVisitDate above) -- this is so the sheet itself is
+// trustworthy to read directly, per explicit request (2026-09). Only moves
+// the date FORWARD (never overwrites a newer manual/approved date with an
+// older one, e.g. if a backlog approval lands after a more recent visit
+// already updated it) and matches project+visitType only (not assignee --
+// "last visit" is per project+type, a VISIT_PLANNER row can list several
+// assignees in col C).
+function updateVisitPlannerLastVisitDate(project, taskType, visitDateStr) {
+  if (!project || !visitDateStr) return;
+  var canon = normaliseVisitType(taskType);
+  if (!canon) return; // not a visit/meeting task type at all
+  var sheet = db().getSheetByName(PLANNER_TAB);
+  if (!sheet || sheet.getLastRow() <= 3) return;
+  var rows = sheet.getRange(4, 1, sheet.getLastRow()-3, 8).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    var rProj = String(rows[i][0]||'').trim();
+    if (rProj !== project) continue;
+    if (normaliseVisitType(rows[i][1]) !== canon) continue;
+    var curH = cellDate(rows[i][7]);
+    if (!curH || visitDateStr > curH) {
+      sheet.getRange(4+i, 8).setValue(visitDateStr);
+    }
+  }
+}
+
 function calcNextVisitDate(entry, lastVisitDate, openTasks) {
   // Check open task for this specific assignee first, then any assignee
   var assigneeStr = String(entry.assignee||'').split(',')[0].trim();
@@ -4841,6 +4886,99 @@ function flagMissedVisits(cadence, history, openTasks) {
   return missedList;
 }
 
+// ── Assigned visit/meeting tasks sitting incomplete 48h+ past their
+// deadline (2026-09, explicit request) ─────────────────────────────
+// Distinct from flagMissedVisits above: that one is about the CADENCE never
+// getting a task pushed at all (fires only after a full frequency cycle,
+// e.g. a week+). This is about a task that WAS pushed/assigned and is just
+// sitting un-actioned -- the assignee never marked it Done. Runs every
+// syncVisitSchedule pass (daily); not deduped, so it repeats daily for as
+// long as a task stays overdue, same as notifyMissedVisits below -- once
+// it's marked Done it drops out on the very next run.
+function checkOverdueAssignedVisits(){
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var rows = sheet.getDataRange().getValues();
+  var today = todayStr();
+  var teamSheet = db().getSheetByName(TEAM_TAB);
+  var emailMap = {};
+  if (teamSheet) {
+    var tRows = teamSheet.getDataRange().getValues();
+    for (var ti=1; ti<tRows.length; ti++) {
+      var tn = String(tRows[ti][0]||'').trim(), te = String(tRows[ti][4]||'').trim();
+      if (tn && te) emailMap[tn] = te;
+    }
+  }
+  var overdue = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    var taskType = String(r[4]||'').trim();
+    if (!isVisitTask(taskType)) continue;
+    var selfStatus = String(r[13]||'').trim();
+    if (selfStatus === 'Done') continue; // completed (even if not yet approved) -- not what this checks
+    var disposition = String(r[COL_BLK_DISPO-1]||'').trim();
+    if (disposition) continue; // Parked/Reassigned/Cancelled/etc — no longer actively pending
+    var deadline = cellDate(r[10]); // K
+    if (!deadline) continue;
+    var daysOver = daysDiff(deadline, today);
+    if (daysOver == null || daysOver < 2) continue; // < 48h
+    var member = String(r[3]||'').trim();
+    overdue.push({ row:i+1, taskId:String(r[0]||''), project:String(r[2]||'').trim(), taskType:taskType,
+      member:member, deadline:deadline, daysOverdue:daysOver, email:emailMap[member]||'' });
+  }
+  if (!overdue.length) return overdue;
+
+  // Per-assignee reminder — group by member so one person doesn't get 3
+  // separate emails for 3 overdue visits.
+  var byMember = {};
+  overdue.forEach(function(o){ (byMember[o.member]=byMember[o.member]||[]).push(o); });
+  Object.keys(byMember).forEach(function(member){
+    var email = byMember[member][0].email;
+    if (!email) return;
+    var items = byMember[member];
+    var rowsHtml = items.map(function(o){
+      return '<tr><td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(o.project)+'</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(o.taskType)+'</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8;color:#8B2020;font-weight:bold">'+mlEsc(o.deadline)+' ('+o.daysOverdue+'d overdue)</td></tr>';
+    }).join('');
+    var body = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto">'
+      + '<div style="background:#8B2020;padding:16px 22px;border-radius:8px 8px 0 0">'
+      + '<p style="color:#fff;font-size:15px;font-weight:bold;margin:0">⚠ '+items.length+' visit/meeting task'+(items.length===1?'':'s')+' not marked done</p>'
+      + '<p style="color:rgba(255,255,255,.7);font-size:11px;margin:4px 0 0">Ideaform Design Studio</p></div>'
+      + '<div style="background:#fff;padding:16px 22px;border:1px solid #E2DFD8;border-top:none;border-radius:0 0 8px 8px">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+      + '<tr style="text-align:left;color:#6B6860;font-size:10.5px;text-transform:uppercase"><th style="padding:6px 8px">Project</th><th style="padding:6px 8px">Type</th><th style="padding:6px 8px">Was due</th></tr>'
+      + rowsHtml + '</table>'
+      + '<p style="font-size:11px;color:#9E9B94;margin:16px 0 0">Mark these done in your DPR form once completed, so they can be reviewed and scored.</p>'
+      + '</div></div>';
+    try {
+      MailApp.sendEmail(email, '[IDS] '+items.length+' visit/meeting task'+(items.length===1?'':'s')+' overdue 48h+', '', {htmlBody:body});
+    } catch(e) { Logger.log('checkOverdueAssignedVisits reminder failed for '+member+': '+e); }
+  });
+
+  // Manager digest — same list, one email.
+  var mgRows = overdue.map(function(o){
+    return '<tr><td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(o.member)+'</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(o.project)+'</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8">'+mlEsc(o.taskType)+'</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #E2DFD8;color:#8B2020;font-weight:bold">'+mlEsc(o.deadline)+' ('+o.daysOverdue+'d overdue)</td></tr>';
+  }).join('');
+  var mgBody = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">'
+    + '<div style="background:#8B2020;padding:16px 22px;border-radius:8px 8px 0 0">'
+    + '<p style="color:#fff;font-size:15px;font-weight:bold;margin:0">⚠ '+overdue.length+' visit/meeting task'+(overdue.length===1?'':'s')+' overdue 48h+</p>'
+    + '<p style="color:rgba(255,255,255,.7);font-size:11px;margin:4px 0 0">Ideaform Design Studio — assigned but not marked done</p></div>'
+    + '<div style="background:#fff;padding:16px 22px;border:1px solid #E2DFD8;border-top:none;border-radius:0 0 8px 8px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    + '<tr style="text-align:left;color:#6B6860;font-size:10.5px;text-transform:uppercase"><th style="padding:6px 8px">Member</th><th style="padding:6px 8px">Project</th><th style="padding:6px 8px">Type</th><th style="padding:6px 8px">Was due</th></tr>'
+    + mgRows + '</table></div></div>';
+  try {
+    var recipients = Object.keys(MANAGER_EMAILS).filter(function(e){ return e.indexOf('@ideaform.in')>-1 || e==='sidinani14@gmail.com' || e==='astha.uch@gmail.com'; });
+    MailApp.sendEmail({ to: recipients.join(','), subject: '[IDS] '+overdue.length+' visit/meeting task'+(overdue.length===1?'':'s')+' overdue 48h+', htmlBody: mgBody });
+  } catch(e) { Logger.log('checkOverdueAssignedVisits manager digest failed: '+e); }
+
+  return overdue;
+}
+
 // One digest email to Siddharth/Astha listing every missed visit — sent by
 // syncVisitSchedule (daily 7 AM trigger) whenever the list is non-empty.
 // Only fires when there's something to report; no email on a clean day.
@@ -5022,7 +5160,34 @@ function debugVisitPlanner() {
   return { today: today, threshold: threshold, cadenceCount: cadence.length, rows: rows };
 }
 
+// 2026-09: syncVisitSchedule is the trigger handler itself (fires directly
+// off the time-driven trigger, nothing else wraps it). Before this fix, an
+// uncaught exception anywhere inside it -- most plausibly withLock() timing
+// out under contention, since 2026-08 made that throw instead of silently
+// proceeding unprotected -- aborted the whole run with zero visible symptom
+// to the team: no tasks pushed, no missed-visit digest, nothing but Apps
+// Script's own default failure notification (easy to miss, and depends on
+// the owner's notification settings). This is very likely why a Monday's
+// visits/meetings sometimes never got assigned at all with no one noticing
+// until the week was half over. Now the whole body is one try/catch that
+// guarantees a visible email to managers on failure, same delivery path as
+// every other digest in this file.
 function syncVisitSchedule() {
+  try {
+    syncVisitScheduleInner();
+  } catch (err) {
+    Logger.log('syncVisitSchedule FAILED: ' + err + (err && err.stack ? '\n'+err.stack : ''));
+    try {
+      var recipients = Object.keys(MANAGER_EMAILS).filter(function(e){ return e.indexOf('@ideaform.in')>-1 || e==='sidinani14@gmail.com' || e==='astha.uch@gmail.com'; });
+      MailApp.sendEmail({ to: recipients.join(','), subject: '[IDS] Visit schedule sync FAILED',
+        htmlBody: '<p style="font-family:Arial,sans-serif;font-size:13px">Today\'s automatic site visit/meeting scheduling run failed and did NOT push this week\'s tasks. '
+          + 'Error: <code>' + mlEsc(String(err)) + '</code></p>'
+          + '<p style="font-family:Arial,sans-serif;font-size:12px;color:#6B6860">Fix from the Apps Script editor, then run <code>syncVisitSchedule</code> manually (or use the manager-only "syncVisitSchedule" action) to catch up.</p>' });
+    } catch (e2) { Logger.log('syncVisitSchedule failure-notification also failed: ' + e2); }
+  }
+}
+
+function syncVisitScheduleInner() {
   Logger.log('=== syncVisitSchedule: '+new Date().toISOString()+' ===');
 
   // Reconcile stalled-project parks every run (park new, revive un-stalled).
@@ -5068,6 +5233,7 @@ function syncVisitSchedule() {
     missedList = flagMissedVisits(cadence, history, openTasks);
   });
   try { notifyMissedVisits(missedList); } catch(e) { Logger.log('notifyMissedVisits error: '+e); }
+  try { checkOverdueAssignedVisits(); } catch(e) { Logger.log('checkOverdueAssignedVisits error: '+e); }
 
   Logger.log('=== syncVisitSchedule complete ===');
 }
@@ -5535,6 +5701,11 @@ function completeDirectorItem(data, authEmail) {
   if (remarks) {
     var existing = String(sheet.getRange(row, 21).getValue() || '').trim(); // U Notes
     sheet.getRange(row, 21).setValue(existing ? existing + ' | ' + remarks : remarks);
+  }
+  var dciTaskType = String(sheet.getRange(row, 5).getValue() || '').trim();
+  if (isVisitTask(dciTaskType)) {
+    var dciProject = String(sheet.getRange(row, 3).getValue() || '').trim();
+    updateVisitPlannerLastVisitDate(dciProject, dciTaskType, today);
   }
   Logger.log('Director item completed: row ' + row + ' (' + who + ') by ' + authEmail);
   try { CacheService.getScriptCache().remove('c_getDirectorPendingItems'); } catch(e) {}
@@ -7118,6 +7289,17 @@ function resolveIssue(issueId) {
 // ════════════════════════════════════════════════════════════════
 
 // Run this ONCE manually to set up the Monday 8AM trigger
+// 2026-09: was Monday-only. Switched to daily so a single failed run (see
+// syncVisitSchedule's new try/catch above) self-heals the very next morning
+// instead of leaving that week's visits/meetings unassigned for a full
+// week with no one noticing -- pushVisitTasks/flagMissedVisits are both
+// idempotent (Priority 1 in calcNextVisitDate treats any already-open task
+// as already-scheduled), so a daily rerun is safe: it never re-pushes or
+// re-emails a task that already exists, it only catches what Monday missed.
+// Under normal conditions this still means "assigned by Monday morning"
+// exactly as before, since every VISIT_PLANNER entry due that week becomes
+// due on Monday's run same as always -- the other 6 days are a safety net,
+// not a behavior change to when things normally get pushed.
 function setupMondayTrigger() {
   // Delete existing visit scheduling triggers, including the stale
   // 'runVisitScheduler' name from a pre-rename version of this project —
@@ -7134,14 +7316,14 @@ function setupMondayTrigger() {
     }
   });
 
-  // Create new Monday 8AM trigger
+  // Create new daily 7-8AM trigger (was Monday-only — see comment above)
   ScriptApp.newTrigger('syncVisitSchedule')
     .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.MONDAY)
-    .atHour(8)
+    .everyDays(1)
+    .atHour(7)
     .create();
 
-  Logger.log('Monday 8AM trigger created for syncVisitSchedule');
+  Logger.log('Daily 7AM trigger created for syncVisitSchedule');
 }
 
 // ════════════════════════════════════════════════════════════════
