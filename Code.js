@@ -730,6 +730,45 @@ function getBulkAttendance(from, to) {
   return out;
 }
 
+// Real biometric presence/lateness for one member over a week, from
+// ATTENDANCE_TAB (Attendance Import v2) -- the actual Paytime import, not a
+// proxy. 2026-09 fix: getDeepakWeeklyStats/getAmanWeeklyStats's own
+// "Biometric" sections never read this tab -- they counted DAILY_SUMMARY
+// rows (a DPR/DPER/CRM *form submission* timestamp) as a stand-in for
+// "was present," explicitly commented "(same as team)" even though the
+// team's real weekly report gets its biometric from getBulkAttendance/
+// ATTENDANCE_TAB via weeklyreport.html, not from DAILY_SUMMARY. That proxy
+// happened to look right as long as the person also filed their form every
+// day, but breaks completely the moment they don't: confirmed live for a
+// week where Deepak had 6/6 real biometric present days (with site-visit
+// field hours) but 0 DAILY_SUMMARY rows (no DPER form filed that week) --
+// his old daysPresent/absentDays came out 0/6, which would have zeroed his
+// Punctuality and Hours scores despite him demonstrably being on-site and
+// working every day. Use this everywhere "biometric presence for one
+// member" is needed instead of re-reading DAILY_SUMMARY.
+function getMemberBiometric(member, mon, sat, thresholdOverride) {
+  var m = String(member||'').trim().toLowerCase();
+  var thr = thresholdOverride || '09:10';
+  var sheet = db().getSheetByName(ATTENDANCE_TAB);
+  var daysPresent = 0, lateCount = 0, totalHrs = 0;
+  if (sheet && sheet.getLastRow() > 1) {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      var rDate = cellDate(rows[i][0]);
+      var rName = String(rows[i][1]||'').trim().toLowerCase();
+      if (rName !== m) continue;
+      if (!rDate || rDate < mon || rDate > sat) continue;
+      var status = String(rows[i][6]||'').trim();
+      if (status === 'Absent') continue;
+      daysPresent++;
+      totalHrs += (parseFloat(rows[i][5])||0) + (parseFloat(rows[i][11])||0); // TotalHrs + FieldHours
+      var late = !!rows[i][7], lateApproved = !!rows[i][8];
+      if (late && !lateApproved) lateCount++;
+    }
+  }
+  return { daysPresent: daysPresent, lateCount: lateCount, absentDays: 6 - daysPresent, totalHrs: Math.round(totalHrs*100)/100 };
+}
+
 // Write a completed "Site Visit" / "Meeting" task to TASK_ASSIGNMENTS for the DPER
 // lead (Deepak), so the visit carries points and feeds Task Completion. Points use
 // the DPR rule (Site Visit ×2/hr, Meeting ×1/hr). Done, but LeadApproved is left
@@ -1010,7 +1049,7 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
   getDirectorPendingItems:1, completeDirectorItem:1, regenerateProjectPDF:1, undeleteMeetingLog:1,
   backfillFieldWorkPoints:1, getDPRAudit:1, backfillDPRTasks:1, fixBackfillUnplannedTag:1,
   saveConfidentialReview:1, getConfidentialReview:1, getSocialMediaLog:1, debugCleanupFieldWork:1,
-  debugMemberWeek:1, debugListTriggers:1 };
+  debugMemberWeek:1, debugListTriggers:1, getMeetingLogGaps:1 };
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
@@ -1525,6 +1564,7 @@ function doGet(e) {
   if (action === 'getAllMeetingLogs')        return safeRespond(getAllMeetingLogs);
   if (action === 'getProjectDetail')         return safeRespond(function(){ return getProjectDetail(p.project||''); });
   if (action === 'getWeeklyDiag')            return safeRespond(function(){ return getWeeklyDiag(p.weekStart||''); });
+  if (action === 'getMeetingLogGaps')        return safeRespond(function(){ return getMeetingLogGaps(p.weekStart||''); });
   if (action === 'getOpenLeads')             return safeRespond(function(){ return getOpenLeads(p.member||''); });
   if (action === 'getProjectWeeklyReport')   return safeRespond(function(){ return getProjectWeeklyReport(p.project||'', p.weekStart||''); });
   if (action === 'get3MData')                return safeRespond(function(){ return get3MData(p.project||'', p.weekStart||''); });
@@ -1560,6 +1600,7 @@ function doPost(e) {
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
     if (data.action === 'debugRawTaskRows') return respond(debugRawTaskRows(data.project||''));
+    if (data.action === 'debugMemberWeek') return respond(debugMemberWeek(data.member||'', data.mon||'', data.sat||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
     // Manager-only: is a specific email in the TEAM tab allowlist right now?
     // For chasing down a real "access denied" report without that person's
@@ -1642,12 +1683,27 @@ function doPost(e) {
         ? cachedSafeRespond('wr_aws_'+(data.weekStart||''), 21600, function(){ return getAmanWeeklyStats(data.weekStart||''); })
         : respond(getAmanWeeklyStats(data.weekStart||''));
     }
+    if (data.action === 'setTeamWeeklyTarget') {
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
+      var stwtRes = setTeamWeeklyTarget(data.member||'', data.target);
+      try { CacheService.getScriptCache().remove('c_getLists'); } catch(e) {}
+      return respond(stwtRes);
+    }
+    if (data.action === 'clearWeeklyCache') {
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
+      var cwcWeek = data.weekStart || '';
+      var cwc = CacheService.getScriptCache();
+      ['wr_ws_','wr_dws_','wr_aws_'].forEach(function(pfx){ cwc.remove(pfx+cwcWeek); });
+      return respond({status:'ok', cleared:['wr_ws_'+cwcWeek,'wr_dws_'+cwcWeek,'wr_aws_'+cwcWeek]});
+    }
     if (data.action === 'getLeadsAnalytics')      return respond(getLeadsAnalytics(data.month||''));
     if (data.action === 'getFeedbackAnalytics')   return respond(getFeedbackAnalytics(data.month||''));
     if (data.action === 'getBlockersThisWeek')    return respond(getBlockersThisWeek());
     if (data.action === 'getBlockRequests')       return cachedSafeRespond('c_getBlockRequests', 15, getBlockRequests);
     if (data.action === 'getProjectsHealth')      return respond(getProjectsHealth());
     if (data.action === 'getWeeklyProjectDigest') return respond(getWeeklyProjectDigest(data.weekStart||''));
+    if (data.action === 'getMeetingLogGaps')      return respond(getMeetingLogGaps(data.weekStart||''));
+    if (data.action === 'getWeeklyDiag')          return respond(getWeeklyDiag(data.weekStart||''));
     if (data.action === 'getAllMeetingLogs')      return respond(getAllMeetingLogs(!!data.includeDeleted));
     if (data.action === 'getMeetingLogForEdit')   return respond(getMeetingLogForEdit(data.logId||''));
     if (data.action === 'undeleteMeetingLog')     return respond(undeleteMeetingLog(data, authEmail));
@@ -1795,6 +1851,27 @@ function doPost(e) {
   } catch(err) {
     return respond({status: 'error', message: err.toString()});
   }
+}
+
+// Manager-only: correct a team member's WeeklyTarget (TEAM tab col C) — this
+// has always been hand-edited directly in the sheet; added as a callable
+// action (2026-09) so a correction can be made and confirmed in the same
+// flow as the report that surfaced it, instead of switching to Sheets.
+function setTeamWeeklyTarget(member, target) {
+  var m = String(member||'').trim();
+  var t = parseFloat(target);
+  if (!m || isNaN(t)) return {status:'error', message:'member and numeric target required'};
+  var sheet = db().getSheetByName(TEAM_TAB);
+  if (!sheet) return {status:'error', message:'TEAM tab not found'};
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]||'').trim() === m) {
+      var prev = rows[i][2];
+      sheet.getRange(i+1, 3).setValue(t);
+      return {status:'ok', member:m, previous: prev, newTarget: t, row: i+1};
+    }
+  }
+  return {status:'error', message:'Member not found in TEAM tab: '+m};
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -7641,25 +7718,10 @@ function getDeepakWeeklyStats(weekStart) {
     }
   }
 
-  // ── 5. Biometric from DAILY_SUMMARY ──────────────────────
-  var sumSheet    = s.getSheetByName(SUMMARY_TAB);
-  var daysPresent = 0, lateCount = 0;
-  var DEEPAK_THR  = '09:10';
-
-  if (sumSheet && sumSheet.getLastRow() > 1) {
-    var sRows = sumSheet.getDataRange().getValues();
-    for (var si = 1; si < sRows.length; si++) {
-      var rDate = cellDate(sRows[si][0]);
-      var rName = String(sRows[si][2] || '').trim();
-      if (rName !== 'Deepak Soni') continue;
-      if (!rDate || rDate < mon || rDate > sat) continue;
-      daysPresent++;
-      var arrTime = String(sRows[si][1] || '').trim();
-      if (arrTime && arrTime > DEEPAK_THR) lateCount++;
-    }
-  }
-
-  var absentDays = 6 - daysPresent;
+  // ── 5. Biometric — real ATTENDANCE_TAB import, not a DAILY_SUMMARY
+  // submission-timestamp proxy (2026-09 fix, see getMemberBiometric) ──
+  var bio = getMemberBiometric('Deepak Soni', mon, sat, '09:10');
+  var daysPresent = bio.daysPresent, lateCount = bio.lateCount, absentDays = bio.absentDays;
 
   // Weekly target — TEAM tab col C, live (same source every team member's
   // Output reads). 2026-08: confirmed 72/wk for Deepak, not the old
@@ -7956,23 +8018,10 @@ function getAmanWeeklyStats(weekStart, member) {
     }
   }
 
-  // ── 5. Biometric from DAILY_SUMMARY (same as team) ──
-  var sumSheet = s.getSheetByName(SUMMARY_TAB);
-  var daysPresent = 0, lateCount = 0;
-  var THR = '09:10';
-  if (sumSheet && sumSheet.getLastRow() > 1) {
-    var smRows = sumSheet.getDataRange().getValues();
-    for (var mi = 1; mi < smRows.length; mi++) {
-      var rDate = cellDate(smRows[mi][0]);
-      var rName = String(smRows[mi][2]||'').trim().toLowerCase();
-      if (rName !== whoLC) continue;
-      if (!rDate || rDate < mon || rDate > sat) continue;
-      daysPresent++;
-      var arr = String(smRows[mi][1]||'').trim();
-      if (arr && arr > THR) lateCount++;
-    }
-  }
-  var absentDays = 6 - daysPresent;
+  // ── 5. Biometric — real ATTENDANCE_TAB import, not a DAILY_SUMMARY
+  // submission-timestamp proxy (2026-09 fix, see getMemberBiometric) ──
+  var bio = getMemberBiometric(who, mon, sat, '09:10');
+  var daysPresent = bio.daysPresent, lateCount = bio.lateCount, absentDays = bio.absentDays;
 
   // ── 5b. Planned vs unplanned points (TASK_ASSIGNMENTS, assigned to Aman) ──
   // Same definition as the team/Deepak formulas: approved-this-week points
@@ -8120,6 +8169,75 @@ function getAmanWeeklyStats(weekStart, member) {
 // getWeeklyDiag — read-only dump of what the Deepak/Aman weekly functions see,
 // for debugging a "showing 0" week. action=getWeeklyDiag&weekStart=YYYY-MM-DD
 // ════════════════════════════════════════════════════════════════
+// Approved visit/meeting TASK_ASSIGNMENTS rows in a week that have no
+// matching MEETING_LOG entry (2026-09, explicit request). A task earning
+// visit/meeting points only requires the assignee to mark it Done + get it
+// approved -- it does NOT require them to also fill out the structured
+// meetlog.html log (the only path that auto-creates one is a DPER site
+// visit, which auto-publishes via skipTasks=true). So it's real and
+// possible for someone to earn visit points on an approved task with no
+// underlying log a client/manager could ever read. Matches on project
+// (case-insensitive) + date within 1 day + assignee's first name appearing
+// in the log's loggedBy or team field -- the same fuzzy-match approach
+// debugMemberWeek already uses for this exact cross-reference, since
+// TASK_ASSIGNMENTS AssignedTo and MEETING_LOG loggedBy/team are free text
+// that don't share a hard key.
+function getMeetingLogGaps(weekStart){
+  var mon = weekStart || dateStr(mondayOf(new Date()));
+  var sat = addDaysToStr(mon, 5);
+  var s = db();
+
+  var mlSheet = s.getSheetByName(MEETING_LOG_TAB);
+  var logs = [];
+  if (mlSheet && mlSheet.getLastRow() > 1) {
+    var mRows = mlSheet.getDataRange().getValues();
+    for (var m = 1; m < mRows.length; m++) {
+      if (String(mRows[m][15]||'').trim() === 'Deleted') continue;
+      logs.push({
+        date: cellDate(mRows[m][1]), project: String(mRows[m][4]||'').trim().toLowerCase(),
+        loggedBy: String(mRows[m][5]||'').toLowerCase(), team: String(mRows[m][6]||'').toLowerCase(),
+      });
+    }
+  }
+  function hasMatchingLog(project, dateStr2, member){
+    var p = String(project||'').trim().toLowerCase();
+    var nameLower = String(member||'').trim().toLowerCase();
+    var firstName = nameLower.split(' ')[0];
+    for (var i = 0; i < logs.length; i++){
+      if (logs[i].project !== p) continue;
+      if (Math.abs(daysDiff(logs[i].date, dateStr2)) > 1) continue;
+      if (logs[i].loggedBy.indexOf(firstName) === -1 && logs[i].team.indexOf(firstName) === -1) continue;
+      return true;
+    }
+    return false;
+  }
+
+  var gaps = [];
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  if (asSheet && asSheet.getLastRow() > 1) {
+    var aRows = asSheet.getDataRange().getValues();
+    var aHdrs = aRows[0] ? aRows[0].map(function(h){ return String(h||'').trim(); }) : [];
+    var is23  = aHdrs.length >= 23 || aHdrs.indexOf('Actual Completion Date') > -1;
+    var C_ACT = is23 ? 15 : -1, C_APPR = is23 ? 16 : 15;
+    for (var i = 1; i < aRows.length; i++) {
+      var r = aRows[i];
+      var taskType = String(r[4]||'').trim();
+      if (!isVisitTask(taskType)) continue;
+      var selfStatus = String(r[13]||'').trim();
+      var approved = String(r[C_APPR]||'').trim();
+      if (selfStatus !== 'Done' || approved !== 'Yes') continue;
+      var doneDate = (C_ACT > -1 ? cellDate(r[C_ACT]) : '') || cellDate(r[14]);
+      if (!doneDate || doneDate < mon || doneDate > sat) continue;
+      var project = String(r[2]||'').trim();
+      var member = String(r[3]||'').trim();
+      if (hasMatchingLog(project, doneDate, member)) continue;
+      gaps.push({ taskId: String(r[0]||''), member: member, project: project, taskType: taskType,
+        date: doneDate, pts: parseFloat(r[8])||0, row: i+1 });
+    }
+  }
+  return { week:[mon,sat], gaps: gaps };
+}
+
 function getWeeklyDiag(weekStart){
   var s = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
