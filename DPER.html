@@ -275,18 +275,6 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- S4: WhatsApp -->
-  <div class="section">
-    <div class="section-head" style="background:#1B5E20">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span>
-      <span class="section-title">WhatsApp Messages</span>
-    </div>
-    <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">One message per project — review and send to each group.</p>
-      <div id="wa-list"><div class="no-issues">Add project reports above to generate messages…</div></div>
-    </div>
-  </div>
-
   </div>
 </div>
 
@@ -1143,66 +1131,14 @@ function collectProjects(){
 }
 
 
-// ── WhatsApp generation ────────────────────────────────────
-function generateWAForProject(p){
-  const date=document.getElementById('f-date')?.value||new Date().toISOString().substring(0,10);
-  const ds=new Date(date+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const statusEmoji=p.onTrack==='Yes'?'✅ On Track':p.onTrack==='At Risk'?'⚠️ At Risk':'🔴 Delayed';
-  const nonDesign=p.issues.filter(i=>i.issueType!=='Design');
-  const design=p.issues.filter(i=>i.issueType==='Design');
-
-  // Check escalated issues for this project (from open issues panel)
-  const escIssues=Object.entries(issueActions)
-    .filter(([,v])=>v.action==='escalate').map(([id])=>id);
-
-  let msg=`*Project Update — ${p.proj}*\n*Date:* ${ds} | *Lead:* ${leadName}\n\n`;
-  msg+=`*Site Status:* ${statusEmoji}\n`;
-  if(p.visitType && p.visitHours){
-    msg+=`*${p.visitType}:* ${p.visitHours} hr${p.visitHours===1?'':'s'} today\n`;
-  }
-  msg+=`*Client Updated:* ${p.clientUpdated==='Yes'?'✅ Yes':'Not yet'}\n`;
-  if(p.clientConcerns) msg+=`*Client Concerns:*\n${p.clientConcerns}\n`;
-  msg+='\n';
-  if(nonDesign.length){
-    msg+=`*Issues Requiring Attention:*\n`;
-    nonDesign.forEach((iss,i)=>{ msg+=`${i+1}. [${iss.issueType}] ${iss.description}\n`; });
-    msg+='\n';
-  }
-  if(design.length){
-    msg+=`*Design Deliverables Required:*\n`;
-    design.forEach((iss,i)=>{ msg+=`${i+1}. [Design] ${iss.description}\n`; });
-    msg+='\n';
-  }
-  if(p.tasks && p.tasks.length){
-    msg+=`*Tasks Assigned Today:*\n`;
-    p.tasks.forEach((t,i)=>{ msg+=`${i+1}. ${t.taskType}${t.description?' — '+t.description:''} → ${t.assignedTo}\n`; });
-    msg+='\n';
-  }
-  msg+=`— Ideaform Design Studio`;
-  return msg;
-}
-
-function generateAllWA(){
-  const projs=collectProjects();
-  const container=document.getElementById('wa-list');
-  if(!projs.length){
-    container.innerHTML='<div class="no-issues">Add project reports above to generate messages…</div>';
-    return;
-  }
-  container.innerHTML=projs.map(p=>{
-    const msg=generateWAForProject(p);
-    return `<div class="wa-block">
-      <div class="wa-proj-name">💬 ${p.proj||'Project'}</div>
-      <textarea class="wa-textarea" id="wa-${p.id}" readonly onclick="this.select()">${msg}</textarea>
-      <button class="copy-btn-sm" onclick="copyWA('wa-${p.id}')">📋 Copy Message</button>
-    </div>`;
-  }).join('');
-}
-
-function copyWA(id){
-  const ta=document.getElementById(id);
-  navigator.clipboard.writeText(ta.value).then(()=>toast('Copied!')).catch(()=>{ta.select();document.execCommand('copy');toast('Copied!');});
-}
+// WhatsApp-message generation removed (2026-09) — built as a copy-paste
+// helper for Deepak to send per-project updates to client groups, but he
+// never used it in practice, so it was dead weight sitting on top of the
+// real problem: DPER's own project coverage wasn't visible to anyone.
+// generateAllWA kept as a no-op so the many call sites sprinkled through
+// this form's field-change handlers don't need to be found and removed
+// one by one.
+function generateAllWA(){}
 
 // ── Submit ─────────────────────────────────────────────────
 async function submitAll(){
@@ -1256,7 +1192,6 @@ async function submitAll(){
     // 2. Each project
     let siddharthErrors = [];
     for(const p of projs){
-      const waMsg=document.getElementById(`wa-${p.id}`)?.value||'';
       const resp = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({
           action:'submitDPER', date:p.date||date,
@@ -1271,7 +1206,6 @@ async function submitAll(){
           remarks:'',
           siddharthPending:p.siddharthPending||'',
           issues:JSON.stringify(p.issues),
-          whatsappMsg:waMsg,
         })});
       try {
         const r = await resp.json();
@@ -1378,7 +1312,6 @@ function resetForm(){
   document.getElementById('success-screen').style.display='none';
   document.querySelector('.submit-bar').style.display='';
   document.getElementById('proj-blocks').innerHTML='';
-  document.getElementById('wa-list').innerHTML='<div class="no-issues">Add project reports above to generate messages…</div>';
   pbCount=0; ibCount=0; issueActions={};
   document.getElementById('submit-btn').disabled=false;
   document.getElementById('submit-status').textContent=leadName;

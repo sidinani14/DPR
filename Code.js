@@ -1104,7 +1104,7 @@ function writeBlockLogHeaders(sheet){
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#8B2020').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
 }
-var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal'];  // departed — hidden from all forms & dashboards
+var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Khushi Gupta'];  // departed, or (Khushi Gupta) an unpaid intern learning at her own pace, not tracked — hidden from all forms & dashboards
 var APPROVAL_FORM_URL = 'https://team.ideaformdesignstudio.com/approval.html';
 var DAYS_BEFORE_ARCH  = 90;
 
@@ -1725,6 +1725,7 @@ function doPost(e) {
     if (data.action === 'getLastPushVisitTasksTrace') return respond(getLastPushVisitTasksTrace());
     if (data.action === 'debugListTriggers')      return respond(ScriptApp.getProjectTriggers().map(function(t){ return {handler:t.getHandlerFunction(), type:String(t.getEventType()), source:String(t.getTriggerSource())}; }));
     if (data.action === 'setupMondayTrigger')     { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); setupMondayTrigger(); return respond({status:'ok'}); }
+    if (data.action === 'deleteTriggersByHandler') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return respond(deleteTriggersByHandler(data.handlerName||'')); }
     if (data.action === 'getBillRequests')        return cachedSafeRespond('c_getBillRequests', 15, getBillRequests);
     if (data.action === 'disposeBillRequest')     return respond(disposeBillRequest(data));
     if (data.action === 'getApprovedBillRequests') return respond(getApprovedBillRequests());
@@ -5856,7 +5857,7 @@ function getWeeklyStats(weekStart) {
     var role   = String(tRows[ti][1] || '').trim();
     var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
-    if (!name || active === 'no' || DIRECTOR_NAMES[name]) continue;
+    if (!name || active === 'no' || DIRECTOR_NAMES[name] || EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
 
     // Tasks assigned this week (AssignedDate in Mon-Sat)
     var tasksAssigned = 0, assignedPts = 0;
@@ -7377,6 +7378,30 @@ function resolveIssue(issueId) {
 // exactly as before, since every VISIT_PLANNER entry due that week becomes
 // due on Monday's run same as always -- the other 6 days are a safety net,
 // not a behavior change to when things normally get pushed.
+// Generic manager-only cleanup for a ghost trigger -- a trigger installed
+// against a function that's since been renamed/removed, which just fails
+// silently (well, not silently -- it emails the script owner a failure
+// notice) every time it fires. 2026-09: found `sendDailyApprovalEmail`
+// firing daily at 8pm and failing every time, because the function it
+// called was deleted (collateral damage from the TEAM_SCORECARD removal
+// commit, which also swept up this unrelated daily-digest feature and its
+// helpers). Same shape of bug as the `runVisitScheduler` ghost trigger
+// setupMondayTrigger already cleans up below -- generalized here so the
+// next one of these doesn't need its own bespoke cleanup function.
+function deleteTriggersByHandler(handlerName) {
+  var name = String(handlerName||'').trim();
+  if (!name) return {status:'error', message:'handlerName required'};
+  var triggers = ScriptApp.getProjectTriggers();
+  var deleted = [];
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === name) {
+      ScriptApp.deleteTrigger(t);
+      deleted.push(name);
+    }
+  });
+  return {status:'ok', deletedCount: deleted.length};
+}
+
 function setupMondayTrigger() {
   // Delete existing visit scheduling triggers, including the stale
   // 'runVisitScheduler' name from a pre-rename version of this project —
