@@ -1691,6 +1691,41 @@ function doPost(e) {
       updateVisitPlannerLastVisitDate(data.project||'', data.taskType||'', data.date||'');
       return respond({status:'ok'});
     }
+    if (data.action === 'auditVisitPlannerColH') {
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
+      return respond(auditVisitPlannerColH(!!data.apply));
+    }
+    // Manual completion-date correction for specific rows -- e.g. a member
+    // files a big backdated catch-up in one sitting and the real work
+    // happened in an earlier week than the (necessarily real-submission-time)
+    // completion date the anti-gaming policy stamped on it. Narrow and
+    // explicit on purpose: every row must already be Done+Approved for the
+    // stated member, or it's skipped rather than silently touched.
+    if (data.action === 'correctTaskCompletionDates') {
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
+      var cctSheet = db().getSheetByName(ASSIGN_TAB);
+      var cctRows = (data.rows||[]);
+      var cctNewDate = String(data.newDate||'').trim();
+      var cctMember = String(data.member||'').trim();
+      var cctResults = [];
+      if (!cctNewDate || !cctMember || !cctRows.length) return respond({status:'error', message:'member, newDate, rows[] required'});
+      cctRows.forEach(function(rowNum){
+        var r = parseInt(rowNum, 10);
+        if (!r || r < 2) { cctResults.push({row:rowNum, ok:false, reason:'invalid row'}); return; }
+        var vals = cctSheet.getRange(r, 1, 1, 23).getValues()[0];
+        var assignedTo = String(vals[3]||'').trim();
+        var selfStatus = String(vals[13]||'').trim();
+        var approved = String(vals[16]||'').trim();
+        if (assignedTo !== cctMember || selfStatus !== 'Done' || approved !== 'Yes') {
+          cctResults.push({row:r, ok:false, reason:'not Done+Approved for '+cctMember+' (found: '+assignedTo+'/'+selfStatus+'/'+approved+')'});
+          return;
+        }
+        cctSheet.getRange(r, 15).setValue(cctNewDate); // O SelfStatusDate
+        cctSheet.getRange(r, 16).setValue(cctNewDate); // P ActualCompletionDate
+        cctResults.push({row:r, ok:true, project:String(vals[2]||''), taskType:String(vals[4]||'')});
+      });
+      return respond({status:'ok', results:cctResults});
+    }
     if (data.action === 'setTeamWeeklyTarget') {
       if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
       var stwtRes = setTeamWeeklyTarget(data.member||'', data.target);
@@ -8228,6 +8263,84 @@ function getAmanWeeklyStats(weekStart, member) {
       total    : total,
     },
   };
+}
+
+// Cross-checks EVERY VISIT_PLANNER row's col H against the real evidence in
+// TASK_ASSIGNMENTS (any Done visit-type task, approved or not -- see
+// updateVisitPlannerLastVisitDate's 2026-09 log-time-not-approval-time
+// change) and MEETING_LOG (any non-deleted entry), using the exact same
+// canon-then-family matching updateVisitPlannerLastVisitDate itself uses --
+// so this reports precisely what the live hooks would have written, not a
+// separate/looser approximation. Built 2026-09 after several real visits
+// (Bhandari Furnitures, Multani Jewellers, Harsh Gupta) turned out to
+// predate the col-H instant-update fix, same root cause as the Abhay Dhoot/
+// Vishal Gautam cases already found -- rather than chase these one at a
+// time as they get reported, this finds every project where col H is
+// behind the real record, in one pass. Pass apply=true to actually write
+// the corrected dates (still only ever moves col H forward); apply=false
+// (or omitted) just reports what's stale without touching the sheet.
+function auditVisitPlannerColH(apply){
+  var s = db();
+  var planSheet = s.getSheetByName(PLANNER_TAB);
+  if (!planSheet || planSheet.getLastRow() <= 3) return {status:'ok', checked:0, stale:[]};
+  var planRows = planSheet.getRange(4, 1, planSheet.getLastRow()-3, 8).getValues();
+
+  // Real visit evidence, keyed by project (lowercased) -> array of {date, canon, fam}
+  var evidence = {};
+  function addEvidence(project, typeStr, dateStr2){
+    if (!project || !dateStr2) return;
+    var key = project.trim().toLowerCase();
+    (evidence[key] = evidence[key] || []).push({
+      date: dateStr2, canon: normaliseVisitType(typeStr), fam: visitFamily(typeStr)
+    });
+  }
+
+  var asSheet = s.getSheetByName(ASSIGN_TAB);
+  if (asSheet && asSheet.getLastRow() > 1) {
+    var aRows = asSheet.getDataRange().getValues();
+    var aHdrs = aRows[0] ? aRows[0].map(function(h){ return String(h||'').trim(); }) : [];
+    var is23  = aHdrs.length >= 23 || aHdrs.indexOf('Actual Completion Date') > -1;
+    var C_ACT = is23 ? 15 : -1;
+    for (var i = 1; i < aRows.length; i++) {
+      var r = aRows[i];
+      var taskType = String(r[4]||'').trim();
+      if (!isVisitTask(taskType)) continue;
+      if (String(r[13]||'').trim() !== 'Done') continue; // logged, regardless of approval
+      var d = (C_ACT > -1 ? cellDate(r[C_ACT]) : '') || cellDate(r[14]);
+      addEvidence(String(r[2]||''), taskType, d);
+    }
+  }
+
+  var mlSheet = s.getSheetByName(MEETING_LOG_TAB);
+  if (mlSheet && mlSheet.getLastRow() > 1) {
+    var mRows = mlSheet.getDataRange().getValues();
+    for (var m = 1; m < mRows.length; m++) {
+      if (String(mRows[m][15]||'').trim() === 'Deleted') continue;
+      addEvidence(String(mRows[m][4]||''), String(mRows[m][3]||''), cellDate(mRows[m][1]));
+    }
+  }
+
+  var stale = [];
+  for (var p = 0; p < planRows.length; p++) {
+    var project = String(planRows[p][0]||'').trim();
+    var visitType = String(planRows[p][1]||'').trim();
+    if (!project || !visitType) continue;
+    var curH = cellDate(planRows[p][7]);
+    var canon = normaliseVisitType(visitType);
+    var fam = visitFamily(visitType);
+    var ev = evidence[project.toLowerCase()] || [];
+    // Same precedence as updateVisitPlannerLastVisitDate: exact canon match
+    // preferred; only fall back to family-wide evidence if nothing exact
+    // matched this row specifically.
+    var exact = ev.filter(function(e){ return canon && e.canon === canon; });
+    var pool = exact.length ? exact : ev.filter(function(e){ return fam && e.fam === fam; });
+    var maxDate = pool.reduce(function(mx, e){ return (!mx || e.date > mx) ? e.date : mx; }, '');
+    if (maxDate && (!curH || maxDate > curH)) {
+      stale.push({ project:project, visitType:visitType, row:4+p, currentColH:curH||'(blank)', realLastVisit:maxDate });
+      if (apply) planSheet.getRange(4+p, 8).setValue(maxDate);
+    }
+  }
+  return { status:'ok', checked: planRows.length, staleCount: stale.length, applied: !!apply, stale: stale };
 }
 
 // ════════════════════════════════════════════════════════════════
