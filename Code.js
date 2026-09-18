@@ -2492,6 +2492,12 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
               : (isVisitTask(taskType) ? a.visitHours : null);
             writeHoursTaken(sheet, i+1, doneHoursTaken);
             stampSubmittedAt(sheet, i+1);
+            // VISIT_PLANNER col H updates the moment this pre-scheduled
+            // visit/meeting is marked Done via DPR, not when it's later
+            // approved — same reasoning as createDoneTask/handleDPERSubmission.
+            if (isVisitTask(taskType)) {
+              try { updateVisitPlannerLastVisitDate(a.project, taskType, actualDate); } catch(vpErr) { Logger.log('VISIT_PLANNER col H update error (status): ' + vpErr); }
+            }
           }
         }
 
@@ -4282,7 +4288,6 @@ function submitApprovals(data) {
 var PLANNER_TAB      = 'VISIT_PLANNER';
 var SITE_EXEC_TAB    = 'SITE_EXECUTION';
 var SITE_ISSUES_TAB  = 'SITE_ISSUES';
-var SITE_WA_TAB      = 'SITE_WA_MESSAGES';
 
 var VISIT_FREQ_DAYS = {'Weekly':7,'Fortnightly':14,'Monthly':30};
 var DAY_INDEX = {
@@ -5573,6 +5578,14 @@ function createDoneTask(data) {
     stampSubmittedAt(sheet, matchRow);
     var existingId = String(rows[matchRow-1][0]||'');
     Logger.log('Done task updated existing: '+member+' / '+data.taskType+' row '+matchRow+' ('+existingId+')');
+    // VISIT_PLANNER col H updates the moment a visit/meeting is logged Done,
+    // not when it's later approved -- see the matching comment in
+    // handleDPERSubmission for why (scoring stays approval-gated; this only
+    // feeds the next-visit-date fallback, so a lagging approval can't cause
+    // a duplicate visit to get scheduled for something that already happened).
+    if (isVisitTask(data.taskType) && data.project) {
+      try { updateVisitPlannerLastVisitDate(data.project, data.taskType, effDate); } catch(vpErr) { Logger.log('VISIT_PLANNER col H update error: ' + vpErr); }
+    }
     return {status:'ok', taskId:existingId, updated:true};
   }
 
@@ -5610,6 +5623,10 @@ function createDoneTask(data) {
   ]);
   writeHoursTaken(sheet, sheet.getLastRow(), hoursTaken);
   stampSubmittedAt(sheet, sheet.getLastRow());
+
+  if (isVisitTask(data.taskType) && data.project) {
+    try { updateVisitPlannerLastVisitDate(data.project, data.taskType, effDate); } catch(vpErr) { Logger.log('VISIT_PLANNER col H update error: ' + vpErr); }
+  }
 
   Logger.log('Done task created (new): '+member+' / '+data.taskType+' = '+weightedPts+'pts → '+newId);
   return {status:'ok', taskId:newId};
@@ -6422,23 +6439,6 @@ function handleDPERSubmission(data) {
       }
     }
 
-    // Write WhatsApp message to SITE_WA_MESSAGES tab
-    if (data.whatsappMsg) {
-      var waSheet = getOrCreate(SITE_WA_TAB, writeSiteWAHeaders);
-      var nonDesignIssues = issues.filter(function(iss) {
-        return iss.issueType !== 'Design';
-      });
-      waSheet.appendRow([
-        subId,
-        data.date   || dateStr(),
-        data.project|| '',
-        data.lead   || '',
-        data.onTrack|| 'Yes',
-        nonDesignIssues.length,
-        data.whatsappMsg,
-      ]);
-    }
-
     // Site Visit / Meeting / Material Selection → a completed, points-bearing
     // task for the lead (Deepak). Points use the SAME rule as DPR visit scoring:
     // Site Visit + Material Selection ×2/hr, Meeting ×1/hr.
@@ -6452,6 +6452,15 @@ function handleDPERSubmission(data) {
         visitPts = calcVisitPts(vtype, vhrs, data.lead||'', getProjectMultiplier(data.project||''));
         var vt = createDperVisitTask(data, vtype, vhrs, visitPts);
         visitTaskId = vt.taskId;
+        // VISIT_PLANNER col H updates the moment the visit is logged, not
+        // when it's later approved (2026-09, explicit request) -- this task
+        // is created Pending, and if approval lags past Monday's sync, the
+        // scheduler would otherwise fall back to a stale col H (since
+        // loadVisitHistory only counts approved visits) and could push a
+        // redundant visit for a project someone already, genuinely, visited.
+        // Scoring/points stay approval-gated as before; this only feeds the
+        // scheduling fallback, which is exactly what col H is used for.
+        try { updateVisitPlannerLastVisitDate(data.project||'', vtype, data.date||dateStr()); } catch(vpErr) { Logger.log('VISIT_PLANNER col H update error (DPER): ' + vpErr); }
         // Start/end also feeds FIELD_WORK → attendance import (Part B).
         if (data.visitStart && data.visitEnd) {
           try { appendFieldWorkRows([{date:data.date||dateStr(), member:data.lead||'', email:'',
@@ -6502,18 +6511,6 @@ function writeSiteExecutionHeaders(sheet) {
   widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
 }
 
-function writeSiteWAHeaders(sheet) {
-  var h = ['Submission ID','Date','Project Name','Execution Lead',
-            'On Track Status','Issues Count','WhatsApp Message'];
-  sheet.getRange(1,1,1,h.length).setValues([h])
-    .setBackground('#1B5E20').setFontColor('#FFFFFF')
-    .setFontWeight('bold').setFontSize(10);
-  sheet.setFrozenRows(1);
-  var widths = [140,100,200,160,140,100,600];
-  widths.forEach(function(w,i){ sheet.setColumnWidth(i+1,w); });
-  // Set col G to wrap text
-  sheet.getRange(1,7,1000,1).setWrap(true);
-}
 
 function writeSiteIssuesHeaders(sheet) {
   var h = ['Issue ID','Submission ID','Date','Project Name','Issue #',
