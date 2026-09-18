@@ -1041,7 +1041,8 @@ function sendPrivateDirectorNote(data, authEmail) {
 }
 // Actions used ONLY by the approval form / weekly report (verified not shared
 // with the dashboard) — callable by managers only.
-var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1,
+var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStats:1, getDperProjectFreshness:1,
+  getOpenActionItems:1, assignDecisionLogItem:1, setDecisionLogStatus:1,
   getPendingTasks:1, getBlockRequests:1, getMeetingApprovals:1, getBillRequests:1,
   submitApprovals:1, approveMeetingLog:1, disposeBillRequest:1, getBillRequestsWithBilling:1, getWeeklyProjectDigest:1, getAllMeetingLogs:1, getMeetingLogForEdit:1,
   getMemberReview:1, importAttendance:1, getLateRequests:1, getMemberAttendance:1, getBulkAttendance:1, getFieldWorkForRange:1,
@@ -1053,6 +1054,11 @@ var MANAGER_ONLY = { getWeeklyStats:1, getDeepakWeeklyStats:1, getAmanWeeklyStat
 // EPIC K — unified Site Visit / Meeting log → AI-polished → lead-approved cumulative client PDF
 var MEETING_LOG_TAB  = 'MEETING_LOG';   // one row per visit/meeting
 var DECISION_LOG_TAB = 'DECISION_LOG';  // one row per action item
+// Col J (TaskID) added 2026-09 for cross-project Open Action Items tracking —
+// blank on old rows and on items that never got a task (Client/Contractor/
+// Other, or an IDS item logged without an owner); migrateDecisionLogColumns
+// backfills just the header on sheets created before this existed.
+var DECISION_LOG_HEADERS = ['Item ID','Log ID','Project','Date','Category','Owner','Task','Deadline','Status','TaskID'];
 var FIELD_WORK_TAB   = 'FIELD_WORK';    // one row per field engagement (visit/meeting/material selection) with start/end → feeds attendance (Part B)
 var ATTENDANCE_TAB   = 'ATTENDANCE';    // biometric (Paytime) import — one row per member+date, upserted on re-import
 var LATE_REQ_TAB      = 'LATE_REQUESTS'; // self-reported "running late, approved" — replaces the WhatsApp workflow
@@ -1542,6 +1548,8 @@ function doGet(e) {
   if (action === 'getDeepakVisitSummary')    return safeRespond(function() { return getDeepakVisitSummary(p.weekStart||''); });
   if (action === 'getCalendarData')          return safeRespond(getCalendarData);
   if (action === 'getDeepakWeeklyStats')     return safeRespond(function(){ return getDeepakWeeklyStats(p.weekStart||''); });
+  if (action === 'getDperProjectFreshness')  return safeRespond(getDperProjectFreshness);
+  if (action === 'getOpenActionItems')       return safeRespond(getOpenActionItems);
   if (action === 'getAmanWeeklyStats')       return safeRespond(function(){ return getAmanWeeklyStats(p.weekStart||''); });
   if (action === 'getLeadsAnalytics')        return safeRespond(function(){ return getLeadsAnalytics(p.month||''); });
   if (action === 'getFeedbackAnalytics')     return safeRespond(function(){ return getFeedbackAnalytics(p.month||''); });
@@ -1677,6 +1685,10 @@ function doPost(e) {
         ? cachedSafeRespond('wr_dws_'+(data.weekStart||''), 21600, function(){ return getDeepakWeeklyStats(data.weekStart||''); })
         : respond(getDeepakWeeklyStats(data.weekStart||''));
     }
+    if (data.action === 'getDperProjectFreshness') return respond(getDperProjectFreshness());
+    if (data.action === 'getOpenActionItems')      return respond(getOpenActionItems());
+    if (data.action === 'assignDecisionLogItem')   return respond(withLock(function(){ return assignDecisionLogItem(data, authEmail); }));
+    if (data.action === 'setDecisionLogStatus')    return respond(setDecisionLogStatus(data));
     if (data.action === 'getAmanWeeklyStats') {
       var awsSat = addDaysToStr(data.weekStart||'', 5);
       return isPastDate(awsSat)
@@ -3265,9 +3277,23 @@ function checkVisitTimingMatch(member, project, date, time, endTime){
   return {checked:true, matched:true, fieldWorkStart:best.start, fieldWorkEnd:best.end};
 }
 function writeDecisionLogHeaders(sheet){
-  var h=['Item ID','Log ID','Project','Date','Category','Owner','Task','Deadline','Status'];
-  sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
+  sheet.getRange(1,1,1,DECISION_LOG_HEADERS.length).setValues([DECISION_LOG_HEADERS])
+    .setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
+}
+function migrateDecisionLogColumns(sheet){
+  if (!sheet) return;
+  var lastCol = sheet.getLastColumn();
+  if (lastCol >= DECISION_LOG_HEADERS.length) return;
+  var have = lastCol > 0
+    ? sheet.getRange(1,1,1,lastCol).getValues()[0].map(function(x){ return String(x||'').trim(); })
+    : [];
+  for (var c = 0; c < DECISION_LOG_HEADERS.length; c++) {
+    if (have[c] !== DECISION_LOG_HEADERS[c]) {
+      sheet.getRange(1, c+1).setValue(DECISION_LOG_HEADERS[c])
+        .setBackground('#1F3A5F').setFontColor('#FFFFFF').setFontWeight('bold');
+    }
+  }
 }
 
 // AI polish via Claude Haiku 4.5. Returns {body, items:{id:text}, whatChanged} or null
@@ -3368,12 +3394,13 @@ function submitMeetingLog(data, authEmail){
 
   // Decision items → DECISION_LOG (store polished text where available); IDS items → tasks
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  migrateDecisionLogColumns(decSheet);
   flat.forEach(function(f){
-    decSheet.appendRow([ f.itemId, logId, project, day, f.cat, f.owner, f.textPolished||f.text, f.deadline, 'Open' ]);
+    var autoTaskId = '';
     if (f.cat === 'IDS' && f.owner && !data.skipTasks){
       var assignee = resolveAssignee(f.owner, project) || f.owner;
-      var taskId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
-      aSheet.appendRow([ taskId, '', project, assignee, 'MoM Action', 1, 1, 1, 1, day,
+      autoTaskId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
+      aSheet.appendRow([ autoTaskId, '', project, assignee, 'MoM Action', 1, 1, 1, 1, day,
         f.deadline || addDaysToStr(day,3),
         f.textPolished||f.text,                    // L Description (action item text)
         '', 'Not Started', '', '', 'Pending', '', '', '',
@@ -3381,6 +3408,7 @@ function submitMeetingLog(data, authEmail){
         loggedBy+' (MoM)', 'Medium' ]);
       parkRowIfStalled(aSheet, project);
     }
+    decSheet.appendRow([ f.itemId, logId, project, day, f.cat, f.owner, f.textPolished||f.text, f.deadline, 'Open', autoTaskId ]);
   });
 
   // Register as a client connection so it shows on the projects dashboard
@@ -3489,6 +3517,88 @@ function openDecisionsText(project){
     out.push('- ['+String(rows[i][4]||'')+'] '+String(rows[i][6]||'')+(rows[i][7]?(' (due '+cellDate(rows[i][7])+')'):''));
   }
   return out.slice(-30).join('\n');
+}
+
+// Cross-project view of every DECISION_LOG item not yet Done — Client/
+// Contractor/Other items and owner-less IDS items never got a task at
+// logging time (only 'IDS'+owner did, in submitMeetingLog), so until now
+// they only ever surfaced per-project via getProjectDetail. This is the
+// single place to see everything still open across every project.
+function getOpenActionItems(){
+  var sheet = db().getSheetByName(DECISION_LOG_TAB);
+  if (!sheet || sheet.getLastRow() < 2) return { items: [] };
+  migrateDecisionLogColumns(sheet);
+  var rows = sheet.getRange(2, 1, sheet.getLastRow()-1, DECISION_LOG_HEADERS.length).getValues();
+  var items = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var status = String(r[8]||'').trim() || 'Open';
+    if (status === 'Done') continue;
+    items.push({
+      itemId: String(r[0]||''), logId: String(r[1]||''), project: String(r[2]||''),
+      date: cellDate(r[3]), category: String(r[4]||''), owner: String(r[5]||''),
+      task: String(r[6]||''), deadline: String(r[7]||''), status: status,
+      taskId: String(r[9]||''),
+    });
+  }
+  items.sort(function(a, b){ return (b.date||'').localeCompare(a.date||''); });
+  return { items: items };
+}
+
+// Late owner-assignment: an item that had no owner (or wasn't IDS category,
+// so never got a task) can be assigned a real task now, from the cross-
+// project view above. Refuses to double-assign a row that already has a
+// TaskID. Mirrors submitMeetingLog's own auto-task shape exactly (same
+// 'MoM Action' 1-pt convention) so it scores/approves identically.
+function assignDecisionLogItem(data, authEmail){
+  var sheet = db().getSheetByName(DECISION_LOG_TAB);
+  if (!sheet) return { status:'error', message:'DECISION_LOG not found' };
+  migrateDecisionLogColumns(sheet);
+  var itemId = String(data.itemId||'').trim();
+  var owner  = String(data.owner||'').trim();
+  var deadline = String(data.deadline||'').trim();
+  if (!itemId || !owner) return { status:'error', message:'itemId and owner required' };
+  var rows = sheet.getDataRange().getValues();
+  var rIdx = -1;
+  for (var i = 1; i < rows.length; i++) { if (String(rows[i][0]||'') === itemId) { rIdx = i; break; } }
+  if (rIdx < 0) return { status:'error', message:'item not found' };
+  var r = rows[rIdx];
+  if (String(r[9]||'').trim()) return { status:'error', message:'already assigned (Task '+r[9]+')' };
+  var project = String(r[2]||'').trim();
+  var day = cellDate(r[3]) || dateStr();
+  var taskText = String(r[6]||'');
+  var assignee = resolveAssignee(owner, project) || owner;
+  var taskId = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
+  var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  aSheet.appendRow([ taskId, '', project, assignee, 'MoM Action', 1, 1, 1, 1, day,
+    deadline || addDaysToStr(day, 3), taskText, '', 'Not Started', '', '', 'Pending', '', '', '',
+    '[Late-assigned from Open Action Items]', (authEmail||'')+' (late-assign)', 'Medium' ]);
+  parkRowIfStalled(aSheet, project);
+  sheet.getRange(rIdx+1, 6).setValue(owner);
+  if (deadline) sheet.getRange(rIdx+1, 8).setValue(deadline);
+  sheet.getRange(rIdx+1, 10).setValue(taskId);
+  return { status:'ok', taskId: taskId };
+}
+
+// Manual status control for items that don't need/get a task (Client/
+// Contractor/Other, or an IDS item the team decided not to formally
+// assign) — the only way those were ever closed out before was silently
+// never, since nothing else in this codebase writes to DECISION_LOG col I.
+function setDecisionLogStatus(data){
+  var sheet = db().getSheetByName(DECISION_LOG_TAB);
+  if (!sheet) return { status:'error', message:'DECISION_LOG not found' };
+  var itemId = String(data.itemId||'').trim();
+  var newStatus = String(data.status||'').trim();
+  var valid = { Open:1, Done:1, Revised:1, Carried:1 };
+  if (!itemId || !valid[newStatus]) return { status:'error', message:'itemId and a valid status required' };
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]||'') === itemId) {
+      sheet.getRange(i+1, 9).setValue(newStatus);
+      return { status:'ok' };
+    }
+  }
+  return { status:'error', message:'item not found' };
 }
 
 // Pending lead approvals — for the approval form
@@ -7627,6 +7737,66 @@ function getDeepakVisitSummary(weekStart) {
 //   Punctuality      /20 — same base as team (biometric)
 //   Hours            /15 — same base as team (biometric)
 // ════════════════════════════════════════════════════════════════
+// Scans ALL columns of CONFIG for the "DEEPAK ACTIVE PROJECTS" header (it
+// lives in col T, not col A), then reads names down that same column until
+// blank. Shared by getDeepakWeeklyStats, getDperProjectFreshness, getWeeklyDiag.
+function getDeepakActiveProjectsList() {
+  var configSheet = db().getSheetByName(CONFIG_TAB);
+  var activeProjects = [];
+  if (!configSheet) return activeProjects;
+  var cRows = configSheet.getDataRange().getValues();
+  var hdrRow = -1, hdrCol = -1;
+  for (var hr = 0; hr < cRows.length && hdrRow === -1; hr++) {
+    for (var hc = 0; hc < cRows[hr].length; hc++) {
+      if (String(cRows[hr][hc] || '').trim().toUpperCase() === 'DEEPAK ACTIVE PROJECTS') {
+        hdrRow = hr; hdrCol = hc; break;
+      }
+    }
+  }
+  if (hdrRow > -1) {
+    for (var ci = hdrRow + 1; ci < cRows.length; ci++) {
+      var cell = String((cRows[ci] || [])[hdrCol] || '').trim();
+      if (!cell) break;
+      activeProjects.push(cell);
+    }
+  }
+  return activeProjects;
+}
+
+// Per-project "last DPER update" freshness -- an at-a-glance view of which
+// of Deepak's active projects haven't had a SITE_EXECUTION entry in a
+// while, the same idea as VISIT_PLANNER col H but for his daily site
+// reports. Sorted worst-first (never-updated, then oldest last-update).
+function getDperProjectFreshness() {
+  var activeProjects = getDeepakActiveProjectsList();
+  var lastDate = {};
+  var execSheet = db().getSheetByName(SITE_EXEC_TAB);
+  if (execSheet && execSheet.getLastRow() > 1) {
+    var eRows = execSheet.getDataRange().getValues();
+    for (var i = 1; i < eRows.length; i++) {
+      var eLead = String(eRows[i][4] || '').trim().toLowerCase();
+      if (eLead.indexOf('deepak') === -1) continue;
+      var eDate = cellDate(eRows[i][1]);
+      var eProj = String(eRows[i][3] || '').trim();
+      if (!eDate || !eProj) continue;
+      var k = eProj.toLowerCase();
+      if (!lastDate[k] || eDate > lastDate[k]) lastDate[k] = eDate;
+    }
+  }
+  var today = todayStr();
+  var rows = activeProjects.map(function(proj){
+    var d = lastDate[proj.toLowerCase()] || '';
+    return { project: proj, lastUpdate: d || null, daysSince: d ? diffDays(d, today) : null };
+  });
+  rows.sort(function(a, b){
+    if (a.daysSince === null && b.daysSince === null) return 0;
+    if (a.daysSince === null) return -1;
+    if (b.daysSince === null) return 1;
+    return b.daysSince - a.daysSince;
+  });
+  return { today: today, rows: rows };
+}
+
 function getDeepakWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
@@ -7644,28 +7814,7 @@ function getDeepakWeeklyStats(weekStart) {
   var doneUpper0 = rawUpper0 > sun0 ? rawUpper0 : sun0;
 
   // ── 1. Read active projects from CONFIG tab ───────────────
-  // Scans ALL columns for the "DEEPAK ACTIVE PROJECTS" header (it lives in
-  // col T, not col A), then reads names down that same column until blank.
-  var activeProjects = [];
-  var configSheet = s.getSheetByName(CONFIG_TAB);
-  if (configSheet) {
-    var cRows = configSheet.getDataRange().getValues();
-    var hdrRow = -1, hdrCol = -1;
-    for (var hr = 0; hr < cRows.length && hdrRow === -1; hr++) {
-      for (var hc = 0; hc < cRows[hr].length; hc++) {
-        if (String(cRows[hr][hc] || '').trim().toUpperCase() === 'DEEPAK ACTIVE PROJECTS') {
-          hdrRow = hr; hdrCol = hc; break;
-        }
-      }
-    }
-    if (hdrRow > -1) {
-      for (var ci = hdrRow + 1; ci < cRows.length; ci++) {
-        var cell = String((cRows[ci] || [])[hdrCol] || '').trim();
-        if (!cell) break;
-        activeProjects.push(cell);
-      }
-    }
-  }
+  var activeProjects = getDeepakActiveProjectsList();
   var totalSites = activeProjects.length;
 
   // ── 2. Scan SITE_EXECUTION for this week ─────────────────
