@@ -192,13 +192,13 @@ function restoreDraft(){
   d.blocks.forEach(bd=>{
     addBlock();
     const block=document.getElementById('block-'+blockCount);
-    if(bd.project){ const ps=block.querySelector('.b-project'); ps.value=bd.project; ps.dispatchEvent(new Event('change')); onBlockProject(block.id); }
-    if(bd.member){ const ms=block.querySelector('.b-member'); ms.value=bd.member; ms.dispatchEvent(new Event('change')); }
+    if(bd.project){ const ps=block.querySelector('.b-project'); ps.value=bd.project; ps.dispatchEvent(new Event('change',{bubbles:true})); onBlockProject(block.id); }
+    if(bd.member){ const ms=block.querySelector('.b-member'); ms.value=bd.member; ms.dispatchEvent(new Event('change',{bubbles:true})); }
     block.querySelectorAll('.b-rows .trow').forEach(r=>r.remove());   // drop the default empty row
     (bd.rows||[]).forEach(rd=>{
       addRow(block.id);
       const tr=block.querySelector('.b-rows .trow:last-child');
-      if(rd.stage){ const ss=tr.querySelector('.r-stage'); ss.value=rd.stage; ss.dispatchEvent(new Event('change')); }
+      if(rd.stage){ const ss=tr.querySelector('.r-stage'); ss.value=rd.stage; ss.dispatchEvent(new Event('change',{bubbles:true})); }
       tr.querySelector('.r-units').value=rd.units||'1';
       tr.querySelector('.r-deadline').value=rd.deadline||'';
       tr.querySelector('.r-desc').value=rd.desc||'';
@@ -276,7 +276,7 @@ function addRow(blockId){
   row.className = 'trow';
   row.innerHTML = `
     <div class="trow-top">
-      <select class="r-stage" onchange="onRowStage(this)">${stageOpts}</select>
+      <select class="r-stage" onchange="onRowStage(this)"><option value="">Select stage…</option>${stageOpts}</select>
       <input type="number" class="r-units" value="1" min="1" onchange="onRowStage(this)" title="Units">
       <input type="date" class="r-deadline" oninput="updateCount()" title="Deadline">
       <span class="pts-badge r-pts">—</span>
