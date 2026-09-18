@@ -1683,6 +1683,14 @@ function doPost(e) {
         ? cachedSafeRespond('wr_aws_'+(data.weekStart||''), 21600, function(){ return getAmanWeeklyStats(data.weekStart||''); })
         : respond(getAmanWeeklyStats(data.weekStart||''));
     }
+    // Manual catch-up for VISIT_PLANNER col H -- covers any visit/meeting
+    // logged before the 2026-09 instant-update fix (or through some future
+    // path that isn't hooked yet), without needing to touch TASK_ASSIGNMENTS.
+    if (data.action === 'backfillVisitPlannerLastDate') {
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
+      updateVisitPlannerLastVisitDate(data.project||'', data.taskType||'', data.date||'');
+      return respond({status:'ok'});
+    }
     if (data.action === 'setTeamWeeklyTarget') {
       if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
       var stwtRes = setTeamWeeklyTarget(data.member||'', data.target);
@@ -3343,6 +3351,14 @@ function submitMeetingLog(data, authEmail){
   // Register as a client connection so it shows on the projects dashboard
   appendConnections(loggedBy, day, [{ project:project, type:type, notes:'Logged '+type+(data.clientAttendees?(' with '+data.clientAttendees):'') }], logId);
 
+  // VISIT_PLANNER col H updates the moment this log is submitted -- meetlog.html
+  // is a third real path a site visit/meeting gets recorded through (alongside
+  // DPR Field Work and DPER), and unlike those two it doesn't even create a
+  // Done visit-type task for the visit itself (only IDS-owned action items
+  // become tasks) -- so without this hook, a meeting logged only here never
+  // touched col H at all, silently, no matter what.
+  try { updateVisitPlannerLastVisitDate(project, type, day); } catch(vpErr) { Logger.log('VISIT_PLANNER col H update error (meetlog): ' + vpErr); }
+
   // Return the AI-polished content so the author can review/edit it before the
   // shareable PDF is generated (Option A — review-then-generate).
   return { status:'ok', logId:logId, polished: !!polished, bodyPolished: bodyPolished,
@@ -4607,30 +4623,57 @@ function getEffectiveLastVisitDate(entry, history) {
 }
 
 // Keeps VISIT_PLANNER col H (manual "Last Site Visit Date") in sync the
-// moment a visit/meeting task is approved, instead of only ever being
-// updated by hand. Scheduling itself doesn't strictly depend on this (it
-// already prefers real approved history via loadVisitHistory/
-// getEffectiveLastVisitDate above) -- this is so the sheet itself is
-// trustworthy to read directly, per explicit request (2026-09). Only moves
-// the date FORWARD (never overwrites a newer manual/approved date with an
-// older one, e.g. if a backlog approval lands after a more recent visit
-// already updated it) and matches project+visitType only (not assignee --
-// "last visit" is per project+type, a VISIT_PLANNER row can list several
-// assignees in col C).
+// moment a visit/meeting task is logged, instead of only ever being updated
+// by hand. Scheduling itself doesn't strictly depend on this (it already
+// prefers real approved history via loadVisitHistory/getEffectiveLastVisitDate
+// above) -- this is so the sheet itself is trustworthy to read directly, per
+// explicit request (2026-09). Only moves the date FORWARD (never overwrites a
+// newer manual/approved date with an older one) and matches project+visitType
+// only (not assignee -- "last visit" is per project+type, a VISIT_PLANNER row
+// can list several assignees in col C).
+//
+// 2026-09 fix: was exact-canonical-match only (normaliseVisitType), which
+// silently did nothing for the generic labels DPR Field Work and meetlog.html
+// actually send ("Site Visit", "Meeting" -- no discipline). Confirmed live:
+// a real "Site Visit" logged for a project whose only VISIT_PLANNER row is
+// "Site Visit (Architecture)" should have matched (generic defaults to Arch)
+// but a *different* real case -- a project's only entry being
+// "Site Visit (Interiors)" -- would have silently missed forever, no error,
+// nothing to notice. Now tries the exact match first (precise when the
+// logged type IS discipline-specific), and if nothing matched, falls back to
+// ANY row for that project in the same rate family (site vs meeting, via
+// visitFamily -- the same helper createDoneTask already uses to reconcile
+// these exact two label shapes). Family fallback can update more than one
+// row if a project genuinely has both an Architecture and an Interiors entry
+// and the log was generic -- an occasional too-broad update is a far smaller
+// problem than the silent no-op this replaces.
 function updateVisitPlannerLastVisitDate(project, taskType, visitDateStr) {
   if (!project || !visitDateStr) return;
   var canon = normaliseVisitType(taskType);
-  if (!canon) return; // not a visit/meeting task type at all
+  var fam = visitFamily(taskType);
+  if (!canon && !fam) return; // not a visit/meeting task type at all
   var sheet = db().getSheetByName(PLANNER_TAB);
   if (!sheet || sheet.getLastRow() <= 3) return;
   var rows = sheet.getRange(4, 1, sheet.getLastRow()-3, 8).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    var rProj = String(rows[i][0]||'').trim();
-    if (rProj !== project) continue;
-    if (normaliseVisitType(rows[i][1]) !== canon) continue;
+
+  function applyTo(i) {
     var curH = cellDate(rows[i][7]);
-    if (!curH || visitDateStr > curH) {
-      sheet.getRange(4+i, 8).setValue(visitDateStr);
+    if (!curH || visitDateStr > curH) sheet.getRange(4+i, 8).setValue(visitDateStr);
+  }
+
+  var matched = false;
+  if (canon) {
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]||'').trim() !== project) continue;
+      if (normaliseVisitType(rows[i][1]) !== canon) continue;
+      applyTo(i); matched = true;
+    }
+  }
+  if (!matched && fam) {
+    for (var j = 0; j < rows.length; j++) {
+      if (String(rows[j][0]||'').trim() !== project) continue;
+      if (visitFamily(rows[j][1]) !== fam) continue;
+      applyTo(j);
     }
   }
 }
@@ -9262,9 +9305,15 @@ function writeBilling(subId, today, finance) {
       sheet.getRange(targetRow+1, 9).setValue(status);        // I Status
       data[targetRow][5] = recd; data[targetRow][8] = status;
     } else {
-      // Payment with no matching bill — record as its own row
+      // Payment with no matching bill (no invoice match, no unpaid bill on
+      // record for the project) — record as its own row. Bill Date used to
+      // be left blank here since no actual bill exists for this row -- but
+      // an empty date read as "forgot to fill it in" rather than "this is a
+      // standalone payment," so it now takes the date this payment was
+      // punched into CRM (same as every real bill's date already does) —
+      // Status makes clear it's a payment-only row regardless.
       var pid = nextId(sheet, 'BILL-');
-      prependRow(sheet, [ pid, p.invoice || '', p.project || '', '', '', amt, today, '', 'Payment (no bill)', subId ]);
+      prependRow(sheet, [ pid, p.invoice || '', p.project || '', today, '', amt, today, '', 'Payment (no bill)', subId ]);
     }
   });
 
