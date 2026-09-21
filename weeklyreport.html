@@ -426,26 +426,11 @@ function scoreCalc(m, taskData, bioOverride, weekStartOverride) {
   const dprDen = Math.max(1, presentDays);
   const s_dpr = dprNA ? null : dprScore(effectiveDprDays, bio);
 
-  // Punctuality /10 (was /15) — rescaled from its own /15 native tiers, with
-  // the absent-day penalty applied. Trimmed 2026-08 to fund Planning below —
-  // less weight on attendance/hours, more on whether work gets planned ahead.
-  const s_punct = Math.round(adjPunct(bio) / 15 * 10 * 10) / 10;
-
-  // Hours /7 (was /10) — same rescale approach.
-  const s_hrs = Math.round(adjHrs(bio) / 10 * 7 * 10) / 10;
-
-  // Planning /8 (new) — share of this week's approved points that came from
-  // PLANNED tasks (assigned ahead of time with a real deadline) rather than
-  // "Unplanned Work" self-logged after the fact. createDoneTask stamps a
-  // same-day deadline on unplanned tasks, so they can never be late by
-  // construction — full credit toward Output with zero Reliability risk,
-  // which was quietly making planning optional. An empty week (nothing
-  // approved) gets full marks — nothing on record to hold against them.
-  const approvedPtsForPlanning = taskData.approvedPts || 0;
-  const plannedPts = taskData.plannedPts != null ? taskData.plannedPts : approvedPtsForPlanning;
-  const s_planning = approvedPtsForPlanning > 0
-    ? Math.round(Math.min(1, plannedPts / approvedPtsForPlanning) * 8 * 10) / 10
-    : 8;
+  // Punctuality /15 and Hours /10 — Planning /8 was removed 2026-09 and its
+  // points went back here, as before Planning existed (team: 50+15+15+10+10).
+  const s_punct = Math.round(adjPunct(bio) * 10) / 10;
+  const s_hrs = Math.round(adjHrs(bio) * 10) / 10;
+  const plannedPts = taskData.plannedPts != null ? taskData.plannedPts : approvedPts;
 
   // Reliability /10 — 10 minus delay penalties (−1 late, −2 reassigned)
   const s_reliability = Math.max(0, Math.round((10 - (taskData.reliabilityPenalty || 0)) * 10) / 10);
@@ -453,9 +438,9 @@ function scoreCalc(m, taskData, bioOverride, weekStartOverride) {
   // A just-joined member (dprNA) gets no Total at all — not a rescaled
   // number, not a ranked score. There isn't enough of a track record yet
   // to fold into one figure, so it's left blank rather than guessed at.
-  const total = dprNA ? null : Math.round((s_output + s_dpr + s_punct + s_hrs + s_planning + s_reliability) * 10) / 10;
+  const total = dprNA ? null : Math.round((s_output + s_dpr + s_punct + s_hrs + s_reliability) * 10) / 10;
 
-  return {s_output, s_dpr, s_punct, s_hrs, s_planning, s_reliability, dprNA,
+  return {s_output, s_dpr, s_punct, s_hrs, s_reliability, dprNA,
           unplannedPts: taskData.unplannedPts||0, plannedPts,
           reliabilityPenalty: taskData.reliabilityPenalty||0, lateCount: taskData.lateCount||0, workNotDone: taskData.workNotDone||0,
           total, tgt, approvedPts,
@@ -523,7 +508,8 @@ function buildOverviewPage(team){
     // Planning column shows Client Satisfaction instead (their work is
     // reactive, not pre-assigned deadline tasks — see 2026-08 revert).
     const isSpecial = m._isDeepak || m._isAman;
-    const planCol = isSpecial ? s.s_client_sat : s.s_planning;
+    const punctMax = isSpecial ? 10 : 15, hrsMax = isSpecial ? 7 : 10;
+    const csCol = isSpecial ? s.s_client_sat : null;
     // Deepak's Output caps at /35 (Client Comm /10 + Issue Reporting /5 fill
     // the rest of the 50 team members' Output alone covers).
     const outMax = m._isDeepak ? 35 : 50;
@@ -532,9 +518,9 @@ function buildOverviewPage(team){
       <td><div class="mn">${m.name}</div><div class="mr">${m._isDeepak?'Execution Lead':m._isAman?'CRM · Client Relations':ROLES[m.name]||''}</div></td>
       <td><div class="sv" style="color:${sc(s.s_output,outMax)}" contenteditable="true">${s.s_output}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_output/outMax*100))}%;background:${sc(s.s_output,outMax)}"></div></div></td>
       <td>${s.dprNA ? `<div class="sv" style="color:#8A8378">N/A</div><div class="mb"><div class="mb-i" style="width:0%"></div></div>` : `<div class="sv" style="color:${sc(s.s_dpr,15)}" contenteditable="true">${s.s_dpr}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_dpr/15*100))}%;background:${sc(s.s_dpr,15)}"></div></div>`}</td>
-      <td><div class="sv" style="color:${sc(s.s_punct,10)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/10*100))}%;background:${sc(s.s_punct,10)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(s.s_hrs,7)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/7*100))}%;background:${sc(s.s_hrs,7)}"></div></div></td>
-      <td><div class="sv" style="color:${sc(planCol,8)}">${planCol}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(planCol/8*100))}%;background:${sc(planCol,8)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_punct,punctMax)}">${s.s_punct}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_punct/punctMax*100))}%;background:${sc(s.s_punct,punctMax)}"></div></div></td>
+      <td><div class="sv" style="color:${sc(s.s_hrs,hrsMax)}">${s.s_hrs}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_hrs/hrsMax*100))}%;background:${sc(s.s_hrs,hrsMax)}"></div></div></td>
+      <td>${csCol==null?`<div class="sv" style="color:#8A8378">—</div>`:`<div class="sv" style="color:${sc(csCol,8)}">${csCol}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(csCol/8*100))}%;background:${sc(csCol,8)}"></div></div>`}</td>
       <td><div class="sv" style="color:${sc(s.s_reliability,10)}">${s.s_reliability}</div><div class="mb"><div class="mb-i" style="width:${Math.min(100,Math.round(s.s_reliability/10*100))}%;background:${sc(s.s_reliability,10)}"></div></div></td>
       <td>${s.total==null ? `<div class="sv" style="color:#A8540C;font-size:16px;">N/A</div>` : `<div class="sv" style="color:${col};font-size:23px;" contenteditable="true">${s.total}</div>`}</td>
       <td>${statusChip(s)}</td>
@@ -549,9 +535,9 @@ function buildOverviewPage(team){
         <th style="width:28px">#</th><th style="width:145px">Member</th>
         <th>Output<br><span style="opacity:.5">/50 · Execution: Visit+Client+Tasks+Issues</span></th>
         <th>DPR<br><span style="opacity:.5">/15</span></th>
-        <th>Punctuality<br><span style="opacity:.5">/10</span></th>
-        <th>Hours<br><span style="opacity:.5">/7</span></th>
-        <th>Planning<br><span style="opacity:.5">/8 · Deepak/Aman: Client Sat.</span></th>
+        <th>Punctuality<br><span style="opacity:.5">/15 · Deepak/Aman /10</span></th>
+        <th>Hours<br><span style="opacity:.5">/10 · Deepak/Aman /7</span></th>
+        <th>Client Sat.<br><span style="opacity:.5">/8 · Deepak/Aman only</span></th>
         <th>Reliability<br><span style="opacity:.5">/10</span></th>
         <th>Total<br><span style="opacity:.5">/100</span></th>
         <th>Status</th>
@@ -761,9 +747,8 @@ function buildIndividualPage(m, taskData){
     <div class="pg">
       ${paramCard('Output<br>Approved Pts',s.s_output,50,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,s.dprNA?'Newly joined — not yet onboarded to DPR filing':`${s.dprDays} of ${s.dprDen} working days filed`,s.dprNA)}
-      ${paramCard('Punctuality<br>Biometric',s.s_punct,10,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
-      ${paramCard('Hours<br>Biometric',s.s_hrs,7,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
-      ${paramCard('Planning',s.s_planning,8,s.approvedPts>0?`${s.plannedPts} of ${s.approvedPts} approved pts were planned ahead (not self-logged "Unplanned Work")`:'No approved work this week to judge')}
+      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
+      ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
       ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 

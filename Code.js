@@ -1728,7 +1728,10 @@ function doPost(e) {
         var assignedTo = String(vals[3]||'').trim();
         var selfStatus = String(vals[13]||'').trim();
         var approved = String(vals[16]||'').trim();
-        if (assignedTo !== cctMember || selfStatus !== 'Done' || approved !== 'Yes') {
+        // allowPending: also fix rows still awaiting approval (never Rejected) --
+        // e.g. visits filed late for a week that are being re-dated into it before approval.
+        var cctApprovedOk = approved === 'Yes' || (data.allowPending === true && approved === 'Pending');
+        if (assignedTo !== cctMember || selfStatus !== 'Done' || !cctApprovedOk) {
           cctResults.push({row:r, ok:false, reason:'not Done+Approved for '+cctMember+' (found: '+assignedTo+'/'+selfStatus+'/'+approved+')'});
           return;
         }
@@ -1737,6 +1740,27 @@ function doPost(e) {
         cctResults.push({row:r, ok:true, project:String(vals[2]||''), taskType:String(vals[4]||'')});
       });
       return respond({status:'ok', results:cctResults});
+    }
+    // Re-dates specific SITE_EXECUTION (DPER) rows filed on the wrong day --
+    // e.g. a Monday filing that actually reports the previous week. Every row
+    // must currently carry the stated oldDate and the stated lead, or it's skipped.
+    if (data.action === 'correctSiteExecDates') {
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
+      var cseSheet = db().getSheetByName(SITE_EXEC_TAB);
+      var cseOld = String(data.oldDate||'').trim(), cseNew = String(data.newDate||'').trim();
+      var cseLead = String(data.lead||'').trim().toLowerCase();
+      var cseRows = data.rows||[], cseRes = [];
+      if (!cseSheet || !cseOld || !cseNew || !cseLead || !cseRows.length) return respond({status:'error', message:'rows[], oldDate, newDate, lead required'});
+      cseRows.forEach(function(rn){
+        var r = parseInt(rn, 10);
+        if (!r || r < 2) { cseRes.push({row:rn, ok:false, reason:'invalid row'}); return; }
+        var v = cseSheet.getRange(r, 1, 1, 5).getValues()[0];
+        var d0 = cellDate(v[1]), lead0 = String(v[4]||'').trim().toLowerCase();
+        if (d0 !== cseOld || lead0.indexOf(cseLead) === -1) { cseRes.push({row:r, ok:false, reason:'found '+d0+' / '+lead0}); return; }
+        cseSheet.getRange(r, 2).setValue(cseNew);
+        cseRes.push({row:r, ok:true, project:String(v[3]||'')});
+      });
+      return respond({status:'ok', results:cseRes});
     }
     if (data.action === 'setTeamWeeklyTarget') {
       if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'});
