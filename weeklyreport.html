@@ -264,10 +264,10 @@ function adjHrs(bio){   const ab=Math.max(0,WEEK_DAYS-((bio&&bio.days)!=null?bio
 function dprScore(daysFiled, bio){ const den=Math.max(1, (bio&&bio.days!=null)?bio.days:WEEK_DAYS); return Math.min(15, Math.round(Math.min(daysFiled||0, den)/den*15*10)/10); }
 
 // ── Team ─────────────────────────────────────────────────
+// Aashi Agrawal and Achal Rathore exited the firm 2026-09-22 — removed from
+// the roster so they no longer get a row/page in the weekly report.
 const ROLES = {
   'Aaditya Koshti'  : 'Junior Architect',
-  'Aashi Agrawal'   : 'Junior ID',
-  'Achal Rathore'   : 'Technical Lead',
   'Bhavesh Bhagwat' : 'Junior Architect',
   'Himanshu Malviya': 'Technical Lead',
   'Poorvi Goyal'    : 'Junior Architect',
@@ -277,7 +277,7 @@ const ROLES = {
 };
 
 const TARGETS = {
-  'Aaditya Koshti':48, 'Aashi Agrawal':48, 'Achal Rathore':72,
+  'Aaditya Koshti':48,
   'Bhavesh Bhagwat':60, 'Himanshu Malviya':72,
   'Poorvi Goyal':48, 'Sahil Maurya':60, 'Kritika Kaushik':48,
   'Shreyas Chourasia':48,
@@ -1093,7 +1093,7 @@ async function loadAndRender(){
         s_output: ds.s_output||0,
         s_dpr   : ds.s_dper,
         s_punct : ds.s_punct,
-        s_hrs   : ds.s_hrs,
+        s_hrs   : ds.s_hrs,
         s_reliability: ds.s_reliability,
         total   : ds.total,
       },
@@ -1122,7 +1122,7 @@ async function loadAndRender(){
         s_output: as.output,
         s_dpr   : as.s_dpr,
         s_punct : as.s_punct,
-        s_hrs   : as.s_hrs,
+        s_hrs   : as.s_hrs,
         s_reliability: as.s_reliability,
         total   : as.total,
       },

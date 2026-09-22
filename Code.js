@@ -1110,7 +1110,7 @@ function writeBlockLogHeaders(sheet){
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#8B2020').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
 }
-var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Khushi Gupta'];  // departed, or (Khushi Gupta) an unpaid intern learning at her own pace, not tracked — hidden from all forms & dashboards
+var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Khushi Gupta', 'Aashi Agrawal', 'Achal Rathore'];  // departed, or (Khushi Gupta) an unpaid intern learning at her own pace, not tracked — hidden from all forms & dashboards
 var APPROVAL_FORM_URL = 'https://team.ideaformdesignstudio.com/approval.html';
 var DAYS_BEFORE_ARCH  = 90;
 
