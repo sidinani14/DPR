@@ -1465,8 +1465,12 @@ function resumeDraft() {
   ibCount   = draft.ibCount   || 0;
   issueActions = draft.issueActions || {};
 
-  // Restore project blocks
-  draft.blocks.forEach(b => {
+  // Restore project blocks -- each block independently try/caught so one bad
+  // field can't silently abort every block after it (see dpr.html's
+  // resumeDraft for the same fix, root-caused after "restore banner shows,
+  // form still comes back blank" reports).
+  let hadError = false;
+  draft.blocks.forEach(b => { try {
     // Add block using existing addProjectBlock logic manually
     const id = b.id;
     const div = document.createElement('div');
@@ -1513,11 +1517,10 @@ function resumeDraft() {
         }
       });
     }
-  });
+  } catch(e){ hadError = true; console.error('resumeDraft: block failed', e); } });
 
-
-  generateAllWA();
-  toast('Draft restored ✓');
+  try { generateAllWA(); } catch(e){ hadError = true; console.error('resumeDraft: generateAllWA failed', e); }
+  toast(hadError ? '⚠ Draft restored, but some fields failed — check the form and your browser console' : 'Draft restored ✓');
 }
 
 function discardDraft() {

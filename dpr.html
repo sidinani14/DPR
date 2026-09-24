@@ -1083,7 +1083,16 @@ function collectDraftData(){
       status: row.querySelector('.t-status:checked')?.value||'Done',
       visitHrs: row.querySelector('.t-visit-hrs')?.value||'',
     }));
-    return { proj: pb.querySelector('.p-name')?.value||'', tasks };
+    // Save the project's NAME alongside the select's raw index value. PROJECTS
+    // is refetched live on every page load and its order/length isn't stable
+    // (new projects, sheet edits) -- a draft saved under one session's index
+    // can point at a completely different project (or nothing) by the time
+    // it's restored in a later session. resumeDraft() matches by name first,
+    // falling back to the index only for older drafts saved before this existed.
+    const pSelForSave = pb.querySelector('.p-name');
+    const pIdxForSave = parseInt(pSelForSave?.value);
+    const pNameForSave = (!isNaN(pIdxForSave) && PROJECTS[pIdxForSave]) ? PROJECTS[pIdxForSave].name : '';
+    return { proj: pSelForSave?.value||'', projName: pNameForSave, tasks };
   });
   const fwBlocks = [...document.querySelectorAll('#fw-blocks > .fw-block')].map(fb => ({
     type: fb.querySelector('.fw-type')?.value||'', proj: fb.querySelector('.fw-proj')?.value||'',
@@ -1171,81 +1180,110 @@ function checkForDraft(){
   document.getElementById('draft-banner').style.display='block';
   window._pendingDprDraft = d;
 }
+// Every section below is independently try/caught -- restoring a draft used
+// to be one long unguarded run, so a single bad field (e.g. Section 3's
+// project pick resolving to a project that no longer exists at that index --
+// see collectDraftData's projName comment) threw partway through and silently
+// killed every section after it, while the banner had already been hidden at
+// the top, making it look like "restore happened" when most of the form
+// stayed blank. Each section now fails on its own without taking the rest
+// down with it, and a warning toast fires if anything had to be skipped.
 function resumeDraft(){
   const d = window._pendingDprDraft; if (!d) return;
   document.getElementById('draft-banner').style.display='none';
   const g = id => document.getElementById(id);
-  if (d.date && g('f-date')) g('f-date').value = d.date;
+  let hadError = false;
+  function section(name, fn){ try { fn(); } catch(e){ hadError = true; console.error('resumeDraft: '+name+' failed', e); } }
 
-  document.getElementById('proj-blocks').innerHTML=''; projCount=0;
-  (d.projBlocks||[]).forEach(pb => {
-    addProject();
-    const el = document.querySelector('#proj-blocks > .proj-block:last-child');
-    const sel = el.querySelector('.p-name'); if (sel && pb.proj) { sel.value = pb.proj; onProjSelect(sel); }
-    const rows = el.querySelector('.task-rows'); rows.innerHTML='';
-    (pb.tasks||[]).forEach(t => {
-      addTask(rows.id);
-      const row = rows.querySelector('.task-entry:last-child');
-      if (t.cat) { row.querySelector('.t-cat').value = t.cat; fillTypes(row.querySelector('.t-cat')); }
-      if (t.type) { row.querySelector('.t-type').value = t.type; refreshTaskPts(row.querySelector('.t-type')); }
-      if (t.units) row.querySelector('.t-units').value = t.units;
-      if (t.area) row.querySelector('.t-area').value = t.area;
-      if (t.hrsTaken) row.querySelector('.t-hrs-taken').value = t.hrsTaken;
-      const radio = row.querySelector(`.t-status[value="${t.status}"]`);
-      if (radio) { radio.checked = true; toggleVisitHrs(radio); }
-      if (t.visitHrs) { const vh = row.querySelector('.t-visit-hrs'); if (vh) vh.value = t.visitHrs; }
-    });
-    if (!(pb.tasks||[]).length) addTask(rows.id);
+  section('report date', () => { if (d.date && g('f-date')) g('f-date').value = d.date; });
+
+  section('Section 3 (projects/tasks)', () => {
+    document.getElementById('proj-blocks').innerHTML=''; projCount=0;
+    (d.projBlocks||[]).forEach(pb => { try {
+      addProject();
+      const el = document.querySelector('#proj-blocks > .proj-block:last-child');
+      const sel = el.querySelector('.p-name');
+      if (sel && (pb.projName || pb.proj)) {
+        // Match by NAME first (stable across sessions); the raw index is
+        // only a fallback for drafts saved before projName existed.
+        let matchIdx = pb.projName ? PROJECTS.findIndex(p => p.name === pb.projName) : -1;
+        if (matchIdx === -1 && pb.proj !== '') { const i = parseInt(pb.proj); if (!isNaN(i) && PROJECTS[i]) matchIdx = i; }
+        if (matchIdx > -1) { sel.value = String(matchIdx); onProjSelect(sel); }
+      }
+      const rows = el.querySelector('.task-rows'); rows.innerHTML='';
+      (pb.tasks||[]).forEach(t => { try {
+        addTask(rows.id);
+        const row = rows.querySelector('.task-entry:last-child');
+        if (t.cat) { row.querySelector('.t-cat').value = t.cat; fillTypes(row.querySelector('.t-cat')); }
+        if (t.type) { row.querySelector('.t-type').value = t.type; refreshTaskPts(row.querySelector('.t-type')); }
+        if (t.units) row.querySelector('.t-units').value = t.units;
+        if (t.area) row.querySelector('.t-area').value = t.area;
+        if (t.hrsTaken) row.querySelector('.t-hrs-taken').value = t.hrsTaken;
+        const radio = row.querySelector(`.t-status[value="${t.status}"]`);
+        if (radio) { radio.checked = true; toggleVisitHrs(radio); }
+        if (t.visitHrs) { const vh = row.querySelector('.t-visit-hrs'); if (vh) vh.value = t.visitHrs; }
+      } catch(e){ hadError = true; console.error('resumeDraft: task row failed', e); } });
+      if (!(pb.tasks||[]).length) addTask(rows.id);
+    } catch(e){ hadError = true; console.error('resumeDraft: proj block failed', e); } });
   });
 
-  document.getElementById('fw-blocks').innerHTML=''; fwCount=0;
-  (d.fwBlocks||[]).forEach(fb => {
-    addFieldWork();
-    const el = document.querySelector('#fw-blocks > .fw-block:last-child');
-    if (fb.type) el.querySelector('.fw-type').value = fb.type;
-    if (fb.proj) el.querySelector('.fw-proj').value = fb.proj;
-    if (fb.start) el.querySelector('.fw-start').value = fb.start;
-    if (fb.end) el.querySelector('.fw-end').value = fb.end;
-    if (fb.notes) el.querySelector('.fw-notes').value = fb.notes;
+  section('Section 4 (field work)', () => {
+    document.getElementById('fw-blocks').innerHTML=''; fwCount=0;
+    (d.fwBlocks||[]).forEach(fb => { try {
+      addFieldWork();
+      const el = document.querySelector('#fw-blocks > .fw-block:last-child');
+      if (fb.type) el.querySelector('.fw-type').value = fb.type;
+      if (fb.proj) el.querySelector('.fw-proj').value = fb.proj;
+      if (fb.start) el.querySelector('.fw-start').value = fb.start;
+      if (fb.end) el.querySelector('.fw-end').value = fb.end;
+      if (fb.notes) el.querySelector('.fw-notes').value = fb.notes;
+    } catch(e){ hadError = true; console.error('resumeDraft: field work block failed', e); } });
   });
 
-  document.getElementById('conn-blocks').innerHTML=''; connCount=0;
-  (d.connBlocks||[]).forEach(cb => {
-    addConnection();
-    const el = document.querySelector('#conn-blocks > .conn-block:last-child');
-    const id = el.id.replace('cn-','');
-    if (cb.proj) el.querySelector('.conn-proj').value = cb.proj;
-    if (cb.with) { const c = document.querySelector(`#cn-with-${id} [data-val="${cb.with}"]`); if (c) pickChip(c); }
-    if (cb.type) { const c2 = document.querySelector(`#cn-type-${id} [data-val="${cb.type}"]`); if (c2) pickChip(c2); }
-    if (cb.name && g('cn-name-'+id)) g('cn-name-'+id).value = cb.name;
-    if (cb.notes && g('cn-notes-'+id)) g('cn-notes-'+id).value = cb.notes;
+  section('Section 5 (connections)', () => {
+    document.getElementById('conn-blocks').innerHTML=''; connCount=0;
+    (d.connBlocks||[]).forEach(cb => { try {
+      addConnection();
+      const el = document.querySelector('#conn-blocks > .conn-block:last-child');
+      const id = el.id.replace('cn-','');
+      if (cb.proj) el.querySelector('.conn-proj').value = cb.proj;
+      if (cb.with) { const c = document.querySelector(`#cn-with-${id} [data-val="${cb.with}"]`); if (c) pickChip(c); }
+      if (cb.type) { const c2 = document.querySelector(`#cn-type-${id} [data-val="${cb.type}"]`); if (c2) pickChip(c2); }
+      if (cb.name && g('cn-name-'+id)) g('cn-name-'+id).value = cb.name;
+      if (cb.notes && g('cn-notes-'+id)) g('cn-notes-'+id).value = cb.notes;
+    } catch(e){ hadError = true; console.error('resumeDraft: connection block failed', e); } });
   });
 
-  document.getElementById('bill-blocks').innerHTML=''; billCount=0;
-  if (d.billraised === 'Yes') {
-    const yesRadio = document.querySelector('input[name=billraised][value="Yes"]');
-    if (yesRadio) { yesRadio.checked = true; document.getElementById('bill-wrap').style.display='block'; }
-    (d.billBlocks||[]).forEach(bb => {
-      addBillable();
-      const el = document.querySelector('#bill-blocks > .conn-block:last-child');
-      const projSel = el.querySelector('.bill-proj');
-      if (bb.proj) { projSel.value = bb.proj; fillBillStagesFromProject(projSel); }
-      const stageSel = el.querySelector('.bill-stage');
-      if (bb.stage && stageSel) stageSel.value = bb.stage;
-    });
-  }
+  section('Section 6 (billables)', () => {
+    document.getElementById('bill-blocks').innerHTML=''; billCount=0;
+    if (d.billraised === 'Yes') {
+      const yesRadio = document.querySelector('input[name=billraised][value="Yes"]');
+      if (yesRadio) { yesRadio.checked = true; document.getElementById('bill-wrap').style.display='block'; }
+      (d.billBlocks||[]).forEach(bb => { try {
+        addBillable();
+        const el = document.querySelector('#bill-blocks > .conn-block:last-child');
+        const projSel = el.querySelector('.bill-proj');
+        if (bb.proj) { projSel.value = bb.proj; fillBillStagesFromProject(projSel); }
+        const stageSel = el.querySelector('.bill-stage');
+        if (bb.stage && stageSel) stageSel.value = bb.stage;
+      } catch(e){ hadError = true; console.error('resumeDraft: billable block failed', e); } });
+    }
+  });
 
-  if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
-  if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
-  if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
-  if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
-  if (d.referrals && g('referrals')) g('referrals').value = d.referrals;
-  if (d.deliverables && g('deliverables')) g('deliverables').value = d.deliverables;
-  if (d.blockers && g('blockers')) g('blockers').value = d.blockers;
-  if (d.mood) { const mr = document.querySelector(`input[name=mood][value="${d.mood}"]`); if (mr) mr.checked = true; }
+  section('Sections 7-8 (accountability/summary)', () => {
+    if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
+    if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
+    if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
+    if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
+    if (d.referrals && g('referrals')) g('referrals').value = d.referrals;
+    if (d.deliverables && g('deliverables')) g('deliverables').value = d.deliverables;
+    if (d.blockers && g('blockers')) g('blockers').value = d.blockers;
+    if (d.mood) { const mr = document.querySelector(`input[name=mood][value="${d.mood}"]`); if (mr) mr.checked = true; }
+  });
 
-  calcScore();
-  toast('Draft restored ✓');
+  section('score recalculation', () => { calcScore(); });
+
+  toast(hadError ? '⚠ Draft restored, but some fields failed — check the form and your browser console' : 'Draft restored ✓');
 }
 function discardDraft(){
   try { localStorage.removeItem(getDraftKey()); } catch(e){}

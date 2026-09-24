@@ -2054,71 +2054,88 @@ function checkForDraft(){
   document.getElementById('draft-banner').style.display='block';
   window._pendingCrmDraft = d;
 }
+// Each section independently try/caught -- one bad field used to be able to
+// silently abort every section after it, while the banner had already been
+// hidden above, making it look like "restore happened" when most of the
+// form stayed blank (see dpr.html's resumeDraft for the fuller writeup).
 function resumeDraft(){
   const d = window._pendingCrmDraft; if (!d) return;
   document.getElementById('draft-banner').style.display='none';
   const g = id => document.getElementById(id);
-  if (d.date && g('f-date')) g('f-date').value = d.date;
+  let hadError = false;
+  function section(name, fn){ try { fn(); } catch(e){ hadError = true; console.error('resumeDraft: '+name+' failed', e); } }
 
-  document.getElementById('fw-blocks').innerHTML=''; fwCount=0;
-  (d.fwBlocks||[]).forEach(fb=>{
-    addFieldWork();
-    const id=fwCount;
-    if (fb.type) g('fw-type-'+id).value = fb.type;
-    if (fb.proj) g('fw-proj-'+id).value = fb.proj;
-    if (fb.start) g('fw-start-'+id).value = fb.start;
-    if (fb.end) g('fw-end-'+id).value = fb.end;
-    if (fb.notes) g('fw-notes-'+id).value = fb.notes;
-    updateFWCalc(id);
+  section('report date', () => { if (d.date && g('f-date')) g('f-date').value = d.date; });
+
+  section('field work', () => {
+    document.getElementById('fw-blocks').innerHTML=''; fwCount=0;
+    (d.fwBlocks||[]).forEach(fb=>{ try {
+      addFieldWork();
+      const id=fwCount;
+      if (fb.type) g('fw-type-'+id).value = fb.type;
+      if (fb.proj) g('fw-proj-'+id).value = fb.proj;
+      if (fb.start) g('fw-start-'+id).value = fb.start;
+      if (fb.end) g('fw-end-'+id).value = fb.end;
+      if (fb.notes) g('fw-notes-'+id).value = fb.notes;
+      updateFWCalc(id);
+    } catch(e){ hadError = true; console.error('resumeDraft: field work block failed', e); } });
   });
 
-  document.getElementById('contact-blocks').innerHTML=''; contCount=0;
-  (d.contactBlocks||[]).forEach(cb=>{
-    addContactBlock();
-    const id=contCount;
-    if (cb.proj) g('cb-proj-'+id).value = cb.proj;
-    if (cb.notes) g('cb-notes-'+id).value = cb.notes;
-    if (cb.type) {
-      const chip = document.querySelector(`#cb-${id} .chip[data-type="${cb.type}"]`);
-      if (chip) selContactType(chip, id);
-    }
+  section('contacts', () => {
+    document.getElementById('contact-blocks').innerHTML=''; contCount=0;
+    (d.contactBlocks||[]).forEach(cb=>{ try {
+      addContactBlock();
+      const id=contCount;
+      if (cb.proj) g('cb-proj-'+id).value = cb.proj;
+      if (cb.notes) g('cb-notes-'+id).value = cb.notes;
+      if (cb.type) {
+        const chip = document.querySelector(`#cb-${id} .chip[data-type="${cb.type}"]`);
+        if (chip) selContactType(chip, id);
+      }
+    } catch(e){ hadError = true; console.error('resumeDraft: contact block failed', e); } });
   });
 
-  document.getElementById('agenda-blocks').innerHTML=''; agendaCount=0;
-  (d.agendaBlocks||[]).forEach(ab=>{
-    addAgendaBlock();
-    const id=agendaCount;
-    if (ab.proj) g('ag-proj-'+id).value = ab.proj;
-    if (ab.type) setAgendaType(id, ab.type);
-    if (ab.date) g('ag-date-'+id).value = ab.date;
-    if (ab.time) g('ag-time-'+id).value = ab.time;
-    if (ab.agenda) g('ag-agenda-'+id).value = ab.agenda;
-    if (ab.others) g('ag-others-'+id).value = ab.others;
-    (ab.team||[]).forEach(name=>{
-      const chip = document.querySelector(`#ag-team-${id} [data-name="${name}"]`);
-      if (chip) chip.classList.add('on');
-    });
-  });
-  generateAllWA();
-
-  document.getElementById('new-iss-blocks').innerHTML=''; issCount=0;
-  (d.newIssBlocks||[]).forEach(ni=>{
-    addNewIssue();
-    const id=issCount;
-    if (ni.kind) setNIKind(id, ni.kind);
-    if (ni.type) selNITypeByValue(id, ni.type);
-    if (ni.proj) g('ni-proj-'+id).value = ni.proj;
-    if (ni.assign) g('ni-assign-'+id).value = ni.assign;
-    if (ni.desc) g('ni-desc-'+id).value = ni.desc;
-    if (ni.tdate) g('ni-tdate-'+id).value = ni.tdate;
+  section('agenda / meetings', () => {
+    document.getElementById('agenda-blocks').innerHTML=''; agendaCount=0;
+    (d.agendaBlocks||[]).forEach(ab=>{ try {
+      addAgendaBlock();
+      const id=agendaCount;
+      if (ab.proj) g('ag-proj-'+id).value = ab.proj;
+      if (ab.type) setAgendaType(id, ab.type);
+      if (ab.date) g('ag-date-'+id).value = ab.date;
+      if (ab.time) g('ag-time-'+id).value = ab.time;
+      if (ab.agenda) g('ag-agenda-'+id).value = ab.agenda;
+      if (ab.others) g('ag-others-'+id).value = ab.others;
+      (ab.team||[]).forEach(name=>{
+        const chip = document.querySelector(`#ag-team-${id} [data-name="${name}"]`);
+        if (chip) chip.classList.add('on');
+      });
+    } catch(e){ hadError = true; console.error('resumeDraft: agenda block failed', e); } });
+    generateAllWA();
   });
 
-  if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
-  if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
-  if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
-  if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
+  section('new issues / deliverables', () => {
+    document.getElementById('new-iss-blocks').innerHTML=''; issCount=0;
+    (d.newIssBlocks||[]).forEach(ni=>{ try {
+      addNewIssue();
+      const id=issCount;
+      if (ni.kind) setNIKind(id, ni.kind);
+      if (ni.type) selNITypeByValue(id, ni.type);
+      if (ni.proj) g('ni-proj-'+id).value = ni.proj;
+      if (ni.assign) g('ni-assign-'+id).value = ni.assign;
+      if (ni.desc) g('ni-desc-'+id).value = ni.desc;
+      if (ni.tdate) g('ni-tdate-'+id).value = ni.tdate;
+    } catch(e){ hadError = true; console.error('resumeDraft: new issue block failed', e); } });
+  });
 
-  toast('Draft restored ✓');
+  section('accountability', () => {
+    if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
+    if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
+    if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
+    if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
+  });
+
+  toast(hadError ? '⚠ Draft restored, but some fields failed — check the form and your browser console' : 'Draft restored ✓');
 }
 function discardDraft(){
   try { localStorage.removeItem(getDraftKey()); } catch(e){}

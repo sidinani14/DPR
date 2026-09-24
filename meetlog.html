@@ -239,24 +239,32 @@ function checkForDraft(){
 function resumeDraft(){
   const d = window._pendingDraft; if (!d) return;
   document.getElementById('draft-banner').style.display='none';
-  setType(d.type||'Meeting');
-  const g = id => document.getElementById(id);
-  if (g('project')) g('project').value = d.project||'';
-  if (g('date')) g('date').value = d.date||'';
-  if (g('time')) g('time').value = d.time||'';
-  if (g('endTime')) g('endTime').value = d.endTime||'';
-  if (g('duration')) g('duration').value = d.duration||'';
-  if (g('loggedBy')) g('loggedBy').value = d.loggedBy||'';
-  (d.teamAttendees||[]).forEach(v=>{ document.querySelectorAll('.ta').forEach(c=>{ if(c.value===v) c.checked=true; }); });
-  if (g('clientAttendees')) g('clientAttendees').value = d.clientAttendees||'';
-  (d.purpose||[]).forEach(v=>{ document.querySelectorAll('#purpose .chip').forEach(c=>{ if(c.dataset.v===v) c.classList.add('on'); }); });
-  if (g('body')) g('body').value = d.body||'';
-  (d.actions||[]).forEach(a=>{
-    if (g('own-'+a.cat)) g('own-'+a.cat).value = a.owner||'';
-    if (g('actt-'+a.cat)) g('actt-'+a.cat).value = a.text||'';
-  });
-  if (g('videos')) g('videos').value = d.videos||'';
-  msg('Draft restored ✓');
+  // Wrapped so one unexpected field can't silently abort the rest of the
+  // restore while the banner's already gone -- see dpr.html's resumeDraft
+  // for the fuller writeup of why this matters.
+  try {
+    setType(d.type||'Meeting');
+    const g = id => document.getElementById(id);
+    if (g('project')) g('project').value = d.project||'';
+    if (g('date')) g('date').value = d.date||'';
+    if (g('time')) g('time').value = d.time||'';
+    if (g('endTime')) g('endTime').value = d.endTime||'';
+    if (g('duration')) g('duration').value = d.duration||'';
+    if (g('loggedBy')) g('loggedBy').value = d.loggedBy||'';
+    (d.teamAttendees||[]).forEach(v=>{ document.querySelectorAll('.ta').forEach(c=>{ if(c.value===v) c.checked=true; }); });
+    if (g('clientAttendees')) g('clientAttendees').value = d.clientAttendees||'';
+    (d.purpose||[]).forEach(v=>{ document.querySelectorAll('#purpose .chip').forEach(c=>{ if(c.dataset.v===v) c.classList.add('on'); }); });
+    if (g('body')) g('body').value = d.body||'';
+    (d.actions||[]).forEach(a=>{
+      if (g('own-'+a.cat)) g('own-'+a.cat).value = a.owner||'';
+      if (g('actt-'+a.cat)) g('actt-'+a.cat).value = a.text||'';
+    });
+    if (g('videos')) g('videos').value = d.videos||'';
+    msg('Draft restored ✓');
+  } catch(e){
+    console.error('resumeDraft failed', e);
+    msg('⚠ Draft restored, but some fields failed — check your browser console');
+  }
 }
 function discardDraft(){
   try { localStorage.removeItem(getDraftKey()); } catch(e){}
