@@ -136,7 +136,16 @@
                 'Tap "Try another account" and sign back in with your own Ideaform account to continue where you left off.',
                 who);
             }
-          }).catch(function () {});
+          }).catch(function () {
+            // Not valid JSON -- Apps Script served something other than our
+            // own respond() output (an HTML quota/consent-page shell before
+            // the script even ran, or a raw network failure). The 'unauthorized'
+            // branch above never runs for this shape, so it was the one
+            // response that silently skipped flushing the draft. The caller's
+            // own r.json() is about to throw on this same response too, so
+            // there's nothing to lose by flushing defensively here first.
+            try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e2) {}
+          });
         } catch (e) {}
       }
       return resp;
