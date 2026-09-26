@@ -3718,9 +3718,29 @@ function generateProjectReportPDF(project, callerEmail){
     return by;
   }
 
-  // Estimate each entry's START page for the cover index: cover = page 1, then per
-  // entry 1 text page + ceil(images/2) image pages (2 photos per A4 page).
-  var running=2;
+  // A long-running project's index can grow past what fits below the cover
+  // branding on one A4 page -- the whole block used to just get pushed to the
+  // bottom of the cover page via .idxwrap{margin-top:auto} regardless of its
+  // own height, so once it grew past the remaining space it silently spilled
+  // into (or got cut across) the page-2 boundary instead of a clean break
+  // (found via Abhay Nagar's log, 9 entries deep with long attendee lists).
+  // Rather than try to predict exact print-engine line wrapping, this counts
+  // an estimated wrapped-line total for the Attendees column (its narrowest,
+  // most variable content) and once that crosses a conservative single-page
+  // budget, promotes the WHOLE index to its own dedicated page instead of
+  // letting part of it ride along with the cover.
+  var IDX_CHARS_PER_LINE = 46; // rough fit for the Attendees column at this font/width
+  var IDX_MAX_LINES_ON_COVER = 14; // conservative budget for the space left below the cover branding
+  var idxEstLines = entries.reduce(function(sum, e){
+    var att = [e.team, e.clients].filter(Boolean).join(', ') || '—';
+    return sum + Math.max(1, Math.ceil(att.length / IDX_CHARS_PER_LINE));
+  }, 0);
+  var indexOwnPage = idxEstLines > IDX_MAX_LINES_ON_COVER;
+
+  // Estimate each entry's START page: cover = page 1 always; the index adds a
+  // page of its own only when it didn't fit on the cover; then per entry 1
+  // text page + ceil(images/2) image pages (2 photos per A4 page).
+  var running = indexOwnPage ? 3 : 2;
   entries.forEach(function(e){
     e.imgIds=e.photoIds.split(',').map(function(s){return s.trim();}).filter(Boolean);
     e.startPage=running; running += 1 + Math.ceil(e.imgIds.length/2);
@@ -3797,6 +3817,7 @@ function generateProjectReportPDF(project, callerEmail){
     + '.cv-proj{font-size:30px;color:#3F3F41;margin-top:12px}'
     + '.cv-title{font-size:22px;color:#E08A1E;font-style:italic;margin-top:26px}'
     + '.idxwrap{margin-top:auto}'
+    + '.idxpage{page-break-before:always;page-break-after:always;padding-top:26px}'
     + '.idx-h{font-size:13px;letter-spacing:3px;color:#4D4D4F;text-transform:uppercase;border-bottom:1.5px solid #F2A03D;padding-bottom:6px;text-align:left}'
     + 'table.idx{width:100%;border-collapse:collapse;font-size:12.5px}'
     + 'table.idx th{background:#4D4D4F;color:#fff;text-align:left;padding:7px 9px;font-weight:normal}'
@@ -3820,9 +3841,15 @@ function generateProjectReportPDF(project, callerEmail){
     + '<div class="rule"></div>'
     + '<div class="cv-lbl">Project</div><div class="cv-proj">'+esc(project)+'</div>'
     + '<div class="cv-title">Meeting &amp; Site Visit Logs</div>'
-    + '<div class="idxwrap"><div class="idx-h">Index of logs</div>'
-    + '<table class="idx"><tr><th>Date</th><th>Type</th><th>Attendees</th><th class="pg">Page</th></tr>'+index+'</table></div>'
+    // A short index still rides along at the bottom of the cover page as
+    // before; once it's grown too long to fit there (indexOwnPage), it gets
+    // promoted to its own dedicated page instead of being cut across the
+    // cover/next-page boundary — see the indexOwnPage comment above.
+    + (indexOwnPage ? '' : '<div class="idxwrap"><div class="idx-h">Index of logs</div>'
+        + '<table class="idx"><tr><th>Date</th><th>Type</th><th>Attendees</th><th class="pg">Page</th></tr>'+index+'</table></div>')
     + '</div>'
+    + (indexOwnPage ? '<div class="idxpage"><div class="idx-h">Index of logs</div>'
+        + '<table class="idx"><tr><th>Date</th><th>Type</th><th>Attendees</th><th class="pg">Page</th></tr>'+index+'</table></div>' : '')
     + sections
     + '<div class="foot">All action plans are subject to follow-up and verification. For clarifications, please contact the project manager. &copy; Ideaform Design Studio &middot; Confidential</div>'
     + '</body></html>';
