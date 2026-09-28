@@ -3354,12 +3354,32 @@ function aiPolishLog(payload){
   } catch(e){ Logger.log('aiPolish error: '+e); return null; }
 }
 
-// Drive: per-project / per-date folder under "IDS Logs"
+// Drive: per-project / per-date folder under "IDS Logs". Cached by ID for
+// 30 min -- a single log's photos are uploaded one call per photo (see
+// uploadMeetingPhoto), and every call resolves the SAME project+date folder,
+// so without this every extra photo paid for the full 3-level Drive
+// name-search again (root -> project -> date, up to 3 real Drive round
+// trips each) even though nothing about the folder had changed. Confirmed
+// live: a single-photo upload was taking ~12s end to end from this alone,
+// on top of whatever the account's own quota throttling adds (2026-09,
+// see the "access denied"/quota notes elsewhere in this file) -- more than
+// enough for a real multi-photo site-visit log on a shaky site connection
+// to time out or drop mid-upload, reported as photos failing to upload/edit.
 function meetingDriveFolder(project, day){
+  var cache = CacheService.getScriptCache();
+  var key = 'mdf_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(
+    Utilities.DigestAlgorithm.MD5, (project||'Unfiled')+'|'+(day||dateStr())));
+  var cachedId = cache.get(key);
+  if (cachedId) {
+    try { return DriveApp.getFolderById(cachedId); }
+    catch (e) { /* folder deleted/moved since caching -- fall through and re-resolve */ }
+  }
   var root, it = DriveApp.getFoldersByName(LOGS_ROOT_FOLDER);
   root = it.hasNext() ? it.next() : DriveApp.createFolder(LOGS_ROOT_FOLDER);
   function child(parent, name){ var c=parent.getFoldersByName(name); return c.hasNext()?c.next():parent.createFolder(name); }
-  return child(child(root, project||'Unfiled'), day||dateStr());
+  var folder = child(child(root, project||'Unfiled'), day||dateStr());
+  try { cache.put(key, folder.getId(), 1800); } catch (e) {} // best-effort; a cache failure just means no speedup, not a broken upload
+  return folder;
 }
 // Upload one base64 image to the visit's Drive folder. Called once per photo.
 function uploadMeetingPhoto(data){
