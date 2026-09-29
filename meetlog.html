@@ -168,8 +168,8 @@ function render(){
     </div>`).join('')}
   </div>
 
-  <div class="card site-only">
-    <div class="ch"><div class="cn">5</div><div class="ct">Site photos & videos</div></div>
+  <div class="card">
+    <div class="ch"><div class="cn">5</div><div class="ct">Photos & videos</div></div>
     <div class="field"><div class="lbl">Photos <span class="opt">added to the client report & Drive</span></div>
       <input type="file" id="photos" accept="image/*" multiple onchange="onPhotos(this)"><div class="ph-list" id="ph-list"></div></div>
     <div class="field"><div class="lbl">Video links <span class="opt">Drive/YouTube URLs, one per line</span></div><textarea id="videos" placeholder="https://drive.google.com/..."></textarea></div>
@@ -293,7 +293,7 @@ function resumeDraft(){
     });
     if (g('videos')) g('videos').value = d.videos||'';
     msg(projMissing ? '⚠ Draft restored, but project "'+d.project+'" is no longer in the list — pick it again.'
-      : 'Draft restored ✓'+(d.type==='Site Visit'?' — re-attach any photos.':''));
+      : 'Draft restored ✓ — re-attach any photos.');
   } catch(e){
     console.error('resumeDraft failed', e);
     msg('⚠ Draft restored, but some fields failed — check your browser console');
@@ -419,9 +419,9 @@ async function submitLog(){
   const go=document.getElementById('go'); go.disabled=true;
   const date=document.getElementById('date').value;
   try{
-    // Photos only belong to Site Visits — the section is hidden for Meetings,
-    // but photos picked before switching type used to upload anyway.
-    const photos = LOG_TYPE==='Site Visit' ? photoFiles : [];
+    // Photos are allowed on both Meetings and Site Visits (2026-09-29 — were
+    // Site-Visit-only; the PDF always supported them for either type).
+    const photos = photoFiles;
     // Each photo remembers its Drive fileId once uploaded, so hitting Submit
     // again after one failure only retries the failed ones (it used to
     // re-upload every photo and leave duplicates in Drive). The first upload
@@ -459,7 +459,7 @@ async function submitLog(){
       purpose:[...document.querySelectorAll('#purpose .chip.on')].map(c=>c.dataset.v),
       body:document.getElementById('body').value, actions:collectActions(),
       duration:document.getElementById('duration').value, photoIds, folderId, clientSubmitId:SUBMIT_ID,
-      videoLinks:LOG_TYPE==='Site Visit'?(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean):[]};
+      videoLinks:(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean)};
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
     if(res.status==='ok'){ clearDraft(); showReview(res, payload); window.scrollTo(0,0); if(res.duplicate) msg('This log was already saved — showing it rather than creating a copy.'); }
     else { msg('Error: '+(res.message||'failed')); go.disabled=false; }
@@ -547,7 +547,7 @@ function renderReview(){
   document.getElementById('app').innerHTML=`
     <div class="card">
       <h1>Review &amp; edit before sharing</h1>
-      <div class="sub">Edit anything below — purpose, attendees${REVIEW.type==='Site Visit'?', photos':''}, notes and actions — then generate the PDF for <b>${esc(REVIEW.project)}</b>.</div>
+      <div class="sub">Edit anything below — purpose, attendees, photos, notes and actions — then generate the PDF for <b>${esc(REVIEW.project)}</b>.</div>
       <div class="field"><div class="lbl">Purpose</div><div class="chips" id="rv-purpose">${purposeHtml}</div></div>
       <div class="field"><div class="lbl">IDS team present</div><div>${attHtml}</div></div>
       <div class="field"><div class="lbl">Other attendees <span class="opt">clients etc.</span></div><input id="rv-clients" value="${qattr(REVIEW.clientAttendees)}"></div>
@@ -572,7 +572,6 @@ function captureReview(){
 // submitted from a site visit) with a bit of thumbnail padding around it so
 // a slightly-off tap still lands on the button, not the photo. (2026-07-23)
 function photoGalleryHtml(){
-  if(REVIEW.type!=='Site Visit') return '';
   const thumbs=(REVIEW.photoIds||[]).map((id,i)=>{
     const src=PHOTO_THUMBS[id];
     const inner = src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`
@@ -590,7 +589,7 @@ function photoGalleryHtml(){
 // the browser can't display — fetch small thumbnails so each photo is
 // recognisable before someone taps × on it.
 async function loadReviewThumbs(){
-  if (!REVIEW || REVIEW.type!=='Site Visit') return;
+  if (!REVIEW) return;
   const missing=(REVIEW.photoIds||[]).filter(id=>!PHOTO_THUMBS[id]);
   if (!missing.length) return;
   const logId=REVIEW.logId;
