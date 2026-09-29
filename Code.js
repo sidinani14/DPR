@@ -3499,8 +3499,21 @@ function submitMeetingLog(data, authEmail){
   // in one locked block, after the slow external call.
   var logId;
   var dupInLock = withLock(function(){
-    if (clientSubmitId) { var d2 = findMeetingLogBySubmitId(logSheet, clientSubmitId); if (d2) return d2; }
+    // Live-tested 2026-09-29: two concurrent submits of the same form BOTH got
+    // past the sheet-based checks below and wrote two rows with the same
+    // ML-id — the second execution's sheet read didn't reflect the first's
+    // just-flushed row. So the lock also keeps its own record, in
+    // Cache/Properties (consistent across executions), of submit keys and
+    // the last id handed out; the sheet scan stays as the long-term fallback.
+    var sc = CacheService.getScriptCache(), props = PropertiesService.getScriptProperties();
+    if (clientSubmitId) {
+      var k = sc.get('mlsub_'+clientSubmitId); if (k) return k;
+      var d2 = findMeetingLogBySubmitId(logSheet, clientSubmitId); if (d2) return d2;
+    }
     logId = nextId(logSheet, 'ML-');
+    var n = parseInt(logId.replace('ML-',''),10) || 0, lastN = parseInt(props.getProperty('ML_LAST_ID_NUM')||'0',10) || 0;
+    if (n <= lastN) { n = lastN + 1; logId = 'ML-' + String(n).padStart(3,'0'); }
+    props.setProperty('ML_LAST_ID_NUM', String(n));
   prependRow(logSheet, [ logId, day, String(data.time||''), type, project, loggedBy,
     (data.teamAttendees||[]).join(', '), String(data.clientAttendees||''),
     (data.purpose||[]).join(', '), bodyRaw, bodyPolished, String(data.duration||''),
@@ -3508,6 +3521,7 @@ function submitMeetingLog(data, authEmail){
     String(data.endTime||''),
     String(authEmail||'').toLowerCase(),   // X — submitter's verified email (ownership)
     clientSubmitId ]);                      // Y — idempotency key
+  if (clientSubmitId) sc.put('mlsub_'+clientSubmitId, logId, 21600);   // only once the row exists
 
   // Decision items → DECISION_LOG (store polished text where available); IDS items → tasks
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
@@ -4368,6 +4382,22 @@ function trashQaTestFiles(){
   var out = [];
   ids.forEach(function(id){ try { var f=DriveApp.getFileById(id); f.setTrashed(true); out.push(id+': trashed '+f.getName()); } catch(e){ out.push(id+': '+e); } });
   try { var fo=DriveApp.getFolderById('1z1kjYNHmwzi9TSoySEj8S-UMIGPg0oeq'); fo.setTrashed(true); out.push('folder: trashed '+fo.getName()); } catch(e){ out.push('folder: '+e); }
+  // Anything else the QA runs created for the fake "ZZ QA Test" project.
+  try { var fit=DriveApp.getFoldersByName('ZZ QA Test'); while(fit.hasNext()){ var qf=fit.next(); qf.setTrashed(true); out.push('folder: trashed '+qf.getId()); } } catch(e){ out.push('qa folders: '+e); }
+  try { var fl=DriveApp.searchFiles("title contains 'ZZ QA Test' and trashed = false"); while(fl.hasNext()){ var qfi=fl.next(); qfi.setTrashed(true); out.push('file: trashed '+qfi.getName()); } } catch(e){ out.push('qa files: '+e); }
+  // Soft-delete (status only) the QA log rows + their items; give the
+  // duplicate-id row from the 2026-09-29 race test a distinct id.
+  var s=db(), ml=s.getSheetByName(MEETING_LOG_TAB), seen={}, qaIds={};
+  var mr=ml.getDataRange().getValues();
+  for (var i=mr.length-1;i>=1;i--){ if(String(mr[i][4]||'').trim()!=='ZZ QA Test') continue;
+    var id=String(mr[i][0]||'').trim();
+    if (seen[id]) { id=id+'-dup'; ml.getRange(i+1,1).setValue(id); }
+    seen[id]=1; qaIds[String(mr[i][0]||'').trim()]=1;
+    ml.getRange(i+1,16).setValue('Deleted'); out.push('log: '+id+' Deleted'); }
+  var dl=s.getSheetByName(DECISION_LOG_TAB), dr=dl.getDataRange().getValues();
+  for (var j=1;j<dr.length;j++){ if(qaIds[String(dr[j][1]||'').trim()] && !isDeadDecision(dr[j][8])) dl.getRange(j+1,9).setValue('Deleted'); }
+  var crm=s.getSheetByName(CRM_LOG_TAB), cr=crm.getDataRange().getValues();
+  for (var k=cr.length-1;k>=1;k--){ if(String(cr[k][6]||'').trim()==='ZZ QA Test') crm.deleteRow(k+1); }
   return {status:'ok', results: out};
 }
 

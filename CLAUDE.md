@@ -322,12 +322,30 @@ quota-exceeded failure — don't keep guessing in code without that signal.
   Drive + Anthropic scopes.
 - **My Logs (2026-09)** — meetlog.html has a team-facing status/edit view
   (link above the form), separate from logs.html's Logs Manager (director-
-  only: sees everyone, can delete). getMyMeetingLogs(member) lists just that
-  member's own logs; getMyMeetingLogForEdit/finalizeMyMeetingLog mirror the
-  manager-only originals but with an ownership check (loggedBy must match
-  the requesting member — logIds are sequential/guessable, so this needed
-  its own check). Reuses the SAME review/edit screen Logs Manager's `?edit=`
-  links already drive.
+  only: sees everyone, can delete). getMyMeetingLogs lists just the caller's
+  own logs; getMyMeetingLogForEdit/finalizeMyMeetingLog mirror the
+  manager-only originals with an ownership check. **Identity comes only
+  from the verified sign-in (authEmail) via `canEditMeetingLog`** — a log
+  is yours if MEETING_LOG col X (Submitted By email) is your email, or
+  loggedBy matches `memberNameForAuth(email)` (TEAM tab, else
+  `DIRECTOR_NAME_BY_EMAIL`). Until 2026-09-29 these trusted a `member` name
+  the browser sent from the editable "Logged by" dropdown — anyone could
+  open/republish anyone's logs. finalizeMeetingLog and deleteMeetingLog
+  use the same rule. Reuses the SAME review/edit screen Logs Manager's
+  `?edit=` links already drive.
+- **MEETING_LOG cols X/Y (2026-09-29)**: X = submitter's verified email,
+  Y = clientSubmitId (one per rendered form). submitMeetingLog dedupes
+  retries on Y — inside `withLock`, backed by CacheService (`mlsub_<id>`)
+  and a Script Property counter `ML_LAST_ID_NUM`, because a live race test
+  showed two concurrent executions both reading the sheet *without* the
+  other's just-flushed row (two rows got the same ML-id). Don't go back to
+  a sheet-scan-only id/dedupe for this tab.
+- **DECISION_LOG status 'Removed'** = an item cleared on the review screen
+  (stays gone); 'Deleted' = its whole log was deleted (undeleteMeetingLog
+  restores only these). Readers skip both via `isDeadDecision()`.
+- `uploadMeetingPhoto` rejects non-image mime types and >6.5MB server-side;
+  `getMeetingLogPhotoThumbs(logId)` gives the review screen thumbnails for
+  reopened logs.
   - **Editing an already-Final/Approved (published) log is explicitly
     allowed** — a deliberate 2026-09 decision, not an oversight. It was
     blocked outright at first; changed because the team needed to be able
