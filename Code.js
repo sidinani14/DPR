@@ -1870,7 +1870,6 @@ function doPost(e) {
     if (data.action === 'getMyMeetingLogForEdit')  return respond(getMyMeetingLogForEdit(data.logId||'', authEmail));
     if (data.action === 'finalizeMyMeetingLog')    return respond(finalizeMyMeetingLog(data, authEmail));
     if (data.action === 'getMeetingLogPhotoThumbs') return respond(getMeetingLogPhotoThumbs(data.logId||'', authEmail));
-    if (data.action === 'trashQaTestFiles') return respond(isDirector(authEmail) ? trashQaTestFiles() : {status:'error', code:'forbidden', message:'Directors only'});
     if (data.action === 'deleteMeetingLog')    return respond(deleteMeetingLog(data, authEmail));
     if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
@@ -4401,35 +4400,6 @@ function getMeetingLogForEdit(logId){
     };
   }
   return {status:'error', message:'Log not found'};
-}
-
-// TEMPORARY (2026-09-29): trash the orphan Drive files left by the meeting-
-// log QA pass. Hardcoded allowlist, trash only (recoverable 30 days).
-// Remove after it has run once.
-function trashQaTestFiles(){
-  var ids = ['1vg591n0gPSDrW-aF2_dUFREpbwWeCLfq','1u_RS0qEg-jC1H4QBLlWTkQZwgtKWiSHe','12u2jEE9vGM0nGGHcIRrPRaoSkhDoABi_',
-             '1lUi5j3RiCTxHgfvjP2R3x4-EkNMTsCrT','1B0mt6SMSHHNHo1SqWYOBqX2b4EIPsLtL','1TXR86Uk_5fsn4I7Ml4ECGmRrTiIEF5Cf',
-             '1awttOMAQgF8lM-2ZZBwhZM_-FMXKUSzs'];
-  var out = [];
-  ids.forEach(function(id){ try { var f=DriveApp.getFileById(id); f.setTrashed(true); out.push(id+': trashed '+f.getName()); } catch(e){ out.push(id+': '+e); } });
-  try { var fo=DriveApp.getFolderById('1z1kjYNHmwzi9TSoySEj8S-UMIGPg0oeq'); fo.setTrashed(true); out.push('folder: trashed '+fo.getName()); } catch(e){ out.push('folder: '+e); }
-  // Anything else the QA runs created for the fake "ZZ QA Test" project.
-  try { var fit=DriveApp.getFoldersByName('ZZ QA Test'); while(fit.hasNext()){ var qf=fit.next(); qf.setTrashed(true); out.push('folder: trashed '+qf.getId()); } } catch(e){ out.push('qa folders: '+e); }
-  try { var fl=DriveApp.searchFiles("title contains 'ZZ QA Test' and trashed = false"); while(fl.hasNext()){ var qfi=fl.next(); qfi.setTrashed(true); out.push('file: trashed '+qfi.getName()); } } catch(e){ out.push('qa files: '+e); }
-  // Soft-delete (status only) the QA log rows + their items; give the
-  // duplicate-id row from the 2026-09-29 race test a distinct id.
-  var s=db(), ml=s.getSheetByName(MEETING_LOG_TAB), seen={}, qaIds={};
-  var mr=ml.getDataRange().getValues();
-  for (var i=mr.length-1;i>=1;i--){ if(String(mr[i][4]||'').trim()!=='ZZ QA Test') continue;
-    var id=String(mr[i][0]||'').trim();
-    if (seen[id]) { id=id+'-dup'; ml.getRange(i+1,1).setValue(id); }
-    seen[id]=1; qaIds[String(mr[i][0]||'').trim()]=1;
-    ml.getRange(i+1,16).setValue('Deleted'); out.push('log: '+id+' Deleted'); }
-  var dl=s.getSheetByName(DECISION_LOG_TAB), dr=dl.getDataRange().getValues();
-  for (var j=1;j<dr.length;j++){ if(qaIds[String(dr[j][1]||'').trim()] && !isDeadDecision(dr[j][8])) dl.getRange(j+1,9).setValue('Deleted'); }
-  var crm=s.getSheetByName(CRM_LOG_TAB), cr=crm.getDataRange().getValues();
-  for (var k=cr.length-1;k>=1;k--){ if(String(cr[k][6]||'').trim()==='ZZ QA Test') crm.deleteRow(k+1); }
-  return {status:'ok', results: out};
 }
 
 // Thumbnails for a reopened log's existing photos. The review screen used to
