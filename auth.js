@@ -112,9 +112,27 @@
   window.fetch = async function (url, opts) {
     opts = opts || {};
     var isBackendEarly = typeof url === 'string' && url.indexOf(API_HOST) > -1;
-    if (isBackendEarly) { try { await ensureFreshToken(); } catch (e) {} }
+    if (!isBackendEarly) return _fetch.call(this, url, opts);
+    // A 'transient' rejection means the server never got past checking the
+    // sign-in (Google's token check hiccupped) -- the action itself did NOT
+    // run, so re-sending is always safe. Before, the page just showed an
+    // error (or, via the server-side race fixed alongside this, a false
+    // "access denied" gate) and people retyped / lost their work.
+    var baseUrl = url, baseBody = opts.body, resp = null;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise(function (r) { setTimeout(r, 1200 * attempt); });
+      resp = await backendFetchOnce(this, baseUrl, opts, baseBody);
+      var j = null;
+      try { j = await resp.clone().json(); } catch (e) {}
+      if (!(j && j.code === 'transient')) break;
+    }
+    return resp;
+  };
+  async function backendFetchOnce(ctx, url, opts, baseBody) {
+    try { await ensureFreshToken(); } catch (e) {}
     var tok = window.IDS_TOKEN;
-    var isBackend = isBackendEarly;
+    var isBackend = true;
+    opts = Object.assign({}, opts, { body: baseBody });
     if (isBackend && tok) {
       var m = (opts.method || 'GET').toUpperCase();
       if (m === 'GET') {
@@ -123,7 +141,7 @@
         try { var b = JSON.parse(opts.body); b.idToken = tok; opts.body = JSON.stringify(b); } catch (e) {}
       }
     }
-    return _fetch.call(this, url, opts).then(function (resp) {
+    return _fetch.call(ctx, url, opts).then(function (resp) {
       if (isBackend && !window.__idsDenied) {
         try {
           resp.clone().json().then(function (j) {
@@ -150,7 +168,7 @@
       }
       return resp;
     });
-  };
+  }
 
   function parseJwt(t) {
     try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); }

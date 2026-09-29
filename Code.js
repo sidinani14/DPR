@@ -1293,6 +1293,8 @@ var AUTH_ALLOWED = {
 function getAllowedEmails() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('allowed_emails');
+  _ALLOW_READ_OK = true;
+  if (cached && cached.charAt(0) === '!') { _ALLOW_READ_OK = false; cached = cached.slice(1); }   // failed-read fallback, see below
   if (cached) { try { return JSON.parse(cached); } catch (e) {} }
   var set = {};
   for (var k in AUTH_ALLOWED) set[k] = 1;            // directors fallback
@@ -1318,9 +1320,14 @@ function getAllowedEmails() {
     }
     readOk = true;
   } catch (e) { logTransientAuth('team-read-error', String(e), e && e.stack); }
-  cache.put('allowed_emails', JSON.stringify(set), readOk ? 300 : 15);
+  _ALLOW_READ_OK = readOk;
+  cache.put('allowed_emails', (readOk ? '' : '!') + JSON.stringify(set), readOk ? 300 : 15);
   return set;
 }
+// false when the allowlist in hand is only the directors-only fallback from
+// a failed TEAM read — verifyIdToken then must not treat "not in the list"
+// as a real (5-min cached) denial.
+var _ALLOW_READ_OK = true;
 // Returns the verified allowlisted email, or null. Caches results (token is
 // short-lived) to avoid an external fetch on every single API call.
 // 2026-08 fix (v1): a transient failure reaching Google's tokeninfo endpoint
@@ -1336,7 +1343,25 @@ function getAllowedEmails() {
 // during a real hiccup fails fast instead of each hanging, short enough that
 // it recovers almost immediately once the hiccup clears (vs. the old 5 min
 // hard-denial bug this whole fix started from).
+// This execution's own verdict, read by respondUnauthorized(). It used to
+// re-read the verdict from the SHARED cache instead, which raced: when a
+// page fires several requests at once, request A's tokeninfo blip wrote
+// '-transient', request B's success then overwrote the same key with the
+// email, and A — now seeing no '-transient' — answered code 'unauthorized',
+// which auth.js turns into the full "access denied, sign in again" gate.
+// (Reproduced live 2026-09-29: a finalize got 'unauthorized' while a read
+// sent at the same moment, same token, succeeded.)
+var _AUTH_VERDICT = '';
 function verifyIdToken(token) {
+  _AUTH_VERDICT = '';
+  var email = verifyIdTokenOnce(token);
+  // One quick retry on a transient tokeninfo failure before giving up —
+  // most blips clear within a second, and each failure costs the user a
+  // visible error.
+  if (!email && _AUTH_VERDICT === 'transient') { Utilities.sleep(500); _AUTH_VERDICT = ''; email = verifyIdTokenOnce(token); }
+  return email;
+}
+function verifyIdTokenOnce(token) {
   if (!token) return null;
   var cache = CacheService.getScriptCache();
   var key = 'auth_' + Utilities.base64EncodeWebSafe(
@@ -1350,7 +1375,7 @@ function verifyIdToken(token) {
   // short-circuited straight back to the same stale failure without ever
   // re-checking tokeninfo, for up to 20s. A single real blip looked like a
   // stuck, unfixable error. Every request now gets a fresh tokeninfo check.
-  if (cached === '-denied') return null;
+  if (cached === '-denied') { _AUTH_VERDICT = 'denied'; return null; }
   if (cached && cached !== '-transient') return cached;
   try {
     var resp = UrlFetchApp.fetch(
@@ -1363,12 +1388,12 @@ function verifyIdToken(token) {
     // over a passing network blip.
     if (resp.getResponseCode() !== 200) {
       logTransientAuth('non200', resp.getResponseCode(), resp.getContentText());
-      cache.put(key, '-transient', 20); return null;
+      _AUTH_VERDICT = 'transient'; cache.put(key, '-transient', 20); return null;
     }
     var info;
     try { info = JSON.parse(resp.getContentText()); } catch (parseErr) {
       logTransientAuth('parse-error', String(parseErr), resp.getContentText());
-      cache.put(key, '-transient', 20); return null;
+      _AUTH_VERDICT = 'transient'; cache.put(key, '-transient', 20); return null;
     }
     // A genuine denial requires tokeninfo to have actually told us WHO this
     // is (real aud + email) and that identity failing the checks below. A
@@ -1380,13 +1405,17 @@ function verifyIdToken(token) {
     // non-200 case, just via a different-shaped failure.
     if (!info || (!info.aud && !info.email)) {
       logTransientAuth('malformed-200', JSON.stringify(info), resp.getContentText());
-      cache.put(key, '-transient', 20); return null;
+      _AUTH_VERDICT = 'transient'; cache.put(key, '-transient', 20); return null;
     }
     var email = String(info.email || '').toLowerCase();
     var audMatch = info.aud === AUTH_CLIENT_ID;
     var emailVerifiedOk = String(info.email_verified) !== 'false';
     var inAllow = !!getAllowedEmails()[email];
     var ok = audMatch && emailVerifiedOk && inAllow;
+    if (!ok && audMatch && emailVerifiedOk && !inAllow && !_ALLOW_READ_OK) {
+      logTransientAuth('allowlist-read-failed', email, '');
+      _AUTH_VERDICT = 'transient'; cache.put(key, '-transient', 20); return null;
+    }
     if (!ok) {
       // TEMP debug (2026-08): a well-formed 200 response is still producing a
       // real denial for accounts confirmed to be on the allowlist -- logging
@@ -1400,7 +1429,7 @@ function verifyIdToken(token) {
           inAllow: inAllow, rawKeys: Object.keys(info)
         }), 1800);
       } catch (logErr) {}
-      cache.put(key, '-denied', 300); return null;
+      _AUTH_VERDICT = 'denied'; cache.put(key, '-denied', 300); return null;
     }
     // 55 min -- close to the token's own ~1hr lifetime (small buffer so a
     // cached verdict never outlives the token itself). Was 30 min; stretched
@@ -1412,7 +1441,7 @@ function verifyIdToken(token) {
     return email;
   } catch (err) {
     logTransientAuth('exception', String(err), err && err.stack);
-    try { cache.put(key, '-transient', 20); } catch(e2){} return null;
+    _AUTH_VERDICT = 'transient'; try { cache.put(key, '-transient', 20); } catch(e2){} return null;
   }
 }
 // TEMP debug (2026-08): the transient path swallows non-200/malformed/exception
@@ -1444,7 +1473,7 @@ function respondUnauthorized(token) {
   // A transient tokeninfo hiccup gets its own 'code' so auth.js's fetch
   // patch (which only nukes the session on code==='unauthorized') leaves a
   // genuinely-valid session alone and just lets that one call fail/retry.
-  if (isTransientAuthFailure(token)) {
+  if (_AUTH_VERDICT === 'transient' || (!_AUTH_VERDICT && isTransientAuthFailure(token))) {
     return respond({ status: 'error', code: 'transient',
                      message: 'Temporary issue verifying sign-in -- please retry.' });
   }
@@ -4268,7 +4297,9 @@ function deleteMeetingLog(data, authEmail){
   sheet.getRange(rIdx+1,16).setValue('Deleted');
   var dec=s.getSheetByName(DECISION_LOG_TAB);
   if(dec && dec.getLastRow()>1){ var dr=dec.getDataRange().getValues();
-    for(var j=1;j<dr.length;j++){ if(String(dr[j][1]||'')===logId) dec.getRange(j+1,9).setValue('Deleted'); } }
+    // Leave 'Removed' items alone — overwriting them with 'Deleted' made an
+    // undelete bring back items cleared on the review screen (live-tested).
+    for(var j=1;j<dr.length;j++){ if(String(dr[j][1]||'')===logId && !isDeadDecision(dr[j][8])) dec.getRange(j+1,9).setValue('Deleted'); } }
   // remove this log's auto-created CRM connection (Submission ID = the logId)
   var crm=s.getSheetByName(CRM_LOG_TAB);
   if(crm && crm.getLastRow()>1){ var cr=crm.getDataRange().getValues();
