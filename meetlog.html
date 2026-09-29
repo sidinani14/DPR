@@ -27,7 +27,11 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 #go:disabled{opacity:.5}.msg{font-size:12px;text-align:center;margin-top:8px;color:#6B6860}
 .toggle{display:flex;gap:0;border:1.5px solid #1F3A5F;border-radius:9px;overflow:hidden;width:fit-content}
 .toggle div{padding:7px 18px;font-size:13px;cursor:pointer;color:#1F3A5F}.toggle div.on{background:#1F3A5F;color:#fff}
-.ph-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.ph-list .t{font-size:10px;background:#EEE;border-radius:5px;padding:3px 7px}
+.ph-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.ph-list .t{font-size:11px;background:#EEE;border-radius:5px;padding:3px 4px 3px 8px;display:inline-flex;align-items:center;gap:4px}
+.ph-list .t button{border:none;background:transparent;color:#C0392B;font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;min-width:28px;min-height:28px}
+/* Date + start + end squeezed three-across made the time pickers unusably
+   narrow on a phone (where site visits are actually logged) — stack them. */
+@media (max-width:520px){ .row{flex-direction:column;gap:0} }
 .draft-banner{background:#FFF8E1;border:1.5px solid #FFE082;border-radius:12px;padding:12px 16px;margin-bottom:14px;display:none}
 .draft-banner-title{font-size:13px;font-weight:700;color:#7A5000;margin-bottom:4px}
 .draft-banner-sub{font-size:11px;color:#A0522D;margin-bottom:10px}
@@ -57,9 +61,23 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 
 <script>
 const API='https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
-let TEAM=[], PROJECTS=[], LOG_TYPE='Meeting', actCount=0, photoFiles=[];
+let TEAM=[], TEAM_EMAILS=[], PROJECTS=[], LOG_TYPE='Meeting', actCount=0, photoFiles=[];
 const PHOTO_THUMBS={};   // fileId → dataUrl, so the review gallery can preview uploaded photos
-const EXTRA_ATTENDEES=['Siddharth Inani'];   // directors not in the active TEAM list
+const EXTRA_ATTENDEES=['Siddharth Inani','Astha Inani'];   // directors not in the active TEAM list
+// Directors aren't in TEAM, so their Google profile name ("Siddharth" /
+// whatever the account shows) never matched an option and "Logged by"
+// silently defaulted to whoever was first in the list.
+const DIRECTOR_NAME_BY_EMAIL={'sidinani14@gmail.com':'Siddharth Inani','siddharth@ideaform.in':'Siddharth Inani','astha@ideaform.in':'Astha Inani','astha.uch@gmail.com':'Astha Inani'};
+// One per rendered form: lets the server recognise a retried submit (response
+// lost on a flaky site connection) instead of creating a duplicate log.
+let SUBMIT_ID='';
+function newSubmitId(){ return 'ms-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10); }
+function myName(){
+  const em=String((window.IDS_USER&&window.IDS_USER.email)||'').toLowerCase();
+  const i=TEAM_EMAILS.findIndex(e=>String(e||'').trim().toLowerCase()===em);
+  if(i>=0) return TEAM[i];
+  return DIRECTOR_NAME_BY_EMAIL[em] || (window.IDS_USER&&window.IDS_USER.name) || '';
+}
 const PURPOSE={
   Meeting:['Project requirement gathering','Design presentation/ feedback','Approvals and decision making','Project progress review','Issue resolution','Material or Vendor selection','Weekly or regular call','Other'],
   'Site Visit':['Measurement / Survey','Client meeting','Contractor coordination','Vendor coordination','Quality check','Progress review','Other']
@@ -69,7 +87,7 @@ const CATS=[['Client','Action plan — Client'],['IDS','Action plan — IDS team
 window.idsOnAuth = async function(){
   try{
     const r = await fetch(API+'?action=getLists').then(x=>x.json());
-    TEAM=r.team||[]; PROJECTS=r.projects||[];
+    TEAM=r.team||[]; TEAM_EMAILS=r.emails||[]; PROJECTS=r.projects||[];
   }catch(e){}
   // Resuming an existing log from the Logs Manager (?edit=<logId>) — e.g. a
   // Draft that was submitted but never finished, or any log that needs a
@@ -86,6 +104,7 @@ window.idsOnAuth = async function(){
           clientAttendees:d.clientAttendees||'', purpose:d.purpose||[],
           photoIds:d.photoIds||[], folderId:d.folderId||''};
         renderReview();
+        loadReviewThumbs();
         return;
       }
       document.getElementById('app').innerHTML = `<div class="card"><h1 style="color:#C0392B">Could not load this log</h1><div class="sub">${esc(d.message||'Unknown error')}</div><a href="logs.html" style="color:#1F3A5F">← Back to Logs Manager</a></div>`;
@@ -98,16 +117,20 @@ window.idsOnAuth = async function(){
   const mlLink = document.getElementById('mylogs-link'); if (mlLink) mlLink.style.display = 'inline-block';
   render();
 };
-function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
+// Full HTML escape — this used to escape only `"`, so a `<` typed into minutes
+// or attendee names broke the review screen's markup (and could inject HTML).
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function projOpts(){return '<option value="">Select project…</option>'+PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');}
-function teamOpts(){const me=(window.IDS_USER&&window.IDS_USER.name)||'';return TEAM.map(t=>`<option ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
+function teamOpts(){const me=myName();const list=attendeeList();if(me&&!list.some(t=>t.toLowerCase()===me.toLowerCase()))list.unshift(me);return list.map(t=>`<option value="${esc(t)}" ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
 function attendeeList(){const seen={};return TEAM.concat(EXTRA_ATTENDEES).filter(t=>{const k=t.toLowerCase();if(seen[k])return false;seen[k]=1;return !!t;});}
 // When Aman is logging (he records Siddharth's meetings), pre-tick Siddharth.
 function isAmanUser(){ return String((window.IDS_USER&&window.IDS_USER.email)||'').toLowerCase()==='aman.raghuwanshi@ideaform.in'; }
 function teamChecks(){return attendeeList().map(t=>{const pre=(isAmanUser()&&t==='Siddharth Inani')?' checked':'';return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}"${pre}>${esc(t)}</label>`;}).join('');}
 
 function render(){
-  const today=new Date().toISOString().substring(0,10);
+  // Local date — toISOString() is UTC, which before 5:30am IST gave yesterday.
+  const _n=new Date(), today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+  SUBMIT_ID=newSubmitId(); photoFiles=[];
   document.getElementById('app').innerHTML=`
   <div class="card">
     <div class="ch"><div class="cn">1</div><div class="ct">Type & project</div></div>
@@ -245,12 +268,21 @@ function resumeDraft(){
   try {
     setType(d.type||'Meeting');
     const g = id => document.getElementById(id);
-    if (g('project')) g('project').value = d.project||'';
+    // The project <select> is wrapped by SearchSelect, whose visible box only
+    // updates on a `change` event — setting .value alone restored the value
+    // but the box kept showing "Select project…", so people re-picked it or
+    // thought the restore failed.
+    let projMissing = false;
+    if (g('project')) {
+      g('project').value = d.project||'';
+      if (d.project && g('project').value !== d.project) projMissing = true;
+      g('project').dispatchEvent(new Event('change',{bubbles:true}));
+    }
     if (g('date')) g('date').value = d.date||'';
     if (g('time')) g('time').value = d.time||'';
     if (g('endTime')) g('endTime').value = d.endTime||'';
     if (g('duration')) g('duration').value = d.duration||'';
-    if (g('loggedBy')) g('loggedBy').value = d.loggedBy||'';
+    if (g('loggedBy') && d.loggedBy) { g('loggedBy').value = d.loggedBy; if (!g('loggedBy').value) g('loggedBy').value = myName(); }
     (d.teamAttendees||[]).forEach(v=>{ document.querySelectorAll('.ta').forEach(c=>{ if(c.value===v) c.checked=true; }); });
     if (g('clientAttendees')) g('clientAttendees').value = d.clientAttendees||'';
     (d.purpose||[]).forEach(v=>{ document.querySelectorAll('#purpose .chip').forEach(c=>{ if(c.dataset.v===v) c.classList.add('on'); }); });
@@ -260,7 +292,8 @@ function resumeDraft(){
       if (g('actt-'+a.cat)) g('actt-'+a.cat).value = a.text||'';
     });
     if (g('videos')) g('videos').value = d.videos||'';
-    msg('Draft restored ✓');
+    msg(projMissing ? '⚠ Draft restored, but project "'+d.project+'" is no longer in the list — pick it again.'
+      : 'Draft restored ✓'+(d.type==='Site Visit'?' — re-attach any photos.':''));
   } catch(e){
     console.error('resumeDraft failed', e);
     msg('⚠ Draft restored, but some fields failed — check your browser console');
@@ -286,8 +319,15 @@ function numKey(e){
   const ta=e.target, pos=ta.selectionStart;
   const before=ta.value.slice(0,pos), after=ta.value.slice(pos);
   const ins='\n'+(before.split('\n').length+1)+'. ';
-  ta.value=before+ins+after;
-  const np=before.length+ins.length; ta.setSelectionRange(np,np);
+  // Renumber every numbered line after the insert — pressing Enter mid-list
+  // used to leave "1. 2. 3. 3. 4." duplicates below the cursor.
+  const lines=(before+ins+after).split('\n'); let n=0;
+  const fixed=lines.map(l=>/^\s*\d+[.)]\s/.test(l)?l.replace(/^\s*\d+([.)])/, (_,p)=>(++n)+p):l).join('\n');
+  ta.value=fixed;
+  const fl=fixed.split('\n'), newIdx=before.split('\n').length;   // index of the line just created
+  const lineStart=fl.slice(0,newIdx).join('\n').length+1;
+  const caret=lineStart+((fl[newIdx]||'').match(/^\s*\d+[.)]\s*/)||[''])[0].length;
+  ta.setSelectionRange(caret,caret);
   ta.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function numFocus(e){ const ta=e.target; if(!ta.value.trim()){ ta.value='1. '; ta.setSelectionRange(3,3); } }
@@ -330,9 +370,18 @@ function compressImage(file, maxDim, quality){
 // of silently sending it and letting it fail further down the line.
 const MAX_UPLOAD_BYTES = 6*1024*1024; // 6MB -- generous for a compressed photo, tight for a raw fallback
 function dataUrlBytes(dataUrl){ return Math.floor(((dataUrl||'').split(',')[1]||'').length*0.75); }
+// The picker's accept="image/*" is only a hint — "Browse files" on Android /
+// desktop still lets a PDF or video through, which then broke the report.
+function isImageFile(f){ return !!f && (/^image\//i.test(f.type||'') || (!f.type && /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name||''))); }
+function renderPhList(){
+  const el=document.getElementById('ph-list'); if(!el) return;
+  el.innerHTML=photoFiles.map((p,i)=>`<span class="t">${esc(p.name)}<button type="button" title="Remove" onclick="removePhoto(${i})">×</button></span>`).join('');
+}
+function removePhoto(i){ photoFiles.splice(i,1); renderPhList(); }
 async function onPhotos(input){
-  const rejected=[];
+  const rejected=[], notImg=[];
   for(const f of input.files){
+    if(!isImageFile(f)){ notImg.push(f.name); continue; }
     const compressed=await compressImage(f, 1600, 0.78);
     let name=f.name, mime, dataUrl;
     if (compressed){
@@ -343,8 +392,9 @@ async function onPhotos(input){
     }
     if (dataUrlBytes(dataUrl) > MAX_UPLOAD_BYTES){ rejected.push(name); continue; }
     photoFiles.push({name, mime, dataUrl});
-    document.getElementById('ph-list').innerHTML=photoFiles.map(p=>`<span class="t">${esc(p.name)}</span>`).join('');
+    renderPhList();
   }
+  if (notImg.length) alert('Only photos can be added here — skipped: '+notImg.join(', ')+'. Put video links in the box below instead.');
   if (rejected.length) alert((rejected.length>1?rejected.length+' photos are':'"'+rejected[0]+'" is')+' too large to upload (over 6MB) — try a smaller photo or a screenshot of it instead.');
   input.value='';
 }
@@ -369,17 +419,35 @@ async function submitLog(){
   const go=document.getElementById('go'); go.disabled=true;
   const date=document.getElementById('date').value;
   try{
-    // upload photos one-by-one
-    const photoIds=[]; let folderId=''; const failed=[];
-    for(let i=0;i<photoFiles.length;i++){ msg('Uploading photo '+(i+1)+'/'+photoFiles.length+'…');
-      const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project,date,name:photoFiles[i].name,mime:photoFiles[i].mime,dataUrl:photoFiles[i].dataUrl})}).then(x=>x.json()).catch(()=>({}));
-      if(r&&r.fileId){photoIds.push(r.fileId); folderId=r.folderId||folderId; PHOTO_THUMBS[r.fileId]=photoFiles[i].dataUrl;}
-      else failed.push({name:photoFiles[i].name, msg:(r&&r.message)||''});
+    // Photos only belong to Site Visits — the section is hidden for Meetings,
+    // but photos picked before switching type used to upload anyway.
+    const photos = LOG_TYPE==='Site Visit' ? photoFiles : [];
+    // Each photo remembers its Drive fileId once uploaded, so hitting Submit
+    // again after one failure only retries the failed ones (it used to
+    // re-upload every photo and leave duplicates in Drive). The first upload
+    // runs alone because it creates the project/date folder; the rest go 3 at
+    // a time.
+    const failed=[]; let folderId='', done=0;
+    const upOne = async p => {
+      if (p.fileId) return;
+      const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'uploadMeetingPhoto',project,date,name:p.name,mime:p.mime,dataUrl:p.dataUrl})}).then(x=>x.json()).catch(()=>({}));
+      if(r&&r.fileId){ p.fileId=r.fileId; p.folderId=r.folderId||''; PHOTO_THUMBS[r.fileId]=p.dataUrl; }
+      else failed.push({name:p.name, msg:(r&&r.message)||''});
+      done++; msg('Uploading photos '+done+'/'+photos.length+'…');
+    };
+    if (photos.length){
+      msg('Uploading photos 0/'+photos.length+'…');
+      await upOne(photos[0]);
+      const rest=photos.slice(1); let k=0;
+      await Promise.all([0,1,2].map(async()=>{ while(k<rest.length){ await upOne(rest[k++]); } }));
     }
+    const photoIds=photos.filter(p=>p.fileId).map(p=>p.fileId);
+    photos.forEach(p=>{ if(p.folderId) folderId=p.folderId; });
     // Don't silently submit a photo-less log — surface upload failures.
     if(failed.length){
       const drive = /permission|Drive|createFolder|createFile/i.test(failed[0].msg||'');
-      msg('⚠ '+failed.length+' of '+photoFiles.length+' photo(s) failed to upload'+(drive?' — Google Drive access is not authorised yet. Ask Siddharth to authorise Drive, then re-add the photos.':' — please try again.'));
+      const why = failed.find(f=>/image|6 MB/i.test(f.msg||''));
+      msg('⚠ '+failed.length+' of '+photos.length+' photo(s) failed to upload'+(drive?' — Google Drive access is not authorised yet. Ask Siddharth to authorise Drive, then re-add the photos.':(why?' — '+why.msg:' — press Submit again to retry just those.')));
       go.disabled=false; return;
     }
     msg('Cleaning up wording & saving…');
@@ -390,10 +458,10 @@ async function submitLog(){
       clientAttendees:document.getElementById('clientAttendees').value,
       purpose:[...document.querySelectorAll('#purpose .chip.on')].map(c=>c.dataset.v),
       body:document.getElementById('body').value, actions:collectActions(),
-      duration:document.getElementById('duration').value, photoIds, folderId,
-      videoLinks:(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean)};
+      duration:document.getElementById('duration').value, photoIds, folderId, clientSubmitId:SUBMIT_ID,
+      videoLinks:LOG_TYPE==='Site Visit'?(document.getElementById('videos')?document.getElementById('videos').value:'').split('\n').map(s=>s.trim()).filter(Boolean):[]};
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
-    if(res.status==='ok'){ clearDraft(); showReview(res, payload); window.scrollTo(0,0); }
+    if(res.status==='ok'){ clearDraft(); showReview(res, payload); window.scrollTo(0,0); if(res.duplicate) msg('This log was already saved — showing it rather than creating a copy.'); }
     else { msg('Error: '+(res.message||'failed')); go.disabled=false; }
   }catch(e){ msg('Network error — try again.'); go.disabled=false; }
 }
@@ -405,12 +473,16 @@ const qattr=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')
 // member the same "is it still a draft / was it published" visibility for
 // just their own logs, using the same getMeetingLogForEdit + review screen
 // Logs Manager's own edit links already use, just ownership-checked.
+// Who "me" is comes from the server (your verified sign-in) — it used to be
+// read from the editable "Logged by" dropdown, so picking a colleague's name
+// showed (and let you edit) their logs.
 async function showMyLogs(){
-  const member = (document.getElementById('loggedBy')?.value) || (window.IDS_USER&&window.IDS_USER.name) || '';
+  flushDraftNow();   // leaving the form re-renders it blank — keep what was typed restorable
   document.getElementById('app').innerHTML = '<div class="card"><div class="sub">Loading your logs…</div></div>';
   try{
-    const r = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyMeetingLogs', member})}).then(x=>x.json());
-    renderMyLogs(member, r.logs||[]);
+    const r = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyMeetingLogs'})}).then(x=>x.json());
+    if (r.status==='error') throw new Error(r.message||'failed');
+    renderMyLogs(r.member || myName(), r.logs||[]);
   }catch(e){
     document.getElementById('app').innerHTML = '<div class="card"><h1 style="color:#C0392B">Network error</h1><a href="javascript:void(0)" onclick="render()" style="color:#1F3A5F">← Back to form</a></div>';
   }
@@ -426,8 +498,8 @@ function renderMyLogs(member, logs){
         <div class="ml-meta">${esc(l.date)} · ${esc(l.type)}${l.clients?' · '+esc(l.clients):''}</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center">
-        ${published && l.pdfId ? `<a href="https://drive.google.com/file/d/${l.pdfId}/view" target="_blank" style="font-size:12px;color:#1F3A5F">Open PDF ↗</a>` : ''}
-        <button class="ml-btn" onclick="continueMyLog('${l.logId}','${qattr(member)}',${published})">${editLabel}</button>
+        ${published && l.pdfId ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(l.pdfId)}/view" target="_blank" style="font-size:12px;color:#1F3A5F">Open PDF ↗</a>` : ''}
+        <button class="ml-btn" data-id="${esc(l.logId)}" onclick="continueMyLog(this.dataset.id,${published})">${editLabel}</button>
       </div>
     </div>`;
   }).join('') : `<div class="sub">No logs found for <b>${esc(member)}</b> yet.</div>`;
@@ -438,17 +510,18 @@ function renderMyLogs(member, logs){
     <a href="javascript:void(0)" onclick="render()" style="display:inline-block;margin-top:8px;color:#1F3A5F;font-size:12px">← Back to form</a>
   </div>`;
 }
-async function continueMyLog(logId, member, published){
+async function continueMyLog(logId, published){
   if (published && !confirm('This log has already been published to the client. Editing it will regenerate the PDF, and Siddharth & Astha will be notified automatically. Continue?')) return;
   document.getElementById('app').innerHTML = '<div class="card"><div class="sub">Loading log…</div></div>';
   try{
-    const d = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyMeetingLogForEdit', logId, member})}).then(x=>x.json());
+    const d = await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyMeetingLogForEdit', logId})}).then(x=>x.json());
     if (d.status==='ok'){
       REVIEW = {logId:d.logId, project:d.project, date:d.date, type:d.type,
         body:d.body||'', items:d.items||[], teamAttendees:d.teamAttendees||[],
         clientAttendees:d.clientAttendees||'', purpose:d.purpose||[],
-        photoIds:d.photoIds||[], folderId:d.folderId||'', selfMember:member};
+        photoIds:d.photoIds||[], folderId:d.folderId||'', selfEdit:true};
       renderReview();
+      loadReviewThumbs();
       return;
     }
     document.getElementById('app').innerHTML = `<div class="card"><h1 style="color:#C0392B">Could not load this log</h1><div class="sub">${esc(d.message||'Unknown error')}</div><a href="javascript:void(0)" onclick="showMyLogs()" style="color:#1F3A5F">← Back to My Logs</a></div>`;
@@ -480,7 +553,7 @@ function renderReview(){
       <div class="field"><div class="lbl">Other attendees <span class="opt">clients etc.</span></div><input id="rv-clients" value="${qattr(REVIEW.clientAttendees)}"></div>
       <div class="field"><div class="lbl">${REVIEW.type==='Site Visit'?'Key observations / issues':'Minutes of meeting'}</div>
         <textarea id="rv-body" style="min-height:150px" onkeydown="numKey(event)" onfocus="numFocus(event)">${esc(REVIEW.body||'')}</textarea></div>
-      ${itemsHtml?'<div class="lbl" style="margin:10px 0 2px">Action items</div>'+itemsHtml:''}
+      ${itemsHtml?'<div class="lbl" style="margin:10px 0 2px">Action items <span class="opt">clear an item\'s text to remove it</span></div>'+itemsHtml:''}
       ${photoBlock}
       <button id="genbtn" onclick="finalizeLog()" style="background:#1F3A5F;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-size:14px;cursor:pointer;width:100%;margin-top:12px">Generate shareable PDF</button>
       <div id="msg" class="sub" style="margin-top:8px"></div>
@@ -513,14 +586,31 @@ function photoGalleryHtml(){
     <input type="file" accept="image/*" multiple onchange="onReviewPhotos(this)">
     <div id="rv-ph" class="sub" style="margin-top:4px">${REVIEW.photoIds.length} photo(s) attached</div></div>`;
 }
+// A log reopened later (My Logs / Logs Manager) has only Drive fileIds, which
+// the browser can't display — fetch small thumbnails so each photo is
+// recognisable before someone taps × on it.
+async function loadReviewThumbs(){
+  if (!REVIEW || REVIEW.type!=='Site Visit') return;
+  const missing=(REVIEW.photoIds||[]).filter(id=>!PHOTO_THUMBS[id]);
+  if (!missing.length) return;
+  const logId=REVIEW.logId;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMeetingLogPhotoThumbs', logId})}).then(x=>x.json());
+    if (r && r.thumbs) Object.keys(r.thumbs).forEach(id=>{ PHOTO_THUMBS[id]=r.thumbs[id]; });
+  }catch(e){ return; }
+  if (!REVIEW || REVIEW.logId!==logId || !document.getElementById('genbtn')) return;   // user moved on
+  captureReview(); renderReview();
+}
 function removeReviewPhoto(id){
   captureReview();                                            // keep in-progress edits
   REVIEW.photoIds=(REVIEW.photoIds||[]).filter(x=>x!==id);
   renderReview();                                             // regenerating the PDF later omits it
 }
 async function onReviewPhotos(input){
-  const ph=document.getElementById('rv-ph'); const failed=[]; let tooLarge=0;
+  const ph=document.getElementById('rv-ph'); const failed=[]; let tooLarge=0; const notImg=[];
+  captureReview();   // the re-render below would otherwise wipe unsaved text edits
   for(const f of input.files){
+    if(!isImageFile(f)){ notImg.push(f.name); continue; }
     if(ph) ph.textContent='Uploading…';
     const compressed=await compressImage(f, 1600, 0.78);
     const dataUrl=compressed ? compressed.dataUrl
@@ -535,27 +625,28 @@ async function onReviewPhotos(input){
   captureReview(); renderReview();                            // repaint gallery with the new thumbnails
   if(failed.length){ const el=document.getElementById('rv-ph'); if(el){ const drive=/permission|Drive|createFolder|createFile/i.test(failed[0]); el.textContent='⚠ '+failed.length+' photo(s) failed'+(drive?' — Drive not authorised':', try again')+' · '+REVIEW.photoIds.length+' attached'; el.style.color='#C0392B'; } }
   if(tooLarge) alert(tooLarge+' photo(s) too large to upload (over 6MB) — try a smaller photo or a screenshot of it instead.');
+  if(notImg.length) alert('Only photos can be added here — skipped: '+notImg.join(', '));
 }
 async function finalizeLog(){
   const gb=document.getElementById('genbtn'); gb.disabled=true; msg('Generating the report PDF…');
   captureReview();
   const items={}; (REVIEW.items||[]).forEach(it=>{ items[it.id]=it.text; });
-  // A session resumed from My Logs (REVIEW.selfMember set) goes through the
-  // ownership-checked action instead -- the plain finalizeMeetingLog has no
-  // owner check at all (fine for the immediate post-submit flow, since only
-  // the author is ever in that state to call it; not fine for a route
-  // reachable later, by logId, from a list).
-  const action = REVIEW.selfMember ? 'finalizeMyMeetingLog' : 'finalizeMeetingLog';
+  // A session resumed from My Logs goes through finalizeMyMeetingLog, which
+  // also emails Siddharth & Astha if the log was already published. Both
+  // actions check ownership server-side against your sign-in.
+  const action = REVIEW.selfEdit ? 'finalizeMyMeetingLog' : 'finalizeMeetingLog';
   const payload = {action,logId:REVIEW.logId,bodyPolished:REVIEW.body,items,teamAttendees:REVIEW.teamAttendees,clientAttendees:REVIEW.clientAttendees,purpose:REVIEW.purpose,photoIds:REVIEW.photoIds};
-  if (REVIEW.selfMember) payload.member = REVIEW.selfMember;
   try{
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
     if(res.status==='ok'){
+      // Cleared items were removed server-side; drop them here too so
+      // "Edit & regenerate" doesn't show empty boxes for them.
+      REVIEW.items=(REVIEW.items||[]).filter(it=>String(it.text||'').trim());
       const link=res.pdfError
         ? `<span style="color:#C0392B">⚠ ${esc(res.pdfError)}</span>`
-        : (res.pdfUrl?`<a href="${res.pdfUrl}" target="_blank" style="color:#1F3A5F;font-weight:600">Open / share the PDF ↗</a>`:'PDF generated.');
+        : (res.pdfUrl?`<a href="${esc(res.pdfUrl)}" target="_blank" style="color:#1F3A5F;font-weight:600">Open / share the PDF ↗</a>`:'PDF generated.');
       document.getElementById('app').innerHTML=`<div class="card"><h1 style="color:#2E7D32">✓ Report ready</h1>
-        <div class="sub">The report for <b>${esc(REVIEW.project)}</b> is updated with this ${LOG_TYPE.toLowerCase()} at the front.<br><br>${link}</div>
+        <div class="sub">The report for <b>${esc(REVIEW.project)}</b> is updated with this ${esc(String(REVIEW.type||LOG_TYPE).toLowerCase())} at the front.<br><br>${link}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px">
           <button onclick="editLog()" style="background:#1F3A5F;color:#fff;border:none;border-radius:8px;padding:10px 15px;font-size:13px;cursor:pointer">Missed something? Edit &amp; regenerate</button>
           <button onclick="deleteLog()" style="background:#fff;color:#C0392B;border:1px solid #E2DFD8;border-radius:8px;padding:10px 15px;font-size:13px;cursor:pointer">Delete this log</button>

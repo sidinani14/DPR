@@ -1837,9 +1837,11 @@ function doPost(e) {
     if (data.action === 'getMeetingApprovals') return cachedSafeRespond('c_getMeetingApprovals', 15, getMeetingApprovals);
     if (data.action === 'approveMeetingLog')   return respond(approveMeetingLog(data, authEmail));
     if (data.action === 'finalizeMeetingLog')  return respond(finalizeMeetingLog(data, authEmail));
-    if (data.action === 'getMyMeetingLogs')        return respond(getMyMeetingLogs(data.member||''));
-    if (data.action === 'getMyMeetingLogForEdit')  return respond(getMyMeetingLogForEdit(data.logId||'', data.member||''));
-    if (data.action === 'finalizeMyMeetingLog')    return respond(finalizeMyMeetingLog(data, data.member||''));
+    if (data.action === 'getMyMeetingLogs')        return respond(getMyMeetingLogs(authEmail));
+    if (data.action === 'getMyMeetingLogForEdit')  return respond(getMyMeetingLogForEdit(data.logId||'', authEmail));
+    if (data.action === 'finalizeMyMeetingLog')    return respond(finalizeMyMeetingLog(data, authEmail));
+    if (data.action === 'getMeetingLogPhotoThumbs') return respond(getMeetingLogPhotoThumbs(data.logId||'', authEmail));
+    if (data.action === 'trashQaTestFiles') return respond(isDirector(authEmail) ? trashQaTestFiles() : {status:'error', code:'forbidden', message:'Directors only'});
     if (data.action === 'deleteMeetingLog')    return respond(deleteMeetingLog(data, authEmail));
     if (data.action === 'getMeetingTimeline')  return respond(getMeetingTimeline(data.project||''));
     if (data.action === 'getRecentLeads')      return respond(getRecentLeads(data.date||''));
@@ -3263,9 +3265,54 @@ function writeMeetingLogHeaders(sheet){
   var h=['Log ID','Date','Time','Type','Project','Logged By','Team Attendees','Client Attendees',
          'Purpose','Body (raw)','Body (polished)','Duration (hrs)','Drive Folder','Photo IDs',
          'Video Links','Status','Approved By','Approval Date','What Changed','Report PDF ID',
-         'Frozen Snapshot','Lead Reviewed','End Time'];
+         'Frozen Snapshot','Lead Reviewed','End Time','Submitted By (email)','Client Submit ID'];
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#1F3A5F').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
+}
+// Cols X/Y added 2026-09 on an existing sheet — label them if missing.
+function ensureMeetingLogExtraHeaders(sheet){
+  try {
+    ensureCols(sheet, 25);
+    var hv = sheet.getRange(1, 24, 1, 2).getValues()[0];
+    if (!hv[0]) sheet.getRange(1, 24).setValue('Submitted By (email)');
+    if (!hv[1]) sheet.getRange(1, 25).setValue('Client Submit ID');
+  } catch (e) {}
+}
+function findMeetingLogBySubmitId(sheet, submitId){
+  if (!submitId || sheet.getLastRow() < 2 || sheet.getLastColumn() < 25) return '';
+  var ids = sheet.getRange(2, 1, sheet.getLastRow()-1, 1).getValues();
+  var keys = sheet.getRange(2, 25, sheet.getLastRow()-1, 1).getValues();
+  for (var i = 0; i < keys.length; i++) if (String(keys[i][0]||'').trim() === submitId) return String(ids[i][0]||'');
+  return '';
+}
+// Same response shape submitMeetingLog returns, rebuilt from the saved row —
+// used when a retried submit turns out to be a duplicate of one already saved.
+function meetingLogSubmitResult(logId, duplicate){
+  var ed = getMeetingLogForEdit(logId);
+  if (ed.status !== 'ok') return { status:'ok', logId:logId, duplicate:!!duplicate, bodyPolished:'', items:[] };
+  return { status:'ok', logId:logId, duplicate:!!duplicate, polished:true, bodyPolished: ed.body,
+    items: (ed.items||[]).map(function(it){ return { id:it.id, cat:it.cat, owner:it.owner, text:it.text }; }) };
+}
+// Verified sign-in email → the person's name as used in "Logged By".
+// Directors aren't guaranteed a TEAM-tab row, hence the fallback map.
+var DIRECTOR_NAME_BY_EMAIL = { 'sidinani14@gmail.com':'Siddharth Inani', 'siddharth@ideaform.in':'Siddharth Inani',
+  'astha@ideaform.in':'Astha Inani', 'astha.uch@gmail.com':'Astha Inani' };
+function memberNameForAuth(authEmail){
+  var e = String(authEmail||'').trim().toLowerCase();
+  if (!e) return '';
+  return nameForEmail(e) || DIRECTOR_NAME_BY_EMAIL[e] || '';
+}
+// Who may view/edit/finalize a meeting log: managers (Logs Manager), the person
+// who actually submitted it (col X, from the verified token), or — for logs
+// saved before col X existed — the person named in Logged By, resolved from the
+// verified sign-in, never from anything the browser sends.
+function canEditMeetingLog(row, authEmail){
+  if (isManager(authEmail)) return true;
+  var e = String(authEmail||'').trim().toLowerCase();
+  if (!e) return false;
+  if (String(row[23]||'').trim().toLowerCase() === e) return true;
+  var me = memberNameForAuth(e);
+  return !!me && String(row[5]||'').trim().toLowerCase() === me.toLowerCase();
 }
 
 // Cross-check a logged visit/meeting's date+time against what the same
@@ -3384,9 +3431,16 @@ function meetingDriveFolder(project, day){
 // Upload one base64 image to the visit's Drive folder. Called once per photo.
 function uploadMeetingPhoto(data){
   try {
-    var folder = meetingDriveFolder(data.project||'', dateStr(data.date||''));
+    // Server-side twin of meetlog.html's checks: images only, ≤ ~6MB. The page
+    // already filters, but a PDF/video slipping through used to land in Drive
+    // and then break the PDF report's inline <img>.
+    var mime = String(data.mime||'image/jpeg').toLowerCase();
+    if (mime.indexOf('image/') !== 0) return { status:'error', message:'Only image files can be uploaded as photos.' };
     var b64 = String(data.dataUrl||'').replace(/^data:[^,]*,/,'');
-    var blob = Utilities.newBlob(Utilities.base64Decode(b64), data.mime||'image/jpeg', data.name||('photo-'+Date.now()+'.jpg'));
+    if (!b64) return { status:'error', message:'Empty photo.' };
+    if (b64.length * 3 / 4 > 6.5 * 1024 * 1024) return { status:'error', message:'Photo is larger than 6 MB.' };
+    var folder = meetingDriveFolder(data.project||'', dateStr(data.date||''));
+    var blob = Utilities.newBlob(Utilities.base64Decode(b64), mime, data.name||('photo-'+Date.now()+'.jpg'));
     var f = folder.createFile(blob);
     return { status:'ok', fileId:f.getId(), folderId:folder.getId() };
   } catch(e){ return { status:'error', message:String(e) }; }
@@ -3398,11 +3452,18 @@ function submitMeetingLog(data, authEmail){
   var s = db();
   var logSheet = getOrCreate(MEETING_LOG_TAB, writeMeetingLogHeaders);
   var decSheet = getOrCreate(DECISION_LOG_TAB, writeDecisionLogHeaders);
-  var logId = nextId(logSheet, 'ML-');
+  ensureMeetingLogExtraHeaders(logSheet);
   var day = dateStr(data.date || '');
   var project = String(data.project || '').trim();
   var loggedBy = String(data.loggedBy || '').trim();
   var type = (data.type === 'Site Visit') ? 'Site Visit' : 'Meeting';
+  // Idempotency: the page sends one clientSubmitId per form. A retry after a
+  // network error (the write landed but the response never made it back --
+  // plausible given the multi-second AI polish below) used to create a second
+  // copy of the same log; now it just gets the first one back.
+  var clientSubmitId = String(data.clientSubmitId || '').trim();
+  var dupId = clientSubmitId ? findMeetingLogBySubmitId(logSheet, clientSubmitId) : '';
+  if (dupId) return meetingLogSubmitResult(dupId, true);
 
   // Action plans: data.actions = {Client:[{owner,text,deadline}], IDS:[...], Contractor:[...], Other:[...]}
   var actions = data.actions || {};
@@ -3430,11 +3491,23 @@ function submitMeetingLog(data, authEmail){
   var folderId = data.folderId || '';
   var videoLinks = (data.videoLinks||[]).join(' | ');
 
+  // The log ID used to be picked at the very top of this function and only
+  // written here, after the multi-second AI polish above, with no lock -- two
+  // people submitting at the same time both got the same "next" ML- number,
+  // and every later lookup by logId (edit/finalize/delete) only ever found the
+  // first of them. ID assignment + every write that references it now happens
+  // in one locked block, after the slow external call.
+  var logId;
+  var dupInLock = withLock(function(){
+    if (clientSubmitId) { var d2 = findMeetingLogBySubmitId(logSheet, clientSubmitId); if (d2) return d2; }
+    logId = nextId(logSheet, 'ML-');
   prependRow(logSheet, [ logId, day, String(data.time||''), type, project, loggedBy,
     (data.teamAttendees||[]).join(', '), String(data.clientAttendees||''),
     (data.purpose||[]).join(', '), bodyRaw, bodyPolished, String(data.duration||''),
     folderId, photoIds, videoLinks, 'Draft', '', '', whatChanged, '', '', '',
-    String(data.endTime||'') ]);
+    String(data.endTime||''),
+    String(authEmail||'').toLowerCase(),   // X — submitter's verified email (ownership)
+    clientSubmitId ]);                      // Y — idempotency key
 
   // Decision items → DECISION_LOG (store polished text where available); IDS items → tasks
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
@@ -3457,6 +3530,9 @@ function submitMeetingLog(data, authEmail){
 
   // Register as a client connection so it shows on the projects dashboard
   appendConnections(loggedBy, day, [{ project:project, type:type, notes:'Logged '+type+(data.clientAttendees?(' with '+data.clientAttendees):'') }], logId);
+    return '';
+  });
+  if (dupInLock) return meetingLogSubmitResult(dupInLock, true);
 
   // VISIT_PLANNER col H updates the moment this log is submitted -- meetlog.html
   // is a third real path a site visit/meeting gets recorded through (alongside
@@ -3501,6 +3577,14 @@ function finalizeMeetingLog(data, authEmail){
   var rows = logSheet.getDataRange().getValues(), rIdx=-1;
   for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===logId){ rIdx=i; break; } }
   if (rIdx<0) return {status:'error', message:'log not found'};
+  // A deleted log used to be silently resurrected to 'Final' (and back into
+  // the client PDF) by any finalize call — e.g. a second tab still sitting on
+  // the review screen. Restore it from Logs Manager first instead.
+  if (String(rows[rIdx][15]||'').trim() === 'Deleted')
+    return {status:'error', message:'This log was deleted. Restore it from Logs Manager before editing it.'};
+  // Had no ownership check at all: any signed-in user could rewrite any log by ID.
+  if (!canEditMeetingLog(rows[rIdx], authEmail))
+    return {status:'error', code:'forbidden', message:'You can only edit logs you submitted.'};
   var rowNum = rIdx+1;
 
   // apply edited body
@@ -3512,11 +3596,23 @@ function finalizeMeetingLog(data, authEmail){
   if (data.clientAttendees != null) logSheet.getRange(rowNum,8 ).setValue(String(data.clientAttendees||''));
   if (data.purpose         != null) logSheet.getRange(rowNum,9 ).setValue(csv(data.purpose));
   if (data.photoIds        != null) logSheet.getRange(rowNum,14).setValue(Array.isArray(data.photoIds)?data.photoIds.join(','):String(data.photoIds||''));
-  // apply edited action-item texts
+  // apply edited action-item texts — only this log's own items (edits is keyed
+  // by item ID from the client, so it was otherwise able to touch any log's
+  // items). Clearing an item's text removes it (status 'Deleted', which the
+  // report, the edit screen and Follow-ups all skip); before, a blank edit was
+  // silently ignored and the item stayed in the client PDF with no way out.
+  // ('Removed' — see isDeadDecision.)
   var edits = data.items || {};
   if (decSheet && decSheet.getLastRow()>1){
     var dr = decSheet.getDataRange().getValues();
-    for (var j=1;j<dr.length;j++){ var id=String(dr[j][0]||''); if(edits[id]!=null && String(edits[id]).trim()) decSheet.getRange(j+1,7).setValue(String(edits[id])); }
+    for (var j=1;j<dr.length;j++){
+      if (String(dr[j][1]||'') !== logId) continue;
+      var id=String(dr[j][0]||'');
+      if (edits[id]==null) continue;
+      var newTxt = String(edits[id]).trim();
+      if (newTxt) decSheet.getRange(j+1,7).setValue(newTxt);
+      else decSheet.getRange(j+1,9).setValue('Removed');   // not 'Deleted' — undeleting the whole log must not bring these back
+    }
   }
 
   // build the entry from current (edited) values, freeze its text snapshot
@@ -3536,6 +3632,11 @@ function finalizeMeetingLog(data, authEmail){
            pdfError: pdf && pdf.error ? 'Log saved, but the PDF could not be regenerated — tell Siddharth so he can check the project\'s log history.' : null };
 }
 
+// DECISION_LOG status that means "not part of the log any more": 'Deleted'
+// (its whole log was deleted — undeleteMeetingLog brings these back) or
+// 'Removed' (cleared individually on the review screen — stays gone).
+function isDeadDecision(status){ var s=String(status||'').trim(); return s==='Deleted' || s==='Removed'; }
+
 // Current decision items for a log (id/cat/owner/text), applying any pending edits.
 function decisionsForLog(logId, edits){
   var sheet = db().getSheetByName(DECISION_LOG_TAB);
@@ -3544,8 +3645,10 @@ function decisionsForLog(logId, edits){
   edits = edits||{};
   var rows = sheet.getDataRange().getValues();
   for (var i=1;i<rows.length;i++){ if(String(rows[i][1]||'')!==logId) continue;
+    if (isDeadDecision(rows[i][8])) continue;
     var id=String(rows[i][0]||''), cat=String(rows[i][4]||'Other');
-    (by[cat]||by.Other).push({ owner:String(rows[i][5]||''), text:(edits[id]!=null&&String(edits[id]).trim())?String(edits[id]):String(rows[i][6]||'') });
+    if (edits[id]!=null && !String(edits[id]).trim()) continue;   // cleared on the review screen = removed
+    (by[cat]||by.Other).push({ owner:String(rows[i][5]||''), text:(edits[id]!=null)?String(edits[id]).trim():String(rows[i][6]||'') });
   }
   return by;
 }
@@ -3577,7 +3680,9 @@ function getOpenActionItems(){
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     var status = String(r[8]||'').trim() || 'Open';
-    if (status === 'Done') continue;
+    // 'Deleted' = its whole meeting log was deleted (deleteMeetingLog soft-
+    // deletes the items with it) -- not an open item, just a removed one.
+    if (status === 'Done' || status === 'Removed' || status === 'Deleted') continue;
     items.push({
       itemId: String(r[0]||''), logId: String(r[1]||''), project: String(r[2]||''),
       date: cellDate(r[3]), category: String(r[4]||''), owner: String(r[5]||''),
@@ -3734,6 +3839,7 @@ function generateProjectReportPDF(project, callerEmail){
   function decsFor(logId){
     var by={Client:[],IDS:[],Contractor:[],Other:[]};
     for (var j=1;j<decRows.length;j++){ if(String(decRows[j][1]||'')!==logId) continue;
+      if (isDeadDecision(decRows[j][8])) continue;
       var cat=String(decRows[j][4]||'Other'); (by[cat]||by.Other).push({owner:String(decRows[j][5]||''),text:String(decRows[j][6]||'')}); }
     return by;
   }
@@ -4136,9 +4242,14 @@ function deleteMeetingLog(data, authEmail){
   for(var i=1;i<rows.length;i++){ if(String(rows[i][0]||'')===logId){ rIdx=i; break; } }
   if(rIdx<0) return {status:'error', message:'log not found'};
   // The author of the log, or a director, may delete it.
+  // (Also the account that actually submitted it — col X — e.g. Aman logging
+  // a meeting "by" Siddharth could otherwise not delete his own mistake.)
+  var e=String(authEmail||'').trim().toLowerCase(), me=memberNameForAuth(e);
   var loggedBy=String(rows[rIdx][5]||'').trim();
-  if(!isDirector(authEmail) && nameForEmail(authEmail)!==loggedBy)
+  var isAuthor = (!!e && String(rows[rIdx][23]||'').trim().toLowerCase()===e) || (!!me && me.toLowerCase()===loggedBy.toLowerCase());
+  if(!isDirector(authEmail) && !isAuthor)
     return {status:'error', code:'forbidden', message:'Only the author or Siddharth can delete this log.'};
+  if(String(rows[rIdx][15]||'').trim()==='Deleted') return {status:'ok', alreadyDeleted:true};
   var project=String(rows[rIdx][4]||'').trim();
   sheet.getRange(rIdx+1,16).setValue('Deleted');
   var dec=s.getSheetByName(DECISION_LOG_TAB);
@@ -4224,7 +4335,7 @@ function getMeetingLogForEdit(logId){
       var dr = decSheet.getDataRange().getValues();
       for (var j = 1; j < dr.length; j++) {
         if (String(dr[j][1]||'').trim() !== logId) continue;
-        if (String(dr[j][8]||'').trim() === 'Deleted') continue;
+        if (isDeadDecision(dr[j][8])) continue;
         items.push({ id:String(dr[j][0]||''), cat:String(dr[j][4]||''), owner:String(dr[j][5]||''), text:String(dr[j][6]||'') });
       }
     }
@@ -4247,6 +4358,44 @@ function getMeetingLogForEdit(logId){
   return {status:'error', message:'Log not found'};
 }
 
+// TEMPORARY (2026-09-29): trash the orphan Drive files left by the meeting-
+// log QA pass. Hardcoded allowlist, trash only (recoverable 30 days).
+// Remove after it has run once.
+function trashQaTestFiles(){
+  var ids = ['1vg591n0gPSDrW-aF2_dUFREpbwWeCLfq','1u_RS0qEg-jC1H4QBLlWTkQZwgtKWiSHe','12u2jEE9vGM0nGGHcIRrPRaoSkhDoABi_',
+             '1lUi5j3RiCTxHgfvjP2R3x4-EkNMTsCrT','1B0mt6SMSHHNHo1SqWYOBqX2b4EIPsLtL','1TXR86Uk_5fsn4I7Ml4ECGmRrTiIEF5Cf',
+             '1awttOMAQgF8lM-2ZZBwhZM_-FMXKUSzs'];
+  var out = [];
+  ids.forEach(function(id){ try { var f=DriveApp.getFileById(id); f.setTrashed(true); out.push(id+': trashed '+f.getName()); } catch(e){ out.push(id+': '+e); } });
+  try { var fo=DriveApp.getFolderById('1z1kjYNHmwzi9TSoySEj8S-UMIGPg0oeq'); fo.setTrashed(true); out.push('folder: trashed '+fo.getName()); } catch(e){ out.push('folder: '+e); }
+  return {status:'ok', results: out};
+}
+
+// Thumbnails for a reopened log's existing photos. The review screen used to
+// show "photo 1, photo 2…" with no image when reopened from My Logs / Logs
+// Manager (the browser can't read Drive files itself), so nobody could tell
+// which photo they were removing. Same ownership rule as editing.
+function getMeetingLogPhotoThumbs(logId, authEmail){
+  logId = String(logId||'').trim();
+  var sheet = db().getSheetByName(MEETING_LOG_TAB);
+  if (!sheet || !logId) return {status:'error', message:'Log not found'};
+  var rows = sheet.getDataRange().getValues(), row = null;
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===logId){ row=rows[i]; break; } }
+  if (!row) return {status:'error', message:'Log not found'};
+  if (!canEditMeetingLog(row, authEmail)) return {status:'error', code:'forbidden', message:'That log belongs to someone else.'};
+  var ids = String(row[13]||'').split(',').map(function(x){return x.trim();}).filter(Boolean);
+  var thumbs = {};
+  ids.forEach(function(id){
+    try {
+      var f = DriveApp.getFileById(id);
+      var t = f.getThumbnail();
+      if (!t) { var b = f.getBlob(); if (b.getBytes().length < 1.5*1024*1024) t = b; }
+      if (t) thumbs[id] = 'data:' + (t.getContentType()||'image/jpeg') + ';base64,' + Utilities.base64Encode(t.getBytes());
+    } catch(e) {}
+  });
+  return {status:'ok', thumbs: thumbs};
+}
+
 // ── Team-facing "My Logs" (2026-09) — logs.html (Logs Manager) is director-
 // only by design (it can delete anything, sees the whole team). A regular
 // team member had NO way to check whether their own submission is Draft
@@ -4254,14 +4403,21 @@ function getMeetingLogForEdit(logId){
 // logs.html's pdfCell comment), Final (published), or check its status at
 // all, short of asking Siddharth/Astha to look it up. These three give a
 // member the same visibility + edit ability, scoped to logs they authored.
-function getMyMeetingLogs(member){
-  var m = String(member||'').trim();
+// 2026-09 security fix: all three used to trust a `member` name sent by the
+// browser — taken from meetlog.html's freely-editable "Logged by" dropdown —
+// so anyone could list, open and republish a colleague's logs just by picking
+// their name. Identity now comes only from the verified sign-in (authEmail).
+function getMyMeetingLogs(authEmail){
+  var e = String(authEmail||'').trim().toLowerCase();
+  var m = memberNameForAuth(e);
   var sheet = db().getSheetByName(MEETING_LOG_TAB);
-  if (!sheet || sheet.getLastRow() < 2 || !m) return {logs:[]};
+  if (!sheet || sheet.getLastRow() < 2 || (!m && !e)) return {member:m, logs:[]};
   var rows = sheet.getDataRange().getValues();
   var out = [];
   for (var i=1;i<rows.length;i++){
-    if (String(rows[i][5]||'').trim().toLowerCase() !== m.toLowerCase()) continue;
+    var mineByName = !!m && String(rows[i][5]||'').trim().toLowerCase() === m.toLowerCase();
+    var mineBySubmit = !!e && String(rows[i][23]||'').trim().toLowerCase() === e;
+    if (!mineByName && !mineBySubmit) continue;
     var status = String(rows[i][15]||'').trim() || 'Draft';
     if (status === 'Deleted') continue;
     out.push({
@@ -4271,40 +4427,42 @@ function getMyMeetingLogs(member){
     });
   }
   out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  return {logs: out};
+  return {member: m, logs: out};
 }
 // Same shape as (manager-only) getMeetingLogForEdit, but only for the log's
 // own author -- logIds are sequential/guessable, so this needs its own
 // ownership check rather than just being thrown open to any signed-in user.
-function getMyMeetingLogForEdit(logId, member){
+function getMyMeetingLogForEdit(logId, authEmail){
   var sheet = db().getSheetByName(MEETING_LOG_TAB);
   if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
   var id = String(logId||'').trim();
   var rows = sheet.getDataRange().getValues();
-  var owner = null;
-  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===id){ owner=String(rows[i][5]||'').trim(); break; } }
-  if (owner === null) return {status:'error', message:'Log not found'};
-  if (owner.toLowerCase() !== String(member||'').trim().toLowerCase())
+  var row = null;
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===id){ row=rows[i]; break; } }
+  if (!row) return {status:'error', message:'Log not found'};
+  if (String(row[15]||'').trim() === 'Deleted') return {status:'error', message:'This log was deleted.'};
+  if (!canEditMeetingLog(row, authEmail))
     return {status:'error', code:'forbidden', message:'That log belongs to someone else.'};
   return getMeetingLogForEdit(id);
 }
-// Same ownership check, then defers to the existing finalizeMeetingLog --
-// only for logs not yet Final/Approved (published + client-facing).
-// Correcting something after that point goes through Siddharth/Astha
-// (Logs Manager can delete + the project PDF regenerates), same as any
-// other already-shipped record in this system -- self-service editing
-// stops at "not sent to the client yet" on purpose.
-function finalizeMyMeetingLog(data, member){
+// Same ownership check, then defers to the existing finalizeMeetingLog.
+// Editing an already-Final/Approved (published) log IS allowed (2026-09
+// decision, see CLAUDE.md "My Logs") -- but it emails Siddharth + Astha
+// the moment it happens, so a correction to a client-facing record is
+// never silent.
+function finalizeMyMeetingLog(data, authEmail){
   var sheet = db().getSheetByName(MEETING_LOG_TAB);
   if (!sheet) return {status:'error', message:'MEETING_LOG not found'};
   var logId = String(data.logId||'').trim();
   var rows = sheet.getDataRange().getValues();
-  var owner = null, priorStatus = '', project = '';
-  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===logId){ owner=String(rows[i][5]||'').trim(); priorStatus=String(rows[i][15]||'').trim(); project=String(rows[i][4]||'').trim(); break; } }
-  if (owner === null) return {status:'error', message:'Log not found'};
-  if (owner.toLowerCase() !== String(member||'').trim().toLowerCase())
+  var row = null;
+  for (var i=1;i<rows.length;i++){ if(String(rows[i][0]||'').trim()===logId){ row=rows[i]; break; } }
+  if (!row) return {status:'error', message:'Log not found'};
+  if (!canEditMeetingLog(row, authEmail))
     return {status:'error', code:'forbidden', message:'That log belongs to someone else.'};
-  var result = finalizeMeetingLog(data, member);
+  var priorStatus = String(row[15]||'').trim(), project = String(row[4]||'').trim();
+  var member = memberNameForAuth(authEmail) || String(authEmail||'');
+  var result = finalizeMeetingLog(data, authEmail);
   // 2026-09 (explicit request): editing an ALREADY-PUBLISHED log is allowed
   // (was blocked outright before) -- self-service, no approval wait -- but
   // since it silently changes a record that may already be in a client's
@@ -7249,6 +7407,7 @@ function getProjectDetail(project){
   var dlSheet=s.getSheetByName(DECISION_LOG_TAB);
   if(dlSheet && dlSheet.getLastRow()>1){ var dl=dlSheet.getDataRange().getValues();
     for(var di=1;di<dl.length;di++){ if(String(dl[di][2]||'').trim().toLowerCase()!==pjl)continue;
+      if(isDeadDecision(dl[di][8]))continue;   // items of deleted logs / removed on review
       out.actionItems.push({ category:String(dl[di][4]||''), owner:String(dl[di][5]||''),
         text:String(dl[di][6]||''), date:cellDate(dl[di][3]), status:String(dl[di][8]||'Open') }); }
     out.actionItems.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -7509,7 +7668,7 @@ function getWeeklyProjectDigest(weekStart){
       if(works) P[k].progress.push({date:d, text:works}); } }
   var dl=s.getSheetByName(DECISION_LOG_TAB);
   if(dl){ var dr=dl.getDataRange().getValues();
-    for(var i=1;i<dr.length;i++){ if(String(dr[i][8]||'').trim()==='Deleted')continue;
+    for(var i=1;i<dr.length;i++){ if(isDeadDecision(dr[i][8]))continue;
       var k=String(dr[i][2]||'').trim().toLowerCase(); if(!P[k])continue; var d=cellDate(dr[i][3]); touch(k,d);
       if(inWk(d)) P[k].actions.push({date:d, cat:String(dr[i][4]||''), owner:String(dr[i][5]||''), text:String(dr[i][6]||'')}); } }
   var iss=s.getSheetByName(SITE_ISSUES_TAB);
