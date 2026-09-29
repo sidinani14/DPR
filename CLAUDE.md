@@ -118,6 +118,18 @@ Root-caused two backend bugs behind reported "sometimes access denied" +
    returned as `{status:'partial', errors:[...]}`. Same pattern applied to
    `updateTaskStatusesFromDPR` (now returns `{updated, errors}`, not void) and
    `submitDPER`/`submitAmanCRM` are now wrapped in `withLock` too.
+4. **(2026-09-29, @389) False "access denied" race** — reproduced live: a
+   finalize got code `unauthorized` while a read sent at the same moment with
+   the same token succeeded. `respondUnauthorized()` re-read the verdict from
+   the SHARED cache, so a concurrent request's success overwrote this
+   request's '-transient' tag and the blip went out as a hard denial →
+   auth.js wiped the saved session and showed the sign-in gate (on every
+   tab). Now each execution answers from its own `_AUTH_VERDICT`; tokeninfo
+   gets one retry; a failed TEAM allowlist read (`_ALLOW_READ_OK=false`) is
+   transient instead of a 5-min cached denial for every non-director; and
+   auth.js re-sends a `transient`-rejected request up to twice (safe: the
+   action never ran). Keep auth verdicts per-request — never re-derive them
+   from the shared cache.
 **Any new score-affecting write path must**: (a) go through `withLock`, (b)
 isolate per-item failures inside a loop with try/catch rather than letting
 one throw kill the batch, (c) return real errors instead of a blanket 'ok'.
