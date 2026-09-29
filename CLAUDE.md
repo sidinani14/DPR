@@ -130,6 +130,13 @@ Root-caused two backend bugs behind reported "sometimes access denied" +
    auth.js re-sends a `transient`-rejected request up to twice (safe: the
    action never ran). Keep auth verdicts per-request — never re-derive them
    from the shared cache.
+5. **(2026-09-29, @391) Unknown doPost actions no longer become DPR rows.**
+   doPost's final fallthrough is the DPR submission handler (dpr.html's
+   main submit sends NO `action`). Any unrecognised action — a typo, or a
+   stale cached page calling a removed action — used to write a blank
+   DAILY_SUMMARY row and answer 'ok'. Now any request with an `action` that
+   reaches the fallthrough gets `code:'unknown_action'`. Every new action
+   still needs its own explicit `if (data.action === …)` line.
 **Any new score-affecting write path must**: (a) go through `withLock`, (b)
 isolate per-item failures inside a loop with try/catch rather than letting
 one throw kill the batch, (c) return real errors instead of a blanket 'ok'.

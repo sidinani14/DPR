@@ -1890,7 +1890,11 @@ function doPost(e) {
     if (data.action === 'createDoneTask')    return respond(withLock(function(){ return createDoneTask(data); }));
     if (data.action === 'createSiddharthTask') return respond(createSiddharthTask(data));
     if (data.action === 'sendPrivateDirectorNote') return respond(sendPrivateDirectorNote(data, authEmail));
-    // Default: DPR submission
+    // Default: DPR submission — dpr.html's main submit is the only caller and
+    // sends NO action. Anything else reaching here (a typo, or a stale cached
+    // page calling a since-removed action) used to be silently written as a
+    // blank DPR row into DAILY_SUMMARY (found 2026-09-29).
+    if (data.action) return respond({ status:'error', code:'unknown_action', message:'Unknown action: ' + String(data.action).slice(0,60) });
     var cfg = readConfig();
     var vPts = {};
     (cfg.visits || []).forEach(function(v) { vPts[v.duration] = v.pts; });
