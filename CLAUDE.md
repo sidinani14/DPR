@@ -130,6 +130,23 @@ Root-caused two backend bugs behind reported "sometimes access denied" +
    auth.js re-sends a `transient`-rejected request up to twice (safe: the
    action never ran). Keep auth verdicts per-request — never re-derive them
    from the shared cache.
+6. **(2026-10-01, @393) 12-hour app sessions — fixes "sudden logout / Access
+   denied" every ~hour** (Aaditya, Poorvi, all forms). Google ID tokens live
+   ~1h; auth.js renewed them by silent Google re-sign-in, which fails for
+   anyone with several Google accounts in the browser, Safari/iOS (no
+   FedCM), or during Google's prompt cool-down — and the failure showed the
+   "Access denied — your sign-in has expired" gate mid-form. Now, after one
+   verified Google sign-in, `startSession` returns an HMAC-signed `ids1.`
+   token (secret = Script Property `SESSION_SECRET`, 12h, can't renew
+   itself); `verifyIdToken` checks it locally (no tokeninfo call) and still
+   re-checks the live TEAM allowlist each request. auth.js stores it
+   (`ids_app_session`), sends it instead of the Google token, skips hourly
+   renewal, and restores it on page load even with an expired Google token.
+   Also: an `unauthorized` reply no longer locks the page on first sight —
+   auth.js retries (session → Google token fallback) and only gates on a
+   persistent refusal (one stray reply right after a deploy used to wipe the
+   saved sign-in). Diagnostics: `getLastSessionDebug` (manager-only).
+   **Never rotate/delete SESSION_SECRET casually** — it logs everyone out.
 5. **(2026-09-29, @391) Unknown doPost actions no longer become DPR rows.**
    doPost's final fallthrough is the DPR submission handler (dpr.html's
    main submit sends NO `action`). Any unrecognised action — a typo, or a
