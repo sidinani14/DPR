@@ -15,6 +15,7 @@
   var STORE_KEY = 'ids_token';
   var EXP_KEY   = 'ids_session_exp';
   var HINT_KEY  = 'ids_email_hint'; // persistent — never deleted, survives expiry
+  var SESS_KEY  = 'ids_app_session'; // {t: server-signed session token, x: expiry ms, e: email}
   var SESSION_MS = 12 * 60 * 60 * 1000;  // 12 hours
 
   // ── Storage helpers — localStorage so sign-in persists across all tabs ──
@@ -47,6 +48,41 @@
   // its own expiry, silently re-authenticates (same FedCM continue-as path
   // boot() already uses) before the request goes out, so the request itself
   // always carries a live token instead of reacting after the fact.
+  // ── App session (2026-10-01) ──
+  // The hourly silent Google re-sign-in below fails for anyone with several
+  // Google accounts in the browser (or in Google's prompt cool-down), and
+  // that failure showed the "Access denied" gate mid-form roughly every hour
+  // (Aaditya + Poorvi, every form). After one real Google sign-in the
+  // backend now hands out a signed 12-hour app session, sent on every call
+  // instead of the 1-hour Google token — so no hourly renewal is needed.
+  function getSession() {
+    try {
+      var s = JSON.parse(storeGet(SESS_KEY) || 'null');
+      var me = (window.IDS_USER && window.IDS_USER.email) || '';
+      if (s && s.t && s.x > Date.now() + 60000 && (!me || s.e === me)) return s;
+    } catch (e) {}
+    return null;
+  }
+  var _sessReq = null;
+  function startSession(googleToken, email) {
+    var cur = getSession();
+    if (cur && cur.e === email) return Promise.resolve(cur);
+    if (_sessReq) return _sessReq;
+    _sessReq = _fetch.call(window, ACCESS_CHECK_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'startSession', idToken: googleToken }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j && j.status === 'ok' && j.session && j.email === email) {
+          var s = { t: j.session, x: j.exp, e: j.email };
+          storeSet(SESS_KEY, JSON.stringify(s)); return s;
+        }
+        return null;
+      })
+      .catch(function () { return null; })
+      .finally(function () { _sessReq = null; });
+    return _sessReq;
+  }
+
   function tokenExpired(bufferMs) {
     if (!window.IDS_TOKEN) return true;
     var p = parseJwt(window.IDS_TOKEN);
@@ -65,12 +101,13 @@
     window.__idsDenied = true;
     try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e) {}
     window.IDS_TOKEN = null;
-    try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
+    try { storeDel(STORE_KEY); storeDel(EXP_KEY); storeDel(SESS_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
     buildGate('denied', msg, who || '');
   }
 
   var _refreshing = null;
   function ensureFreshToken() {
+    if (getSession()) return Promise.resolve(true);   // app session covers it — no Google renewal needed
     if (!window.IDS_TOKEN || !tokenExpired(120000)) return Promise.resolve(true);
     if (_refreshing) return _refreshing;
     _refreshing = new Promise(function (resolve) {
@@ -113,27 +150,53 @@
     opts = opts || {};
     var isBackendEarly = typeof url === 'string' && url.indexOf(API_HOST) > -1;
     if (!isBackendEarly) return _fetch.call(this, url, opts);
-    // A 'transient' rejection means the server never got past checking the
-    // sign-in (Google's token check hiccupped) -- the action itself did NOT
-    // run, so re-sending is always safe. Before, the page just showed an
-    // error (or, via the server-side race fixed alongside this, a false
-    // "access denied" gate) and people retyped / lost their work.
-    var baseUrl = url, baseBody = opts.body, resp = null;
-    for (var attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await new Promise(function (r) { setTimeout(r, 1200 * attempt); });
+    // A 'transient' or 'unauthorized' reply means the server rejected the
+    // sign-in BEFORE running the action, so re-sending is always safe.
+    // - transient: Google's token check hiccupped -> just retry.
+    // - unauthorized: used to lock the page and wipe the saved sign-in on the
+    //   FIRST such reply. One stray reply (seen live right after deploys, when
+    //   Google briefly serves mixed versions) was enough to throw someone out
+    //   mid-form. Now: retry once; if an app session was the thing rejected,
+    //   drop it and retry with the Google token; only a refusal that persists
+    //   shows the "Access denied" screen.
+    var baseUrl = url, baseBody = opts.body, resp = null, unauthCount = 0;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (attempt) await new Promise(function (r) { setTimeout(r, 1000 * attempt); });
+      var usedSession = !!getSession();
       resp = await backendFetchOnce(this, baseUrl, opts, baseBody);
       var j = null;
-      try { j = await resp.clone().json(); } catch (e) {}
-      if (!(j && j.code === 'transient')) break;
+      try { j = await resp.clone().json(); } catch (e) {
+        // Not JSON -- Google served its own error/quota page instead of our
+        // respond() output. The action may or may not have run, so no retry;
+        // just make sure the page's draft is saved before its r.json() throws.
+        try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e2) {}
+        break;
+      }
+      if (j && j.code === 'transient') continue;
+      if (j && j.code === 'unauthorized') {
+        unauthCount++;
+        if (usedSession && unauthCount >= 2) storeDel(SESS_KEY);   // fall back to the Google token next try
+        if (unauthCount < 2 || (usedSession && unauthCount < 3)) continue;
+        if (!window.__idsDenied) {
+          var who = (window.IDS_USER && window.IDS_USER.email) || '';
+          showExpiredGate(
+            'Your progress on this page has been saved. ' +
+            'The signed-in account (' + (who || 'unknown') + ') is not on the authorised team list. ' +
+            'Tap "Try another account" and sign back in with your own Ideaform account to continue where you left off.',
+            who);
+        }
+        break;
+      }
+      break;
     }
     return resp;
   };
   async function backendFetchOnce(ctx, url, opts, baseBody) {
     try { await ensureFreshToken(); } catch (e) {}
-    var tok = window.IDS_TOKEN;
-    var isBackend = true;
+    var sess = getSession();
+    var tok = sess ? sess.t : window.IDS_TOKEN;
     opts = Object.assign({}, opts, { body: baseBody });
-    if (isBackend && tok) {
+    if (tok) {
       var m = (opts.method || 'GET').toUpperCase();
       if (m === 'GET') {
         url += (url.indexOf('?') > -1 ? '&' : '?') + 'idToken=' + encodeURIComponent(tok);
@@ -141,33 +204,7 @@
         try { var b = JSON.parse(opts.body); b.idToken = tok; opts.body = JSON.stringify(b); } catch (e) {}
       }
     }
-    return _fetch.call(ctx, url, opts).then(function (resp) {
-      if (isBackend && !window.__idsDenied) {
-        try {
-          resp.clone().json().then(function (j) {
-            if (j && j.code === 'unauthorized') {
-              var who = (window.IDS_USER && window.IDS_USER.email) || '';
-              showExpiredGate(
-                'Your progress on this page has been saved. ' +
-                'The signed-in account (' + (who || 'unknown') + ') is not on the authorised team list — ' +
-                'this can also happen briefly after a server hiccup and clears up within seconds. ' +
-                'Tap "Try another account" and sign back in with your own Ideaform account to continue where you left off.',
-                who);
-            }
-          }).catch(function () {
-            // Not valid JSON -- Apps Script served something other than our
-            // own respond() output (an HTML quota/consent-page shell before
-            // the script even ran, or a raw network failure). The 'unauthorized'
-            // branch above never runs for this shape, so it was the one
-            // response that silently skipped flushing the draft. The caller's
-            // own r.json() is about to throw on this same response too, so
-            // there's nothing to lose by flushing defensively here first.
-            try { if (typeof window.flushDraftNow === 'function') window.flushDraftNow(); } catch (e2) {}
-          });
-        } catch (e) {}
-      }
-      return resp;
-    });
+    return _fetch.call(ctx, url, opts);
   }
 
   function parseJwt(t) {
@@ -212,7 +249,7 @@
       var rb = document.getElementById('ids-retry');
       if (rb) rb.onclick = function () {
         window.__idsDenied = false;
-        try { storeDel(STORE_KEY); storeDel(EXP_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
+        try { storeDel(STORE_KEY); storeDel(EXP_KEY); storeDel(SESS_KEY); google.accounts.id.disableAutoSelect(); } catch (e) {}
         // Re-initialize (no auto_select → fresh account picker) BEFORE rendering.
         _inited = false;
         ensureInit(false);
@@ -324,6 +361,8 @@
     storeSet(EXP_KEY, String(Date.now() + SESSION_MS));
     storeSet(HINT_KEY, String(p.email || '').toLowerCase()); // persist email — never deleted
     window.__idsDenied = false;
+    // A fresh Google token → swap it for a 12h app session (see getSession).
+    if (p.exp && p.exp * 1000 > Date.now() + 60000) { try { startSession(token, window.IDS_USER.email); } catch (e) {} }
     // reveal page
     var s = document.getElementById('ids-lock-style'); if (s) s.remove();
     var g = document.getElementById('ids-gate'); if (g) g.remove();
@@ -346,6 +385,15 @@
           grant(saved, sp);
           return;
         }
+        // Google token expired, but a valid 12h app session for the same
+        // person exists → stay signed in without asking Google again.
+        try {
+          var as = JSON.parse(storeGet(SESS_KEY) || 'null');
+          if (sp && sp.email && as && as.t && as.x > nowMs + 60000 && as.e === String(sp.email).toLowerCase()) {
+            grant(saved, sp);
+            return;
+          }
+        } catch (e) {}
         // Token expired — save email hint before deleting (fixes loginHint bug)
         if (sp && sp.email) storeSet(HINT_KEY, String(sp.email).toLowerCase());
         storeDel(STORE_KEY); storeDel(EXP_KEY);
@@ -393,7 +441,7 @@
 
   // Expose sign-out so pages can wire it to a button
   window.IDS_SIGNOUT = function () {
-    storeDel(STORE_KEY); storeDel(EXP_KEY);
+    storeDel(STORE_KEY); storeDel(EXP_KEY); storeDel(SESS_KEY);
     // NOTE: HINT_KEY intentionally kept — helps pick right account on next sign-in
     window.IDS_TOKEN = null;
     try { google.accounts.id.disableAutoSelect(); } catch (e) {}

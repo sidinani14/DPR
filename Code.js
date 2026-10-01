@@ -1354,12 +1354,75 @@ var _ALLOW_READ_OK = true;
 var _AUTH_VERDICT = '';
 function verifyIdToken(token) {
   _AUTH_VERDICT = '';
+  if (String(token||'').indexOf(SESSION_PREFIX) === 0) return verifySessionToken(token);
   var email = verifyIdTokenOnce(token);
   // One quick retry on a transient tokeninfo failure before giving up —
   // most blips clear within a second, and each failure costs the user a
   // visible error.
   if (!email && _AUTH_VERDICT === 'transient') { Utilities.sleep(500); _AUTH_VERDICT = ''; email = verifyIdTokenOnce(token); }
   return email;
+}
+// ── App session tokens (2026-10-01) ─────────────────────────────
+// Google ID tokens live ~1 hour, and auth.js renewed them by asking Google
+// to silently re-sign the user in. That silent renewal fails outright for
+// anyone with more than one Google account in the browser, or during
+// Google's prompt cool-down — and auth.js then showed the "Access denied —
+// your sign-in has expired" gate, mid-form, every ~hour (reported by
+// Aaditya + Poorvi on every form). Now one verified Google sign-in buys a
+// 12-hour app session (same window auth.js already used), signed here with
+// an HMAC secret; verifying it needs no Google round trip at all. Still
+// re-checked against the live team list on every request, so removing
+// someone from TEAM revokes access within the allowlist's 5-min cache.
+var SESSION_PREFIX = 'ids1.';
+var SESSION_MS = 12 * 60 * 60 * 1000;
+function getSessionSecret(){
+  var props = PropertiesService.getScriptProperties();
+  var s = props.getProperty('SESSION_SECRET');
+  if (s) return s;
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) {}
+  try {
+    s = props.getProperty('SESSION_SECRET');   // another execution may have just made it
+    if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('SESSION_SECRET', s); }
+  } finally { try { lock.releaseLock(); } catch (e) {} }
+  return s;
+}
+function signSession(payloadB64){
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(SESSION_PREFIX + payloadB64, getSessionSecret())).replace(/=+$/,'');
+}
+function issueSessionToken(authEmail, viaToken){
+  // Only a real Google sign-in can start a session — a session can't renew
+  // itself, so access still ends 12h after the last actual Google sign-in.
+  if (String(viaToken||'').indexOf(SESSION_PREFIX) === 0) return { status:'error', message:'Session must start from a Google sign-in.' };
+  var exp = Date.now() + SESSION_MS;
+  var payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify({ e: String(authEmail||'').toLowerCase(), x: exp })).replace(/=+$/,'');
+  return { status:'ok', session: SESSION_PREFIX + payloadB64 + '.' + signSession(payloadB64), exp: exp, email: String(authEmail||'').toLowerCase() };
+}
+function sessionDebug(reason, extra){
+  try {
+    var fp = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, getSessionSecret())).slice(0,8);
+    CacheService.getScriptCache().put('last_session_debug', JSON.stringify({ at:new Date().toISOString(), reason:reason, secretFp:fp, extra:extra||'' }), 1800);
+  } catch (e) {}
+}
+function verifySessionToken(token){
+  try {
+    var parts = String(token).slice(SESSION_PREFIX.length).split('.');
+    if (parts.length !== 2) { sessionDebug('parts', parts.length); _AUTH_VERDICT = 'denied'; return null; }
+    if (signSession(parts[0]) !== parts[1]) { sessionDebug('sig', parts[1].slice(0,6) + ' vs ' + signSession(parts[0]).slice(0,6)); _AUTH_VERDICT = 'denied'; return null; }
+    var b64 = parts[0] + '==='.slice((parts[0].length + 3) % 4);
+    var p = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(b64)).getDataAsString());
+    if (!p || !p.e || !(p.x > Date.now())) { sessionDebug('expired-or-bad', JSON.stringify(p)); _AUTH_VERDICT = 'denied'; return null; }
+    var allow = getAllowedEmails();
+    if (!allow[p.e]) {
+      sessionDebug('not-allowed', p.e + ' readOk=' + _ALLOW_READ_OK);
+      if (!_ALLOW_READ_OK) { _AUTH_VERDICT = 'transient'; return null; }
+      _AUTH_VERDICT = 'denied'; return null;
+    }
+    return p.e;
+  } catch (e) {
+    logTransientAuth('session-verify-exception', String(e), e && e.stack);
+    _AUTH_VERDICT = 'transient'; return null;
+  }
 }
 function verifyIdTokenOnce(token) {
   if (!token) return null;
@@ -1616,6 +1679,7 @@ function doPost(e) {
     var data = JSON.parse(raw);
     var authEmail = verifyIdToken(data.idToken);
     if (!authEmail) return respondUnauthorized(data.idToken);
+    if (data.action === 'startSession') return respond(issueSessionToken(authEmail, data.idToken));
     if (MANAGER_ONLY[data.action] && !isManager(authEmail))
       return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
@@ -1646,6 +1710,10 @@ function doPost(e) {
       if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
       var dbg = CacheService.getScriptCache().get('last_denial_debug');
       return respond({ debug: dbg ? JSON.parse(dbg) : null });
+    }
+    if (data.action === 'getLastSessionDebug') {
+      if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
+      return respond({ debug: CacheService.getScriptCache().get('last_session_debug') });
     }
     if (data.action === 'getLastTransientDebug') {
       if (!isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
