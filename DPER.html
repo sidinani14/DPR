@@ -1337,9 +1337,20 @@ function getDraftKey() {
   return googleUser ? 'dper_draft_' + googleUser.email : 'dper_draft_anonymous';
 }
 
+// A draft only counts if something was actually filled in. saveDraft used to
+// store ANY state — including the blank form right after reopening the page
+// (plus a 60s timer and every app switch) — so the real draft got overwritten
+// with an empty one, and the banner still offered "Restore" for it: reported
+// as "Restore appears but the form contents are lost" (2026-10-01).
+function draftHasContent(d){
+  return !!(d && (d.blocks||[]).some(b => b.proj || b.vtype || b.vstart || b.clientCon ||
+    (b.issues||[]).some(i => i.desc)));
+}
 function saveDraft() {
   if (!googleUser) return;
+  if (window._pendingDraft) return;   // a saved draft is waiting behind the Restore banner — don't overwrite it
   const draft = collectDraftData();
+  if (!draftHasContent(draft)) return;
   try {
     localStorage.setItem(getDraftKey(), JSON.stringify(draft));
   } catch(e) { console.warn('Draft save failed:', e); }
@@ -1351,8 +1362,9 @@ let _srvDraftT = null;
 function pushServerDraft(){
   if (!googleUser) return;
   try {
+    if (window._pendingDraft) return;
     const draft = collectDraftData();
-    if (!draft.blocks || !draft.blocks.length) return;
+    if (!draftHasContent(draft)) return;
     fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'savePlanDraft', draft:JSON.stringify(draft), formType:'dper'})}).catch(()=>{});
   } catch(e){}
@@ -1436,7 +1448,7 @@ function checkForDraft() {
     const raw = localStorage.getItem(key);
     if (!raw) return;
     const draft = JSON.parse(raw);
-    if (!draft || !draft.blocks || draft.blocks.length === 0) return;
+    if (!draftHasContent(draft)) return;
     // Show restore banner
     const savedAt = new Date(draft.savedAt);
     const minsAgo = Math.round((Date.now() - savedAt.getTime()) / 60000);
@@ -1455,6 +1467,7 @@ function checkForDraft() {
 function resumeDraft() {
   const draft = window._pendingDraft;
   if (!draft) return;
+  window._pendingDraft = null;   // resolved — autosave may write again
   document.getElementById('draft-banner').style.display = 'none';
 
   // Set date

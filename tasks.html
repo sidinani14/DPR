@@ -174,15 +174,17 @@ function planDraft(){
 }
 function draftHasContent(d){ return !!(d && d.blocks && d.blocks.some(b=> b.project || (b.rows||[]).some(r=>r.stage||r.desc))); }
 let _srvT=null;
-function pushServerDraft(){ try{ const d=planDraft(); if(draftHasContent(d)) api('savePlanDraft',{draft:JSON.stringify(d)}); }catch(e){} }
+function pushServerDraft(){ try{ if(window._draftPending) return; const d=planDraft(); if(draftHasContent(d)) api('savePlanDraft',{draft:JSON.stringify(d)}); }catch(e){} }
 function saveDraft(){
+  if(window._draftPending) return;   // a saved plan is waiting behind the Restore banner — don't overwrite it with the fresh form
   try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){}
   clearTimeout(_srvT); _srvT=setTimeout(pushServerDraft, 3000);   // also persist server-side (cross-device)
 }
 function saveDraftSoon(){ clearTimeout(_draftT); _draftT=setTimeout(saveDraft, 500); }
-function clearDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} const b=document.getElementById('draft-banner'); if(b) b.style.display='none'; try{ api('savePlanDraft',{draft:''}); }catch(e){} }
+function clearDraft(){ window._draftPending=false; try{ localStorage.removeItem(DRAFT_KEY); }catch(e){} const b=document.getElementById('draft-banner'); if(b) b.style.display='none'; try{ api('savePlanDraft',{draft:''}); }catch(e){} }
 function discardDraft(){ clearDraft(); }
 function restoreDraft(){
+  window._draftPending=false;
   let d; try{ d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null'); }catch(e){}
   if(!d||!d.blocks){ clearDraft(); return; }
   const byEl=document.getElementById('meta-by');
@@ -220,6 +222,7 @@ function maybeShowDraftBanner(){
   const n=d.blocks.reduce((a,b)=>a+(b.rows||[]).filter(r=>r.stage).length,0);
   document.getElementById('draft-banner-text').textContent='You have an unsaved task plan'+(when?' from '+when:'')+(n?` (${n} task${n!==1?'s':''})`:'')+'.';
   document.getElementById('draft-banner').style.display='flex';
+  window._draftPending=true;
 }
 document.addEventListener('input',  e=>{ if(e.target.closest('.block')||e.target.closest('.meta-row')) saveDraftSoon(); });
 document.addEventListener('change', e=>{ if(e.target.closest('.block')||e.target.closest('.meta-row')) saveDraftSoon(); });
@@ -227,7 +230,7 @@ document.addEventListener('change', e=>{ if(e.target.closest('.block')||e.target
 // above (switching to WhatsApp mid-entry, screen lock, etc.) — flush the
 // draft immediately, no debounce, the moment the tab is hidden or unloaded,
 // so the autosave safety net can't lose the last few keystrokes to timing.
-function flushDraftNow(){ clearTimeout(_draftT); try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){} }
+function flushDraftNow(){ clearTimeout(_draftT); if(window._draftPending) return; try{ const d=planDraft(); if(draftHasContent(d)) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){} }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
 window.addEventListener('pagehide', flushDraftNow);
 

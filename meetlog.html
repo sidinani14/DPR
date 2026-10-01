@@ -214,6 +214,7 @@ function draftHasContent(d){
 let _draftSoonT=null, _srvDraftT=null;
 function saveDraft(){
   if (!(window.IDS_USER&&window.IDS_USER.email)) return;
+  if (window._pendingDraft) return;   // a saved draft is waiting behind the Restore banner — don't overwrite it with the fresh form
   const d = collectDraftData();
   if (!draftHasContent(d)) return;
   try { localStorage.setItem(getDraftKey(), JSON.stringify(d)); } catch(e){}
@@ -222,6 +223,7 @@ function saveDraft(){
 function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
 function pushServerDraft(){
   try {
+    if (window._pendingDraft) return;
     const d = collectDraftData();
     if (!draftHasContent(d)) return;
     fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
@@ -261,6 +263,7 @@ function checkForDraft(){
 }
 function resumeDraft(){
   const d = window._pendingDraft; if (!d) return;
+  window._pendingDraft = null;   // resolved — autosave may write again
   document.getElementById('draft-banner').style.display='none';
   // Wrapped so one unexpected field can't silently abort the rest of the
   // restore while the banner's already gone -- see dpr.html's resumeDraft

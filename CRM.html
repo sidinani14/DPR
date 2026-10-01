@@ -2009,6 +2009,7 @@ function draftHasContent(d){
 let _draftSoonT=null, _srvDraftT=null;
 function saveDraft(){
   if (!googleUser) return;
+  if (window._pendingCrmDraft) return;   // a saved draft is waiting behind the Restore banner — don't overwrite it with the fresh form
   const d = collectDraftData();
   if (!draftHasContent(d)) return;
   try { localStorage.setItem(getDraftKey(), JSON.stringify(d)); } catch(e){}
@@ -2017,6 +2018,7 @@ function saveDraft(){
 function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
 function pushServerDraft(){
   try {
+    if (window._pendingCrmDraft) return;
     const d = collectDraftData();
     if (!draftHasContent(d)) return;
     fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
@@ -2060,6 +2062,7 @@ function checkForDraft(){
 // form stayed blank (see dpr.html's resumeDraft for the fuller writeup).
 function resumeDraft(){
   const d = window._pendingCrmDraft; if (!d) return;
+  window._pendingCrmDraft = null;   // resolved — autosave may write again
   document.getElementById('draft-banner').style.display='none';
   const g = id => document.getElementById(id);
   let hadError = false;
