@@ -74,6 +74,16 @@
     location.replace('meetlog.html');
     return true;
   }
+  // Lets a page correct the remembered role once the server says otherwise
+  // (e.g. a freelancer preview has ended, or someone's role changed) —
+  // otherwise the redirect above would keep firing until the 12h session ran out.
+  window.IDS_SET_ROLE = function (role) {
+    try {
+      var s = JSON.parse(storeGet(SESS_KEY) || 'null');
+      if (s && s.r !== role) { s.r = role; storeSet(SESS_KEY, JSON.stringify(s)); }
+      window.IDS_ROLE = role;
+    } catch (e) {}
+  };
   var _sessReq = null;
   function startSession(googleToken, email) {
     var cur = getSession();

@@ -46,6 +46,7 @@ textarea{min-height:70px;resize:vertical}.row{display:flex;gap:8px}.row>*{flex:1
 .ml-badge.pending{background:#E3F2FD;color:#1565C0}.ml-badge.rejected{background:#FFEBEE;color:#8B2020}
 .ml-btn{font-size:12px;font-weight:600;color:#fff;background:#1F3A5F;border:none;border-radius:7px;padding:7px 12px;cursor:pointer}
 </style></head><body>
+<div id="preview-banner" style="display:none;background:#FFF3CD;border:1.5px solid #F2C94C;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#5C4400"></div>
 <h1>Site Visit / Meeting Log</h1>
 <div class="sub">Ideaform Design Studio · replaces the Google Forms · sign in to begin.</div>
 <div class="mylogs-link" id="mylogs-link" onclick="showMyLogs()" style="display:none">📋 My Logs — check status or finish a draft</div>
@@ -94,6 +95,10 @@ window.idsOnAuth = async function(){
   try{
     const r = await fetch(API+'?action=getLists').then(x=>x.json());
     TEAM=r.team||[]; TEAM_EMAILS=r.emails||[]; PROJECTS=r.projects||[]; ME=r.me||null; FREELANCERS=r.freelancers||[];
+    // The server's answer is the truth for the role — fix the browser's copy.
+    if (window.IDS_SET_ROLE && (r.projects||r.team)) window.IDS_SET_ROLE(ME && ME.role==='freelancer' ? 'freelancer' : 'team');
+    const pvb=document.getElementById('preview-banner');
+    if (pvb) { pvb.style.display = (ME && ME.preview) ? 'block' : 'none'; if (ME && ME.preview) pvb.innerHTML = '👀 <b>Freelancer preview</b> — this is exactly what <b>'+esc(ME.name)+'</b> sees. Nothing you submit here is saved. Preview ends automatically within 2 hours.'; }
   }catch(e){}
   // Resuming an existing log from the Logs Manager (?edit=<logId>) — e.g. a
   // Draft that was submitted but never finished, or any log that needs a

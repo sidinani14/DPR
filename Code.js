@@ -1345,8 +1345,38 @@ function freelancerRecords(){
 // A freelancer = Role "Freelancer" on TEAM (and not a manager).
 function freelancerFor(authEmail){
   var e = String(authEmail||'').trim().toLowerCase();
-  if (!e || isManager(e)) return null;
+  if (!e) return null;
+  var pv = getFreelancerPreview();
+  if (pv && pv.email === e) {
+    var rec = freelancerRecords()[String(pv.as||'').toLowerCase()];
+    if (rec) return { name: rec.name, projects: rec.projects, preview: true };
+  }
+  if (isManager(e)) return null;
   return getFreelancers()[e] || null;
+}
+// "See what a freelancer sees" (2026-10-06): a director can temporarily make
+// one of THEIR OWN accounts behave exactly like a given freelancer — same
+// server gate, same redirect, same screens — for a limited time. Writes are
+// refused in preview (freelancerGate), so nothing is saved under the
+// freelancer's name. Stored in Script Property FREELANCER_PREVIEW
+// {email, as, until}; expires on its own.
+var FREELANCER_PREVIEW_EMAILS = { 'astha.uch@gmail.com':1, 'astha@ideaform.in':1, 'siddharth@ideaform.in':1, 'sidinani14@gmail.com':1 };
+function getFreelancerPreview(){
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('FREELANCER_PREVIEW');
+    if (!raw) return null;
+    var pv = JSON.parse(raw);
+    return (pv && pv.until > Date.now()) ? pv : null;
+  } catch (e) { return null; }
+}
+function setFreelancerPreview(email, asName, hours){
+  email = String(email||'').trim().toLowerCase();
+  if (!FREELANCER_PREVIEW_EMAILS[email]) return { status:'error', message:'Preview can only be turned on for Siddharth’s or Astha’s own accounts.' };
+  var rec = freelancerRecords()[String(asName||'').trim().toLowerCase()];
+  if (!rec) return { status:'error', message:'No active freelancer named "' + asName + '" on the TEAM tab.' };
+  var until = Date.now() + Math.min(Math.max(parseFloat(hours)||2, 0.25), 8) * 3600000;
+  PropertiesService.getScriptProperties().setProperty('FREELANCER_PREVIEW', JSON.stringify({ email: email, as: rec.name, until: until }));
+  return { status:'ok', email: email, as: rec.name, projects: rec.projects, until: new Date(until).toISOString() };
 }
 function freelancerHasProject(f, project){
   var p = String(project||'').trim().toLowerCase();
@@ -1362,6 +1392,9 @@ function freelancerGate(authEmail, action, data){
   if (!f) return null;
   if (!FREELANCER_ACTIONS[action||''])
     return { status:'error', code:'freelancer_forbidden', message:'This page isn’t available for freelancer accounts.' };
+  var PREVIEW_WRITES = { submitMeetingLog:1, uploadMeetingPhoto:1, finalizeMeetingLog:1, finalizeMyMeetingLog:1, deleteMeetingLog:1, logFreelancerConnection:1, savePlanDraft:1 };
+  if (f.preview && PREVIEW_WRITES[action])
+    return { status:'error', code:'preview', message:'Freelancer preview — nothing is saved. (Turn preview off to work normally.)' };
   var proj = data && data.project;
   if ((action === 'submitMeetingLog' || action === 'uploadMeetingPhoto' || action === 'logFreelancerConnection') && !freelancerHasProject(f, proj))
     return { status:'error', code:'forbidden', message:'You can only log for projects assigned to you: ' + (f.projects.join(', ') || 'none yet — ask Siddharth') + '.' };
@@ -1373,7 +1406,7 @@ function getListsForFreelancer(f){
   var full = getLists();
   return { team: full.team || [], emails: [], allMembers: [], targets: {}, freelancers: full.freelancers || [],
     projects: (full.projects||[]).filter(function(p){ return freelancerHasProject(f, p.name); }),
-    me: { name: f.name, role: 'freelancer', projects: f.projects } };
+    me: { name: f.name, role: 'freelancer', projects: f.projects, preview: !!f.preview } };
 }
 function logFreelancerConnection(data, f){
   var type = String(data.type||'').trim();
@@ -1803,6 +1836,11 @@ function doPost(e) {
       if (data.action === 'getLists')               return respond(getListsForFreelancer(flUserP));
       if (data.action === 'logFreelancerConnection') return respond(logFreelancerConnection(data, flUserP));
       if (data.action === 'getMyConnections')       return respond(getMyConnections(flUserP));
+    }
+    if (data.action === 'setFreelancerPreview' || data.action === 'clearFreelancerPreview') {
+      if (!isDirector(authEmail) && !isManager(authEmail)) return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
+      if (data.action === 'clearFreelancerPreview') { PropertiesService.getScriptProperties().deleteProperty('FREELANCER_PREVIEW'); return respond({ status:'ok', cleared:true }); }
+      return respond(setFreelancerPreview(data.email, data.as, data.hours));
     }
     if (data.action === 'getMyRole') return respond({ role: flUserP ? 'freelancer' : (isManager(authEmail) ? 'manager' : 'team'),
       name: flUserP ? flUserP.name : (memberNameForAuth(authEmail) || ''), projects: flUserP ? flUserP.projects : null });
