@@ -1290,6 +1290,106 @@ var AUTH_ALLOWED = {
 // Single source of truth for access = the TEAM tab's Email column (active rows)
 // UNIONED with the hardcoded directors list (fallback so a sheet read failure
 // can never lock everyone out). Cached 5 min. Add someone to TEAM → they get in.
+// ── Freelance architects (2026-10-06) ─────────────────────────────
+// External freelancers working on some projects: no DPR, no dashboard, no
+// scoring — only the Site Visit / MoM log (+ My Logs) and a quick client-
+// connection entry, for the projects assigned to them. Kept in their OWN tab,
+// deliberately NOT the TEAM tab: everything that reads TEAM (DPR, weekly
+// report, dashboard scoring, visit planner, attendance) must never see them.
+// FREELANCERS cols: A Name · B Email · C Projects (comma-separated, exact
+// PROJECTS names) · D Active (Yes/No) · E Notes.
+// Access is enforced HERE, server-side: a freelancer's request is only
+// accepted for the actions in FREELANCER_ACTIONS, and project-scoped actions
+// are checked against their assigned projects. Their logs publish to the
+// client PDF directly (2026-10-06 decision) — Siddharth gets an email for
+// each one — and IDS action items they name DO create team tasks.
+var FREELANCERS_TAB = 'FREELANCERS';
+function writeFreelancerHeaders(sheet){
+  sheet.getRange(1,1,1,5).setValues([['Name','Email','Projects (comma-separated, exact project names)','Active (Yes/No)','Notes']])
+    .setBackground('#1F3A5F').setFontColor('#FFFFFF').setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  sheet.setColumnWidth(1,170); sheet.setColumnWidth(2,230); sheet.setColumnWidth(3,380);
+}
+// email → {name, projects:[...]}, active rows only. Cached 5 min (same as the
+// team allowlist), so adding/removing someone takes effect within 5 minutes.
+function getFreelancers(){
+  var cache = CacheService.getScriptCache();
+  var c = cache.get('freelancers_v1');
+  if (c) { try { return JSON.parse(c); } catch (e) {} }
+  var out = {};
+  try {
+    var sh = getOrCreate(FREELANCERS_TAB, writeFreelancerHeaders);
+    if (sh.getLastRow() > 1) {
+      sh.getRange(2,1,sh.getLastRow()-1,4).getValues().forEach(function(r){
+        var name = String(r[0]||'').trim(), email = String(r[1]||'').trim().toLowerCase();
+        var active = String(r[3]||'').trim().toLowerCase();
+        if (!name || !email || active === 'no') return;
+        out[email] = { name: name, projects: String(r[2]||'').split(',').map(function(p){ return p.trim(); }).filter(Boolean) };
+      });
+    }
+    cache.put('freelancers_v1', JSON.stringify(out), 300);
+  } catch (e) { logTransientAuth('freelancer-read-error', String(e), e && e.stack); }
+  return out;
+}
+// A freelancer = on the FREELANCERS tab and NOT a team member/manager (if
+// someone is somehow on both, the team role wins).
+function freelancerFor(authEmail){
+  var e = String(authEmail||'').trim().toLowerCase();
+  if (!e || isManager(e)) return null;
+  var f = getFreelancers()[e];
+  if (!f) return null;
+  if (nameForEmail(e)) return null;   // also on the TEAM tab → treat as team
+  return f;
+}
+function freelancerHasProject(f, project){
+  var p = String(project||'').trim().toLowerCase();
+  return !!p && (f.projects||[]).some(function(x){ return x.toLowerCase() === p; });
+}
+var FREELANCER_ACTIONS = { checkAccess:1, getLists:1, getMyRole:1,
+  submitMeetingLog:1, uploadMeetingPhoto:1, finalizeMeetingLog:1, deleteMeetingLog:1,
+  getMyMeetingLogs:1, getMyMeetingLogForEdit:1, finalizeMyMeetingLog:1, getMeetingLogPhotoThumbs:1,
+  savePlanDraft:1, getPlanDraft:1, logFreelancerConnection:1, getMyConnections:1 };
+// null = allowed; otherwise the refusal to send back.
+function freelancerGate(authEmail, action, data){
+  var f = freelancerFor(authEmail);
+  if (!f) return null;
+  if (!FREELANCER_ACTIONS[action||''])
+    return { status:'error', code:'freelancer_forbidden', message:'This page isn’t available for freelancer accounts.' };
+  var proj = data && data.project;
+  if ((action === 'submitMeetingLog' || action === 'uploadMeetingPhoto' || action === 'logFreelancerConnection') && !freelancerHasProject(f, proj))
+    return { status:'error', code:'forbidden', message:'You can only log for projects assigned to you: ' + (f.projects.join(', ') || 'none yet — ask Siddharth') + '.' };
+  return null;
+}
+// getLists, trimmed for a freelancer: only their projects, team names (for
+// attendee ticks / IDS action owners) but no emails or targets.
+function getListsForFreelancer(f){
+  var full = getLists();
+  return { team: full.team || [], emails: [], allMembers: [], targets: {},
+    projects: (full.projects||[]).filter(function(p){ return freelancerHasProject(f, p.name); }),
+    me: { name: f.name, role: 'freelancer', projects: f.projects } };
+}
+function logFreelancerConnection(data, f){
+  var type = String(data.type||'').trim();
+  var ok = { 'Call':1, 'WhatsApp':1, 'Meeting':1, 'Site Visit':1, 'Email':1 };
+  if (!ok[type]) return { status:'error', message:'Pick how you connected (call, WhatsApp, meeting, site visit or email).' };
+  var notes = String(data.notes||'').trim();
+  if (!notes) return { status:'error', message:'Add a line about what was discussed.' };
+  var n = withLock(function(){
+    return appendConnections(f.name, dateStr(data.date||''), [{ project: String(data.project).trim(), type: type, notes: notes }], 'FL-' + Utilities.getUuid().slice(0,8));
+  });
+  return { status:'ok', written:n };
+}
+function getMyConnections(f){
+  var sh = db().getSheetByName(CRM_LOG_TAB);
+  if (!sh || sh.getLastRow() < 2) return { connections: [] };
+  var rows = sh.getDataRange().getValues(), out = [];
+  for (var i = 1; i < rows.length && out.length < 15; i++) {
+    if (String(rows[i][3]||'').trim() !== f.name || String(rows[i][4]||'') !== 'Client Connection') continue;
+    out.push({ date: cellDate(rows[i][2]), type: String(rows[i][5]||''), project: String(rows[i][6]||''), notes: String(rows[i][7]||'') });
+  }
+  return { connections: out };
+}
+
 function getAllowedEmails() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('allowed_emails');
@@ -1318,6 +1418,10 @@ function getAllowedEmails() {
         if (email && active !== 'no') set[email] = 1;
       }
     }
+    // Freelancers may sign in too — what they can then DO is limited by
+    // freelancerGate() on every request, not by this list.
+    var fl = getFreelancers();
+    for (var fe in fl) set[fe] = 1;
     readOk = true;
   } catch (e) { logTransientAuth('team-read-error', String(e), e && e.stack); }
   _ALLOW_READ_OK = readOk;
@@ -1396,7 +1500,8 @@ function issueSessionToken(authEmail, viaToken){
   if (String(viaToken||'').indexOf(SESSION_PREFIX) === 0) return { status:'error', message:'Session must start from a Google sign-in.' };
   var exp = Date.now() + SESSION_MS;
   var payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify({ e: String(authEmail||'').toLowerCase(), x: exp })).replace(/=+$/,'');
-  return { status:'ok', session: SESSION_PREFIX + payloadB64 + '.' + signSession(payloadB64), exp: exp, email: String(authEmail||'').toLowerCase() };
+  return { status:'ok', session: SESSION_PREFIX + payloadB64 + '.' + signSession(payloadB64), exp: exp, email: String(authEmail||'').toLowerCase(),
+           role: freelancerFor(authEmail) ? 'freelancer' : 'team' };
 }
 function sessionDebug(reason, extra){
   try {
@@ -1619,6 +1724,10 @@ function doGet(e) {
   var authEmail = verifyIdToken(p.idToken);
   if (!authEmail) return respondUnauthorized(p.idToken);
   var action = p.action || '', member = p.member || '';
+  var flRefusal = freelancerGate(authEmail, action, p);
+  if (flRefusal) return respond(flRefusal);
+  var flUser = freelancerFor(authEmail);
+  if (flUser && action === 'getLists') return safeRespond(function(){ return getListsForFreelancer(flUser); });
   if (MANAGER_ONLY[action] && !isManager(authEmail))
     return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
   // Lightweight access check used by the sign-in gate (auth.js)
@@ -1680,6 +1789,18 @@ function doPost(e) {
     var authEmail = verifyIdToken(data.idToken);
     if (!authEmail) return respondUnauthorized(data.idToken);
     if (data.action === 'startSession') return respond(issueSessionToken(authEmail, data.idToken));
+    var flRefusalP = freelancerGate(authEmail, data.action, data);
+    if (flRefusalP) return respond(flRefusalP);
+    var flUserP = freelancerFor(authEmail);
+    if (flUserP) {
+      // Never trust the page for who is logging: always the freelancer's own name.
+      if (data.action === 'submitMeetingLog') data.loggedBy = flUserP.name;
+      if (data.action === 'getLists')               return respond(getListsForFreelancer(flUserP));
+      if (data.action === 'logFreelancerConnection') return respond(logFreelancerConnection(data, flUserP));
+      if (data.action === 'getMyConnections')       return respond(getMyConnections(flUserP));
+    }
+    if (data.action === 'getMyRole') return respond({ role: flUserP ? 'freelancer' : (isManager(authEmail) ? 'manager' : 'team'),
+      name: flUserP ? flUserP.name : (memberNameForAuth(authEmail) || ''), projects: flUserP ? flUserP.projects : null });
     if (MANAGER_ONLY[data.action] && !isManager(authEmail))
       return respond({ status:'error', code:'forbidden', message:'Restricted to Siddharth & Astha.' });
     Logger.log('doPost action: ' + data.action + ' | raw: ' + raw.substring(0,100));
@@ -3400,7 +3521,7 @@ var DIRECTOR_NAME_BY_EMAIL = { 'sidinani14@gmail.com':'Siddharth Inani', 'siddha
 function memberNameForAuth(authEmail){
   var e = String(authEmail||'').trim().toLowerCase();
   if (!e) return '';
-  return nameForEmail(e) || DIRECTOR_NAME_BY_EMAIL[e] || '';
+  return nameForEmail(e) || DIRECTOR_NAME_BY_EMAIL[e] || ((getFreelancers()[e]||{}).name) || '';
 }
 // Who may view/edit/finalize a meeting log: managers (Logs Manager), the person
 // who actually submitted it (col X, from the verified token), or — for logs
@@ -3742,6 +3863,19 @@ function finalizeMeetingLog(data, authEmail){
   var project = String(rows[rIdx][4]||'').trim();
   var pdf = safeGenerateProjectReportPDF(project, authEmail);
   if (pdf && pdf.fileId) logSheet.getRange(rowNum,20).setValue(pdf.fileId);
+  // Freelancer logs go straight into the client PDF (2026-10-06 decision), so
+  // Siddharth hears about every one. Flush first — never call MailApp
+  // between a Sheets write and its flush (see CLAUDE.md, visit planner).
+  var fl = freelancerFor(authEmail);
+  if (fl) {
+    try { SpreadsheetApp.flush(); } catch (fe) {}
+    notifyMember('Siddharth Inani', 'Freelancer log published — ' + project + ' (' + fl.name + ')', [
+      fl.name + ' published a ' + String(rows[rIdx][3]||'log').toLowerCase() + ' for ' + project + ' dated ' + cellDate(rows[rIdx][1]) + '.',
+      'Log ID: ' + logId,
+      pdf && pdf.url ? 'Updated client PDF: ' + pdf.url : 'PDF regeneration: ' + (pdf && pdf.error ? 'failed — check Logs Manager' : 'ok'),
+      'Review or edit it in Logs Manager.'
+    ]);
+  }
   return { status:'ok', logId:logId, pdfUrl: pdf && pdf.url, pdfId: pdf && pdf.fileId,
            pdfError: pdf && pdf.error ? 'Log saved, but the PDF could not be regenerated — tell Siddharth so he can check the project\'s log history.' : null };
 }
@@ -4387,12 +4521,16 @@ function getAllMeetingLogs(includeDeleted){
   var sheet=db().getSheetByName(MEETING_LOG_TAB);
   if(!sheet || sheet.getLastRow()<2) return {logs:[]};
   var rows=sheet.getDataRange().getValues(), out=[];
+  var fl=getFreelancers(), flNames={};
+  for(var fe in fl) flNames[fl[fe].name.toLowerCase()]=1;
   for(var i=1;i<rows.length;i++){
     var st=String(rows[i][15]||'').trim();
     if(st==='Deleted' && !includeDeleted) continue;
+    var by=String(rows[i][5]||''), subBy=String(rows[i][23]||'').trim().toLowerCase();
     out.push({ logId:String(rows[i][0]||''), date:cellDate(rows[i][1]), type:String(rows[i][3]||''),
-      project:String(rows[i][4]||''), loggedBy:String(rows[i][5]||''), clients:String(rows[i][7]||''),
-      status:st, pdfId:String(rows[i][19]||'') }); }
+      project:String(rows[i][4]||''), loggedBy:by, clients:String(rows[i][7]||''),
+      status:st, pdfId:String(rows[i][19]||''),
+      byFreelancer: !!(flNames[by.trim().toLowerCase()] || (subBy && fl[subBy])) }); }
   out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   return {logs:out};
 }
