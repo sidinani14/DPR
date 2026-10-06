@@ -393,6 +393,32 @@ quota-exceeded failure — don't keep guessing in code without that signal.
     meetlog.html shows a confirm() warning before loading the edit screen
     for a published log, mentioning the notification.
 
+## Freelance architects (2026-10-06, @396)
+- External freelancers get ONLY the Site Visit / Meeting Log (+ My Logs) and
+  a quick "Log a client connection" card, for their assigned projects. No
+  DPR, dashboard, scoring or other pages.
+- Managed in the **FREELANCERS** tab (auto-created): A Name · B Email ·
+  C Projects (comma-separated, exact PROJECTS names) · D Active (Yes/No) ·
+  E Notes. Deliberately NOT the TEAM tab — everything reading TEAM (DPR,
+  weekly report, dashboard, visit planner, attendance) must never see them.
+  `getFreelancers()` is cached 5 min, as is the allowlist they're merged into.
+- **Enforcement is server-side**: `freelancerGate()` runs on every doGet/
+  doPost request; only `FREELANCER_ACTIONS` are accepted, and
+  submitMeetingLog / uploadMeetingPhoto / logFreelancerConnection must be for
+  one of their projects. Anything else → `code:'freelancer_forbidden'`.
+  `getLists` returns a trimmed list (their projects, team names only, no
+  emails/targets, plus `me`). `loggedBy` is forced to their name. Someone on
+  both TEAM and FREELANCERS is treated as team.
+- Decisions (2026-10-06): their logs publish straight to the client PDF and
+  email Siddharth each time (`finalizeMeetingLog`); IDS action items they
+  name DO create team tasks; connections go to CRM_LOG as 'Client
+  Connection' under their name.
+- auth.js: `startSession` returns `role`; a freelancer session is redirected
+  to meetlog.html from any other page. logs.html has a "Freelancers only"
+  filter (`byFreelancer` flag from getAllMeetingLogs).
+- Any new action a freelancer genuinely needs must be added to
+  FREELANCER_ACTIONS deliberately — the default is refusal.
+
 ## Notifications (2026-09) — email today, WhatsApp-ready later
 - `notifyMember()`/`notifyTaskAssigned()`/`notifySubmissionRecorded()` are the
   one central send point — every future channel (WhatsApp, once set up) is a
