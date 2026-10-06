@@ -397,11 +397,16 @@ quota-exceeded failure — don't keep guessing in code without that signal.
 - External freelancers get ONLY the Site Visit / Meeting Log (+ My Logs) and
   a quick "Log a client connection" card, for their assigned projects. No
   DPR, dashboard, scoring or other pages.
-- Managed in the **FREELANCERS** tab (auto-created): A Name · B Email ·
-  C Projects (comma-separated, exact PROJECTS names) · D Active (Yes/No) ·
-  E Notes. Deliberately NOT the TEAM tab — everything reading TEAM (DPR,
-  weekly report, dashboard, visit planner, attendance) must never see them.
-  `getFreelancers()` is cached 5 min, as is the allowlist they're merged into.
+- **Source of truth = TEAM + PROJECTS, no separate tab** (Siddharth's call,
+  2026-10-06 — a short-lived FREELANCERS tab was dropped): a freelancer is a
+  TEAM row with **Role (col B) = "Freelancer"**, signing in with the Email in
+  col E; their projects are the PROJECTS rows where they're **Project Lead
+  (col F)** or listed in **Team Members (col G)**. `freelancerRecords()` /
+  `getFreelancers()` (cached 5 min). Because they're TEAM rows, anything
+  that reads TEAM as "the studio team" must skip `isFreelancerRole()` —
+  done in getLists (team/allMembers/targets; exposed separately as
+  `getLists.freelancers` for meeting-log attendees) and getWeeklyStats.
+  Any NEW TEAM reader needs the same skip.
 - **Enforcement is server-side**: `freelancerGate()` runs on every doGet/
   doPost request; only `FREELANCER_ACTIONS` are accepted, and
   submitMeetingLog / uploadMeetingPhoto / logFreelancerConnection must be for
