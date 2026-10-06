@@ -63,6 +63,17 @@
     } catch (e) {}
     return null;
   }
+  // Freelance architects (2026-10-06) only get the Site Visit / Meeting Log.
+  // The server refuses everything else for them regardless; this just sends
+  // them to the one page that works instead of a broken-looking one.
+  var FREELANCER_PAGES = ['meetlog.html'];
+  function keepFreelancerOnAllowedPage(role) {
+    if (role !== 'freelancer') return false;
+    var page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    if (FREELANCER_PAGES.indexOf(page) > -1) return false;
+    location.replace('meetlog.html');
+    return true;
+  }
   var _sessReq = null;
   function startSession(googleToken, email) {
     var cur = getSession();
@@ -73,8 +84,10 @@
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (j && j.status === 'ok' && j.session && j.email === email) {
-          var s = { t: j.session, x: j.exp, e: j.email };
-          storeSet(SESS_KEY, JSON.stringify(s)); return s;
+          var s = { t: j.session, x: j.exp, e: j.email, r: j.role || 'team' };
+          storeSet(SESS_KEY, JSON.stringify(s));
+          keepFreelancerOnAllowedPage(s.r);
+          return s;
         }
         return null;
       })
@@ -173,6 +186,7 @@
         break;
       }
       if (j && j.code === 'transient') continue;
+      if (j && j.code === 'freelancer_forbidden') { keepFreelancerOnAllowedPage('freelancer'); break; }
       if (j && j.code === 'unauthorized') {
         unauthCount++;
         if (usedSession && unauthCount >= 2) storeDel(SESS_KEY);   // fall back to the Google token next try
@@ -361,6 +375,9 @@
     storeSet(EXP_KEY, String(Date.now() + SESSION_MS));
     storeSet(HINT_KEY, String(p.email || '').toLowerCase()); // persist email — never deleted
     window.__idsDenied = false;
+    var knownSess = getSession();
+    if (knownSess && keepFreelancerOnAllowedPage(knownSess.r)) return;   // leaving this page — don't start it
+    window.IDS_ROLE = (knownSess && knownSess.r) || '';
     // A fresh Google token → swap it for a 12h app session (see getSession).
     if (p.exp && p.exp * 1000 > Date.now() + 60000) { try { startSession(token, window.IDS_USER.email); } catch (e) {} }
     // reveal page

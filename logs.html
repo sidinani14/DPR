@@ -31,6 +31,7 @@ tr:last-child td{border-bottom:none}
     <input id="q" placeholder="Filter by project, person, type…" oninput="render()">
     <button onclick="load()">↻ Refresh</button>
     <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="showDel" onchange="load()">Show deleted</label>
+    <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="onlyFl" onchange="render()">Freelancers only</label>
     <span id="status" style="font-size:12px;color:var(--ink3)"></span>
   </div>
   <div id="out"><div class="empty">Sign in…</div></div>
@@ -72,14 +73,15 @@ function pdfCell(l){
 }
 function render(){
   const q=(document.getElementById('q').value||'').toLowerCase();
-  const rows=LOGS.filter(l=>!q||[l.project,l.loggedBy,l.type,l.clients].join(' ').toLowerCase().includes(q));
+  const onlyFl=document.getElementById('onlyFl').checked;
+  const rows=LOGS.filter(l=>(!onlyFl||l.byFreelancer) && (!q||[l.project,l.loggedBy,l.type,l.clients].join(' ').toLowerCase().includes(q)));
   if(!rows.length){ document.getElementById('out').innerHTML='<div class="empty">No logs.</div>'; return; }
   document.getElementById('out').innerHTML='<table><tr><th>Date</th><th>Project</th><th>Type</th><th>Logged by</th><th>Clients</th><th>Status</th><th>PDF</th><th></th></tr>'+
     rows.map(l=>`<tr class="${l._dup?'dup':''}">
       <td>${shortD(l.date)}</td>
       <td><b>${esc(l.project)}</b>${l._dup?'<span class="tag">possible repeat</span>':''}</td>
       <td>${esc(l.type)}</td>
-      <td>${esc(l.loggedBy)}</td>
+      <td>${esc(l.loggedBy)}${l.byFreelancer?'<span class="tag" style="background:#E3F2FD;color:#1565C0">freelancer</span>':''}</td>
       <td>${esc(l.clients||'—')}</td>
       <td>${esc(l.status||'—')}</td>
       <td id="pdf-${l.logId}">${l.status==='Deleted'?'—':pdfCell(l)}</td>

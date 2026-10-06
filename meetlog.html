@@ -72,7 +72,13 @@ const DIRECTOR_NAME_BY_EMAIL={'sidinani14@gmail.com':'Siddharth Inani','siddhart
 // lost on a flaky site connection) instead of creating a duplicate log.
 let SUBMIT_ID='';
 function newSubmitId(){ return 'ms-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10); }
+// Set from getLists for freelance architects ({name, role:'freelancer', projects}).
+// They only see their assigned projects (server-filtered) and get a quick
+// client-connection card; the server enforces all of it.
+let ME=null;
+function isFreelancer(){ return !!(ME && ME.role==='freelancer'); }
 function myName(){
+  if (ME && ME.name) return ME.name;
   const em=String((window.IDS_USER&&window.IDS_USER.email)||'').toLowerCase();
   const i=TEAM_EMAILS.findIndex(e=>String(e||'').trim().toLowerCase()===em);
   if(i>=0) return TEAM[i];
@@ -87,7 +93,7 @@ const CATS=[['Client','Action plan — Client'],['IDS','Action plan — IDS team
 window.idsOnAuth = async function(){
   try{
     const r = await fetch(API+'?action=getLists').then(x=>x.json());
-    TEAM=r.team||[]; TEAM_EMAILS=r.emails||[]; PROJECTS=r.projects||[];
+    TEAM=r.team||[]; TEAM_EMAILS=r.emails||[]; PROJECTS=r.projects||[]; ME=r.me||null;
   }catch(e){}
   // Resuming an existing log from the Logs Manager (?edit=<logId>) — e.g. a
   // Draft that was submitted but never finished, or any log that needs a
@@ -121,7 +127,7 @@ window.idsOnAuth = async function(){
 // or attendee names broke the review screen's markup (and could inject HTML).
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function projOpts(){return '<option value="">Select project…</option>'+PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');}
-function teamOpts(){const me=myName();const list=attendeeList();if(me&&!list.some(t=>t.toLowerCase()===me.toLowerCase()))list.unshift(me);return list.map(t=>`<option value="${esc(t)}" ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
+function teamOpts(){const me=myName();if(isFreelancer())return `<option value="${esc(me)}" selected>${esc(me)}</option>`;const list=attendeeList();if(me&&!list.some(t=>t.toLowerCase()===me.toLowerCase()))list.unshift(me);return list.map(t=>`<option value="${esc(t)}" ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
 function attendeeList(){const seen={};return TEAM.concat(EXTRA_ATTENDEES).filter(t=>{const k=t.toLowerCase();if(seen[k])return false;seen[k]=1;return !!t;});}
 // When Aman is logging (he records Siddharth's meetings), pre-tick Siddharth.
 function isAmanUser(){ return String((window.IDS_USER&&window.IDS_USER.email)||'').toLowerCase()==='aman.raghuwanshi@ideaform.in'; }
@@ -131,7 +137,7 @@ function render(){
   // Local date — toISOString() is UTC, which before 5:30am IST gave yesterday.
   const _n=new Date(), today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
   SUBMIT_ID=newSubmitId(); photoFiles=[];
-  document.getElementById('app').innerHTML=`
+  document.getElementById('app').innerHTML=(isFreelancer()?connCardHtml(today):'')+`
   <div class="card">
     <div class="ch"><div class="cn">1</div><div class="ct">Type & project</div></div>
     <div class="field"><div class="lbl">Log type</div>
@@ -178,6 +184,47 @@ function render(){
   <div id="bar"><button id="go" onclick="submitLog()">Submit log</button><div class="msg" id="msg"></div></div>`;
   setType(LOG_TYPE);
   loadDraftAndCheck();
+  if (isFreelancer()) loadMyConnections();
+}
+
+// ── Quick client connection (freelancers) — a call / WhatsApp / meeting with
+// the client that isn't a full site visit or MoM. Writes to the same CRM_LOG
+// connections the team's DPR connections go to, so it shows on the project.
+function connCardHtml(today){
+  const projs=PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  return `<div class="card" id="conn-card">
+    <div class="ch"><div class="cn">✆</div><div class="ct">Log a client connection</div></div>
+    <div class="sub" style="margin:-4px 0 10px">A call, WhatsApp or quick meeting with the client — not a full site visit / MoM (use the form below for those).</div>
+    <div class="row"><div class="field"><div class="lbl">Project</div><select id="cc-project"><option value="">Select project…</option>${projs}</select></div>
+      <div class="field"><div class="lbl">How</div><select id="cc-type"><option>Call</option><option>WhatsApp</option><option>Meeting</option><option>Site Visit</option><option>Email</option></select></div>
+      <div class="field"><div class="lbl">Date</div><input type="date" id="cc-date" value="${today}"></div></div>
+    <div class="field"><div class="lbl">What was discussed</div><textarea id="cc-notes" style="min-height:52px" placeholder="e.g. Client approved the kitchen layout; wants revised false ceiling options by Friday"></textarea></div>
+    <button type="button" id="cc-go" onclick="logConnection()" style="background:#1F3A5F;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer">Save connection</button>
+    <span id="cc-msg" class="sub" style="margin-left:8px"></span>
+    <div id="cc-recent" style="margin-top:10px"></div>
+  </div>`;
+}
+async function logConnection(){
+  const g=id=>document.getElementById(id), btn=g('cc-go'), m=g('cc-msg');
+  const payload={action:'logFreelancerConnection', project:g('cc-project').value, type:g('cc-type').value, date:g('cc-date').value, notes:g('cc-notes').value.trim()};
+  if(!payload.project){ m.textContent='Pick a project.'; return; }
+  if(!payload.notes){ m.textContent='Add a line about what was discussed.'; return; }
+  btn.disabled=true; m.textContent='Saving…';
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).then(x=>x.json());
+    if(r.status==='ok'){ m.textContent='Saved ✓'; g('cc-notes').value=''; loadMyConnections(); }
+    else m.textContent='⚠ '+(r.message||'Could not save');
+  }catch(e){ m.textContent='⚠ Network error — try again.'; }
+  btn.disabled=false;
+}
+async function loadMyConnections(){
+  const el=document.getElementById('cc-recent'); if(!el) return;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getMyConnections'})}).then(x=>x.json());
+    const list=(r.connections||[]).slice(0,5);
+    el.innerHTML=list.length?'<div class="lbl" style="margin-bottom:4px">Your recent connections</div>'+list.map(c=>
+      `<div style="font-size:12px;padding:5px 0;border-top:1px solid #EEE"><b>${esc(c.date)}</b> · ${esc(c.type)} · ${esc(c.project)}<div style="color:#6B6860">${esc(c.notes)}</div></div>`).join(''):'';
+  }catch(e){}
 }
 function setType(t){
   LOG_TYPE=t; const app=document.getElementById('app');
