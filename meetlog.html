@@ -93,7 +93,7 @@ const CATS=[['Client','Action plan — Client'],['IDS','Action plan — IDS team
 window.idsOnAuth = async function(){
   try{
     const r = await fetch(API+'?action=getLists').then(x=>x.json());
-    TEAM=r.team||[]; TEAM_EMAILS=r.emails||[]; PROJECTS=r.projects||[]; ME=r.me||null;
+    TEAM=r.team||[]; TEAM_EMAILS=r.emails||[]; PROJECTS=r.projects||[]; ME=r.me||null; FREELANCERS=r.freelancers||[];
   }catch(e){}
   // Resuming an existing log from the Logs Manager (?edit=<logId>) — e.g. a
   // Draft that was submitted but never finished, or any log that needs a
@@ -128,7 +128,8 @@ window.idsOnAuth = async function(){
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function projOpts(){return '<option value="">Select project…</option>'+PROJECTS.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');}
 function teamOpts(){const me=myName();if(isFreelancer())return `<option value="${esc(me)}" selected>${esc(me)}</option>`;const list=attendeeList();if(me&&!list.some(t=>t.toLowerCase()===me.toLowerCase()))list.unshift(me);return list.map(t=>`<option value="${esc(t)}" ${t===me?'selected':''}>${esc(t)}</option>`).join('');}
-function attendeeList(){const seen={};return TEAM.concat(EXTRA_ATTENDEES).filter(t=>{const k=t.toLowerCase();if(seen[k])return false;seen[k]=1;return !!t;});}
+let FREELANCERS=[];   // freelance architects (TEAM Role = Freelancer) — attendees only, not team
+function attendeeList(){const seen={};return TEAM.concat(EXTRA_ATTENDEES, FREELANCERS).filter(t=>{const k=t.toLowerCase();if(seen[k])return false;seen[k]=1;return !!t;});}
 // When Aman is logging (he records Siddharth's meetings), pre-tick Siddharth.
 function isAmanUser(){ return String((window.IDS_USER&&window.IDS_USER.email)||'').toLowerCase()==='aman.raghuwanshi@ideaform.in'; }
 function teamChecks(){return attendeeList().map(t=>{const pre=(isAmanUser()&&t==='Siddharth Inani')?' checked':'';return `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:3px 8px 3px 0"><input type="checkbox" style="width:auto" class="ta" value="${esc(t)}"${pre}>${esc(t)}</label>`;}).join('');}
