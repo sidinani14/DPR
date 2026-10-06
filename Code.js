@@ -1293,53 +1293,60 @@ var AUTH_ALLOWED = {
 // ── Freelance architects (2026-10-06) ─────────────────────────────
 // External freelancers working on some projects: no DPR, no dashboard, no
 // scoring — only the Site Visit / MoM log (+ My Logs) and a quick client-
-// connection entry, for the projects assigned to them. Kept in their OWN tab,
-// deliberately NOT the TEAM tab: everything that reads TEAM (DPR, weekly
-// report, dashboard scoring, visit planner, attendance) must never see them.
-// FREELANCERS cols: A Name · B Email · C Projects (comma-separated, exact
-// PROJECTS names) · D Active (Yes/No) · E Notes.
-// Access is enforced HERE, server-side: a freelancer's request is only
-// accepted for the actions in FREELANCER_ACTIONS, and project-scoped actions
-// are checked against their assigned projects. Their logs publish to the
-// client PDF directly (2026-10-06 decision) — Siddharth gets an email for
-// each one — and IDS action items they name DO create team tasks.
-var FREELANCERS_TAB = 'FREELANCERS';
-function writeFreelancerHeaders(sheet){
-  sheet.getRange(1,1,1,5).setValues([['Name','Email','Projects (comma-separated, exact project names)','Active (Yes/No)','Notes']])
-    .setBackground('#1F3A5F').setFontColor('#FFFFFF').setFontWeight('bold');
-  sheet.setFrozenRows(1);
-  sheet.setColumnWidth(1,170); sheet.setColumnWidth(2,230); sheet.setColumnWidth(3,380);
-}
-// email → {name, projects:[...]}, active rows only. Cached 5 min (same as the
-// team allowlist), so adding/removing someone takes effect within 5 minutes.
+// connection entry, for the projects assigned to them.
+// Source of truth (per Siddharth, 2026-10-06 — NO separate tab):
+//   • TEAM tab: Role (col B) = "Freelancer", Email (col E) = the Google
+//     account they sign in with, Active (col F) not "No".
+//   • PROJECTS tab: their projects = rows where they're the Project Lead
+//     (col F) or listed in Team Members (col G, comma-separated).
+// Because they live on TEAM, every TEAM reader that means "the studio team"
+// must skip them — see isFreelancerRole() in getLists / getWeeklyStats.
+// Access is enforced server-side: a freelancer's request is only accepted
+// for FREELANCER_ACTIONS, and project-scoped actions are checked against
+// their projects. Their logs publish to the client PDF directly (2026-10-06
+// decision) — Siddharth gets an email for each — and IDS action items they
+// name DO create team tasks.
+function isFreelancerRole(role){ return /freelanc/i.test(String(role||'')); }
+// email → {name, projects:[...]}. Cached 5 min (same as the allowlist), so
+// role / project-lead changes take effect within 5 minutes.
 function getFreelancers(){
   var cache = CacheService.getScriptCache();
-  var c = cache.get('freelancers_v1');
+  var c = cache.get('freelancers_v2');
   if (c) { try { return JSON.parse(c); } catch (e) {} }
   var out = {};
   try {
-    var sh = getOrCreate(FREELANCERS_TAB, writeFreelancerHeaders);
-    if (sh.getLastRow() > 1) {
-      sh.getRange(2,1,sh.getLastRow()-1,4).getValues().forEach(function(r){
-        var name = String(r[0]||'').trim(), email = String(r[1]||'').trim().toLowerCase();
-        var active = String(r[3]||'').trim().toLowerCase();
-        if (!name || !email || active === 'no') return;
-        out[email] = { name: name, projects: String(r[2]||'').split(',').map(function(p){ return p.trim(); }).filter(Boolean) };
-      });
-    }
-    cache.put('freelancers_v1', JSON.stringify(out), 300);
+    var byName = freelancerRecords();
+    for (var k in byName) if (byName[k].email) out[byName[k].email] = { name: byName[k].name, projects: byName[k].projects };
+    cache.put('freelancers_v2', JSON.stringify(out), 300);
   } catch (e) { logTransientAuth('freelancer-read-error', String(e), e && e.stack); }
   return out;
 }
-// A freelancer = on the FREELANCERS tab and NOT a team member/manager (if
-// someone is somehow on both, the team role wins).
+// lower-cased name → {name, email, projects} for every active Role=Freelancer
+// row, including ones with no email yet (those can't sign in).
+function freelancerRecords(){
+    var t = db().getSheetByName(TEAM_TAB);
+    var tr = t ? t.getDataRange().getValues() : [];
+    var byName = {};
+    for (var i = 1; i < tr.length; i++) {
+      var name = String(tr[i][0]||'').trim(), email = String(tr[i][4]||'').trim().toLowerCase();
+      if (!name || !isFreelancerRole(tr[i][1]) || String(tr[i][5]||'').trim().toLowerCase() === 'no') continue;
+      byName[name.toLowerCase()] = { name: name, email: email, projects: [] };
+    }
+    var p = db().getSheetByName(PROJECTS_TAB);
+    var pr = p ? p.getDataRange().getValues() : [];
+    for (var j = 1; j < pr.length; j++) {
+      var pname = String(pr[j][1]||'').trim(); if (!pname) continue;
+      var people = [String(pr[j][5]||'')].concat(String(pr[j][6]||'').split(','))
+        .map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean);
+      people.forEach(function(who){ if (byName[who] && byName[who].projects.indexOf(pname) === -1) byName[who].projects.push(pname); });
+    }
+    return byName;
+}
+// A freelancer = Role "Freelancer" on TEAM (and not a manager).
 function freelancerFor(authEmail){
   var e = String(authEmail||'').trim().toLowerCase();
   if (!e || isManager(e)) return null;
-  var f = getFreelancers()[e];
-  if (!f) return null;
-  if (nameForEmail(e)) return null;   // also on the TEAM tab → treat as team
-  return f;
+  return getFreelancers()[e] || null;
 }
 function freelancerHasProject(f, project){
   var p = String(project||'').trim().toLowerCase();
@@ -1364,7 +1371,7 @@ function freelancerGate(authEmail, action, data){
 // attendee ticks / IDS action owners) but no emails or targets.
 function getListsForFreelancer(f){
   var full = getLists();
-  return { team: full.team || [], emails: [], allMembers: [], targets: {},
+  return { team: full.team || [], emails: [], allMembers: [], targets: {}, freelancers: full.freelancers || [],
     projects: (full.projects||[]).filter(function(p){ return freelancerHasProject(f, p.name); }),
     me: { name: f.name, role: 'freelancer', projects: f.projects } };
 }
@@ -1418,10 +1425,8 @@ function getAllowedEmails() {
         if (email && active !== 'no') set[email] = 1;
       }
     }
-    // Freelancers may sign in too — what they can then DO is limited by
-    // freelancerGate() on every request, not by this list.
-    var fl = getFreelancers();
-    for (var fe in fl) set[fe] = 1;
+    // (Freelancers are TEAM rows too, so they're in here — what they can
+    // then DO is limited by freelancerGate() on every request.)
     readOk = true;
   } catch (e) { logTransientAuth('team-read-error', String(e), e && e.stack); }
   _ALLOW_READ_OK = readOk;
@@ -2191,7 +2196,7 @@ function getLists() {
   // team = Active = Yes only (for DPR form member selector)
   // allMembers = everyone (for Task Assignment form assignee dropdowns)
   var tSheet = s.getSheetByName(TEAM_TAB);
-  var team = [], emails = [], allMembers = [], allEmails = [], targets = {};
+  var team = [], emails = [], allMembers = [], allEmails = [], targets = {}, freelancers = [];
   if (tSheet) {
     var tRows = tSheet.getDataRange().getValues();
     for (var i = 1; i < tRows.length; i++) {
@@ -2202,6 +2207,10 @@ function getLists() {
       if (!name) continue;
       // Departed — removed from all forms & dashboards
       if (EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
+      // Freelance architects (Role = Freelancer) are not studio team: kept out
+      // of DPR / Plan Tasks / dashboard / attendance / weekly-report rosters.
+      // Listed separately so the meeting log can still tick them as attendees.
+      if (isFreelancerRole(tRows[i][1])) { if (active !== 'no') freelancers.push(name); continue; }
       // All members regardless of active status
       allMembers.push(name);
       allEmails.push(email);
@@ -2231,7 +2240,7 @@ function getLists() {
     }
   }
 
-  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets };
+  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets, freelancers:freelancers };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -6533,6 +6542,7 @@ function getWeeklyStats(weekStart) {
     var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
     if (!name || active === 'no' || DIRECTOR_NAMES[name] || EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
+    if (isFreelancerRole(role)) continue;   // freelance architects aren't scored (no DPR / targets)
 
     // Tasks assigned this week (AssignedDate in Mon-Sat)
     var tasksAssigned = 0, assignedPts = 0;
