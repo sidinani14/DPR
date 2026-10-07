@@ -1864,11 +1864,51 @@ function dprMissedDigest(){
     var d = addDaysToStr(dateStr(), -1);
     for (var k = 0; k < 7 && !isWorkingDay(d); k++) d = addDaysToStr(d, -1);   // Monday → Saturday, skip holidays
     var missed = membersWhoMissed(d);
+    // tidy dedupe keys from dailyFormOpened older than a week
+    try {
+      var props = PropertiesService.getScriptProperties(), all = props.getKeys(), cutoff = addDaysToStr(dateStr(), -7);
+      all.forEach(function(key){ var m = key.match(/^missedopen_(\d{4}-\d{2}-\d{2})_/); if (m && m[1] < cutoff) props.deleteProperty(key); });
+    } catch (ce) {}
     var dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d + 'T12:00:00').getDay()];
     notifyMember('Siddharth Inani', missed.length ? ('DPR missed on ' + dow + ' ' + d + ' — ' + missed.length + ' ' + (missed.length === 1 ? 'person' : 'people')) : ('Everyone filed their DPR on ' + dow + ' ' + d), missed.length
       ? ['Not filed for ' + dow + ' ' + d + ' (now locked — counts as missed):', ''].concat(missed.map(function(n){ return '• ' + n; }))
       : ['All active team members filed on ' + dow + ' ' + d + '.']);
   } catch (e) { Logger.log('dprMissedDigest failed: ' + e); }
+}
+// Real-time heads-up (2026-10-07, Siddharth): when someone who did NOT file
+// the previous working day opens their DPR / DPER / CRM form between 12 am
+// and 5 pm the next day, email Siddharth so he can ask what happened. One
+// email per person per missed day (Script Property dedupe key, cleaned up by
+// dprMissedDigest). People who did file never trigger anything.
+function dailyFormOpened(authEmail, form, dryRun){
+  try {
+    var name = memberNameForAuth(authEmail);
+    if (!name || DIRECTOR_NAMES[name]) return { status:'ok', notified:false };
+    if ((getLists().team || []).indexOf(name) === -1) return { status:'ok', notified:false };
+    var tz = Session.getScriptTimeZone(), now = new Date();
+    var mins = parseInt(Utilities.formatDate(now, tz, 'H'), 10) * 60 + parseInt(Utilities.formatDate(now, tz, 'm'), 10);
+    if (mins >= 17 * 60) return { status:'ok', notified:false };
+    var today = dateStr(), prev = addDaysToStr(today, -1);
+    for (var k = 0; k < 7 && !isWorkingDay(prev); k++) prev = addDaysToStr(prev, -1);
+    if (filedOn(prev)[name.toLowerCase()]) return { status:'ok', notified:false };
+    var props = PropertiesService.getScriptProperties(), key = 'missedopen_' + prev + '_' + name;
+    if (props.getProperty(key)) return { status:'ok', notified:false, already:true };
+    if (!dryRun) props.setProperty(key, '1');
+    var dow = function(d){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d + 'T12:00:00').getDay()]; };
+    var formName = String(form || 'DPR').toUpperCase() === 'CRM' ? 'CRM report' : (String(form || 'DPR').toUpperCase() === 'DPER' ? 'DPER' : 'DPR');
+    var filedToday = !!filedOn(today)[name.toLowerCase()];
+    var subj = name + ' opened the ' + formName + ' — missed ' + dow(prev) + ' ' + prev;
+    var lines = [
+      name + ' opened the ' + formName + ' at ' + Utilities.formatDate(now, tz, 'h:mm a') + ' today (' + dow(today) + ' ' + today + ').',
+      'They did NOT file their ' + formName + ' for ' + dow(prev) + ' ' + prev + ' — that day is now locked and counts as missed.',
+      filedToday ? 'They have already filed today’s report.' : 'They haven’t filed today’s report yet.',
+      '',
+      'You may want to check with them what happened / whether they have a query.'
+    ];
+    if (dryRun) return { status:'ok', wouldNotify:true, subject: subj, lines: lines };
+    notifyMember('Siddharth Inani', subj, lines);
+    return { status:'ok', notified:true };
+  } catch (e) { Logger.log('dailyFormOpened failed: ' + e); return { status:'ok', notified:false }; }
 }
 function setupDprReminderTriggers(){
   ScriptApp.getProjectTriggers().forEach(function(t){
@@ -2157,6 +2197,8 @@ function doPost(e) {
     if (data.action === 'debugVisitPlanner')      return respond(debugVisitPlanner());
     if (data.action === 'getLastPushVisitTasksTrace') return respond(getLastPushVisitTasksTrace());
     if (data.action === 'debugListTriggers')      return respond(ScriptApp.getProjectTriggers().map(function(t){ return {handler:t.getHandlerFunction(), type:String(t.getEventType()), source:String(t.getTriggerSource())}; }));
+    if (data.action === 'dailyFormOpened')  return respond(dailyFormOpened(authEmail, data.form||'DPR'));
+    if (data.action === 'testDailyFormOpened') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(dailyFormOpened(data.email||'', data.form||'DPR', true)); }
     if (data.action === 'setupDprReminderTriggers') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return respond(setupDprReminderTriggers()); }
     if (data.action === 'previewDprMissed') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond({ today: dateStr(), notYetToday: membersWhoMissed(dateStr()), yesterday: membersWhoMissed(addDaysToStr(dateStr(), -1)) }); }
     if (data.action === 'setupMondayTrigger')     { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); setupMondayTrigger(); return respond({status:'ok'}); }

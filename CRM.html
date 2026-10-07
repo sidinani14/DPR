@@ -2361,6 +2361,19 @@ window.addEventListener('DOMContentLoaded',()=>{
     if (top && !msg && top.dataset.dn) { top.className="banner"; top.textContent="Submit before 7:30 PM · responses go directly to your scoresheet"; delete top.dataset.dn; }
     if (top && msg) { top.dataset.dn="1"; top.className="banner late"; top.textContent = mins < 6*60 ? "Past midnight — yesterday’s DPR can’t be filed any more. This is today’s DPR." : "Past 7:30 PM — submit before 12 midnight or today’s DPR counts as missed."; }
   }
+
+  // Tell the server this form was opened (once per page load, only before
+  // 5 PM). If the person missed the previous working day, Siddharth gets an
+  // email so he can follow up — see dailyFormOpened in Code.js.
+  let _openPinged=false;
+  function pingOpened(){
+    if (_openPinged || !(window.IDS_USER && window.IDS_USER.email)) return;
+    if (new Date().getHours() >= 17) return;
+    _openPinged=true;
+    try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'dailyFormOpened', form:'CRM'})}).catch(()=>{}); } catch(e){}
+  }
+  document.addEventListener('ids-auth', pingOpened);
+  if (window.IDS_USER) setTimeout(pingOpened, 0);
   window.dayNotice = dayNotice;
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', dayNotice); else dayNotice();
   setInterval(dayNotice, 60000);
