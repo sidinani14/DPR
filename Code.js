@@ -1820,6 +1820,98 @@ function doGet(e) {
   return respond({status: 'IDS DPR live'});
 }
 
+// ── DPR reminders (2026-10-07) ──────────────────────────────────────
+// 7 pm: email every active team member who hasn't filed today's report yet
+//       (DPR — or DPER/CRM for Deepak/Aman, which also write DAILY_SUMMARY).
+// 10 am: one email to Siddharth listing who didn't file the previous working
+//       day. Sundays and HOLIDAYS-tab dates are skipped. Freelancers,
+//       directors and departed members aren't in getLists().team, so they're
+//       never chased. Installed by setupDprReminderTriggers().
+function filedOn(dayStr){
+  var sh = db().getSheetByName(SUMMARY_TAB), filed = {};
+  if (!sh || sh.getLastRow() < 2) return filed;
+  var rows = sh.getRange(2, 1, Math.min(sh.getLastRow()-1, 600), 3).getValues();   // newest rows are on top
+  rows.forEach(function(r){ if (cellDate(r[0]) === dayStr) filed[String(r[2]||'').trim().toLowerCase()] = true; });
+  return filed;
+}
+function isWorkingDay(dayStr){
+  if (new Date(dayStr + 'T12:00:00').getDay() === 0) return false;
+  return (getHolidays(dayStr, dayStr).dates || []).length === 0;
+}
+function membersWhoMissed(dayStr){
+  var filed = filedOn(dayStr);
+  return (getLists().team || []).filter(function(n){ return n && !DIRECTOR_NAMES[n] && !filed[n.toLowerCase()]; });
+}
+function dprEveningReminder(){
+  try {
+    var today = dateStr();
+    if (!isWorkingDay(today)) return;
+    membersWhoMissed(today).forEach(function(n){
+      var form = n === 'Deepak Soni' ? 'DPER' : (/^aman /i.test(n) ? 'CRM report' : 'DPR');
+      notifyMember(n, 'Reminder: today’s ' + form + ' isn’t filed yet', [
+        'Hi ' + n.split(' ')[0] + ',',
+        '',
+        'Your ' + form + ' for today (' + today + ') hasn’t been submitted yet.',
+        'Reports can only be filed for the same day — after midnight, today’s can’t be filed and counts as missed.',
+        '',
+        'https://team.ideaformdesignstudio.com/' + (form === 'DPER' ? 'DPER.html' : form === 'CRM report' ? 'CRM.html' : 'dpr.html')
+      ]);
+    });
+  } catch (e) { Logger.log('dprEveningReminder failed: ' + e); }
+}
+function dprMissedDigest(){
+  try {
+    var d = addDaysToStr(dateStr(), -1);
+    for (var k = 0; k < 7 && !isWorkingDay(d); k++) d = addDaysToStr(d, -1);   // Monday → Saturday, skip holidays
+    var missed = membersWhoMissed(d);
+    var dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d + 'T12:00:00').getDay()];
+    notifyMember('Siddharth Inani', missed.length ? ('DPR missed on ' + dow + ' ' + d + ' — ' + missed.length + ' ' + (missed.length === 1 ? 'person' : 'people')) : ('Everyone filed their DPR on ' + dow + ' ' + d), missed.length
+      ? ['Not filed for ' + dow + ' ' + d + ' (now locked — counts as missed):', ''].concat(missed.map(function(n){ return '• ' + n; }))
+      : ['All active team members filed on ' + dow + ' ' + d + '.']);
+  } catch (e) { Logger.log('dprMissedDigest failed: ' + e); }
+}
+function setupDprReminderTriggers(){
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    var h = t.getHandlerFunction();
+    if (h === 'dprEveningReminder' || h === 'dprMissedDigest') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dprEveningReminder').timeBased().everyDays(1).atHour(19).nearMinute(0).create();
+  ScriptApp.newTrigger('dprMissedDigest').timeBased().everyDays(1).atHour(10).nearMinute(0).create();
+  return { status:'ok', triggers: ScriptApp.getProjectTriggers().map(function(t){ return t.getHandlerFunction(); }) };
+}
+
+// ── Daily reports are for TODAY only (2026-10-07, Siddharth's decision) ──
+// DPR, DPER and CRM used to accept a backdated "Report Date" (and the DPR's
+// own client-sent Timestamp), which is what let people file a week's worth
+// on Saturday or Monday morning and spread it back over the week — mixing
+// up which day work, visits and task completions actually happened. Now
+// every daily-form request is stamped with the SERVER's today/now here,
+// whatever the page sent. No grace window: once the day ends, that day's
+// report can't be filed (it counts as missed). Site visit / meeting logs
+// (meetlog) are NOT covered — logging an earlier visit there stays allowed.
+var DAILY_FORM_ACTIONS = { createDoneTask:1, logConnections:1, submitBillables:1, updateTaskStatuses:1,
+  submitDPER:1, submitAmanCRM:1, submitFieldWorkBatch:1, submitDailySummary:1 };
+function lockDailyFormDates(data){
+  if (!data) return;
+  var today = dateStr(), nowIso = new Date().toISOString();
+  if (!data.action) {                          // dpr.html main submission
+    data['Timestamp'] = nowIso;
+    data['Report Date'] = today;
+    ['Done Tasks','Ongoing Tasks'].forEach(function(k){
+      if (!data[k]) return;
+      try {
+        var arr = typeof data[k] === 'string' ? JSON.parse(data[k]) : data[k];
+        (arr||[]).forEach(function(t){ if (t && typeof t === 'object') t.date = today; });
+        data[k] = typeof data[k] === 'string' ? JSON.stringify(arr) : arr;
+      } catch (e) {}
+    });
+    return;
+  }
+  if (!DAILY_FORM_ACTIONS[data.action]) return;
+  data.date = today;
+  if (data['Timestamp']) data['Timestamp'] = nowIso;
+}
+
 function doPost(e) {
   try {
     var raw  = e && e.postData ? e.postData.contents : '';
@@ -1829,6 +1921,7 @@ function doPost(e) {
     if (data.action === 'startSession') return respond(issueSessionToken(authEmail, data.idToken));
     var flRefusalP = freelancerGate(authEmail, data.action, data);
     if (flRefusalP) return respond(flRefusalP);
+    lockDailyFormDates(data);
     var flUserP = freelancerFor(authEmail);
     if (flUserP) {
       // Never trust the page for who is logging: always the freelancer's own name.
@@ -2064,6 +2157,8 @@ function doPost(e) {
     if (data.action === 'debugVisitPlanner')      return respond(debugVisitPlanner());
     if (data.action === 'getLastPushVisitTasksTrace') return respond(getLastPushVisitTasksTrace());
     if (data.action === 'debugListTriggers')      return respond(ScriptApp.getProjectTriggers().map(function(t){ return {handler:t.getHandlerFunction(), type:String(t.getEventType()), source:String(t.getTriggerSource())}; }));
+    if (data.action === 'setupDprReminderTriggers') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return respond(setupDprReminderTriggers()); }
+    if (data.action === 'previewDprMissed') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond({ today: dateStr(), notYetToday: membersWhoMissed(dateStr()), yesterday: membersWhoMissed(addDaysToStr(dateStr(), -1)) }); }
     if (data.action === 'setupMondayTrigger')     { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); setupMondayTrigger(); return respond({status:'ok'}); }
     if (data.action === 'deleteTriggersByHandler') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return respond(deleteTriggersByHandler(data.handlerName||'')); }
     if (data.action === 'getBillRequests')        return cachedSafeRespond('c_getBillRequests', 15, getBillRequests);
@@ -6659,14 +6754,19 @@ function getWeeklyStats(weekStart) {
 
     // DPR days filed this week
     // DAILY_SUMMARY cols: Date=A(0) Time=B(1) Member=C(2) Email=D(3) ArrivedOnTime=E(4)
-    var dprDays = 0;
+    // DISTINCT days (2026-10-07): this used to count rows, so several catch-up
+    // DPRs filed on one day (seen live: 4 on a Saturday, 6 on a Monday
+    // morning) earned several days of consistency credit — rewarding the very
+    // weekend batching it should discourage.
+    var dprDaySet = {};
     sumRows.forEach(function(r, i) {
       if (i === 0) return;
       var rDate = cellDate(r[0]); // col A = Date
       var rName = String(r[2]||'').trim(); // col C = Member name
       if (rName === name && rDate >= mon && rDate <= sat)
-        dprDays++;
+        dprDaySet[rDate] = true;
     });
+    var dprDays = Object.keys(dprDaySet).length;
 
     // Reliability — delays this week. Late (deadline in week, passed, not done
     // on time) = −1; "Work Not Done" (reassigned by a lead) = −2.

@@ -231,8 +231,9 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
         </div>
       </div>
       <div class="field">
-        <div class="lbl">Report date <span class="opt">change if filling this late for an earlier day</span></div>
+        <div class="lbl">Report date</div>
         <input type="date" id="f-date">
+        <div class="opt" style="font-size:11px;margin-top:4px">Reports are for <b>today only</b> — after midnight, today's report can't be filed and counts as missed.</div>
       </div>
     </div>
   </div>
@@ -417,7 +418,7 @@ function isVisitRate2(t){ return VISIT_TYPES_ARCH.indexOf(t)>-1 || t==='Site Vis
 
 window.addEventListener('DOMContentLoaded', () => {
   setHeaderDate(); setDeadlineBanner();
-  document.getElementById('f-date').value = new Date().toISOString().substring(0,10);
+  if (window.lockReportDateToToday) window.lockReportDateToToday();
   // fetchAll() needs the sign-in token, so it runs after auth (see idsOnAuth below)
 });
 
@@ -1250,7 +1251,8 @@ function resumeDraft(){
   function section(name, fn){ try { fn(); } catch(e){ hadError = true; console.error('resumeDraft: '+name+' failed', e); } }
   let assignedMsg = '';
 
-  section('report date', () => { if (d.date && g('f-date')) g('f-date').value = d.date; });
+  // Report date is always today (a draft from an earlier day becomes today's report).
+  section('report date', () => { if (window.lockReportDateToToday) window.lockReportDateToToday(); });
 
   section('Section 2 (assigned tasks)', () => {
     const list = d.assigned || [];
@@ -1909,6 +1911,18 @@ function toast(msg, duration) {
   clearTimeout(el._hideTimer);
   el._hideTimer=setTimeout(()=>el.classList.remove('show'),duration||2800);
 }
+</script>
+
+<script>
+// Daily reports are for TODAY only (2026-10-07): the server stamps every
+// submission with its own date regardless, this just shows it honestly.
+(function(){
+  function localToday(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+  function lock(){ const el=document.getElementById('f-date'); if(!el) return; const t=localToday(); el.value=t; el.min=t; el.max=t; el.readOnly=true; el.style.opacity='.75'; el.title='Reports can only be filed for today'; }
+  window.lockReportDateToToday = lock;
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', lock); else lock();
+  setInterval(lock, 60000);   // a tab left open past midnight rolls over to the new day
+})();
 </script>
 </body>
 </html>
