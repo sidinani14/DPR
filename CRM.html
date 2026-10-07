@@ -2358,7 +2358,8 @@ window.addEventListener('DOMContentLoaded',()=>{
     el.style.cssText = msg ? "margin-top:8px;padding:9px 11px;border-radius:8px;font-size:12px;line-height:1.45;background:"+bg+";color:"+fg : "display:none";
     el.textContent = msg;
     const top=document.getElementById("banner");   // dpr.html's own top banner
-    if (top && msg) { top.className="banner late"; top.textContent = mins < 6*60 ? "Past midnight — yesterday’s DPR can’t be filed any more. This is today’s DPR." : "Past 7:30 PM — submit before 12 midnight or today’s DPR counts as missed."; }
+    if (top && !msg && top.dataset.dn) { top.className="banner"; top.textContent="Submit before 7:30 PM · responses go directly to your scoresheet"; delete top.dataset.dn; }
+    if (top && msg) { top.dataset.dn="1"; top.className="banner late"; top.textContent = mins < 6*60 ? "Past midnight — yesterday’s DPR can’t be filed any more. This is today’s DPR." : "Past 7:30 PM — submit before 12 midnight or today’s DPR counts as missed."; }
   }
   window.dayNotice = dayNotice;
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', dayNotice); else dayNotice();
