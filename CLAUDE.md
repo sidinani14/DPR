@@ -465,6 +465,30 @@ quota-exceeded failure — don't keep guessing in code without that signal.
 - Total: /100
 - Delivery and Quality removed
 
+## Daily reports are same-day only (2026-10-07, Siddharth's decision)
+- Problem (data 24 Aug–7 Oct): ~28% of DPRs filed next morning, catch-up
+  batches of 3–6 reports in one sitting (Saturday / Monday morning), weekly
+  filers 11 → ~6. Backdated Report Dates spread a weekend's batch back over
+  the week, and every DAILY_SUMMARY row / task completion got the
+  submission day — mixing up what happened when.
+- Rules: a DPR / DPER / CRM report can only be filed for **today**; no grace
+  window (next morning = missed, no credit). **Supersedes** the 2026-08
+  "Report Date for late-filed work" feature below — that backdating is gone.
+- Enforced server-side by `lockDailyFormDates()` in doPost: Report Date,
+  Timestamp and per-task dates are replaced with the server's today/now for
+  the DPR main submission and DAILY_FORM_ACTIONS. Meeting/site-visit logs
+  (meetlog) are NOT covered — logging an earlier visit there is fine.
+- Forms show Report Date as read-only today (local date, rolls at midnight).
+- DPR Consistency in getWeeklyStats counts **distinct days** (it counted
+  rows, so batched catch-ups earned several days).
+- Reminders: `dprEveningReminder` 7 pm (each active member not yet filed,
+  from DAILY_SUMMARY — DPER/CRM write there too) and `dprMissedDigest`
+  10 am (to Siddharth: who missed the previous working day). Sundays and
+  HOLIDAYS skipped. Install via `setupDprReminderTriggers` (manager action).
+- Note: DAILY_SUMMARY col B (Time) is a time-only cell in a sheet whose
+  timezone is GMT, read by a script in IST — raw values read back ~5h21m
+  late ("…GMT+0521"). Subtract 5:21 when analysing filing times.
+
 ## Key rules
 - Always run: node --check filename.js or node --check filename.html after edits
 - Week = Monday to Saturday (6 days)
