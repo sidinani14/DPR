@@ -485,6 +485,11 @@ quota-exceeded failure — don't keep guessing in code without that signal.
   from DAILY_SUMMARY — DPER/CRM write there too) and `dprMissedDigest`
   10 am (to Siddharth: who missed the previous working day). Sundays and
   HOLIDAYS skipped. Install via `setupDprReminderTriggers` (manager action).
+- `dailyFormOpened` (@402): each daily form pings once per load before 5 PM;
+  if that member didn't file the previous working day, Siddharth gets ONE
+  email per person per missed day (dedupe Script Property
+  `missedopen_<date>_<name>`, pruned by dprMissedDigest). Manager dry run:
+  `testDailyFormOpened {email, form}`.
 - Note: DAILY_SUMMARY col B (Time) is a time-only cell in a sheet whose
   timezone is GMT, read by a script in IST — raw values read back ~5h21m
   late ("…GMT+0521"). Subtract 5:21 when analysing filing times.
