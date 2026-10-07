@@ -430,7 +430,7 @@ function setHeaderDate() {
 function setDeadlineBanner() {
   const now=new Date(), mins=now.getHours()*60+now.getMinutes(), dead=19*60+30;
   const b=document.getElementById('banner');
-  if (mins>dead){ b.className='banner late'; b.textContent='Past 7:30 PM — please submit now. Late submissions are flagged.'; }
+  if (mins>dead || mins<6*60){ if (window.dayNotice) window.dayNotice(); return; }
   else if (mins>dead-60){ b.textContent=`Less than ${dead-mins} minutes left — submit before 7:30 PM`; }
 }
 
@@ -1922,6 +1922,29 @@ function toast(msg, duration) {
   window.lockReportDateToToday = lock;
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', lock); else lock();
   setInterval(lock, 60000);   // a tab left open past midnight rolls over to the new day
+
+  // Deadline / past-midnight notice (2026-10-07). Reports are same-day only,
+  // so make the cut-off visible: evening warning after 7:30 PM, and after
+  // midnight say plainly that yesterday's report is gone and this one counts
+  // for the new day (otherwise a 1 AM filer thinks they're filing yesterday's).
+  function dayNotice(){
+    const n=new Date(), mins=n.getHours()*60+n.getMinutes();
+    const dayLbl=n.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"});
+    let el=document.getElementById("day-notice");
+    const anchor=document.getElementById("f-date");
+    if(!el && anchor){ el=document.createElement("div"); el.id="day-notice"; anchor.parentElement.appendChild(el); }
+    if(!el) return;
+    let msg="", bg="", fg="";
+    if (mins < 6*60) { msg="🌙 It’s past midnight — yesterday’s report can no longer be filed and counts as missed. Anything you submit now is recorded as today’s ("+dayLbl+") report."; bg="#FDECEA"; fg="#8B2020"; }
+    else if (mins >= 19*60+30) { msg="⏰ Past 7:30 PM — submit now. Today’s ("+dayLbl+") report can only be filed until 12 midnight; after that it counts as missed and can’t be filed."; bg="#FFF4E5"; fg="#7A4A00"; }
+    el.style.cssText = msg ? "margin-top:8px;padding:9px 11px;border-radius:8px;font-size:12px;line-height:1.45;background:"+bg+";color:"+fg : "display:none";
+    el.textContent = msg;
+    const top=document.getElementById("banner");   // dpr.html's own top banner
+    if (top && msg) { top.className="banner late"; top.textContent = mins < 6*60 ? "Past midnight — yesterday’s DPR can’t be filed any more. This is today’s DPR." : "Past 7:30 PM — submit before 12 midnight or today’s DPR counts as missed."; }
+  }
+  window.dayNotice = dayNotice;
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', dayNotice); else dayNotice();
+  setInterval(dayNotice, 60000);
 })();
 </script>
 </body>
