@@ -262,6 +262,12 @@ var ATTENDANCE_COLS = ['Date','Member','Email','First In','Last Out','Total Hrs'
 // (day-unit formula), and merged in any Field Work hours. This just upserts
 // the finished row by Member+Date so re-importing a correction overwrites
 // rather than duplicates.
+// Past weeks' bulk attendance is cached 6 h (getBulkAttendance route). The
+// cache key carries this version, bumped on every import — otherwise a
+// correction to an earlier week (leave marked, late approved) stayed
+// invisible on the weekly report for up to 6 hours (found 2026-10-12).
+function attendanceCacheVersion(){ return PropertiesService.getScriptProperties().getProperty('ATT_CACHE_VER') || '0'; }
+function bumpAttendanceCacheVersion(){ try { PropertiesService.getScriptProperties().setProperty('ATT_CACHE_VER', String(Date.now())); } catch (e) {} }
 function importAttendance(data) {
   var rows = data.rows;
   if (!rows || !rows.length) return {status:'error', message:'no rows'};
@@ -293,6 +299,7 @@ function importAttendance(data) {
     if (keyRow[key]){ sheet.getRange(keyRow[key],1,1,vals.length).setValues([vals]); updated++; }
     else { sheet.appendRow(vals); appended++; }
   });
+  bumpAttendanceCacheVersion();   // corrections to an already-closed week must show on the report immediately
   return {status:'ok', appended:appended, updated:updated};
 }
 
@@ -2034,7 +2041,7 @@ function doPost(e) {
     if (data.action === 'getMemberAttendance')    return respond(getMemberAttendance(data.member||'', data.from||'', data.to||''));
     if (data.action === 'getBulkAttendance') {
       return isPastDate(data.to||'')
-        ? cachedSafeRespond('wr_bulk_'+(data.from||'')+'_'+(data.to||''), 21600, function(){ return getBulkAttendance(data.from||'', data.to||''); })
+        ? cachedSafeRespond('wr_bulk_' + attendanceCacheVersion() + '_' + (data.from||'')+'_'+(data.to||''), 21600, function(){ return getBulkAttendance(data.from||'', data.to||''); })
         : respond(getBulkAttendance(data.from||'', data.to||''));
     }
     if (data.action === 'importAttendance')       return respond(importAttendance(data));
