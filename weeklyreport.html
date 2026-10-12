@@ -1512,11 +1512,29 @@ window.idsOnAuth = async function(u){   // gated by auth.js; weekly report = Sid
     // on the scorecard at all. Every active team member not already listed is
     // added with their TEAM-tab role. Deepak/Aman keep their own pages;
     // freelancers and directors aren't in getLists().team.
+    const autoAdded = [];
     (d.team||[]).forEach(name => {
       if (!name || ROLES[name] || name === 'Deepak Soni' || /^aman /i.test(name)) return;
       ROLES[name] = (d.roles && d.roles[name]) || 'Team member';
       if (TARGETS[name] == null) TARGETS[name] = 48;
+      autoAdded.push(name);
     });
+    // A new joiner's first week isn't scored (Siddharth, 2026-10-12): anyone
+    // added above with no day actually worked in the 5 weeks before this
+    // week is in their first week → left off this week's scorecard. They
+    // appear automatically from the following week.
+    if (autoAdded.length) {
+      try {
+        const prevFrom = dateStr(new Date(new Date(WEEK_START+'T00:00:00').getTime() - 35*864e5));
+        const prevTo   = dateStr(new Date(new Date(WEEK_START+'T00:00:00').getTime() - 864e5));
+        const prev = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+          body:JSON.stringify({action:'getBulkAttendance', from:prevFrom, to:prevTo})}).then(x=>x.json());
+        autoAdded.forEach(name => {
+          const worked = ((prev[name]||{}).days||[]).some(x => x.status && x.status!=='Absent' && x.status!=='Leave' && x.status!=='Holiday');
+          if (!worked) delete ROLES[name];
+        });
+      } catch(e2) {}
+    }
   } catch(e){}
   await loadBioForWeek();
   const anyData = Object.keys(BIO).some(n => BIO[n] && BIO[n].days > 0);
