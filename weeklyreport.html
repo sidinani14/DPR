@@ -1507,6 +1507,16 @@ window.idsOnAuth = async function(u){   // gated by auth.js; weekly report = Sid
     const d = await listsRes.json();
     WR_ROSTER=(d.allMembers||[]).filter(Boolean);
     if (d.targets) Object.assign(TARGETS, d.targets);
+    // Roster follows the TEAM tab (2026-10-12): ROLES above was the only
+    // member list, so anyone who joined later (Jagrati, Shavy) never appeared
+    // on the scorecard at all. Every active team member not already listed is
+    // added with their TEAM-tab role. Deepak/Aman keep their own pages;
+    // freelancers and directors aren't in getLists().team.
+    (d.team||[]).forEach(name => {
+      if (!name || ROLES[name] || name === 'Deepak Soni' || /^aman /i.test(name)) return;
+      ROLES[name] = (d.roles && d.roles[name]) || 'Team member';
+      if (TARGETS[name] == null) TARGETS[name] = 48;
+    });
   } catch(e){}
   await loadBioForWeek();
   const anyData = Object.keys(BIO).some(n => BIO[n] && BIO[n].days > 0);

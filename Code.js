@@ -2371,7 +2371,7 @@ function getLists() {
   // team = Active = Yes only (for DPR form member selector)
   // allMembers = everyone (for Task Assignment form assignee dropdowns)
   var tSheet = s.getSheetByName(TEAM_TAB);
-  var team = [], emails = [], allMembers = [], allEmails = [], targets = {}, freelancers = [];
+  var team = [], emails = [], allMembers = [], allEmails = [], targets = {}, freelancers = [], roles = {};
   if (tSheet) {
     var tRows = tSheet.getDataRange().getValues();
     for (var i = 1; i < tRows.length; i++) {
@@ -2388,6 +2388,7 @@ function getLists() {
       if (isFreelancerRole(tRows[i][1])) { if (active !== 'no') freelancers.push(name); continue; }
       // All members regardless of active status
       allMembers.push(name);
+      roles[name] = String(tRows[i][1] || '').trim();   // B Role — lets reports pick up new joiners automatically
       allEmails.push(email);
       if (wtgt > 0) targets[name] = wtgt;
       // Active only — for DPR form
@@ -2415,7 +2416,7 @@ function getLists() {
     }
   }
 
-  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets, freelancers:freelancers };
+  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets, freelancers:freelancers, roles:roles };
 }
 
 // ════════════════════════════════════════════════════════════════
