@@ -268,7 +268,7 @@ var ATTENDANCE_COLS = ['Date','Member','Email','First In','Last Out','Total Hrs'
 // invisible on the weekly report for up to 6 hours (found 2026-10-12).
 // Bump whenever weekly-scoring logic changes so cached past-week stats are
 // recomputed immediately after the deploy.
-var REPORT_LOGIC_VER = '2026-10-12a';
+var REPORT_LOGIC_VER = '2026-10-12b';
 function attendanceCacheVersion(){ return PropertiesService.getScriptProperties().getProperty('ATT_CACHE_VER') || '0'; }
 function bumpAttendanceCacheVersion(){ try { PropertiesService.getScriptProperties().setProperty('ATT_CACHE_VER', String(Date.now())); } catch (e) {} }
 function importAttendance(data) {
@@ -6855,7 +6855,12 @@ function getWeeklyStats(weekStart) {
       // A block request still awaiting the lead's decision pauses the clock
       // (Siddharth, 2026-10-12). Rejecting it restores the original deadline,
       // so the task then counts late as normal (plus −1 for the rejected block).
-      if (selfStat === 'Blocked' && String(r[COL_BLK_DISPO-1]||'').trim() === 'Pending') return;
+      var blkDispo = String(r[COL_BLK_DISPO-1]||'').trim();
+      if (selfStat === 'Blocked' && blkDispo === 'Pending') return;
+      // Approved blocks release the task without penalty, same as everywhere
+      // else in the app: a block approved as Cancelled (task stays 'Blocked'
+      // as a record), or Reassigned/Parked. These were still counted late.
+      if ((selfStat === 'Blocked' && blkDispo === 'Cancelled') || selfStat === 'Reassigned' || selfStat === 'Parked' || selfStat.indexOf('Parked') === 0) return;
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       var onTime   = String(r[COL_LEADAPPR]||'').trim() === 'Yes' && doneDate && doneDate <= dl;
       if (!onTime) lateCount++;
