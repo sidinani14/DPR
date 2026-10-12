@@ -266,6 +266,9 @@ var ATTENDANCE_COLS = ['Date','Member','Email','First In','Last Out','Total Hrs'
 // cache key carries this version, bumped on every import — otherwise a
 // correction to an earlier week (leave marked, late approved) stayed
 // invisible on the weekly report for up to 6 hours (found 2026-10-12).
+// Bump whenever weekly-scoring logic changes so cached past-week stats are
+// recomputed immediately after the deploy.
+var REPORT_LOGIC_VER = '2026-10-12a';
 function attendanceCacheVersion(){ return PropertiesService.getScriptProperties().getProperty('ATT_CACHE_VER') || '0'; }
 function bumpAttendanceCacheVersion(){ try { PropertiesService.getScriptProperties().setProperty('ATT_CACHE_VER', String(Date.now())); } catch (e) {} }
 function importAttendance(data) {
@@ -2000,7 +2003,10 @@ function doPost(e) {
     if (data.action === 'getWeeklyStats') {
       var wsSat = addDaysToStr(data.weekStart||'', 5);
       return isPastDate(wsSat)
-        ? cachedSafeRespond('wr_ws_'+(data.weekStart||''), 21600, function(){ return getWeeklyStats(data.weekStart||''); })
+        // 15 min (was 6 h) + REPORT_LOGIC_VER in the key: approvals, block
+        // decisions and scoring fixes for a past week used to stay invisible
+        // on its report for up to 6 hours (found 2026-10-12).
+        ? cachedSafeRespond('wr_ws_' + REPORT_LOGIC_VER + '_' + attendanceCacheVersion() + '_' + (data.weekStart||''), 900, function(){ return getWeeklyStats(data.weekStart||''); })
         : respond(getWeeklyStats(data.weekStart||''));
     }
     if (data.action === 'getMemberReview')        return respond(getMemberReview(data.member||'', data.from||'', data.to||''));
