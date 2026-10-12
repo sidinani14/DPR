@@ -3194,12 +3194,14 @@ function disposeBlock(data){
   return {status:'ok', disposition:label};
 }
 // Reliability penalty: rejected blocks this week, per member (−1 each)
-function rejectedBlocksThisWeek(name){
+// weekMon/weekSat: the report's week. It used to always use the CURRENT week,
+// so viewing an older week's report applied whatever was rejected this week.
+function rejectedBlocksThisWeek(name, weekMon, weekSat){
   var sheet = db().getSheetByName(BLOCK_LOG_TAB);
   if (!sheet || sheet.getLastRow() < 2) return 0;
-  var mon = dateStr(mondayOf(new Date()));
-  var sun = new Date(mondayOf(new Date())); sun.setDate(sun.getDate()+6);
-  var sunStr = dateStr(sun);
+  var mon = weekMon || dateStr(mondayOf(new Date()));
+  var sun = new Date(mon + 'T00:00:00'); sun.setDate(sun.getDate()+6);
+  var sunStr = weekSat ? addDaysToStr(weekSat, 1) : dateStr(sun);
   var rows = sheet.getDataRange().getValues(), c = 0;
   for (var i = 1; i < rows.length; i++){
     if (String(rows[i][3]||'').trim() !== name) continue;
@@ -6488,6 +6490,13 @@ function createDoneTask(data) {
 function createSelfAssignedTask(data) {
   var sheet    = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
   var tomorrow = addDaysToStr(dateStr(), 1);
+  // Self-logged ongoing work: the person sets their own expected completion
+  // date (2026-10-12) and reliability judges them against THAT — the old
+  // automatic next-day deadline penalised every multi-day task (e.g. a 3D
+  // model logged as ongoing) the moment it ran past one day. Must be today
+  // or later and within 60 days; anything else falls back to tomorrow.
+  var target = String(data.targetDate || '').trim();
+  var deadline = (/^\d{4}-\d{2}-\d{2}$/.test(target) && target >= dateStr() && target <= addDaysToStr(dateStr(), 60)) ? target : tomorrow;
   var s        = db();
 
   // Get project discipline + multiplier
@@ -6520,7 +6529,7 @@ function createSelfAssignedTask(data) {
     units,                     // H Units
     weightedPts,               // I Weighted Pts = F × G × H
     data.date         || dateStr(), // J AssignedDate
-    tomorrow,                  // K Deadline = tomorrow
+    deadline,                  // K Deadline = their expected completion date (default tomorrow)
     data.area         || '',   // L Area
     data.drawing      || '',   // M Drawing
     'In Progress',             // N SelfStatus
@@ -6837,11 +6846,15 @@ function getWeeklyStats(weekStart) {
       var selfStat = String(r[13]||'').trim();         // N SelfStatus
       if (selfStat === 'Work Not Done') { wndCount++; return; }
       if (dl >= lateRefDate) return;                    // not due yet (as of this week's own end) — not late
+      // A block request still awaiting the lead's decision pauses the clock
+      // (Siddharth, 2026-10-12). Rejecting it restores the original deadline,
+      // so the task then counts late as normal (plus −1 for the rejected block).
+      if (selfStat === 'Blocked' && String(r[COL_BLK_DISPO-1]||'').trim() === 'Pending') return;
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       var onTime   = String(r[COL_LEADAPPR]||'').trim() === 'Yes' && doneDate && doneDate <= dl;
       if (!onTime) lateCount++;
     });
-    var rejBlk = rejectedBlocksThisWeek(name);   // −1 each (gaming a block)
+    var rejBlk = rejectedBlocksThisWeek(name, mon, sat);   // −1 each (gaming a block), in THIS report's week
     var reliabilityPenalty = lateCount * 1 + wndCount * 2 + rejBlk * 1;
 
     results.push({

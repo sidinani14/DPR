@@ -1126,6 +1126,7 @@ function collectDraftData(){
       cat: row.querySelector('.t-cat')?.value||'', type: row.querySelector('.t-type')?.value||'',
       units: row.querySelector('.t-units')?.value||'', area: row.querySelector('.t-area')?.value||'',
       hrsTaken: row.querySelector('.t-hrs-taken')?.value||'',
+      target: row.querySelector('.t-target')?.value||'',
       status: row.querySelector('.t-status:checked')?.value||'Done',
       visitHrs: row.querySelector('.t-visit-hrs')?.value||'',
     }));
@@ -1289,6 +1290,7 @@ function resumeDraft(){
         if (t.units) row.querySelector('.t-units').value = t.units;
         if (t.area) row.querySelector('.t-area').value = t.area;
         if (t.hrsTaken) row.querySelector('.t-hrs-taken').value = t.hrsTaken;
+        if (t.target && row.querySelector('.t-target')) row.querySelector('.t-target').value = t.target;
         const radio = row.querySelector(`.t-status[value="${t.status}"]`);
         if (radio) { radio.checked = true; toggleVisitHrs(radio); }
         if (t.visitHrs) { const vh = row.querySelector('.t-visit-hrs'); if (vh) vh.value = t.visitHrs; }
@@ -1468,6 +1470,10 @@ function addTask(containerId) {
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
         <input type="radio" name="t-status-${containerId}-${Date.now()}" class="t-status" value="Ongoing" style="accent-color:var(--amber)" onchange="toggleVisitHrs(this)"> Ongoing
       </label>
+      <span class="target-wrap" style="display:none;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--amber);font-weight:600">Expected completion *</span>
+        <input type="date" class="t-target" style="font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+      </span>
       <span class="visit-hrs-wrap" style="display:none;align-items:center;gap:6px">
         <input type="number" class="t-visit-hrs" min="0.5" max="12" step="0.5" placeholder="hours"
           style="width:70px;font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
@@ -1499,6 +1505,11 @@ function toggleVisitHrs(radio) {
   // this same toggle before, which made it hard to find for unplanned work).
   const row = radio.closest('.task-entry');
   if (!row) return;
+  // Ongoing work: the person sets their own expected completion date — reliability
+  // judges them against that, not an automatic next-day deadline (2026-10-12).
+  const tWrap = row.querySelector('.target-wrap');
+  if (tWrap) { const on = radio.value === 'Ongoing'; tWrap.style.display = on ? 'flex' : 'none';
+    const ti = row.querySelector('.t-target'); if (ti) { const n0=new Date(); ti.min = n0.getFullYear()+'-'+String(n0.getMonth()+1).padStart(2,'0')+'-'+String(n0.getDate()).padStart(2,'0'); } }
   const typeVal = row.querySelector('.t-type')?.value;
   const idx = parseInt(typeVal);
   const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
@@ -1684,6 +1695,7 @@ function collectData() {
           taskType:stage.label, area, drawing, units,
           basePts:stage.pts, project:proj.name, member:member,
           discipline:proj.discipline, date:new Date().toISOString().substring(0,10),
+          targetDate: tr.querySelector('.t-target')?.value || '',
         });
       }
     });
@@ -1794,6 +1806,7 @@ function flagMissingHours() {
     const stage = (!isNaN(idx) && STAGES[idx]) ? STAGES[idx] : null;
     if (!stage) return; // empty row, ignored elsewhere too
     const status = tr.querySelector('.t-status:checked')?.value || 'Done';
+    if (status === 'Ongoing') { const tg = tr.querySelector('.t-target'); if (!tg || !tg.value) bad(tg || tr); return; }
     if (status !== 'Done') return;
     if (isVisitType(stage.label)) {
       const el = tr.querySelector('.t-visit-hrs');
@@ -1817,7 +1830,9 @@ function validate(d) {
   if (missingHours) {
     missingHours.scrollIntoView({behavior:'smooth', block:'center'});
     missingHours.focus();
-    toast('Enter the hours taken for every task marked Done before submitting.', 5500);
+    toast(missingHours.classList && missingHours.classList.contains('t-target')
+      ? 'Set an expected completion date for every task marked Ongoing — your reliability is judged against the date you choose.'
+      : 'Enter the hours taken for every task marked Done before submitting.', 5500);
     return false;
   }
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }

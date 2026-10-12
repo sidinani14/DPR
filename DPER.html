@@ -396,6 +396,10 @@ function unpRefreshPts(sel) {
 function unpToggleVisitHrs(radio) {
   const row = radio.closest('.unp-task-entry');
   if (!row) return;
+  // Ongoing work: expected completion date set by the person (2026-10-12).
+  const tWrap = row.querySelector('.unp-target-wrap');
+  if (tWrap) { tWrap.style.display = radio.value === 'Ongoing' ? 'flex' : 'none';
+    const ti = row.querySelector('.unp-target'); if (ti) { const n0=new Date(); ti.min = n0.getFullYear()+'-'+String(n0.getMonth()+1).padStart(2,'0')+'-'+String(n0.getDate()).padStart(2,'0'); } }
   const idx = parseInt(row.querySelector('.unp-type')?.value);
   const stage = (!isNaN(idx) && CFG_STAGES[idx]) ? CFG_STAGES[idx] : null;
   const wrap = row.querySelector('.unp-visit-hrs-wrap');
@@ -479,6 +483,10 @@ function addUnplannedTask(projBlockId){
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
         <input type="radio" name="unp-status-${rowKey}" class="unp-status" value="Ongoing" onchange="unpToggleVisitHrs(this)"> Ongoing
       </label>
+      <span class="unp-target-wrap" style="display:none;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--amber);font-weight:600">Expected completion *</span>
+        <input type="date" class="unp-target" style="font-size:12px;padding:4px 8px">
+      </span>
       <span class="unp-visit-hrs-wrap" style="display:none;align-items:center;gap:6px">
         <input type="number" class="unp-visit-hrs" min="0.5" max="12" step="0.5" placeholder="hours" style="width:70px;font-size:12px;padding:4px 8px">
         <span style="font-size:10px;color:var(--accent)">hrs (visit pts)</span>
@@ -517,6 +525,7 @@ function flagMissingHoursDPER() {
     const stage = (!isNaN(idx) && CFG_STAGES[idx]) ? CFG_STAGES[idx] : null;
     if (!stage) return; // empty row, ignored elsewhere too
     const status = tr.querySelector('.unp-status:checked')?.value || 'Done';
+    if (status === 'Ongoing') { const tg = tr.querySelector('.unp-target'); if (!tg || !tg.value) bad(tg || tr); return; }
     if (status !== 'Done') return;
     if (isVisitType(stage.label)) {
       const el = tr.querySelector('.unp-visit-hrs');
@@ -561,7 +570,7 @@ function collectUnplanned(){
         project:projName, discipline:proj?proj.discipline:'',
       };
       if (status==='Done') done.push({...item, visitHours, hoursTaken});
-      else ongoing.push(item);
+      else ongoing.push({...item, targetDate: tr.querySelector('.unp-target')?.value || ''});
     });
   });
   return {done, ongoing};
@@ -1154,7 +1163,9 @@ async function submitAll(){
   if (missingHours) {
     missingHours.scrollIntoView({behavior:'smooth', block:'center'});
     missingHours.focus();
-    toast('Enter the hours taken for every task marked Done before submitting.', 5500);
+    toast(missingHours.classList && missingHours.classList.contains('unp-target')
+      ? 'Set an expected completion date for every task marked Ongoing — reliability is judged against the date you choose.'
+      : 'Enter the hours taken for every task marked Done before submitting.', 5500);
     return;
   }
   const projs=collectProjects();
@@ -1281,7 +1292,7 @@ async function submitAll(){
         const cstR = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
           body:JSON.stringify({action:'createSelfTask', member:leadName, project:u.project,
             taskType:u.taskType, basePts:u.basePts, units:u.units, area:u.area, discipline:u.discipline,
-            date})}).then(r=>r.json());
+            date, targetDate:u.targetDate||''})}).then(r=>r.json());
         if (cstR && cstR.status === 'error') scoringErrors.push(u.taskType+' — '+u.project+': '+(cstR.message||'failed'));
       } catch(e){ scoringErrors.push(u.taskType+' — '+u.project+': network error'); }
     }
