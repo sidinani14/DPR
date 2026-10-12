@@ -133,11 +133,13 @@ function bestMatch(rawName){
 
 function toHrsFromHHMM(t){ const m=String(t||'').match(/(\d{1,2}):(\d{2})/); if(!m) return 0; return +m[1]+ +m[2]/60; }
 
-// ── Classification: on-time / late (09:10, Achal 10:40) · half-day (<6h) ·
+// ── Classification: on-time / late (09:10; see SHIFT_THRESHOLDS) · half-day (<6h) ·
 // undertime/overtime — day-unit formula: shortfall or excess minutes /60/8
 // (e.g. 15 min short of 8h = 15/60/8 = 0.03125). A late day with no explicit
 // Approve becomes Absent — zero hours, zero UT/OT, full-day deduction. ──
-function lateThreshold(member){ return member==='Achal Rathore' ? 640 : 550; }  // 10:40 / 09:10 in minutes
+// Non-standard shifts: late = start + 10 min grace. Jagrati Barfa 10 AM-6 PM (2026-10-12).
+const SHIFT_THRESHOLDS = { 'Jagrati Barfa':610 };   // minutes (10:10)
+function lateThreshold(member){ return SHIFT_THRESHOLDS[member] || 550; }  // default 09:10
 function isHoliday(date){ return HOLIDAYS.indexOf(date) > -1; }
 // row.finalHrs always holds the actual worked hours (bio+field, editable) —
 // it is NEVER zeroed here, so toggling Approve/Deny back and forth never

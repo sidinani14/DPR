@@ -1282,9 +1282,9 @@ function doOptions(e) {
 // ════════════════════════════════════════════════════════════════
 var AUTH_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 var AUTH_ALLOWED = {
-  'ar.deepaksoni@gmail.com':1, 'achal.rathore@ideaform.in':1, 'himanshu.malviya@ideaform.in':1,
+  'ar.deepaksoni@gmail.com':1, 'himanshu.malviya@ideaform.in':1,   // Achal Rathore + Aashi Agrawal removed (resigned)
   'poorvi.goyal@ideaform.in':1, 'sahil.maurya@ideaform.in':1, 'aaditya.koshti@ideaform.in':1,
-  'aman.raghuwanshi@ideaform.in':1, 'bhavesh.bhagwat@ideaform.in':1, 'aashi.agrawal@ideaform.in':1,
+  'aman.raghuwanshi@ideaform.in':1, 'bhavesh.bhagwat@ideaform.in':1,
   'siddharth@ideaform.in':1, 'sidinani14@gmail.com':1, 'astha@ideaform.in':1, 'astha.uch@gmail.com':1
 };
 // Single source of truth for access = the TEAM tab's Email column (active rows)
@@ -1455,7 +1455,9 @@ function getAllowedEmails() {
       for (var i = 1; i < rows.length; i++) {
         var email  = String(rows[i][4] || '').trim().toLowerCase();
         var active = String(rows[i][5] || '').trim().toLowerCase();
-        if (email && active !== 'no') set[email] = 1;
+        // Departed members (EXCLUDED_MEMBERS) lose sign-in access too, even if
+        // their TEAM row was never set Active = No.
+        if (email && active !== 'no' && EXCLUDED_MEMBERS.indexOf(String(rows[i][0]||'').trim()) === -1) set[email] = 1;
       }
     }
     // (Freelancers are TEAM rows too, so they're in here — what they can

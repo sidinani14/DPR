@@ -299,13 +299,19 @@ const DPR_NA_UNTIL = { 'Kritika Kaushik': '2026-08-03',
 // ── Biometric — live, built from ATTENDANCE via getMemberAttendance ────────
 // hrs score: ≥7:55 (475min) avg→10 · 7:00–7:54→7 · <7:00→4
 // punct score: 0 late→15, 1→12, 2→9, 3+→6
-// Achal threshold: 10:40 | Others: 09:10 (already applied server-side, in
+// Late threshold 09:10 (SPECIAL_SHIFTS: Jagrati 10:10), applied at import time, in
 // the `late` flag on each ATTENDANCE row at import time)
 // BIO/IMPROVE start empty and are populated per-week by loadBioForWeek()
 // (see below), fed by whatever's been imported via the Import Attendance
 // panel on this page. Note: ATTENDANCE has no per-day "approved leave"
 // concept (only a monthly total) — a day nobody explicitly marks Holiday
 // will show as a plain Absent even if it was pre-approved leave.
+// Members on a non-standard shift (late = start + 10 min grace, same as 9:00 -> 09:10
+// for everyone else). Jagrati Barfa works 10 AM - 6 PM (Siddharth, 2026-10-12).
+const SPECIAL_SHIFTS = {
+  'Jagrati Barfa': { shift:'10:00 AM – 6:00 PM', thr:'10:10', thrMin:610 },
+};
+function thrLabel(name){ return SPECIAL_SHIFTS[name] ? SPECIAL_SHIFTS[name].thr : '09:10'; }
 let BIO = {};
 let IMPROVE = {};
 
@@ -354,7 +360,9 @@ function buildBioFromAttendance(resp, weekStartOverride){
     if (row.status==='Half-day') n='Short day ('+fmtHM(row.hrs)+')';
     if (row.status==='Absent' && row.late) n='Late arrival, not approved';
     if (row.late && row.lateApproved) n=(n?n+' — ':'')+'Approved late';
-    return {d:shortDayLabel(dt), t:row.firstIn||'—', s, l:!!row.late, n};
+    // An approved / pre-informed late is NOT a late mark (Siddharth: approved lates
+    // "don't impact punctuality") — it was being counted anyway until 2026-10-12.
+    return {d:shortDayLabel(dt), t:row.firstIn||'—', s, l:!!row.late && !row.lateApproved, a:!!row.late && !!row.lateApproved, n};
   });
   const presentCount=att.filter(x=>x.s!=='A' && x.s!=='H' && x.s!=='L').length;
   const lateCount=att.filter(x=>x.l).length;
@@ -465,7 +473,7 @@ function statusChip(s){
 
 function attClass(d){if(d.s==='L'||d.s==='A')return'aa';if(d.s==='H')return'ah';if(d.l)return'al';if(d.s==='HD')return'ah';return'ap';}
 function attColor(d){if(d.s==='L')return'#5A6067';if(d.s==='A')return'#C0392B';if(d.s==='H')return'#A8540C';if(d.l)return'#8A6408';if(d.s==='HD')return'#A8540C';return'#1B5E20';}
-function attLabel(d){if(d.s==='L')return'Leave';if(d.s==='A')return'Absent';if(d.s==='H')return'Holiday';if(d.s==='HD')return'Half Day';if(d.s==='E')return'On Time (E)';return d.l?'⚠ Late':'On Time';}
+function attLabel(d){if(d.s==='L')return'Leave';if(d.s==='A')return'Absent';if(d.s==='H')return'Holiday';if(d.s==='HD')return'Half Day';if(d.s==='E')return'On Time (E)';return d.l?'⚠ Late':(d.a?'Late · informed':'On Time');}
 
 // ── Header ─────────────────────────────────────────────────
 function hdr(){return `<div class="rh"><div class="rh-logo"><img src="data:image/jpeg;base64,${LOGO_B64}" alt="Ideaform Design Studio"></div><div class="rh-meta"><div class="rh-title">Weekly Performance Report</div><div class="rh-week">${WEEK_LABEL}</div><div class="rh-gen">Week of ${WEEK_LABEL} · Ideaform Design Studio · Confidential</div></div></div>`;}
@@ -669,7 +677,7 @@ function buildIndividualPage(m, taskData){
   const teamFacts = {
     absences: Math.max(0, WEEK_DAYS - (bio.days!=null?bio.days:WEEK_DAYS) - leaveCount(bio)),
     lateCount: bio.lateCount||0,
-    threshold: m.name==='Achal Rathore' ? '10:40' : '09:10',
+    threshold: thrLabel(m.name),
     avgHrsDecimal: bio.avgHrs ? (function(){ const p=bio.avgHrs.split(':'); return (+p[0])+(+p[1])/60; })() : null,
     avgHrsLabel: bio.avgHrs,
     dprDays: s.dprNA ? null : s.dprDays, dprDen: s.dprNA ? null : s.dprDen,
@@ -721,7 +729,7 @@ function buildIndividualPage(m, taskData){
       <div class="ad-st" style="color:${attColor(d)}">${attLabel(d)}</div>
     </div>`).join('');
 
-  const achalNote = m.name==='Achal Rathore' ? '<br>(Shift: 10:30 AM · Threshold: 10:40)' : '';
+  const achalNote = SPECIAL_SHIFTS[m.name] ? '<br>(Shift: '+SPECIAL_SHIFTS[m.name].shift+' · Threshold: '+SPECIAL_SHIFTS[m.name].thr+')' : '';
 
   return `<div class="page">
     ${hdr()}
@@ -743,7 +751,7 @@ function buildIndividualPage(m, taskData){
     <div class="pg">
       ${paramCard('Output<br>Approved Pts',s.s_output,50,`${s.approvedPts} pts approved<br>Target: ${tgt} pts`)}
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,s.dprNA?'Newly joined — not yet onboarded to DPR filing':`${s.dprDays} of ${s.dprDen} working days filed`,s.dprNA)}
-      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: 09:10${achalNote}`)}
+      ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: ${thrLabel(m.name)}${achalNote}`)}
       ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
       ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
@@ -1206,7 +1214,7 @@ function wrBestMatch(rawName){
   hit=WR_ROSTER.find(m=>m.toLowerCase().split(' ')[0]===firstTok);
   return hit||null;
 }
-function wrLateThreshold(member){ return member==='Achal Rathore' ? 640 : 550; }
+function wrLateThreshold(member){ return SPECIAL_SHIFTS[member] ? SPECIAL_SHIFTS[member].thrMin : 550; }
 function wrIsHoliday(date){ return WR_HOLIDAYS.indexOf(date) > -1; }
 function wrRecompute(row){
   const totalMin=(parseFloat(row.finalHrs)||0)*60;
