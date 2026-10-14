@@ -1932,6 +1932,37 @@ function setupDprReminderTriggers(){
   return { status:'ok', triggers: ScriptApp.getProjectTriggers().map(function(t){ return t.getHandlerFunction(); }) };
 }
 
+// ── TASK_ASSIGNMENTS layout guard (2026-10-13) ───────────────────────
+// Every task read/write in this file uses fixed column positions. When the
+// Drawing Name column was deleted from the sheet (12 Oct), every later column
+// moved left and the app silently misread approvals/statuses and wrote ~200
+// rows into the wrong cells. Now: if the header no longer matches the layout
+// the code expects, task-related requests are refused with a clear message
+// and Siddharth is emailed (at most hourly). Column M is kept, hidden, as
+// "Drawing (unused — hidden)" — don't delete or insert columns in this tab.
+function taskLayoutOk(){
+  var cache = CacheService.getScriptCache(), c = cache.get('task_layout_ok');
+  if (c) return c === '1';
+  var ok = true;
+  try {
+    var h = db().getSheetByName(ASSIGN_TAB).getRange(1, 1, 1, 17).getValues()[0].map(function(x){ return String(x||'').trim(); });
+    ok = /task\s*id/i.test(h[0]) && /self\s*status$/i.test(h[13]) && /lead\s*approved/i.test(h[16]) && /deadline/i.test(h[10]);
+  } catch (e) { ok = true; }   // can't read -> don't block on a transient error
+  cache.put('task_layout_ok', ok ? '1' : '0', ok ? 300 : 60);
+  if (!ok && !cache.get('task_layout_mailed')) {
+    cache.put('task_layout_mailed', '1', 3600);
+    try { notifyMember('Siddharth Inani', 'URGENT: TASK_ASSIGNMENTS columns changed — task features paused', [
+      'The column headers in the TASK_ASSIGNMENTS tab no longer match what the app expects',
+      '(K = Deadline, N = Self Status, Q = Lead Approved). A column was probably inserted or deleted.',
+      'DPR / task / approval requests are being refused so nothing is written into the wrong cells.',
+      'Undo the column change (or ask Claude to adapt the code) and it resumes automatically within a minute.' ]); } catch (e) {}
+  }
+  return ok;
+}
+var TASK_LAYOUT_ACTIONS = { getAllTasks:1, getOpenTasksForMember:1, getPendingTasks:1, submitApprovals:1, assignTasks:1,
+  bulkAssignTasks:1, createSelfTask:1, createDoneTask:1, reassignTask:1, parkTask:1, unparkTask:1, disposeBlock:1,
+  updateTaskStatuses:1, submitDPER:1, submitAmanCRM:1, submitMeetingLog:1, submitFieldWorkBatch:1, completeDirectorItem:1 };
+
 // ── Daily reports are for TODAY only (2026-10-07, Siddharth's decision) ──
 // DPR, DPER and CRM used to accept a backdated "Report Date" (and the DPR's
 // own client-sent Timestamp), which is what let people file a week's worth
@@ -1974,6 +2005,8 @@ function doPost(e) {
     var flRefusalP = freelancerGate(authEmail, data.action, data);
     if (flRefusalP) return respond(flRefusalP);
     lockDailyFormDates(data);
+    if ((!data.action || TASK_LAYOUT_ACTIONS[data.action]) && !taskLayoutOk())
+      return respond({ status:'error', code:'layout_changed', message:'The task sheet\u2019s columns were changed, so task features are paused to protect your data. Siddharth has been notified \u2014 please try again later.' });
     var flUserP = freelancerFor(authEmail);
     if (flUserP) {
       // Never trust the page for who is logging: always the freelancer's own name.
@@ -2013,6 +2046,7 @@ function doPost(e) {
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
     if (data.action === 'debugRawTaskRows') return respond(debugRawTaskRows(data.project||''));
+    if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
     if (data.action === 'debugMemberWeek') return respond(debugMemberWeek(data.member||'', data.mon||'', data.sat||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
     // Manager-only: is a specific email in the TEAM tab allowlist right now?
@@ -5741,6 +5775,20 @@ function debugMemberWeek(member, mon, sat) {
   return out;
 }
 
+// Every cell of one TASK_ASSIGNMENTS row, labelled by column letter + header
+// (manager diagnostic) — for spotting column-shifted rows.
+function debugTaskRowRaw(taskId) {
+  var sheet = db().getSheetByName(ASSIGN_TAB);
+  if (!sheet) return { error: 'no sheet' };
+  var rows = sheet.getDataRange().getValues(), hdr = rows[0];
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]||'').trim() !== String(taskId||'').trim()) continue;
+    var out = {};
+    rows[i].forEach(function(v, c){ var L = c < 26 ? String.fromCharCode(65+c) : 'A'+String.fromCharCode(65+c-26); out[L+' '+String(hdr[c]||'').slice(0,18)] = v instanceof Date ? cellDate(v) : String(v); });
+    return { row: i+1, cells: out };
+  }
+  return { error: 'not found' };
+}
 function debugRawTaskRows(project) {
   var sheet = db().getSheetByName(ASSIGN_TAB);
   if (!sheet) return { rowCount: 0, rows: [] };
