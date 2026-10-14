@@ -245,6 +245,16 @@ quota-exceeded failure — don't keep guessing in code without that signal.
 - tasks.html — **Bulk Task Planning** (the "Plan Tasks" form; was assign.html, now deleted)
 - searchselect.js · auth.js — shared browser components (not pushed to Apps Script)
 
+## ⚠ TASK_ASSIGNMENTS column positions are fixed — never insert/delete columns
+On 12 Oct 2026 the Drawing Name column (M) was deleted by hand; every later
+column shifted left while all code uses fixed positions → approvals/statuses
+misread, and DPRs that evening re-saved ~200 old finished tasks. Recovered on
+13 Oct from the 12 Oct 5:19 pm Drive revision (Siddharth chose: restore M,
+hidden). Column M now exists as **"Drawing (unused — hidden)"** and is hidden —
+leave it. `taskLayoutOk()` checks the header (K Deadline, N Self Status,
+Q Lead Approved) and refuses task requests + emails Siddharth if it changes.
+`debugTaskRowRaw {taskId}` (manager) dumps one row's raw cells by column.
+
 ## Sheet structure — TASK_ASSIGNMENTS (23 cols A–W)
 - A: TaskID, B: ProjectID, C: ProjectName, D: AssignedTo
 - E: Stage/TaskType, F: Discipline, G: BasePts, H: Multiplier, I: WeightedPts
