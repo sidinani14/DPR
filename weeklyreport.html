@@ -753,7 +753,7 @@ function buildIndividualPage(m, taskData){
       ${paramCard('DPR<br>Consistency',s.s_dpr,15,s.dprNA?'Newly joined — not yet onboarded to DPR filing':`${s.dprDays} of ${s.dprDen} working days filed`,s.dprNA)}
       ${paramCard('Punctuality<br>Biometric',s.s_punct,15,`${bio.lateCount||0} late · ${bio.days||0}/${WEEK_DAYS} present · Thr: ${thrLabel(m.name)}${achalNote}`)}
       ${paramCard('Hours<br>Biometric',s.s_hrs,10,`Avg: ${bio.avgHrs||'—'}/day · ${bio.days||0}/${WEEK_DAYS} present`)}
-      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
+      ${paramCard('Reliability<br>Delays',s.s_reliability,10,`Starts at 10 → −1 per late/overdue task, −2 per task reassigned (Work Not Done). Only deadlines set by a lead or by you count — auto-scheduled visits and default meeting dates don’t. This week: ${s.lateCount||0} late, ${s.workNotDone||0} reassigned.${blkLine} <b>To improve:</b> set realistic target dates and finish tasks on time.`)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 145px;gap:3.5mm;margin-bottom:2mm;">

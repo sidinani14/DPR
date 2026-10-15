@@ -233,10 +233,13 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
       <div class="field">
         <div class="lbl">Report date</div>
         <input type="date" id="f-date">
-        <div class="opt" style="font-size:11px;margin-top:4px">Reports are for <b>today only</b> — after midnight, today's report can't be filed and counts as missed.</div>
+        <div class="opt" style="font-size:11px;margin-top:4px">File today's report today. Forgot? You can still file it the next day until <b>12 noon</b> — after that it counts as missed.</div>
       </div>
     </div>
   </div>
+
+  <!-- Already submitted for the chosen day → offer a one-time correction (2026-10-15) -->
+  <div id="filed-panel" style="display:none;background:#EAF4EC;border:1.5px solid #9CCBA5;border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.5;color:#1B5E20"></div>
 
   <!-- Section 2: Assigned Tasks -->
   <div class="card">
@@ -309,61 +312,30 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 7: Accountability -->
+  <!-- Section 7: Anything else (2026-10-15: arrival question, referrals, deliverables
+       list and mood removed — arrival comes from the biometric, deliverables
+       repeated what Sections 2–4 already record) -->
   <div class="card">
-    <div class="card-head"><div class="card-num">7</div><div class="card-title">Accountability</div></div>
+    <div class="card-head"><div class="card-num">7</div><div class="card-title">Anything else?</div><div class="card-sub">optional</div></div>
     <div class="card-body">
-      <div class="field">
-        <div class="lbl">Arrived on time today? <span class="req">*</span></div>
-        <div class="radio-group">
-          <label class="radio-opt"><input type="radio" name="ontime" value="Yes" onchange="toggleLateReq()"><div class="rdot"></div><div class="rtxt">Yes — before 9:00 AM</div></label>
-          <label class="radio-opt"><input type="radio" name="ontime" value="No" onchange="toggleLateReq()"><div class="rdot"></div><div class="rtxt">No — arrived late</div></label>
-        </div>
-        <div id="late-req-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
-          <div class="lbl" style="margin-bottom:6px">Did you inform us before 9 AM that you'd be late? <span class="req">*</span></div>
-          <div class="radio-group" style="margin-bottom:10px">
-            <label class="radio-opt"><input type="radio" name="late-informed" value="Yes"><div class="rdot"></div><div class="rtxt">Yes</div></label>
-            <label class="radio-opt"><input type="radio" name="late-informed" value="No"><div class="rdot"></div><div class="rtxt">No</div></label>
-          </div>
-          <div class="lbl" style="margin-bottom:6px">What time did you punch in? <span class="req">*</span></div>
-          <input type="time" id="late-punch-in" style="margin-bottom:10px">
-          <div class="lbl" style="margin-bottom:6px">Reason <span class="opt">optional</span></div>
-          <textarea id="late-req-reason" placeholder="Traffic, personal, family matter…" style="min-height:44px"></textarea>
-        </div>
-      </div>
-      <div class="divider"></div>
-      <div class="field">
-        <div class="lbl">Client / lead referrals given today <span class="opt">optional</span></div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="number" id="referrals" min="0" max="20" value="0" style="width:70px">
-          <span style="font-size:13px;color:var(--text2)">referrals today</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Section 8: Summary -->
-  <div class="card">
-    <div class="card-head"><div class="card-num">8</div><div class="card-title">Today's summary</div></div>
-    <div class="card-body">
-      <div class="field">
-        <div class="lbl">Full list of deliverables released today <span class="req">*</span></div>
-        <textarea id="deliverables" placeholder="1. Ajay Chordia — false ceiling WD, Drawing Room complete&#10;2. Multani Jewellers — elevation concept sent to client&#10;&#10;Copy-paste from your WhatsApp group message"></textarea>
-      </div>
-      <div class="divider"></div>
       <div class="field">
         <div class="lbl">Anything blocking you? <span class="opt">optional</span></div>
         <textarea id="blockers" style="min-height:56px" placeholder="Waiting on structural engineer / client not responding / need direction on..."></textarea>
       </div>
       <div class="divider"></div>
       <div class="field">
-        <div class="lbl">How was your day?</div>
-        <div class="mood-grid">
-          <label class="mood-opt"><input type="radio" name="mood" value="1"><span class="mood-emoji">😞</span><div class="mood-name">Rough</div></label>
-          <label class="mood-opt"><input type="radio" name="mood" value="2"><span class="mood-emoji">😐</span><div class="mood-name">Okay</div></label>
-          <label class="mood-opt"><input type="radio" name="mood" value="3" checked><span class="mood-emoji">🙂</span><div class="mood-name">Good</div></label>
-          <label class="mood-opt"><input type="radio" name="mood" value="4"><span class="mood-emoji">😊</span><div class="mood-name">Great</div></label>
-          <label class="mood-opt"><input type="radio" name="mood" value="5"><span class="mood-emoji">🔥</span><div class="mood-name">Crushing it</div></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2)">
+          <input type="checkbox" id="late-toggle" onchange="toggleLateReq()" style="width:auto;margin:0">
+          I came in late and want to add a note <span class="opt">optional</span>
+        </label>
+        <div id="late-req-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
+          <div class="lbl" style="margin-bottom:6px">Did you inform us before 9 AM?</div>
+          <div class="radio-group" style="margin-bottom:10px">
+            <label class="radio-opt"><input type="radio" name="late-informed" value="Yes"><div class="rdot"></div><div class="rtxt">Yes</div></label>
+            <label class="radio-opt"><input type="radio" name="late-informed" value="No"><div class="rdot"></div><div class="rtxt">No</div></label>
+          </div>
+          <div class="lbl" style="margin-bottom:6px">Reason</div>
+          <textarea id="late-req-reason" placeholder="Traffic, site visit first, personal…" style="min-height:44px"></textarea>
         </div>
       </div>
     </div>
@@ -393,7 +365,7 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     <div class="sc-cell"><div class="sc-val" id="fin-units">—</div><div class="sc-lbl">Units done</div></div>
     <div class="sc-cell"><div class="sc-val" id="fin-proj">—</div><div class="sc-lbl">Projects</div></div>
   </div>
-  <button class="close-btn" onclick="document.getElementById('success').classList.remove('show')">Close</button>
+  <button class="close-btn" onclick="location.reload()">Close</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -430,7 +402,7 @@ function setHeaderDate() {
 function setDeadlineBanner() {
   const now=new Date(), mins=now.getHours()*60+now.getMinutes(), dead=19*60+30;
   const b=document.getElementById('banner');
-  if (mins>dead || mins<6*60){ if (window.dayNotice) window.dayNotice(); return; }
+  if (mins>dead || mins<12*60){ if (window.lockReportDateToToday) window.lockReportDateToToday(); return; }   // reportday.js owns these notices
   else if (mins>dead-60){ b.textContent=`Less than ${dead-mins} minutes left — submit before 7:30 PM`; }
 }
 
@@ -789,6 +761,7 @@ async function fetchAssignedTasks() {
       try { data = JSON.parse(text); }
       catch(pe) { throw new Error('Invalid JSON: ' + text.substring(0,100)); }
       // Separate rejected tasks (last 24h) from open tasks
+    if (window._dprEdit) return;   // a reopened report already loaded its own task list
     const allFetched = data.tasks || [];
     // Done & awaiting approval → locked (no re-marking). Everything else (incl.
     // rejected/revision) → editable so it can be acted on / redone.
@@ -879,7 +852,7 @@ function renderAssignedTasks() {
       </div>
       ${!isVisitType(t.taskType) ? `
       <div style="padding:8px 13px 4px">
-        <div style="font-size:11px;color:var(--red);font-weight:600;margin-bottom:4px;font-family:'DM Mono',monospace">HOURS TAKEN *</div>
+        <div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px;font-family:'DM Mono',monospace">HOURS TAKEN <span style="font-weight:400">· optional, rough is fine</span></div>
         <input type="number" class="atc-hrs-taken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3"
           style="font-size:13px;padding:7px 10px;width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
       </div>` : ''}
@@ -1167,16 +1140,15 @@ function collectDraftData(){
     assigned: window._assignedLoaded ? collectAssignedDraft() : ((window._pendingAssignedDraft) || (window._lastDraftAssigned) || []),
     projBlocks, fwBlocks, connBlocks, billBlocks,
     billraised: document.querySelector('input[name=billraised]:checked')?.value||'No',
-    ontime: document.querySelector('input[name=ontime]:checked')?.value||'',
+    lateNote: !!g('late-toggle')?.checked,
     lateInformed: document.querySelector('input[name=late-informed]:checked')?.value||'',
-    latePunchIn: g('late-punch-in')?.value||'', lateReqReason: g('late-req-reason')?.value||'',
-    referrals: g('referrals')?.value||'', deliverables: g('deliverables')?.value||'',
-    blockers: g('blockers')?.value||'', mood: document.querySelector('input[name=mood]:checked')?.value||'',
+    lateReqReason: g('late-req-reason')?.value||'',
+    blockers: g('blockers')?.value||'',
   };
 }
 function draftHasContent(d){
   if (!d) return false;
-  return !!(d.deliverables || d.blockers || (d.assigned||[]).length ||
+  return !!(d.blockers || d.lateReqReason || (d.assigned||[]).length ||
     (d.projBlocks||[]).some(p=>p.proj || (p.tasks||[]).some(t=>t.type||t.area)) ||
     (d.fwBlocks||[]).some(f=>f.proj||f.notes) ||
     (d.connBlocks||[]).some(c=>c.proj) || (d.billBlocks||[]).some(b=>b.proj));
@@ -1189,6 +1161,7 @@ function saveDraft(){
   // with the fresh, mostly-blank form before Restore is tapped — that was the
   // other way "Restore appears but the contents are lost".
   if (window._pendingDprDraft) return;
+  if (window._dprEdit) return;   // correcting a submitted report — not a draft
   const d = collectDraftData();
   if (!draftHasContent(d)) return;
   try { localStorage.setItem(getDraftKey(), JSON.stringify(d)); } catch(e){}
@@ -1197,7 +1170,7 @@ function saveDraft(){
 function saveDraftSoon(){ clearTimeout(_draftSoonT); _draftSoonT = setTimeout(saveDraft, 500); }
 function pushServerDraft(){
   try {
-    if (window._pendingDprDraft) return;
+    if (window._pendingDprDraft || window._dprEdit) return;
     const d = collectDraftData();
     if (!draftHasContent(d)) return;
     fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
@@ -1342,15 +1315,11 @@ function resumeDraft(){
     }
   });
 
-  section('Sections 7-8 (accountability/summary)', () => {
-    if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
+  section('Section 7 (anything else)', () => {
+    if ((d.lateNote || d.ontime === 'No') && g('late-toggle')) { g('late-toggle').checked = true; toggleLateReq(); }
     if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
-    if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
     if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
-    if (d.referrals && g('referrals')) g('referrals').value = d.referrals;
-    if (d.deliverables && g('deliverables')) g('deliverables').value = d.deliverables;
     if (d.blockers && g('blockers')) g('blockers').value = d.blockers;
-    if (d.mood) { const mr = document.querySelector(`input[name=mood][value="${d.mood}"]`); if (mr) mr.checked = true; }
   });
 
   section('score recalculation', () => { calcScore(); });
@@ -1458,7 +1427,7 @@ function addTask(containerId) {
       <input type="text" class="t-area" placeholder="Description (optional)" style="font-size:12px;padding:6px 10px">
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
-      <span style="font-size:11px;color:var(--red);font-weight:600">Hours taken *</span>
+      <span style="font-size:11px;color:var(--text3);font-weight:600">Hours taken <span style="font-weight:400">(optional)</span></span>
       <input type="number" class="t-hrs-taken" min="0.25" max="16" step="0.25" placeholder="e.g. 3"
         style="width:80px;font-size:12px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text)">
     </div>
@@ -1633,22 +1602,19 @@ function collectData() {
     };
   });
 
-  // Defaults to today, editable — lets someone filling this late for an
-  // earlier day (a site visit/meeting that actually happened yesterday, say)
-  // date the work correctly instead of everything landing on today.
-  const reportDate = document.getElementById('f-date')?.value || new Date().toISOString().substring(0,10);
+  // Today — or, until 12 noon, the previous working day if chosen at the top
+  // (reportday.js). The server re-checks this and stamps today otherwise.
+  const reportDate = (window.getReportDay && window.getReportDay()) || document.getElementById('f-date')?.value || new Date().toISOString().substring(0,10);
 
   const data={
     'Timestamp'         : new Date().toISOString(),
     'Report Date'       : reportDate,
+    reportDay           : reportDate,
     'Member'            : member,
     'Member Email'      : googleUser?googleUser.email:'',
     'Assigned Statuses' : JSON.stringify(assignedStatuses),
-    'Arrived on Time'   : document.querySelector('input[name=ontime]:checked')?.value||'',
-    'Referrals Today'   : parseInt(document.getElementById('referrals').value)||0,
-    'Deliverables List' : document.getElementById('deliverables').value.trim(),
+    'Arrived on Time'   : document.getElementById('late-toggle')?.checked ? 'Late (note added)' : '',
     'Blockers'          : document.getElementById('blockers').value.trim(),
-    'Mood Score'        : document.querySelector('input[name=mood]:checked')?.value||'3',
     'Total Weighted Pts': parseFloat(document.getElementById('sc-pts').textContent)||0,
     'Total Task Units'  : parseInt(document.getElementById('sc-units').textContent)||0,
     'Projects Count'    : parseInt(document.getElementById('sc-proj').textContent)||0,
@@ -1733,23 +1699,6 @@ function collectData() {
   return data;
 }
 
-// A required field is easy to satisfy with a throwaway "." or "No" — that
-// technically passes the empty check but defeats the point of the field.
-// Block anything that isn't a real sentence describing the day's work.
-const TRIVIAL_DELIVERABLES = new Set(['no','none','na','n/a','nil','ok','okay','done','nothing','yes','same','as usual','-','.']);
-function isTrivialDeliverables(text) {
-  const t = (text||'').trim();
-  if (!t) return true;
-  const stripped = t.toLowerCase().replace(/[.\-\s]/g,'');
-  if (TRIVIAL_DELIVERABLES.has(t.toLowerCase()) || TRIVIAL_DELIVERABLES.has(stripped)) return true;
-  return t.length < 8; // shorter than a real sentence
-}
-
-// Deliverables text describes work, but nothing was actually logged as a
-// scoreable task (Section 2 status change, Section 3 task, or Field Work —
-// Field Work rows are already folded into Done Tasks by collectData()) —
-// this is exactly the gap that let real work go uncredited: people typing
-// their day into the summary and assuming that alone counts.
 // Section 3 silently drops an entire project block (all its task rows) if
 // no project was picked for it — collectData()'s `if (!proj) return;`. That
 // happens with zero error because it's a client-side filter, not a server
@@ -1780,13 +1729,11 @@ function countLoggedWorkItems(d) {
   return n;
 }
 
-// Hours-taken/visit-hours were already labelled required (*) on both Section 2
-// (assigned tasks) and Section 3 (self-logged tasks) but nothing actually
-// blocked submission if left blank -- the field just silently went in as
-// null. This is what lets a lead cross-check a task's points/hr in
-// approval.html and, for site visits, sanity-check the reported hours at all.
-// Only checked for rows marked Done -- Ongoing/Blocked/Not Started tasks
-// don't have "hours taken" yet.
+// Required before submitting: visit/meeting HOURS on rows marked Done (those
+// hours ARE the points) and the expected completion date on ongoing work
+// (reliability is judged against it). "Hours taken" on ordinary design tasks
+// is optional since 2026-10-15 — few people track time that precisely, and
+// it's only an approval-screen hint, never part of the score.
 function flagMissingHours() {
   let firstBad = null;
   const bad = (el) => { if (el && !firstBad) firstBad = el; };
@@ -1795,9 +1742,6 @@ function flagMissingHours() {
     if (status !== 'Done') return;
     if (isVisitType(t.taskType)) {
       const el = document.querySelector(`.atc-visit-hrs-${i}`);
-      if (!(parseFloat(el?.value) > 0)) bad(el);
-    } else {
-      const el = document.querySelector(`.atc-hrs-taken-${i}`);
       if (!(parseFloat(el?.value) > 0)) bad(el);
     }
   });
@@ -1810,9 +1754,6 @@ function flagMissingHours() {
     if (status !== 'Done') return;
     if (isVisitType(stage.label)) {
       const el = tr.querySelector('.t-visit-hrs');
-      if (!(parseFloat(el?.value) > 0)) bad(el);
-    } else {
-      const el = tr.querySelector('.t-hrs-taken');
       if (!(parseFloat(el?.value) > 0)) bad(el);
     }
   });
@@ -1832,25 +1773,20 @@ function validate(d) {
     missingHours.focus();
     toast(missingHours.classList && missingHours.classList.contains('t-target')
       ? 'Set an expected completion date for every task marked Ongoing — your reliability is judged against the date you choose.'
-      : 'Enter the hours taken for every task marked Done before submitting.', 5500);
+      : 'Enter the visit / meeting hours for every visit marked Done — those hours are its points.', 5500);
     return false;
   }
   if (GOOGLE_CLIENT_ID!=='YOUR_GOOGLE_CLIENT_ID_HERE'&&!googleUser){ toast('Please sign in with Google first'); return false; }
   if (!d['Member'])            { toast('Please select your name');              return false; }
-  if (!d['Arrived on Time'])   { toast('Please mark your arrival time');        return false; }
-  if (d['Arrived on Time']==='No'){
-    if (!document.querySelector('input[name=late-informed]:checked')) { toast('Let us know if you informed us before 9 AM'); return false; }
-    if (!document.getElementById('late-punch-in')?.value) { toast('Enter the time you punched in'); return false; }
-  }
-  if (!d['Deliverables List']) { toast("Fill in today's deliverables");         return false; }
-  if (isTrivialDeliverables(d['Deliverables List'])) {
-    toast('Please describe today’s actual work in the Deliverables list — a placeholder like "." or "No" isn’t enough.', 5500);
+  const rd = window.REPORT_DAY;
+  if (rd && rd.loaded && rd.filed && rd.filed[d['Report Date']] && !window._dprEdit) {
+    toast('You’ve already submitted the report for this day — use “Correct my DPR” at the top to change it.', 5500);
     return false;
   }
-  if (countLoggedWorkItems(d) === 0) {
-    toast('You described work in your Deliverables list but haven’t logged any of it above — mark an assigned task Done/Ongoing, add it under Additional/Unplanned Work, or log it as Field Work, then submit.', 6500);
-    return false;
-  }
+  // Nothing logged at all — usually a slip (a task left on Not Started), but a
+  // genuine no-progress day is allowed after a confirm.
+  if (countLoggedWorkItems(d) === 0 &&
+      !confirm('You haven’t marked any task Done or Ongoing, added unplanned work, or logged field work. Submit anyway?')) return false;
   return true;
 }
 
@@ -1859,6 +1795,10 @@ async function submitForm() {
   if (_submitting) return;
   const data=collectData();
   if (!validate(data)) return;
+  // Kept server-side so this report can be reopened and corrected once
+  // (until 12 noon the next day) — see getDprForEdit in Code.js.
+  try { data._formState = JSON.stringify(collectDraftData()); } catch(e){}
+  if (window._dprEdit) { data._isEdit = true; data._editDay = window._dprEdit.day; data['Report Date'] = data.reportDay = window._dprEdit.day; }
   _submitting = true;
   document.getElementById('submit-btn').disabled = true;
   document.getElementById('sending').classList.add('show');
@@ -1869,7 +1809,7 @@ async function submitForm() {
         headers: {'Content-Type': 'text/plain'},
         body: JSON.stringify(data),
       }).then(r=>r.json());
-      if (mainRes && mainRes.status === 'error') throw new Error(mainRes.message || 'Submission failed');
+      if (mainRes && mainRes.status === 'error') { const e = new Error(mainRes.message || 'Submission failed'); e.fromServer = !!mainRes.code; throw e; }
       // A backend hiccup on one task/status shouldn't hide the whole submission
       // behind a generic failure -- most of it saved, so show the success
       // screen but flag exactly what needs re-checking/re-entering.
@@ -1880,17 +1820,17 @@ async function submitForm() {
       const member = googleUser ? googleUser.name : (document.getElementById('member-name')?.value||'');
       const conns = collectConnections(), bills = collectBillables();
       if (conns.length) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({action:'logConnections', member, connections:conns})}).catch(()=>{});
+        body: JSON.stringify({action:'logConnections', member, connections:conns, reportDay:data['Report Date']})}).catch(()=>{});
       if (bills.length) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({action:'submitBillables', member, billables:bills})}).catch(()=>{});
-      // Late-arrival context (replaces messaging Siddharth on WhatsApp) — every
-      // late day is logged; Siddharth decides excuse-vs-absent when he reviews
-      // the Paytime import, not here.
-      if (data['Arrived on Time']==='No') await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'submitBillables', member, billables:bills, reportDay:data['Report Date']})}).catch(()=>{});
+      // Late-arrival context (replaces messaging Siddharth on WhatsApp);
+      // Siddharth decides excuse-vs-absent when he reviews the Paytime import.
+      // Optional since 2026-10-15 — only when "I came in late" was ticked.
+      if (document.getElementById('late-toggle')?.checked) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({action:'submitLateRequest', member, email:googleUser?.email||'',
-          date:new Date().toISOString().substring(0,10),
+          date: data['Report Date'],
           informedBefore9: document.querySelector('input[name=late-informed]:checked')?.value||'No',
-          reportedPunchIn: document.getElementById('late-punch-in')?.value||'',
+          reportedPunchIn: '',
           reason: document.getElementById('late-req-reason')?.value.trim()||''})}).catch(()=>{});
     }
     document.getElementById('sending').classList.remove('show');
@@ -1906,19 +1846,73 @@ async function submitForm() {
       pw.style.display = 'none';
     }
     clearDraft();
+    if (window._dprEdit) document.querySelector('#success .success-title').textContent = 'Correction submitted!';
+    window._dprEdit = null;
     document.getElementById('success').classList.add('show');
   } catch(err) {
     document.getElementById('sending').classList.remove('show');
     _submitting = false;
     document.getElementById('submit-btn').disabled = false;
-    toast('Submission failed — check your connection and try again');
+    toast(err && err.fromServer ? err.message : 'Submission failed — check your connection and try again', err && err.fromServer ? 7000 : 2800);
   }
 }
 
 function toggleLateReq(){
-  const isLate = document.querySelector('input[name=ontime]:checked')?.value === 'No';
+  const isLate = !!document.getElementById('late-toggle')?.checked;
   const wrap = document.getElementById('late-req-wrap');
   if (wrap) wrap.style.display = isLate ? 'block' : 'none';
+}
+
+// ── Already submitted → correct it once (2026-10-15) ────────────────────
+// When the chosen day (reportday.js) is already filed, the form shows that
+// instead of inviting a duplicate, with a "Correct my DPR" button while the
+// one correction is still available (until 12 noon the next day). Reopening
+// loads the report as it was filled in, and Section 2 as it was BEFORE that
+// submission; submitting then replaces the original (server: undoDprSubmission).
+window._dprEdit = null;
+function fmtDay(d){ try { return new Date(d+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'}); } catch(e){ return d; } }
+function renderFiledPanel(){
+  const p = document.getElementById('filed-panel'); if (!p) return;
+  const rd = window.REPORT_DAY || {}, day = window.getReportDay ? window.getReportDay() : '';
+  const btn = document.getElementById('submit-btn');
+  const look = (bg, bd, fg) => { p.style.background = bg; p.style.borderColor = bd; p.style.color = fg; };
+  if (window._dprEdit) {
+    p.style.display = 'block'; look('#FFF4E5', '#E8C87A', '#7A4A00');
+    p.innerHTML = '✏️ <b>Correcting your report for ' + fmtDay(window._dprEdit.day) + '.</b> Fix what’s wrong and press <b>Submit correction</b> — it replaces what you sent before. A report can be corrected only once. <a href="#" onclick="location.reload();return false" style="color:inherit;font-weight:600">Cancel</a>';
+    if (btn) btn.textContent = 'Submit correction';
+    return;
+  }
+  if (btn && btn.textContent === 'Submit correction') btn.textContent = 'Submit';
+  if (!rd.loaded || !rd.filed || !rd.filed[day]) { p.style.display = 'none'; return; }
+  const ed = (rd.edit || {})[day] || {}, isToday = day === rd.today;
+  p.style.display = 'block'; look('#EAF4EC', '#9CCBA5', '#1B5E20');
+  let html = '✅ <b>Your report for ' + (isToday ? 'today' : fmtDay(day)) + ' is submitted</b>' + (ed.submittedAt ? ' (' + String(ed.submittedAt).slice(11) + ')' : '') + '.';
+  if (ed.canEdit) html += ' Spotted a mistake? You can correct it once, until 12 noon ' + (isToday ? 'tomorrow' : 'today') + '.'
+    + '<div style="margin-top:8px"><button type="button" onclick="startDprEdit(\'' + day + '\')" style="background:#1B5E20;color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">Correct my DPR</button></div>';
+  else if (ed.reason === 'used') html += ' It has already been corrected once — tell your lead if anything else needs fixing.';
+  else if (ed.reason === 'closed') html += ' The time to correct it has passed — tell your lead if something needs fixing.';
+  else if (ed.reason === 'no_record' || ed.reason === 'too_big') html += ' It can’t be reopened here — tell your lead if something needs fixing.';
+  p.innerHTML = html;
+}
+document.addEventListener('reportday-change', renderFiledPanel);
+
+async function startDprEdit(day){
+  const p = document.getElementById('filed-panel');
+  p.innerHTML = 'Opening your report…';
+  try {
+    const r = await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'getDprForEdit', day})}).then(x => x.json());
+    if (!r || r.status !== 'ok') { toast((r && r.message) || 'Could not open the report', 7000); renderFiledPanel(); return; }
+    window._dprEdit = { day };
+    window._pendingDprDraft = null; document.getElementById('draft-banner').style.display = 'none';
+    const all = r.tasks || [];
+    window._pendingTasks = all.filter(t => t.status === 'Approval Pending');
+    assignedTasks = all.filter(t => t.status !== 'Approval Pending');
+    renderAssignedTasks(); window._assignedLoaded = true;
+    window._pendingDprDraft = r.form; resumeDraft();
+    renderFiledPanel();
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  } catch(e) { toast('Could not open the report — check your connection and try again', 5000); renderFiledPanel(); }
 }
 function toast(msg, duration) {
   const el=document.getElementById('toast');
@@ -1928,53 +1922,7 @@ function toast(msg, duration) {
 }
 </script>
 
-<script>
-// Daily reports are for TODAY only (2026-10-07): the server stamps every
-// submission with its own date regardless, this just shows it honestly.
-(function(){
-  function localToday(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
-  function lock(){ const el=document.getElementById('f-date'); if(!el) return; const t=localToday(); el.value=t; el.min=t; el.max=t; el.readOnly=true; el.style.opacity='.75'; el.title='Reports can only be filed for today'; }
-  window.lockReportDateToToday = lock;
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', lock); else lock();
-  setInterval(lock, 60000);   // a tab left open past midnight rolls over to the new day
-
-  // Deadline / past-midnight notice (2026-10-07). Reports are same-day only,
-  // so make the cut-off visible: evening warning after 7:30 PM, and after
-  // midnight say plainly that yesterday's report is gone and this one counts
-  // for the new day (otherwise a 1 AM filer thinks they're filing yesterday's).
-  function dayNotice(){
-    const n=new Date(), mins=n.getHours()*60+n.getMinutes();
-    const dayLbl=n.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"});
-    let el=document.getElementById("day-notice");
-    const anchor=document.getElementById("f-date");
-    if(!el && anchor){ el=document.createElement("div"); el.id="day-notice"; anchor.parentElement.appendChild(el); }
-    if(!el) return;
-    let msg="", bg="", fg="";
-    if (mins < 6*60) { msg="🌙 It’s past midnight — yesterday’s report can no longer be filed and counts as missed. Anything you submit now is recorded as today’s ("+dayLbl+") report."; bg="#FDECEA"; fg="#8B2020"; }
-    else if (mins >= 19*60+30) { msg="⏰ Past 7:30 PM — submit now. Today’s ("+dayLbl+") report can only be filed until 12 midnight; after that it counts as missed and can’t be filed."; bg="#FFF4E5"; fg="#7A4A00"; }
-    el.style.cssText = msg ? "margin-top:8px;padding:9px 11px;border-radius:8px;font-size:12px;line-height:1.45;background:"+bg+";color:"+fg : "display:none";
-    el.textContent = msg;
-    const top=document.getElementById("banner");   // dpr.html's own top banner
-    if (top && !msg && top.dataset.dn) { top.className="banner"; top.textContent="Submit before 7:30 PM · responses go directly to your scoresheet"; delete top.dataset.dn; }
-    if (top && msg) { top.dataset.dn="1"; top.className="banner late"; top.textContent = mins < 6*60 ? "Past midnight — yesterday’s DPR can’t be filed any more. This is today’s DPR." : "Past 7:30 PM — submit before 12 midnight or today’s DPR counts as missed."; }
-  }
-
-  // Tell the server this form was opened (once per page load, only before
-  // 5 PM). If the person missed the previous working day, Siddharth gets an
-  // email so he can follow up — see dailyFormOpened in Code.js.
-  let _openPinged=false;
-  function pingOpened(){
-    if (_openPinged || !(window.IDS_USER && window.IDS_USER.email)) return;
-    if (new Date().getHours() >= 17) return;
-    _openPinged=true;
-    try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'dailyFormOpened', form:'DPR'})}).catch(()=>{}); } catch(e){}
-  }
-  document.addEventListener('ids-auth', pingOpened);
-  if (window.IDS_USER) setTimeout(pingOpened, 0);
-  window.dayNotice = dayNotice;
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', dayNotice); else dayNotice();
-  setInterval(dayNotice, 60000);
-})();
-</script>
+<!-- Which day this report is for: today, or the previous working day until 12 noon (2026-10-15) -->
+<script src="reportday.js?v=20261015" data-form="DPR"></script>
 </body>
 </html>

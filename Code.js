@@ -268,7 +268,7 @@ var ATTENDANCE_COLS = ['Date','Member','Email','First In','Last Out','Total Hrs'
 // invisible on the weekly report for up to 6 hours (found 2026-10-12).
 // Bump whenever weekly-scoring logic changes so cached past-week stats are
 // recomputed immediately after the deploy.
-var REPORT_LOGIC_VER = '2026-10-12b';
+var REPORT_LOGIC_VER = '2026-10-15';
 function attendanceCacheVersion(){ return PropertiesService.getScriptProperties().getProperty('ATT_CACHE_VER') || '0'; }
 function bumpAttendanceCacheVersion(){ try { PropertiesService.getScriptProperties().setProperty('ATT_CACHE_VER', String(Date.now())); } catch (e) {} }
 function importAttendance(data) {
@@ -1835,8 +1835,9 @@ function doGet(e) {
 // ── DPR reminders (2026-10-07) ──────────────────────────────────────
 // 7 pm: email every active team member who hasn't filed today's report yet
 //       (DPR — or DPER/CRM for Deepak/Aman, which also write DAILY_SUMMARY).
-// 10 am: one email to Siddharth listing who didn't file the previous working
-//       day. Sundays and HOLIDAYS-tab dates are skipped. Freelancers,
+// 12:30 pm: one email to Siddharth listing who didn't file the previous working
+//       day (after the 12 noon catch-up window closes — 2026-10-15; was 10 am).
+//       Sundays and HOLIDAYS-tab dates are skipped. Freelancers,
 //       directors and departed members aren't in getLists().team, so they're
 //       never chased. Installed by setupDprReminderTriggers().
 function filedOn(dayStr){
@@ -1864,7 +1865,7 @@ function dprEveningReminder(){
         'Hi ' + n.split(' ')[0] + ',',
         '',
         'Your ' + form + ' for today (' + today + ') hasn’t been submitted yet.',
-        'Reports can only be filed for the same day — after midnight, today’s can’t be filed and counts as missed.',
+        'Please file it tonight. If you forget, you can still file it tomorrow until 12 noon — after that it counts as missed.',
         '',
         'https://team.ideaformdesignstudio.com/' + (form === 'DPER' ? 'DPER.html' : form === 'CRM report' ? 'CRM.html' : 'dpr.html')
       ]);
@@ -1883,15 +1884,17 @@ function dprMissedDigest(){
     } catch (ce) {}
     var dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d + 'T12:00:00').getDay()];
     notifyMember('Siddharth Inani', missed.length ? ('DPR missed on ' + dow + ' ' + d + ' — ' + missed.length + ' ' + (missed.length === 1 ? 'person' : 'people')) : ('Everyone filed their DPR on ' + dow + ' ' + d), missed.length
-      ? ['Not filed for ' + dow + ' ' + d + ' (now locked — counts as missed):', ''].concat(missed.map(function(n){ return '• ' + n; }))
+      ? ['Not filed for ' + dow + ' ' + d + ' (the 12 noon catch-up window has closed — counts as missed):', ''].concat(missed.map(function(n){ return '• ' + n; }))
       : ['All active team members filed on ' + dow + ' ' + d + '.']);
   } catch (e) { Logger.log('dprMissedDigest failed: ' + e); }
 }
 // Real-time heads-up (2026-10-07, Siddharth): when someone who did NOT file
-// the previous working day opens their DPR / DPER / CRM form between 12 am
-// and 5 pm the next day, email Siddharth so he can ask what happened. One
-// email per person per missed day (Script Property dedupe key, cleaned up by
-// dprMissedDigest). People who did file never trigger anything.
+// the previous working day opens their DPR / DPER / CRM form the next day,
+// email Siddharth so he can ask what happened. Since 2026-10-15 yesterday's
+// report can still be filed until 12 noon, so this only fires between 12 noon
+// and 5 pm, once that window has closed. One email per person per missed day
+// (Script Property dedupe key, cleaned up by dprMissedDigest). People who did
+// file never trigger anything.
 function dailyFormOpened(authEmail, form, dryRun){
   try {
     var name = memberNameForAuth(authEmail);
@@ -1899,7 +1902,7 @@ function dailyFormOpened(authEmail, form, dryRun){
     if ((getLists().team || []).indexOf(name) === -1) return { status:'ok', notified:false };
     var tz = Session.getScriptTimeZone(), now = new Date();
     var mins = parseInt(Utilities.formatDate(now, tz, 'H'), 10) * 60 + parseInt(Utilities.formatDate(now, tz, 'm'), 10);
-    if (mins >= 17 * 60) return { status:'ok', notified:false };
+    if (mins < DAILY_FORM_GRACE_HOUR * 60 || mins >= 17 * 60) return { status:'ok', notified:false };
     var today = dateStr(), prev = addDaysToStr(today, -1);
     for (var k = 0; k < 7 && !isWorkingDay(prev); k++) prev = addDaysToStr(prev, -1);
     if (filedOn(prev)[name.toLowerCase()]) return { status:'ok', notified:false };
@@ -1928,7 +1931,7 @@ function setupDprReminderTriggers(){
     if (h === 'dprEveningReminder' || h === 'dprMissedDigest') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('dprEveningReminder').timeBased().everyDays(1).atHour(19).nearMinute(0).create();
-  ScriptApp.newTrigger('dprMissedDigest').timeBased().everyDays(1).atHour(10).nearMinute(0).create();
+  ScriptApp.newTrigger('dprMissedDigest').timeBased().everyDays(1).atHour(12).nearMinute(30).create();
   return { status:'ok', triggers: ScriptApp.getProjectTriggers().map(function(t){ return t.getHandlerFunction(); }) };
 }
 
@@ -1963,36 +1966,266 @@ var TASK_LAYOUT_ACTIONS = { getAllTasks:1, getOpenTasksForMember:1, getPendingTa
   bulkAssignTasks:1, createSelfTask:1, createDoneTask:1, reassignTask:1, parkTask:1, unparkTask:1, disposeBlock:1,
   updateTaskStatuses:1, submitDPER:1, submitAmanCRM:1, submitMeetingLog:1, submitFieldWorkBatch:1, completeDirectorItem:1 };
 
-// ── Daily reports are for TODAY only (2026-10-07, Siddharth's decision) ──
-// DPR, DPER and CRM used to accept a backdated "Report Date" (and the DPR's
-// own client-sent Timestamp), which is what let people file a week's worth
-// on Saturday or Monday morning and spread it back over the week — mixing
-// up which day work, visits and task completions actually happened. Now
-// every daily-form request is stamped with the SERVER's today/now here,
-// whatever the page sent. No grace window: once the day ends, that day's
-// report can't be filed (it counts as missed). Site visit / meeting logs
-// (meetlog) are NOT covered — logging an earlier visit there stays allowed.
+// ── Which day a daily report is for (2026-10-07, revised 2026-10-15) ──
+// DPR, DPER and CRM used to accept any backdated "Report Date", which is what
+// let people file a week's worth on Saturday or Monday morning and spread it
+// back over the week. 2026-10-07: today only. 2026-10-15 (Siddharth): people
+// were missing whole days simply because they forgot in the evening, so the
+// PREVIOUS working day's report can still be filed until 12 noon (IST). The
+// page asks for the day (data.reportDay / 'Report Date' / date); anything
+// other than today — or yesterday before noon — is stamped as today. Site
+// visit / meeting logs (meetlog) are NOT covered — logging an earlier visit
+// there stays allowed.
+// Dates are computed in the script's time zone (IST) here, not with
+// dateStr() (UTC), so the noon cut-off and "yesterday" are the team's own.
+var DAILY_FORM_GRACE_HOUR = 12;
 var DAILY_FORM_ACTIONS = { createDoneTask:1, logConnections:1, submitBillables:1, updateTaskStatuses:1,
   submitDPER:1, submitAmanCRM:1, submitFieldWorkBatch:1, submitDailySummary:1 };
+function localDayNow(){ return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
+function localHourNow(){ return parseInt(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'H'), 10); }
+function prevWorkingDay(dayStr){
+  var d = addDaysToStr(dayStr, -1);
+  for (var k = 0; k < 7 && !isWorkingDay(d); k++) d = addDaysToStr(d, -1);
+  return d;
+}
+function catchUpWindowOpen(){ return localHourNow() < DAILY_FORM_GRACE_HOUR; }
+function allowedReportDay(requested){
+  var today = localDayNow(), r = String(requested || '').trim().substring(0, 10);
+  if (r && r !== today && catchUpWindowOpen() && r === prevWorkingDay(today)) return r;
+  return today;
+}
+// A Timestamp whose dateStr() (UTC date) is exactly `day` — everything
+// downstream (DAILY_SUMMARY col A, task status dates) derives the day from it.
+function timestampForDay(day){
+  var nowIso = new Date().toISOString();
+  return nowIso.substring(0, 10) === day ? nowIso : (day + 'T12:00:00.000Z');
+}
 function lockDailyFormDates(data){
   if (!data) return;
-  var today = dateStr(), nowIso = new Date().toISOString();
   if (!data.action) {                          // dpr.html main submission
-    data['Timestamp'] = nowIso;
-    data['Report Date'] = today;
+    var day = allowedReportDay(data.reportDay || data['Report Date']);
+    data._filedAt = new Date().toISOString();  // the real moment, for DAILY_SUMMARY's Time column
+    data._lateFiled = day !== localDayNow();
+    data['Timestamp'] = timestampForDay(day);
+    data['Report Date'] = day;
     ['Done Tasks','Ongoing Tasks'].forEach(function(k){
       if (!data[k]) return;
       try {
         var arr = typeof data[k] === 'string' ? JSON.parse(data[k]) : data[k];
-        (arr||[]).forEach(function(t){ if (t && typeof t === 'object') t.date = today; });
+        (arr||[]).forEach(function(t){ if (t && typeof t === 'object') t.date = day; });
         data[k] = typeof data[k] === 'string' ? JSON.stringify(arr) : arr;
       } catch (e) {}
     });
     return;
   }
   if (!DAILY_FORM_ACTIONS[data.action]) return;
-  data.date = today;
-  if (data['Timestamp']) data['Timestamp'] = nowIso;
+  var d2 = allowedReportDay(data.reportDay || data.date);
+  data.date = d2;
+  if (data['Timestamp']) data['Timestamp'] = timestampForDay(d2);
+}
+
+// What the daily-form pages need to offer the right day: today, the previous
+// working day while the noon window is open, whether each is already filed,
+// and (DPR only) whether a filed report can still be corrected.
+function getDailyFormStatus(authEmail, form){
+  var today = localDayNow(), prev = prevWorkingDay(today), open = catchUpWindowOpen();
+  var out = { status:'ok', today:today, prev:prev, windowOpen:open, graceHour:DAILY_FORM_GRACE_HOUR, filed:{}, edit:{} };
+  var name = memberNameForAuth(authEmail);
+  if (!name) return out;
+  var key = name.toLowerCase(), fToday = filedOn(today), fPrev = filedOn(prev);
+  out.member = name;
+  out.filed[today] = !!fToday[key];
+  out.filed[prev]  = !!fPrev[key];
+  if (String(form || 'DPR').toUpperCase() === 'DPR') {
+    [today, prev].forEach(function(d){
+      if (!out.filed[d]) return;
+      var rec = dprSubmissionRecord(name, d);
+      var inWindow = d === today || open;
+      out.edit[d] = !rec ? { canEdit:false, reason:'no_record' }
+        : { canEdit: inWindow && rec.editsUsed < DPR_MAX_EDITS && !!rec.undo, reason: !inWindow ? 'closed' : rec.editsUsed >= DPR_MAX_EDITS ? 'used' : (!rec.undo ? 'too_big' : ''),
+            submittedAt: rec.submittedAt, editedAt: rec.editedAt, editsUsed: rec.editsUsed };
+    });
+  }
+  return out;
+}
+
+// ── Correcting a submitted DPR (2026-10-15, Siddharth) ──────────────────
+// Once per report, while it can still be filed (same day, or the next day
+// until 12 noon), someone can reopen their submitted DPR with everything
+// they entered, fix it and resubmit. The resubmission REPLACES the original:
+// inside one lock the original's effects are undone (task rows it changed
+// are restored to how they were before, task rows it created are voided,
+// its DAILY_SUMMARY / FIELD_WORK / connection / late-arrival rows removed,
+// its billable requests withdrawn) and the corrected report is applied as
+// normal. TASK_ASSIGNMENTS rows are never deleted — approvals, blocks and
+// other actions address them by row number — a voided row is marked
+// 'Reassigned' (hidden and excluded everywhere, the same as a reassigned
+// original) with LeadApproved 'No' and a note. If a lead has already
+// approved/rejected anything from the original, it can't be corrected (the
+// person is told to ask their lead) — nothing is changed in that case.
+// What's needed to do this is kept per member+day in DPR_SUBMISSIONS: the
+// form as filled (to reopen it) and the undo record (row snapshots + ids).
+var DPR_SUBS_TAB = 'DPR_SUBMISSIONS';
+var DPR_MAX_EDITS = 1;
+var DPR_SUBS_HEADERS = ['Day','Member','Email','Submitted At','Edited At','Edits Used','Form (JSON)','Undo (JSON)'];
+// TASK_ASSIGNMENTS columns a DPR can change on an existing row: G H I M N O P
+// Q U, block X Y Z, hours AC, submitted-at AD (1-based).
+var DPR_UNDO_COLS = [7,8,9,13,14,15,16,17,21,24,25,26,29,30];
+var _DPR_UNDO = null;   // set only while a DPR submission is being applied
+function dprUndoSnap(sheet, row){
+  if (!_DPR_UNDO) return;
+  try {
+    var width = Math.min(30, sheet.getMaxColumns());
+    var v = sheet.getRange(row, 1, 1, width).getValues()[0];
+    var id = String(v[0] || '').trim();
+    if (!id || _DPR_UNDO.snap[id] || _DPR_UNDO.created.indexOf(id) > -1) return;
+    var snap = {};
+    DPR_UNDO_COLS.forEach(function(c){
+      if (c > width) return;
+      var x = v[c-1];
+      snap[c] = (x instanceof Date) ? ((c === 30) ? Utilities.formatDate(x, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : cellDate(x)) : x;
+    });
+    _DPR_UNDO.snap[id] = snap;
+  } catch (e) { _DPR_UNDO.broken = true; Logger.log('dprUndoSnap failed: ' + e); }
+}
+function dprUndoCreated(id){ if (_DPR_UNDO && id) _DPR_UNDO.created.push(String(id)); }
+function dprUndoBlock(id){ if (_DPR_UNDO && id) _DPR_UNDO.blocks.push(String(id)); }
+
+function dprSubsSheet(){
+  return getOrCreate(DPR_SUBS_TAB, function(sh){
+    sh.getRange(1, 1, 1, DPR_SUBS_HEADERS.length).setValues([DPR_SUBS_HEADERS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  });
+}
+function dprSubmissionRecord(member, day){
+  var sh = db().getSheetByName(DPR_SUBS_TAB);
+  if (!sh || sh.getLastRow() < 2) return null;
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, DPR_SUBS_HEADERS.length).getValues();
+  var m = String(member || '').trim().toLowerCase();
+  for (var i = rows.length - 1; i >= 0; i--) {
+    if (cellDate(rows[i][0]) === day && String(rows[i][1]||'').trim().toLowerCase() === m) {
+      var undo = null, form = null;
+      try { undo = rows[i][7] ? JSON.parse(rows[i][7]) : null; } catch (e) {}
+      try { form = rows[i][6] ? JSON.parse(rows[i][6]) : null; } catch (e) {}
+      return { row: i + 2, day: day, member: String(rows[i][1]||''), email: String(rows[i][2]||'').toLowerCase(),
+        submittedAt: String(rows[i][3]||''), editedAt: String(rows[i][4]||''), editsUsed: parseInt(rows[i][5], 10) || 0,
+        form: form, undo: undo };
+    }
+  }
+  return null;
+}
+function saveDprSubmissionRecord(member, email, day, formJson, undo, prev){
+  var sh = dprSubsSheet();
+  var tz = Session.getScriptTimeZone(), nowS = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm');
+  var undoJson = undo && !undo.broken ? JSON.stringify({ snap: undo.snap, created: undo.created, blocks: undo.blocks }) : '';
+  if (undoJson.length > 49000) undoJson = '';          // too big for one cell — this report just can't be corrected
+  if (String(formJson||'').length > 49000) { formJson = ''; undoJson = ''; }
+  var vals = [day, member, String(email||'').toLowerCase(), prev ? prev.submittedAt : nowS, prev ? nowS : '',
+    prev ? prev.editsUsed + 1 : 0, formJson || '', undoJson];
+  if (prev) sh.getRange(prev.row, 1, 1, vals.length).setValues([vals]);
+  else sh.appendRow(vals);
+}
+
+// Undo everything a recorded DPR submission wrote. Returns {status:'ok'} or
+// {status:'error', code:'reviewed'} without touching anything if a lead has
+// already acted on any task it changed or created.
+function undoDprSubmission(rec){
+  var undo = rec.undo || {}, member = rec.member, day = rec.day;
+  var snaps = undo.snap || {}, created = undo.created || [];
+  var aSheet = db().getSheetByName(ASSIGN_TAB);
+  var width = Math.min(30, aSheet.getMaxColumns());
+  var ids = Object.keys(snaps).concat(created);
+  var found = {};
+  if (ids.length && aSheet.getLastRow() > 1) {
+    var colA = aSheet.getRange(2, 1, aSheet.getLastRow()-1, 1).getValues();
+    var want = {}; ids.forEach(function(id){ want[id] = true; });
+    for (var i = 0; i < colA.length; i++) { var id = String(colA[i][0]||'').trim(); if (want[id] && !found[id]) found[id] = { row: i + 2 }; }
+    // 1) refuse if a lead has already acted on anything this DPR touched
+    for (var fid in found) {
+      var v = aSheet.getRange(found[fid].row, 1, 1, width).getValues()[0];
+      found[fid].v = v;
+      var q = String(v[16]||'').trim(), z = String(v[25]||'').trim(), s = snaps[fid];
+      if (q === 'Yes') return { status:'error', code:'reviewed', taskId: fid };
+      if (q === 'No' && !(s && String(s[17]||'').trim() === 'No')) return { status:'error', code:'reviewed', taskId: fid };
+      if (s && z && z !== 'Pending' && z !== String(s[26]||'').trim()) return { status:'error', code:'reviewed', taskId: fid };
+    }
+  }
+  // 2) restore changed rows, void created rows
+  Object.keys(snaps).forEach(function(id){
+    var f = found[id]; if (!f) return;
+    var arr = f.v.slice();
+    Object.keys(snaps[id]).forEach(function(c){ var ci = parseInt(c, 10); if (ci <= width) arr[ci-1] = snaps[id][c]; });
+    aSheet.getRange(f.row, 1, 1, width).setValues([arr]);
+  });
+  created.forEach(function(id){
+    var f = found[id]; if (!f) return;
+    var arr = f.v.slice();
+    arr[13] = 'Reassigned';                                     // N — hidden/excluded everywhere
+    arr[16] = 'No';                                             // Q — never counts as output
+    arr[20] = '[Removed — ' + day + ' DPR corrected] ' + String(arr[20]||'');
+    aSheet.getRange(f.row, 1, 1, width).setValues([arr]);
+  });
+  (undo.blocks || []).forEach(function(id){ try { updateBlockLog(id, 'Withdrawn', member, dateStr(), 'DPR corrected'); } catch (e) {} });
+
+  var mKey = String(member||'').trim().toLowerCase();
+  function deleteRowsWhere(sheet, nCols, test){
+    if (!sheet || sheet.getLastRow() < 2) return 0;
+    var rows = sheet.getRange(2, 1, sheet.getLastRow()-1, nCols).getValues(), del = [];
+    rows.forEach(function(r, i){ if (test(r)) del.push(i + 2); });
+    for (var k = del.length - 1; k >= 0; k--) sheet.deleteRow(del[k]);
+    return del.length;
+  }
+  var s = db();
+  // DAILY_SUMMARY: A Date · C Member
+  deleteRowsWhere(s.getSheetByName(SUMMARY_TAB), 3, function(r){ return cellDate(r[0]) === day && String(r[2]||'').trim().toLowerCase() === mKey; });
+  // FIELD_WORK: B Date · C Member · K Source
+  deleteRowsWhere(s.getSheetByName(FIELD_WORK_TAB), 11, function(r){ return cellDate(r[1]) === day && String(r[2]||'').trim().toLowerCase() === mKey && String(r[10]||'self') === 'self'; });
+  // CRM_LOG connections logged from the DPR (no submission id): B SubID · C Date · D Member · E Type
+  deleteRowsWhere(s.getSheetByName(CRM_LOG_TAB), 5, function(r){ return !String(r[1]||'').trim() && cellDate(r[2]) === day && String(r[3]||'').trim().toLowerCase() === mKey && String(r[4]||'') === 'Client Connection'; });
+  // LATE_REQUESTS: B Date · C Member
+  deleteRowsWhere(s.getSheetByName(LATE_REQ_TAB), 3, function(r){ return cellDate(r[1]) === day && String(r[2]||'').trim().toLowerCase() === mKey; });
+  // BILL_REQUESTS still pending → withdrawn (rows are addressed by number — never deleted)
+  var br = s.getSheetByName(BILL_REQ_TAB);
+  if (br && br.getLastRow() > 1) {
+    var bRows = br.getRange(2, 1, br.getLastRow()-1, 7).getValues();
+    bRows.forEach(function(r, i){
+      if (cellDate(r[1]) === day && String(r[2]||'').trim().toLowerCase() === mKey && String(r[6]||'').trim() === 'Pending') {
+        br.getRange(i + 2, 7).setValue('Withdrawn');
+        br.getRange(i + 2, 11).setValue('DPR corrected');
+      }
+    });
+    try { var bc = CacheService.getScriptCache(); bc.remove('c_getBillRequests'); bc.remove('c_getBillRequestsWithBilling'); } catch (e) {}
+  }
+  return { status:'ok' };
+}
+
+// Reopen a submitted DPR for correction: the form as it was filled, plus the
+// person's task list as it was BEFORE that submission (so Section 2 shows the
+// tasks the way they were when the report was first filled in).
+function getDprForEdit(authEmail, day){
+  var name = memberNameForAuth(authEmail);
+  if (!name) return { status:'error', message:'Not signed in as a team member.' };
+  var today = localDayNow();
+  if (!(day === today || (day === prevWorkingDay(today) && catchUpWindowOpen())))
+    return { status:'error', code:'closed', message:'This report can no longer be corrected.' };
+  var rec = dprSubmissionRecord(name, day);
+  if (!rec) return { status:'error', code:'no_record', message:'This report was filed before corrections were possible, so it can’t be reopened.' };
+  if (rec.editsUsed >= DPR_MAX_EDITS) return { status:'error', code:'used', message:'This report has already been corrected once.' };
+  if (!rec.undo || !rec.form) return { status:'error', code:'too_big', message:'This report is too large to reopen automatically — ask Siddharth to correct it.' };
+  // Same "has a lead acted?" check the real correction does, so nobody fills the form in for nothing.
+  var patch = {};
+  var aSheet = db().getSheetByName(ASSIGN_TAB), width = Math.min(30, aSheet.getMaxColumns());
+  var rows = aSheet.getRange(1, 1, aSheet.getLastRow(), width).getValues();
+  for (var i = 1; i < rows.length; i++) {
+    var id = String(rows[i][0]||'').trim(), s = rec.undo.snap[id], isNew = rec.undo.created.indexOf(id) > -1;
+    if (!s && !isNew) continue;
+    var q = String(rows[i][16]||'').trim(), z = String(rows[i][25]||'').trim();
+    if (q === 'Yes' || (q === 'No' && !(s && String(s[17]||'').trim() === 'No')) || (s && z && z !== 'Pending' && z !== String(s[26]||'').trim()))
+      return { status:'error', code:'reviewed', message:'Your lead has already reviewed part of this report, so it can’t be corrected here — please tell your lead what needs fixing.' };
+    patch[id] = isNew ? { 14:'Reassigned' } : s;
+  }
+  var open = getOpenTasksForMember(name, patch);
+  return { status:'ok', day: day, form: rec.form, tasks: open.tasks || [], submittedAt: rec.submittedAt };
 }
 
 function doPost(e) {
@@ -2247,6 +2480,8 @@ function doPost(e) {
     if (data.action === 'getLastPushVisitTasksTrace') return respond(getLastPushVisitTasksTrace());
     if (data.action === 'debugListTriggers')      return respond(ScriptApp.getProjectTriggers().map(function(t){ return {handler:t.getHandlerFunction(), type:String(t.getEventType()), source:String(t.getTriggerSource())}; }));
     if (data.action === 'dailyFormOpened')  return respond(dailyFormOpened(authEmail, data.form||'DPR'));
+    if (data.action === 'getDailyFormStatus') return respond(getDailyFormStatus(authEmail, data.form||'DPR'));
+    if (data.action === 'getDprForEdit')    return respond(getDprForEdit(authEmail, String(data.day||'')));
     if (data.action === 'testDailyFormOpened') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(dailyFormOpened(data.email||'', data.form||'DPR', true)); }
     if (data.action === 'setupDprReminderTriggers') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden',message:'Restricted to Siddharth & Astha.'}); return respond(setupDprReminderTriggers()); }
     if (data.action === 'previewDprMissed') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond({ today: dateStr(), notYetToday: membersWhoMissed(dateStr()), yesterday: membersWhoMissed(addDaysToStr(dateStr(), -1)) }); }
@@ -2329,7 +2564,23 @@ function doPost(e) {
     // bad entry doesn't take the rest down with it, and any real failures are
     // returned to the client instead of being invisible.
     var submissionErrors = [];
+    // Correcting an already-submitted report (2026-10-15) — see undoDprSubmission.
+    var reportDay = data['Report Date'];
+    var subMember = String(data['Member']||'').trim();
+    var formJson = typeof data._formState === 'string' ? data._formState : (data._formState ? JSON.stringify(data._formState) : '');
+    var editRefusal = null;
     withLock(function(){
+      var prevRec = dprSubmissionRecord(subMember, reportDay);
+      if (data._isEdit) {
+        if (data._editDay && data._editDay !== reportDay) { editRefusal = { code:'closed', message:'The time to correct this report has passed (12 noon).' }; return; }
+        if (!prevRec || !prevRec.undo) { editRefusal = { code:'no_record', message:'This report can’t be reopened for correction.' }; return; }
+        if (prevRec.email && prevRec.email !== String(authEmail||'').toLowerCase()) { editRefusal = { code:'forbidden', message:'You can only correct your own report.' }; return; }
+        if (prevRec.editsUsed >= DPR_MAX_EDITS) { editRefusal = { code:'used', message:'This report has already been corrected once.' }; return; }
+        var u = undoDprSubmission(prevRec);
+        if (u.status !== 'ok') { editRefusal = { code:'reviewed', message:'Your lead has already reviewed part of this report, so it can’t be corrected here — please tell your lead what needs fixing.' }; return; }
+      }
+      _DPR_UNDO = { snap:{}, created:[], blocks:[] };
+      try {
       writeDailySummary(data);
 
       // Update assigned task statuses + write both date columns
@@ -2370,9 +2621,17 @@ function doPost(e) {
           Logger.log('Created ' + ongoingOk + '/' + ongoing.length + ' self-assigned ongoing tasks');
         } catch(err) { Logger.log('Ongoing tasks error: ' + err); submissionErrors.push('ongoing tasks: ' + err); }
       }
+      } finally {
+        var undoRec = _DPR_UNDO; _DPR_UNDO = null;
+        // A second plain filing for the same day (an old cached page) keeps the
+        // first record — only a real correction replaces it.
+        try { if (data._isEdit || !prevRec) saveDprSubmissionRecord(subMember, authEmail, reportDay, formJson, undoRec, data._isEdit ? prevRec : null); }
+        catch (recErr) { Logger.log('DPR submission record error: ' + recErr); }
+      }
     });
+    if (editRefusal) return respond({ status:'error', code: editRefusal.code, message: editRefusal.message });
 
-    notifySubmissionRecorded(data['Member'], 'DPR', data['Report Date'] || dateStr(), [
+    notifySubmissionRecorded(data['Member'], data._isEdit ? 'DPR (corrected)' : 'DPR', data['Report Date'] || dateStr(), [
       'Weighted pts: ' + (data['Total Weighted Pts']||0),
       'Task units: ' + (data['Total Task Units']||0),
       'Projects touched: ' + (data['Projects Count']||0),
@@ -2581,11 +2840,12 @@ function readConfig() {
 // ════════════════════════════════════════════════════════════════
 function writeDailySummary(data) {
   var sheet = getOrCreate(SUMMARY_TAB, writeSummaryHeaders);
-  // Time in HH:MM 24-hour format from Timestamp
-  var ts    = data['Timestamp'] ? new Date(data['Timestamp']) : new Date();
+  // Time in HH:MM 24-hour format — the real filing moment (_filedAt) when the
+  // report is for an earlier day (filed the next morning), marked "+1d".
+  var ts    = data._filedAt ? new Date(data._filedAt) : (data['Timestamp'] ? new Date(data['Timestamp']) : new Date());
   var hh    = String(ts.getHours()).padStart(2,'0');
   var mm    = String(ts.getMinutes()).padStart(2,'0');
-  var timeStr = hh + ':' + mm;
+  var timeStr = hh + ':' + mm + (data._lateFiled ? ' (+1d)' : '');
   prependRow(sheet, [
     dateStr(data['Timestamp']),  // A Date
     timeStr,                      // B Time (HH:MM 24h)
@@ -2706,10 +2966,18 @@ function writeAssignHeaders(s) {
 // ════════════════════════════════════════════════════════════════
 // GET ALL TASKS — for dashboard
 // ════════════════════════════════════════════════════════════════
-function getAllTasks() {
+// patch (optional): { taskId: { 1-based col: value } } applied to a COPY of
+// those rows before anything is computed — getDprForEdit uses it to show the
+// task list as it was before a DPR submission, without changing the sheet.
+function getAllTasks(patch) {
   var sheet = db().getSheetByName(ASSIGN_TAB);
   if (!sheet) return {tasks:[]};
   var rows = sheet.getDataRange().getValues();
+  if (patch) rows = rows.map(function(r, i){
+    var p = i > 0 && patch[String(r[0]||'').trim()];
+    if (!p) return r;
+    var c2 = r.slice(); Object.keys(p).forEach(function(c){ c2[parseInt(c,10)-1] = p[c]; }); return c2;
+  });
   var tasks = [], today = dateStr();
 
   // Build project → discipline text map from PROJECTS tab (col B=Name, col D=Discipline)
@@ -2849,9 +3117,9 @@ function getAllTasks() {
 // GET OPEN TASKS FOR MEMBER — for DPR form section 2
 // Returns Upcoming + Ongoing + Delayed + Revision Required
 // ════════════════════════════════════════════════════════════════
-function getOpenTasksForMember(member) {
+function getOpenTasksForMember(member, patch) {
   var resolved = resolveName(member);
-  var all      = getAllTasks();
+  var all      = getAllTasks(patch);
   var allTasks = all.tasks || [];
 
   // Debug: log all unique assignees in the sheet
@@ -2965,6 +3233,7 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
 
       if (match) {
         var taskType = rT; // E
+        dprUndoSnap(sheet, i+1);   // no-op unless a DPR submission is being applied
 
         // ── Corrections: the assigned scope was slightly off (unit count,
         // drawing/type) — editable independent of status, since catching
@@ -2996,6 +3265,7 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
           sheet.getRange(i+1, COL_BLK_ORIGDL).setValue(origDeadline);
           sheet.getRange(i+1, COL_BLK_DISPO ).setValue('Pending');
           logBlockRaised(String(rows[i][0]||''), i+1, a.member, a.project, a.taskType, now, a.note||'', priorStatus, origDeadline);
+          dprUndoBlock(String(rows[i][0]||''));
         }
 
         if (newStatus) {
@@ -3992,7 +4262,7 @@ function submitMeetingLog(data, authEmail){
         f.deadline || addDaysToStr(day,3),
         f.textPolished||f.text,                    // L Description (action item text)
         '', 'Not Started', '', '', 'Pending', '', '', '',
-        '[From '+type+' '+day+']',                 // U Notes (source metadata)
+        '[From '+type+' '+day+']' + (f.deadline ? '' : ' [auto deadline]'),   // U Notes (source metadata; auto = not counted for reliability)
         loggedBy+' (MoM)', 'Medium' ]);
       parkRowIfStalled(aSheet, project);
     }
@@ -4205,7 +4475,7 @@ function assignDecisionLogItem(data, authEmail){
   var aSheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
   aSheet.appendRow([ taskId, '', project, assignee, 'MoM Action', 1, 1, 1, 1, day,
     deadline || addDaysToStr(day, 3), taskText, '', 'Not Started', '', '', 'Pending', '', '', '',
-    '[Late-assigned from Open Action Items]', (authEmail||'')+' (late-assign)', 'Medium' ]);
+    '[Late-assigned from Open Action Items]' + (deadline ? '' : ' [auto deadline]'), (authEmail||'')+' (late-assign)', 'Medium' ]);
   parkRowIfStalled(aSheet, project);
   sheet.getRange(rIdx+1, 6).setValue(owner);
   if (deadline) sheet.getRange(rIdx+1, 8).setValue(deadline);
@@ -6477,6 +6747,7 @@ function createDoneTask(data) {
     // buckets the points into the week the work actually happened in.
     var effDate = data.date || today;
     var actualDate = data.actualCompletionDate || effDate;
+    dprUndoSnap(sheet, matchRow);   // no-op unless a DPR submission is being applied
     sheet.getRange(matchRow, 9 ).setValue(weightedPts); // I WeightedPts (recalc with current mult)
     sheet.getRange(matchRow, 14).setValue('Done');       // N SelfStatus
     sheet.getRange(matchRow, 15).setValue(effDate);      // O SelfStatusDate
@@ -6531,6 +6802,7 @@ function createDoneTask(data) {
   ]);
   writeHoursTaken(sheet, sheet.getLastRow(), hoursTaken);
   stampSubmittedAt(sheet, sheet.getLastRow());
+  dprUndoCreated(newId);
 
   if (isVisitTask(data.taskType) && data.project) {
     try { updateVisitPlannerLastVisitDate(data.project, data.taskType, effDate); } catch(vpErr) { Logger.log('VISIT_PLANNER col H update error: ' + vpErr); }
@@ -6593,10 +6865,11 @@ function createSelfAssignedTask(data) {
     '',                        // R ApprovedBy
     '',                        // S ApprovalDate
     '',                        // T RevisionTag
-    'Unplanned — self assigned via DPR', // U Notes
+    'Unplanned — self assigned via DPR' + (deadline === target ? '' : ' [auto deadline]'), // U Notes (auto = not counted for reliability)
     data.member       || '',   // V AssignedBy (self)
     'Medium',                  // W Priority
   ]);
+  dprUndoCreated(newId);
   parkRowIfStalled(sheet, data.project || '');  // stalled project → auto-park
 
   Logger.log('Self-assigned task created: '+data.member+' / '+data.taskType+' → '+newId);
@@ -6727,6 +7000,42 @@ function completeDirectorItem(data, authEmail) {
 // Returns per-member stats for a given week (Mon-Sat)
 // action=getWeeklyStats&weekStart=2026-05-11
 // ════════════════════════════════════════════════════════════════
+// ── Reliability counts only deadlines someone actually set (2026-10-15) ──
+// A late task costs Reliability only if its deadline was chosen by a lead
+// (assigned with a date) or by the person themselves (ongoing work's expected
+// completion date). Dates the system filled in on its own don't count:
+//   • visit tasks from the visit schedule (AssignedBy 'Auto-scheduled');
+//   • meeting / site-visit-log action items logged without a deadline (the
+//     task got +3 days) — DECISION_LOG has the deadline blank for those;
+//   • DPER/CRM site issues raised without a target date (+2 days);
+//   • self-logged ongoing work from before 2026-10-12 (automatic next day).
+// New rows of those kinds carry '[auto deadline]' in Notes. The tasks still
+// show as overdue on the dashboard — they just don't cost points.
+function autoDeadlineTaskIds(){
+  var ids = {};
+  try {
+    var sh = db().getSheetByName(DECISION_LOG_TAB);
+    if (sh && sh.getLastRow() > 1 && sh.getLastColumn() >= 10) {
+      sh.getRange(2, 1, sh.getLastRow()-1, 10).getValues().forEach(function(r){
+        var tid = String(r[9]||'').trim();
+        if (tid && !cellDate(r[7])) ids[tid] = true;          // H Deadline blank → default was used
+      });
+    }
+  } catch (e) { Logger.log('autoDeadlineTaskIds: ' + e); }
+  return ids;
+}
+function hasAgreedDeadline(r, autoIds){
+  var notes = String(r[20]||''), type = String(r[4]||'').trim();
+  if (String(r[21]||'').trim() === 'Auto-scheduled') return false;
+  if (notes.indexOf('[auto deadline]') > -1) return false;
+  if (autoIds && autoIds[String(r[0]||'').trim()]) return false;
+  var j = cellDate(r[9]), k = cellDate(r[10]);
+  if (notes.indexOf('Unplanned — self assigned') === 0 && j < '2026-10-12' && k === addDaysToStr(j, 1)) return false;
+  if ((notes.indexOf('[DPER: ') === 0 || notes.indexOf('[CRM: ') === 0) &&
+      (type.indexOf('Site Issue') === 0 || type === 'Design Deliverable — CRM') && k === addDaysToStr(j, 2)) return false;
+  return true;
+}
+
 function getWeeklyStats(weekStart) {
   var s   = db();
   var mon = weekStart || dateStr(mondayOf(new Date()));
@@ -6783,6 +7092,7 @@ function getWeeklyStats(weekStart) {
   var COL_NOTES   = is23 ? 20 : 19;
 
   var results = [];
+  var autoDlIds = autoDeadlineTaskIds();
 
   for (var ti = 1; ti < tRows.length; ti++) {
     var name   = String(tRows[ti][0] || '').trim();
@@ -6909,6 +7219,8 @@ function getWeeklyStats(weekStart) {
       // else in the app: a block approved as Cancelled (task stays 'Blocked'
       // as a record), or Reassigned/Parked. These were still counted late.
       if ((selfStat === 'Blocked' && blkDispo === 'Cancelled') || selfStat === 'Reassigned' || selfStat === 'Parked' || selfStat.indexOf('Parked') === 0) return;
+      // Only deadlines someone actually set count (2026-10-15) — see hasAgreedDeadline.
+      if (!hasAgreedDeadline(r, autoDlIds)) return;
       var doneDate = (COL_ACTUALDT > -1 ? cellDate(r[COL_ACTUALDT]) : '') || cellDate(r[COL_STATUSDT]);
       var onTime   = String(r[COL_LEADAPPR]||'').trim() === 'Yes' && doneDate && doneDate <= dl;
       if (!onTime) lateCount++;
@@ -7618,7 +7930,7 @@ function createIssueTask(iss, project, date, onTrack) {
   var taskType = (iss.kind === 'Deliverable') ? 'Design Deliverable — CRM'
                : 'Site Issue — ' + (iss.issueType || 'General');
   var description = iss.description || '';
-  var metaNotes   = '[' + srcLabel + ': ' + project + ', ' + date + ']';
+  var metaNotes   = '[' + srcLabel + ': ' + project + ', ' + date + ']' + (iss.targetDate ? '' : ' [auto deadline]');
 
   sheet.appendRow([
     newId,                    // A TaskID
@@ -8679,7 +8991,7 @@ function getDeepakWeeklyStats(weekStart) {
 
     // Reliability — Deepak's OWN tasks with a deadline in this week (same rule
     // as the team): late/overdue = −1, "Work Not Done" (reassigned) = −2.
-    var nowD = dateStr();
+    var nowD = dateStr(), dAutoIds = autoDeadlineTaskIds();
     for (var k = 1; k < asRows.length; k++) {
       var rr = asRows[k];
       if (String(rr[3] || '').trim() !== 'Deepak Soni') continue;
@@ -8688,6 +9000,13 @@ function getDeepakWeeklyStats(weekStart) {
       var ss = String(rr[13] || '').trim();
       if (ss === 'Work Not Done') { dWnd++; continue; }
       if (dl >= nowD) continue;                       // not yet due — not late
+      // Same exemptions as the team (2026-10-15): pending block pauses the
+      // clock, approved blocks release the task, and only deadlines someone
+      // actually set count.
+      var dBlk = String(rr[COL_BLK_DISPO-1] || '').trim();
+      if (ss === 'Blocked' && (dBlk === 'Pending' || dBlk === 'Cancelled')) continue;
+      if (ss === 'Reassigned' || ss.indexOf('Parked') === 0) continue;
+      if (!hasAgreedDeadline(rr, dAutoIds)) continue;
       var dd = (COL_ACTDT > -1 ? cellDate(rr[COL_ACTDT]) : '') || cellDate(rr[COL_STATDT]);
       var ot = String(rr[COL_LEADAP] || '').trim() === 'Yes' && dd && dd <= dl;
       if (!ot) dLate++;

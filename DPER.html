@@ -230,7 +230,7 @@ textarea{min-height:62px;resize:vertical;}
     <div class="section-head"><span class="section-num">1</span><span class="section-title">Report Date</span></div>
     <div class="section-body">
       <input type="date" id="f-date">
-      <div class="opt" style="font-size:11px;margin-top:4px">Reports are for <b>today only</b> — after midnight, today's report can't be filed and counts as missed.</div>
+      <div class="opt" style="font-size:11px;margin-top:4px">File today's report today. Forgot? You can still file it the next day until <b>12 noon</b> — after that it counts as missed.</div>
       <div class="field" style="margin-top:12px">
         <div class="lbl">Arrived on time today? <span class="opt">before 9:00 AM</span></div>
         <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-right:16px;cursor:pointer"><input type="radio" name="ontime" value="Yes" onchange="toggleLateReq()" style="width:auto">Yes</label>
@@ -1624,53 +1624,7 @@ function buildPBInnerHTML(id, projOpts) {
 }
 </script>
 
-<script>
-// Daily reports are for TODAY only (2026-10-07): the server stamps every
-// submission with its own date regardless, this just shows it honestly.
-(function(){
-  function localToday(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
-  function lock(){ const el=document.getElementById('f-date'); if(!el) return; const t=localToday(); el.value=t; el.min=t; el.max=t; el.readOnly=true; el.style.opacity='.75'; el.title='Reports can only be filed for today'; }
-  window.lockReportDateToToday = lock;
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', lock); else lock();
-  setInterval(lock, 60000);   // a tab left open past midnight rolls over to the new day
-
-  // Deadline / past-midnight notice (2026-10-07). Reports are same-day only,
-  // so make the cut-off visible: evening warning after 7:30 PM, and after
-  // midnight say plainly that yesterday's report is gone and this one counts
-  // for the new day (otherwise a 1 AM filer thinks they're filing yesterday's).
-  function dayNotice(){
-    const n=new Date(), mins=n.getHours()*60+n.getMinutes();
-    const dayLbl=n.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"});
-    let el=document.getElementById("day-notice");
-    const anchor=document.getElementById("f-date");
-    if(!el && anchor){ el=document.createElement("div"); el.id="day-notice"; anchor.parentElement.appendChild(el); }
-    if(!el) return;
-    let msg="", bg="", fg="";
-    if (mins < 6*60) { msg="🌙 It’s past midnight — yesterday’s report can no longer be filed and counts as missed. Anything you submit now is recorded as today’s ("+dayLbl+") report."; bg="#FDECEA"; fg="#8B2020"; }
-    else if (mins >= 19*60+30) { msg="⏰ Past 7:30 PM — submit now. Today’s ("+dayLbl+") report can only be filed until 12 midnight; after that it counts as missed and can’t be filed."; bg="#FFF4E5"; fg="#7A4A00"; }
-    el.style.cssText = msg ? "margin-top:8px;padding:9px 11px;border-radius:8px;font-size:12px;line-height:1.45;background:"+bg+";color:"+fg : "display:none";
-    el.textContent = msg;
-    const top=document.getElementById("banner");   // dpr.html's own top banner
-    if (top && !msg && top.dataset.dn) { top.className="banner"; top.textContent="Submit before 7:30 PM · responses go directly to your scoresheet"; delete top.dataset.dn; }
-    if (top && msg) { top.dataset.dn="1"; top.className="banner late"; top.textContent = mins < 6*60 ? "Past midnight — yesterday’s DPR can’t be filed any more. This is today’s DPR." : "Past 7:30 PM — submit before 12 midnight or today’s DPR counts as missed."; }
-  }
-
-  // Tell the server this form was opened (once per page load, only before
-  // 5 PM). If the person missed the previous working day, Siddharth gets an
-  // email so he can follow up — see dailyFormOpened in Code.js.
-  let _openPinged=false;
-  function pingOpened(){
-    if (_openPinged || !(window.IDS_USER && window.IDS_USER.email)) return;
-    if (new Date().getHours() >= 17) return;
-    _openPinged=true;
-    try { fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'dailyFormOpened', form:'DPER'})}).catch(()=>{}); } catch(e){}
-  }
-  document.addEventListener('ids-auth', pingOpened);
-  if (window.IDS_USER) setTimeout(pingOpened, 0);
-  window.dayNotice = dayNotice;
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', dayNotice); else dayNotice();
-  setInterval(dayNotice, 60000);
-})();
-</script>
+<!-- Which day this report is for: today, or the previous working day until 12 noon (2026-10-15) -->
+<script src="reportday.js?v=20261015" data-form="DPER"></script>
 </body>
 </html>
