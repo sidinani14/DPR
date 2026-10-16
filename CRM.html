@@ -229,6 +229,7 @@ textarea{min-height:62px;resize:vertical;}
 .msel-x{cursor:pointer;font-size:13px;line-height:1;opacity:.8;}
 .msel-x:hover{opacity:1;}
 .msel-drop{margin-top:6px;background:#fff;border:1.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 4px 14px rgba(0,0,0,.08);padding:8px;max-height:260px;overflow:hidden;display:flex;flex-direction:column;}
+.msel-drop.hidden{display:none;}   /* .msel-drop's display:flex otherwise beats .hidden */
 .msel-search{margin-bottom:6px;}
 .msel-opts{overflow-y:auto;}
 .msel-opt{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:12.5px;cursor:pointer;color:var(--text);}
