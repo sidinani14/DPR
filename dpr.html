@@ -1584,7 +1584,7 @@ function collectData() {
     const blockNote = document.querySelector(`.atc-note-${i}`)?.value.trim()||'';
     const genNote   = document.querySelector(`.atc-gnote-${i}`)?.value.trim()||'';
     return {
-      row:t.row, member:member, taskType:t.taskType, project:t.project,
+      row:t.row, taskId:t.taskId||'', member:member, taskType:t.taskType, project:t.project,
       area:t.area||'', drawing:t.drawing||'',   // original values — used to match the row, unchanged
       status:document.querySelector(`input[name="atc-${i}"]:checked`)?.value||'Not Started',
       note: blockNote || genNote,

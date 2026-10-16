@@ -3218,6 +3218,16 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
     var hasCorrection = (a.units && a.units > 0) || (a.newDrawing && a.newDrawing.trim()) || (a.note && a.note.trim());
     if (!newStatus && !hasCorrection) return;
 
+    // Match by Task ID when the page sends it (2026-10-15). Matching only on
+    // member + project + type + description used to land on the WRONG row
+    // whenever a project had several tasks of one type (repeated scheduled
+    // visits with no description, say) — often an old hidden Reassigned /
+    // Parked / already-Blocked row — so the task actually on screen never
+    // changed: it kept reappearing in the DPR and its block never reached
+    // the approval form. It also never matched a task assigned to two people
+    // ("A, B"), since AssignedTo had to equal the name exactly.
+    var wantId = String(a.taskId || '').trim();
+    var isMine = function(cell){ return String(cell||'').split(',').map(function(x){ return x.trim(); }).indexOf(a.member) > -1; };
     for (var i = 1; i < rows.length; i++) {
       var rM = String(rows[i][3]  || '').trim(); // D AssignedTo
       var rP = String(rows[i][2]  || '').trim(); // C ProjectName
@@ -3226,10 +3236,12 @@ function updateTaskStatusesFromDPR(statuses, submissionDate) {
       var rD = String(rows[i][12] || '').trim(); // M DrawingName
       var rS = String(rows[i][13] || '').trim(); // N SelfStatus
 
-      var match = rM === a.member && rP === a.project && rT === a.taskType &&
-                  (!a.area    || !rA || rA === a.area) &&
-                  (!a.drawing || !rD || rD === a.drawing) &&
-                  rS !== 'Done';
+      var match = wantId
+        ? (String(rows[i][0]||'').trim() === wantId && isMine(rM) && rS !== 'Done')
+        : (isMine(rM) && rP === a.project && rT === a.taskType &&
+           (!a.area    || !rA || rA === a.area) &&
+           (!a.drawing || !rD || rD === a.drawing) &&
+           ['Done','Reassigned','Parked','Work Not Done','Blocked'].indexOf(rS) === -1 && rS.indexOf('Parked') !== 0);
 
       if (match) {
         var taskType = rT; // E

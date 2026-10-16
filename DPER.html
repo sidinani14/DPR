@@ -775,7 +775,7 @@ function collectTaskStatuses(){
     }
 
     return {
-      member:leadName, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
+      taskId:t.taskId||'', member:leadName, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
       status, actualCompletionDate:today,
       units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
       newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',

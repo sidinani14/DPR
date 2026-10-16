@@ -949,7 +949,7 @@ function collectTaskStatuses(){
     const note = document.querySelector(`.mt-gnote-${i}`)?.value.trim() || '';
     const status = document.querySelector(`input[name="mt-r-${i}"]:checked`)?.value||'Not Started';
     return {
-      member:crmUser, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
+      taskId:t.taskId||'', member:crmUser, project:t.project, taskType:t.taskType, area:t.area||'', drawing:t.drawing||'',
       status, actualCompletionDate:today,
       units: (units && Math.abs(units - (t.units||1)) > 0.001) ? units : null,
       newDrawing: newDrawing && newDrawing !== (t.drawing||'') ? newDrawing : '',
