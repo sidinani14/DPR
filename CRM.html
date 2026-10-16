@@ -167,6 +167,10 @@ textarea{min-height:62px;resize:vertical;}
 .at-btn{padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);}
 .at-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .at-btn.on-no{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
+.section.collapsible>.section-head{cursor:pointer;user-select:none;}
+.section.collapsible>.section-head::after{content:'▾';color:#fff;font-size:12px;margin-left:8px;transition:transform .15s;}
+.section.collapsible.collapsed>.section-head::after{transform:rotate(-90deg);}
+.section.collapsible.collapsed>.section-body{display:none;}
 .activity-detail{display:none;padding-top:10px;}
 .activity-detail.open{display:block;}
 
@@ -296,8 +300,9 @@ textarea{min-height:62px;resize:vertical;}
   <div id="form-body">
 
   <!-- ── S0: Open Issues ───────────────────────── -->
-  <div class="section">
-    <div class="section-head">
+  <!-- The three review panels start collapsed (2026-10-16) — tap the header. -->
+  <div class="section collapsible collapsed">
+    <div class="section-head" onclick="this.parentElement.classList.toggle('collapsed')">
       <span class="section-num">!</span>
       <span class="section-title">Open CRM Issues</span>
       <span class="section-badge" id="issues-badge">—</span>
@@ -308,8 +313,8 @@ textarea{min-height:62px;resize:vertical;}
   </div>
 
   <!-- ── Your open tasks ───────────────────────── -->
-  <div class="section">
-    <div class="section-head">
+  <div class="section collapsible collapsed">
+    <div class="section-head" onclick="this.parentElement.classList.toggle('collapsed')">
       <span class="section-num">✓</span>
       <span class="section-title">Your Open Tasks</span>
       <span class="section-badge" id="mytasks-badge">—</span>
@@ -320,8 +325,8 @@ textarea{min-height:62px;resize:vertical;}
   </div>
 
   <!-- ── Open Leads — pending status updates ────── -->
-  <div class="section">
-    <div class="section-head">
+  <div class="section collapsible collapsed">
+    <div class="section-head" onclick="this.parentElement.classList.toggle('collapsed')">
       <span class="section-num">★</span>
       <span class="section-title">Open Leads — Review &amp; Update</span>
       <span class="section-badge" id="leads-badge">—</span>
@@ -340,20 +345,6 @@ textarea{min-height:62px;resize:vertical;}
     <div class="section-body">
       <input type="date" id="f-date">
       <div class="opt" style="font-size:11px;margin-top:4px">File today's report today. Forgot? You can still file it the next day until <b>12 noon</b> — after that it counts as missed.</div>
-      <div class="field" style="margin-top:12px">
-        <div class="lbl">Arrived on time today? <span class="opt">before 9:00 AM</span></div>
-        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-right:16px;cursor:pointer"><input type="radio" name="ontime" value="Yes" onchange="toggleLateReq()" style="width:auto">Yes</label>
-        <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="ontime" value="No" onchange="toggleLateReq()" style="width:auto">No — arrived late</label>
-        <div id="late-req-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--surface2,#f5f5f5);border-radius:8px">
-          <div class="lbl">Did you inform us before 9 AM that you'd be late?</div>
-          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-right:16px;cursor:pointer"><input type="radio" name="late-informed" value="Yes" style="width:auto">Yes</label>
-          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="late-informed" value="No" style="width:auto">No</label>
-          <div class="lbl" style="margin-top:8px">What time did you punch in?</div>
-          <input type="time" id="late-punch-in">
-          <div class="lbl" style="margin-top:8px">Reason <span class="opt">optional</span></div>
-          <textarea id="late-req-reason" placeholder="Traffic, personal, family matter…"></textarea>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -437,23 +428,12 @@ textarea{min-height:62px;resize:vertical;}
       <span class="section-title">Tomorrow's Meetings &amp; Site Visits</span>
     </div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Plan tomorrow's meetings/visits → agenda auto-generated for project group.</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Plan tomorrow's meetings and site visits — each team attendee gets a task for it.</p>
       <div id="agenda-blocks"></div>
       <button class="add-btn green" id="add-agenda-btn" onclick="addAgendaBlock()" disabled>+ Add Meeting / Site Visit</button>
     </div>
   </div>
-
-  <!-- ── WhatsApp Agendas ───────────────────────── -->
-  <div class="section">
-    <div class="section-head" style="background:#1B5E20">
-      <span class="section-num" style="background:rgba(255,255,255,0.2)">📱</span>
-      <span class="section-title">Meeting Agenda Messages</span>
-    </div>
-    <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Review, copy, and send to respective project WhatsApp groups before each meeting.</p>
-      <div id="wa-list"><div class="no-issues">Add tomorrow's plans above to generate messages…</div></div>
-    </div>
-  </div>
+  <!-- WhatsApp agenda messages section removed 2026-10-16 (not used). -->
 
   <!-- ── Finance ───────────────────────────── -->
   <div class="section">
@@ -463,50 +443,16 @@ textarea{min-height:62px;resize:vertical;}
     </div>
     <div class="section-body">
 
-      <!-- Bills Raised -->
-      <div class="field">
-        <div class="activity-toggle-row" style="padding-top:0">
-          <span class="atl">Bills Raised Today?</span>
-          <div class="at-btns">
-            <div class="at-btn" id="bills-yes" onclick="setActivity('bills','yes')">Yes</div>
-            <div class="at-btn on-no" id="bills-no" onclick="setActivity('bills','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="bills-detail">
-          <div id="bills-entries"></div>
-          <button class="add-btn green" onclick="addBill()">+ Add Bill</button>
-        </div>
+      <!-- 2026-10-16: no Yes/No toggles — add what happened; nothing added = No. -->
+      <p style="font-size:12px;color:var(--text2);margin:0 0 10px">Only add what happened today — leave the rest empty.</p>
+      <div id="bills-entries"></div>
+      <div id="pay-entries"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="add-btn green" onclick="addBill()" style="flex:1;min-width:140px">+ Bill raised</button>
+        <button class="add-btn green" onclick="addPayment()" style="flex:1;min-width:140px">+ Payment received</button>
       </div>
-
-      <!-- Payment Received -->
-      <div class="field">
-        <div class="activity-toggle-row">
-          <span class="atl">Payment Received Today?</span>
-          <div class="at-btns">
-            <div class="at-btn" id="pay-yes" onclick="setActivity('pay','yes')">Yes</div>
-            <div class="at-btn on-no" id="pay-no" onclick="setActivity('pay','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="pay-detail">
-          <div id="pay-entries"></div>
-          <button class="add-btn green" onclick="addPayment()">+ Add Payment</button>
-        </div>
-      </div>
-
-      <!-- Payment Follow-ups -->
-      <div class="field">
-        <div class="activity-toggle-row">
-          <span class="atl">Payment Follow-ups Done Today?</span>
-          <div class="at-btns">
-            <div class="at-btn" id="fup-yes" onclick="setActivity('fup','yes')">Yes</div>
-            <div class="at-btn on-no" id="fup-no" onclick="setActivity('fup','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="fup-detail">
-          <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Projects Followed Up <span class="opt">select all that apply</span></span>
-          <div id="msel-fup"></div>
-        </div>
-      </div>
+      <span class="lbl" style="font-size:10px;margin-bottom:5px;display:block">Payment follow-ups done today <span class="opt">tap the projects, if any</span></span>
+      <div id="msel-fup"></div>
 
     </div>
   </div>
@@ -518,64 +464,18 @@ textarea{min-height:62px;resize:vertical;}
       <span class="section-title">Other Activities</span>
     </div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:6px">Mark each activity Yes/No. If Yes, add the project(s) involved with notes for each.</p>
-
-      <!-- Vendor Coordination -->
-      <div class="field">
-        <div class="activity-toggle-row" style="padding-top:0">
-          <span class="atl">Vendor Coordination</span>
-          <div class="at-btns">
-            <div class="at-btn" id="vendor-yes" onclick="setActivity('vendor','yes')">Yes</div>
-            <div class="at-btn on-no" id="vendor-no" onclick="setActivity('vendor','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="vendor-detail">
-          <div id="vendor-entries"></div>
-          <button class="add-btn teal" onclick="addActEntry('vendor')">+ Add Project</button>
-        </div>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 10px">Only add what you did today — leave the rest empty.</p>
+      <div id="vendor-entries"></div>
+      <div id="siteissues-entries"></div>
+      <div id="tncp-entries"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="add-btn teal" onclick="addActEntry('vendor')" style="flex:1;min-width:140px">+ Vendor coordination</button>
+        <button class="add-btn teal" onclick="addActEntry('siteissues')" style="flex:1;min-width:140px">+ Site issue addressed</button>
+        <button class="add-btn teal" onclick="addActEntry('tncp')" style="flex:1;min-width:140px">+ TnCP coordination</button>
       </div>
-
-      <!-- Site Issues Addressed -->
-      <div class="field">
-        <div class="activity-toggle-row">
-          <span class="atl">Site Issues Addressed</span>
-          <div class="at-btns">
-            <div class="at-btn" id="siteissues-yes" onclick="setActivity('siteissues','yes')">Yes</div>
-            <div class="at-btn on-no" id="siteissues-no" onclick="setActivity('siteissues','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="siteissues-detail">
-          <div id="siteissues-entries"></div>
-          <button class="add-btn teal" onclick="addActEntry('siteissues')">+ Add Project</button>
-        </div>
-      </div>
-
-      <!-- TnCP Coordination -->
-      <div class="field">
-        <div class="activity-toggle-row">
-          <span class="atl">TnCP Coordination</span>
-          <div class="at-btns">
-            <div class="at-btn" id="tncp-yes" onclick="setActivity('tncp','yes')">Yes</div>
-            <div class="at-btn on-no" id="tncp-no" onclick="setActivity('tncp','no')">No</div>
-          </div>
-        </div>
-        <div class="activity-detail" id="tncp-detail">
-          <div id="tncp-entries"></div>
-          <button class="add-btn teal" onclick="addActEntry('tncp')">+ Add Project</button>
-        </div>
-      </div>
-
-      <!-- BNI Activity — simple Yes/No only -->
-      <div class="field">
-        <div class="activity-toggle-row">
-          <span class="atl">BNI Activity</span>
-          <div class="at-btns">
-            <div class="at-btn" id="bni-yes" onclick="setActivity('bni','yes')">Yes</div>
-            <div class="at-btn on-no" id="bni-no" onclick="setActivity('bni','no')">No</div>
-          </div>
-        </div>
-      </div>
-
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="bni-check" style="width:auto;margin:0"> BNI activity today
+      </label>
     </div>
   </div>
 
@@ -601,18 +501,9 @@ textarea{min-height:62px;resize:vertical;}
       <span class="section-title">Monthly Client Feedback</span>
     </div>
     <div class="section-body">
-      <div class="activity-toggle-row" style="padding-top:0">
-        <span class="atl">Monthly feedback collected today?</span>
-        <div class="at-btns">
-          <div class="at-btn" id="fb-yes" onclick="setFeedback('yes')">Yes</div>
-          <div class="at-btn on-no" id="fb-no" onclick="setFeedback('no')">No</div>
-        </div>
-      </div>
-      <div class="activity-detail" id="fb-detail">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Record monthly feedback per project/client. Add a block for each.</p>
-        <div id="fb-blocks"></div>
-        <button class="add-btn blue" onclick="addFeedbackBlock()">+ Add Project Feedback</button>
-      </div>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 10px">Only when you collected a client's monthly feedback today — one block per project.</p>
+      <div id="fb-blocks"></div>
+      <button class="add-btn blue" onclick="addFeedbackBlock()">+ Add client feedback</button>
     </div>
   </div>
 
@@ -903,7 +794,7 @@ function renderMyTasks(){
         <label><input type="radio" name="mt-r-${i}" value="Done" onchange="toggleMtStatus(${i},this)"><span class="mt-btn done">Done</span></label>
       </div>
       <div id="mt-hrstaken-${i}" style="margin-top:8px">
-        <div class="lbl" style="margin-bottom:4px">Hours taken <span style="color:#C0392B">*</span></div>
+        <div class="lbl" style="margin-bottom:4px">Hours taken <span class="opt">optional</span></div>
         <input type="number" class="mt-hrstaken-${i}" min="0.25" max="16" step="0.25" placeholder="e.g. 3" style="width:100px">
       </div>
       ${overdue ? (t.delayReason ? `
@@ -1280,11 +1171,6 @@ function setLeadStatus(id, status) {
 // attendance import (Part B) — matches dpr.html Section 4 / DPER's per-project
 // visit block.
 // ════════════════════════════════════════
-function toggleLateReq(){
-  const isLate = document.querySelector('input[name=ontime]:checked')?.value === 'No';
-  const wrap = document.getElementById('late-req-wrap');
-  if (wrap) wrap.style.display = isLate ? 'block' : 'none';
-}
 const FW_TYPES=['Site Visit','Meeting','Material Selection'];
 function fwRate(t){ return (t==='Site Visit'||t==='Material Selection')?2:1; }
 function fwHours(start,end){
@@ -1483,6 +1369,7 @@ function buildAgendaWA(id) {
 function generateAllWA() {
   const blocks=document.querySelectorAll('.agenda-block');
   const c=document.getElementById('wa-list');
+  if(!c) return;   // the WhatsApp messages section was removed (2026-10-16)
   if(!blocks.length){
     c.innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
     return;
@@ -1510,18 +1397,8 @@ function copyWA(id){
 // ════════════════════════════════════════
 // OTHER ACTIVITIES — Section 6
 // ════════════════════════════════════════
-// keys whose "Yes" just reveals a panel with no auto-added entry row
-const NO_AUTO_ENTRY = ['bni','fup'];
-function setActivity(key, val) {
-  document.getElementById(key+'-yes').className='at-btn'+(val==='yes'?' on-yes':'');
-  document.getElementById(key+'-no').className='at-btn'+(val==='no'?' on-no':'');
-  const detail=document.getElementById(key+'-detail');
-  if(detail) detail.classList.toggle('open', val==='yes');   // BNI has no detail panel
-  if(val!=='yes' || NO_AUTO_ENTRY.includes(key)) return;
-  if(key==='pay'){ if(!document.querySelector('#pay-entries .entry-row')) addPayment(); }
-  else if(key==='bills'){ if(!document.querySelector('#bills-entries .entry-row')) addBill(); }
-  else { const c=document.getElementById(key+'-entries'); if(c && !c.querySelector('.entry-row')) addActEntry(key); }
-}
+// 2026-10-16: the Yes/No toggles are gone — Finance, Other Activities and
+// Feedback are "Yes" exactly when something was added (BNI: its checkbox).
 
 // ── Bills repeater (project + amount) ──────────────────────
 let billCount=0;
@@ -1530,6 +1407,7 @@ function addBill(){
   const div=document.createElement('div');
   div.className='entry-row'; div.id='bill-'+id;
   div.innerHTML=`
+    <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Bill raised</div>
     <div class="entry-top">
       <select id="bill-proj-${id}">${projOptionsHtml()}</select>
       <button class="entry-x" onclick="document.getElementById('bill-${id}').remove()">✕</button>
@@ -1561,6 +1439,7 @@ function addPayment(){
   const div=document.createElement('div');
   div.className='entry-row'; div.id='pay-'+id;
   div.innerHTML=`
+    <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Payment received</div>
     <div class="entry-top">
       <select id="pay-proj-${id}">${projOptionsHtml()}</select>
       <button class="entry-x" onclick="document.getElementById('pay-${id}').remove()">✕</button>
@@ -1590,7 +1469,9 @@ function addActEntry(act){
   const id=act+'-'+actEntryCount[act];
   const div=document.createElement('div');
   div.className='entry-row'; div.id='ae-'+id;
+  const ACT_LABEL={vendor:'Vendor coordination', siteissues:'Site issue addressed', tncp:'TnCP coordination'};
   div.innerHTML=`
+    <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${ACT_LABEL[act]||act}</div>
     <div class="entry-top">
       <select id="ae-proj-${id}">${projOptionsHtml()}</select>
       <button class="entry-x" onclick="document.getElementById('ae-${id}').remove()">✕</button>
@@ -1609,8 +1490,9 @@ function collectActEntries(act){
   return out;
 }
 function collectActivity(act){
-  const on=document.getElementById(act+'-yes')?.classList.contains('on-yes');
-  return {on:on?'Yes':'No', entries:on?collectActEntries(act):[]};
+  if (act === 'bni') return {on: document.getElementById('bni-check')?.checked ? 'Yes' : 'No', entries: []};
+  const entries = collectActEntries(act);
+  return {on: entries.length ? 'Yes' : 'No', entries: entries};
 }
 function collectActivities(){
   return {
@@ -1706,12 +1588,6 @@ function setNIPri(id, val) {
 // MONTHLY CLIENT FEEDBACK — Section 8
 // ════════════════════════════════════════
 let fbCount=0;
-function setFeedback(val){
-  document.getElementById('fb-yes').className='at-btn'+(val==='yes'?' on-yes':'');
-  document.getElementById('fb-no').className='at-btn'+(val==='no'?' on-no':'');
-  document.getElementById('fb-detail').classList.toggle('open', val==='yes');
-  if(val==='yes' && !document.querySelector('#fb-blocks .fb-block')) addFeedbackBlock();
-}
 
 // rating scale: 1..n buttons with left/right anchor labels
 function rateScale(id, field, n, leftLbl, rightLbl){
@@ -1806,7 +1682,6 @@ function addFeedbackBlock(){
 }
 
 function collectFeedback(){
-  if(!document.getElementById('fb-yes')?.classList.contains('on-yes')) return [];
   const out=[];
   document.querySelectorAll('#fb-blocks .fb-block').forEach(b=>{
     const id=b.id.replace('fb-','');
@@ -1914,20 +1789,19 @@ function collectAgendas() {
 }
 
 function collectFinance() {
-  const billsOn=document.getElementById('bills-yes')?.classList.contains('on-yes');
-  const payOn  =document.getElementById('pay-yes')?.classList.contains('on-yes');
-  const fupOn  =document.getElementById('fup-yes')?.classList.contains('on-yes');
-  const bills  =billsOn?collectBills():[];
-  const fupProj=fupOn?getMsel('fup'):[];
+  // "Yes" = something was added (the Yes/No toggles were removed 2026-10-16).
+  const bills  =collectBills();
+  const payments=collectPayments();
+  const fupProj=getMsel('fup');
   return {
-    billsRaised    : billsOn?'Yes':'No',
+    billsRaised    : bills.length?'Yes':'No',
     bills          : bills,
     billsCount     : bills.length,
     billsAmount    : bills.reduce((s,b)=>s+(b.amount||0),0),
     billsProjects  : bills.map(b=>b.project).filter(Boolean),
-    paymentReceived: payOn?'Yes':'No',
-    payments       : payOn?collectPayments():[],
-    followupsDone  : fupOn?'Yes':'No',
+    paymentReceived: payments.length?'Yes':'No',
+    payments       : payments,
+    followupsDone  : fupProj.length?'Yes':'No',
     followupCount  : fupProj.length,
     followupProjects: fupProj,
   };
@@ -1995,9 +1869,6 @@ function collectDraftData(){
   return {
     savedAt: new Date().toISOString(), date: g('f-date')?.value||'',
     fwBlocks, contactBlocks, agendaBlocks, newIssBlocks,
-    ontime: document.querySelector('input[name=ontime]:checked')?.value||'',
-    lateInformed: document.querySelector('input[name=late-informed]:checked')?.value||'',
-    latePunchIn: g('late-punch-in')?.value||'', lateReqReason: g('late-req-reason')?.value||'',
   };
 }
 function draftHasContent(d){
@@ -2029,8 +1900,8 @@ function pushServerDraft(){
 function flushDraftNow(){ clearTimeout(_draftSoonT); saveDraft(); }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDraftNow(); });
 window.addEventListener('pagehide', flushDraftNow);
-document.addEventListener('input',  e=>{ if(e.target.closest('#fw-blocks')||e.target.closest('#contact-blocks')||e.target.closest('#agenda-blocks')||e.target.closest('#new-iss-blocks')||e.target.closest('#f-date')||e.target.closest('#late-req-wrap')) saveDraftSoon(); });
-document.addEventListener('change', e=>{ if(e.target.closest('#fw-blocks')||e.target.closest('#contact-blocks')||e.target.closest('#agenda-blocks')||e.target.closest('#new-iss-blocks')||e.target.id==='f-date'||e.target.closest('#late-req-wrap')||e.target.name==='ontime') saveDraftSoon(); });
+document.addEventListener('input',  e=>{ if(e.target.closest('#fw-blocks')||e.target.closest('#contact-blocks')||e.target.closest('#agenda-blocks')||e.target.closest('#new-iss-blocks')||e.target.closest('#f-date')) saveDraftSoon(); });
+document.addEventListener('change', e=>{ if(e.target.closest('#fw-blocks')||e.target.closest('#contact-blocks')||e.target.closest('#agenda-blocks')||e.target.closest('#new-iss-blocks')||e.target.id==='f-date') saveDraftSoon(); });
 document.addEventListener('click',  e=>{ if(e.target.closest('.chip')||e.target.closest('.type-btn')||e.target.closest('.kind-btn')) saveDraftSoon(); });
 
 async function loadDraftAndCheck(){
@@ -2133,13 +2004,6 @@ function resumeDraft(){
     } catch(e){ hadError = true; console.error('resumeDraft: new issue block failed', e); } });
   });
 
-  section('accountability', () => {
-    if (d.ontime) { const r = document.querySelector(`input[name=ontime][value="${d.ontime}"]`); if (r) { r.checked = true; toggleLateReq(); } }
-    if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
-    if (d.latePunchIn && g('late-punch-in')) g('late-punch-in').value = d.latePunchIn;
-    if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
-  });
-
   toast(hadError ? '⚠ Draft restored, but some fields failed — check the form and your browser console' : 'Draft restored ✓');
 }
 function discardDraft(){
@@ -2157,13 +2021,7 @@ function clearDraft(){
 
 async function submitAll() {
   if(!googleUser){ toast('Sign in first'); return; }
-  const missingHours = flagMissingHoursCRM();
-  if (missingHours) {
-    missingHours.scrollIntoView({behavior:'smooth', block:'center'});
-    missingHours.focus();
-    toast('Enter the hours taken for every task marked Done before submitting.', 5500);
-    return;
-  }
+  // Hours taken is optional since 2026-10-16 (same as the DPR).
   const date=document.getElementById('f-date')?.value||'';
 
   document.getElementById('submit-btn').disabled=true;
@@ -2193,16 +2051,6 @@ async function submitAll() {
       } catch(e){ scoringErrors.push('task status update: network error'); }
     }
 
-    // 1c. Late-arrival context (replaces messaging Siddharth on WhatsApp) —
-    // logged whenever Arrived-on-time is No; Siddharth decides excuse-vs-absent
-    // when reviewing the Paytime import, not here.
-    if (document.querySelector('input[name=ontime]:checked')?.value === 'No') await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'submitLateRequest', member:crmUser, email:googleUser?.email||'',
-        date:new Date().toISOString().substring(0,10),
-        informedBefore9: document.querySelector('input[name=late-informed]:checked')?.value||'No',
-        reportedPunchIn: document.getElementById('late-punch-in')?.value||'',
-        reason: document.getElementById('late-req-reason')?.value.trim()||''})}).catch(()=>{});
-
     // 2. Main CRM submission
     const leads    = collectLeads();
     const followups= collectLeadUpdates();
@@ -2229,7 +2077,6 @@ async function submitAll() {
         date, time  : new Date().toTimeString().substring(0,5),
         member      : crmUser,
         email       : googleUser?.email||'',
-        arrivedOnTime: document.querySelector('input[name=ontime]:checked')?.value||'',
         newLeads    : JSON.stringify(leads),
         leadFollowups: JSON.stringify(followups),
         contacts    : JSON.stringify(contacts),
@@ -2268,7 +2115,7 @@ async function submitAll() {
       `CRM report submitted by ${crmUser}<br>`+
       (leads.length?`📋 ${leads.length} new lead${leads.length!==1?'s':''} added to LMS<br>`:'')+
       (contacts.length?`📞 ${contacts.length} client connection${contacts.length!==1?'s':''} logged<br>`:'')+
-      (agendas.length?`📅 ${agendas.length} meeting agenda${agendas.length!==1?'s':''} ready to send<br>`:'')+
+      (agendas.length?`📅 ${agendas.length} meeting${agendas.length!==1?'s':''} / visit${agendas.length!==1?'s':''} planned<br>`:'')+
       (billsAmt?`🧾 ₹${billsAmt.toLocaleString('en-IN')} billed today<br>`:'')+
       (payAmt?`💰 ₹${payAmt.toLocaleString('en-IN')} payment received<br>`:'')+
       (newIssues.length?`🚩 ${newIssues.length} issue${newIssues.length!==1?'s':''} logged<br>`:'')+
@@ -2294,13 +2141,10 @@ function resetForm() {
    'bills-entries','pay-entries','vendor-entries','siteissues-entries','tncp-entries','bni-entries','fb-blocks'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.innerHTML='';
   });
-  // Reset all Yes/No toggles back to No + close details
-  ['bills','pay','fup','vendor','siteissues','tncp','bni'].forEach(k=>setActivity(k,'no'));
-  setFeedback('no');
+  const bniC = document.getElementById('bni-check'); if (bniC) bniC.checked = false;
   // Rebuild project multi-selects (clears selection)
   Object.keys(mselState).forEach(k=>mselState[k]=[]);
   buildMsels();
-  document.getElementById('wa-list').innerHTML='<div class="no-issues">Add tomorrow\'s plans above to generate messages…</div>';
   leadCount=contCount=agendaCount=issCount=payCount=billCount=fbCount=0;
   actEntryCount.vendor=actEntryCount.siteissues=actEntryCount.tncp=actEntryCount.bni=0;
   issueActions={}; openLeads=[]; newProjects=[];
