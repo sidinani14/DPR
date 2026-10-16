@@ -9408,7 +9408,9 @@ function getAmanWeeklyStats(weekStart, member) {
     {max:LEAD_MAX,     val:s_lead,     active:leadActive},
     {max:REV_MAX,      val:s_rev,      active:revActive},
     {max:COORD_MAX,    val:s_coord,    active:true},
-    {max:FEEDBACK_MAX, val:s_feedback, active:true},
+    // Monthly Client Feedback was removed from the CRM form (2026-10-16), so
+    // it can't be earned any more — excluded; Output rescales over the rest.
+    {max:FEEDBACK_MAX, val:s_feedback, active:false},
   ];
   var activeMax = outParts.reduce(function(s2,p){ return s2 + (p.active?p.max:0); }, 0);
   var activeVal = outParts.reduce(function(s2,p){ return s2 + (p.active?p.val:0); }, 0);
@@ -9435,7 +9437,12 @@ function getAmanWeeklyStats(weekStart, member) {
   var reliabilityPenalty = leadSlaMissed * 1;
   var s_reliability = Math.max(0, r1(10 - reliabilityPenalty));
 
-  var total    = r1(output + s_dpr + s_punct + s_hrs + s_client_sat + s_reliability);
+  // 2026-10-16: feedback collection left the CRM form, so Client Satisfaction
+  // (feedback-count based) is no longer part of the total — same as the
+  // weekly report already computes it: Punctuality /15 and Hours /10 again.
+  s_punct = r1(Math.min(15, punctBase));
+  s_hrs   = r1(Math.min(10, hrsBase));
+  var total    = r1(output + s_dpr + s_punct + s_hrs + s_reliability);
 
   return {
     member        : who,
@@ -10330,7 +10337,7 @@ function submitAmanCRM(data) {
     // no longer duplicated as a redundant boolean index. ──
     var subId = 'CRM-' + Utilities.getUuid().substring(0,8).toUpperCase();
     var summarySheet = getOrCreate(SUMMARY_TAB, writeSummaryHeaders);
-    prependRow(summarySheet, [ realToday, now, member, data.email || '', data.arrivedOnTime || '', '', '', '' ]);
+    prependRow(summarySheet, [ realToday, now, member, data.email || '', data.arrivedOnTime || '', '', '', data.mood || '' ]);   // H Mood (2026-10-16)
     Logger.log('DAILY_SUMMARY written for Aman: ' + subId);
 
     // ── 1a. Client connections + activities → CRM_LOG (one row each) ──

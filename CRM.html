@@ -167,6 +167,12 @@ textarea{min-height:62px;resize:vertical;}
 .at-btn{padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);}
 .at-btn.on-yes{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .at-btn.on-no{background:var(--surface2);border-color:var(--border2);color:var(--text3);}
+.mood-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.mood-opt{text-align:center;cursor:pointer}
+.mood-opt input{display:none}
+.mood-emoji{font-size:22px;width:100%;padding:8px 0;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);display:block;transition:all .15s;line-height:1}
+.mood-opt input:checked+.mood-emoji{border-color:var(--accent);background:var(--accent-light);transform:scale(1.08)}
+.mood-name{font-size:10px;color:var(--text3);margin-top:3px}
 .section.collapsible>.section-head{cursor:pointer;user-select:none;}
 .section.collapsible>.section-head::after{content:'▾';color:#fff;font-size:12px;margin-left:8px;transition:transform .15s;}
 .section.collapsible.collapsed>.section-head::after{transform:rotate(-90deg);}
@@ -495,16 +501,21 @@ textarea{min-height:62px;resize:vertical;}
     </div>
   </div>
 
-  <!-- ── S8: Monthly Client Feedback ──────────────── -->
+  <!-- ── S10: Mood ──────────────── -->
   <div class="section">
-    <div class="section-head" style="background:#6A1B9A">
+    <div class="section-head">
       <span class="section-num" style="background:rgba(255,255,255,0.2)">10</span>
-      <span class="section-title">Monthly Client Feedback</span>
+      <span class="section-title">How was your day?</span>
     </div>
     <div class="section-body">
-      <p style="font-size:12px;color:var(--text2);margin:0 0 10px">Only when you collected a client's monthly feedback today — one block per project.</p>
-      <div id="fb-blocks"></div>
-      <button class="add-btn blue" onclick="addFeedbackBlock()">+ Add client feedback</button>
+      <!-- Monthly Client Feedback section removed 2026-10-16 (Siddharth). -->
+      <div class="mood-grid">
+        <label class="mood-opt"><input type="radio" name="mood" value="1"><span class="mood-emoji">😞</span><div class="mood-name">Rough</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="2"><span class="mood-emoji">😐</span><div class="mood-name">Okay</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="3" checked><span class="mood-emoji">🙂</span><div class="mood-name">Good</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="4"><span class="mood-emoji">😊</span><div class="mood-name">Great</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="5"><span class="mood-emoji">🔥</span><div class="mood-name">Crushing it</div></label>
+      </div>
     </div>
   </div>
 
@@ -2078,6 +2089,7 @@ async function submitAll() {
         date, time  : new Date().toTimeString().substring(0,5),
         member      : crmUser,
         email       : googleUser?.email||'',
+        mood        : document.querySelector('input[name=mood]:checked')?.value||'3',
         newLeads    : JSON.stringify(leads),
         leadFollowups: JSON.stringify(followups),
         contacts    : JSON.stringify(contacts),
