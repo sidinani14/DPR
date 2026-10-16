@@ -312,31 +312,18 @@ textarea{resize:vertical;min-height:78px;line-height:1.55}
     </div>
   </div>
 
-  <!-- Section 7: Anything else (2026-10-15: arrival question, referrals, deliverables
-       list and mood removed — arrival comes from the biometric, deliverables
-       repeated what Sections 2–4 already record) -->
+  <!-- Section 7: mood only (2026-10-16). The arrival question, referrals,
+       deliverables list, blockers box and late note were removed — arrival
+       comes from the biometric; deliverables repeated Sections 2–4. -->
   <div class="card">
-    <div class="card-head"><div class="card-num">7</div><div class="card-title">Anything else?</div><div class="card-sub">optional</div></div>
+    <div class="card-head"><div class="card-num">7</div><div class="card-title">How was your day?</div></div>
     <div class="card-body">
-      <div class="field">
-        <div class="lbl">Anything blocking you? <span class="opt">optional</span></div>
-        <textarea id="blockers" style="min-height:56px" placeholder="Waiting on structural engineer / client not responding / need direction on..."></textarea>
-      </div>
-      <div class="divider"></div>
-      <div class="field">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2)">
-          <input type="checkbox" id="late-toggle" onchange="toggleLateReq()" style="width:auto;margin:0">
-          I came in late and want to add a note <span class="opt">optional</span>
-        </label>
-        <div id="late-req-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm)">
-          <div class="lbl" style="margin-bottom:6px">Did you inform us before 9 AM?</div>
-          <div class="radio-group" style="margin-bottom:10px">
-            <label class="radio-opt"><input type="radio" name="late-informed" value="Yes"><div class="rdot"></div><div class="rtxt">Yes</div></label>
-            <label class="radio-opt"><input type="radio" name="late-informed" value="No"><div class="rdot"></div><div class="rtxt">No</div></label>
-          </div>
-          <div class="lbl" style="margin-bottom:6px">Reason</div>
-          <textarea id="late-req-reason" placeholder="Traffic, site visit first, personal…" style="min-height:44px"></textarea>
-        </div>
+      <div class="mood-grid">
+        <label class="mood-opt"><input type="radio" name="mood" value="1"><span class="mood-emoji">😞</span><div class="mood-name">Rough</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="2"><span class="mood-emoji">😐</span><div class="mood-name">Okay</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="3" checked><span class="mood-emoji">🙂</span><div class="mood-name">Good</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="4"><span class="mood-emoji">😊</span><div class="mood-name">Great</div></label>
+        <label class="mood-opt"><input type="radio" name="mood" value="5"><span class="mood-emoji">🔥</span><div class="mood-name">Crushing it</div></label>
       </div>
     </div>
   </div>
@@ -1140,15 +1127,12 @@ function collectDraftData(){
     assigned: window._assignedLoaded ? collectAssignedDraft() : ((window._pendingAssignedDraft) || (window._lastDraftAssigned) || []),
     projBlocks, fwBlocks, connBlocks, billBlocks,
     billraised: document.querySelector('input[name=billraised]:checked')?.value||'No',
-    lateNote: !!g('late-toggle')?.checked,
-    lateInformed: document.querySelector('input[name=late-informed]:checked')?.value||'',
-    lateReqReason: g('late-req-reason')?.value||'',
-    blockers: g('blockers')?.value||'',
+    mood: document.querySelector('input[name=mood]:checked')?.value||'',
   };
 }
 function draftHasContent(d){
   if (!d) return false;
-  return !!(d.blockers || d.lateReqReason || (d.assigned||[]).length ||
+  return !!((d.assigned||[]).length ||
     (d.projBlocks||[]).some(p=>p.proj || (p.tasks||[]).some(t=>t.type||t.area)) ||
     (d.fwBlocks||[]).some(f=>f.proj||f.notes) ||
     (d.connBlocks||[]).some(c=>c.proj) || (d.billBlocks||[]).some(b=>b.proj));
@@ -1316,10 +1300,7 @@ function resumeDraft(){
   });
 
   section('Section 7 (anything else)', () => {
-    if ((d.lateNote || d.ontime === 'No') && g('late-toggle')) { g('late-toggle').checked = true; toggleLateReq(); }
-    if (d.lateInformed) { const r2 = document.querySelector(`input[name=late-informed][value="${d.lateInformed}"]`); if (r2) r2.checked = true; }
-    if (d.lateReqReason && g('late-req-reason')) g('late-req-reason').value = d.lateReqReason;
-    if (d.blockers && g('blockers')) g('blockers').value = d.blockers;
+    if (d.mood) { const mr = document.querySelector(`input[name=mood][value="${d.mood}"]`); if (mr) mr.checked = true; }
   });
 
   section('score recalculation', () => { calcScore(); });
@@ -1613,8 +1594,7 @@ function collectData() {
     'Member'            : member,
     'Member Email'      : googleUser?googleUser.email:'',
     'Assigned Statuses' : JSON.stringify(assignedStatuses),
-    'Arrived on Time'   : document.getElementById('late-toggle')?.checked ? 'Late (note added)' : '',
-    'Blockers'          : document.getElementById('blockers').value.trim(),
+    'Mood Score'        : document.querySelector('input[name=mood]:checked')?.value||'3',
     'Total Weighted Pts': parseFloat(document.getElementById('sc-pts').textContent)||0,
     'Total Task Units'  : parseInt(document.getElementById('sc-units').textContent)||0,
     'Projects Count'    : parseInt(document.getElementById('sc-proj').textContent)||0,
@@ -1823,15 +1803,6 @@ async function submitForm() {
         body: JSON.stringify({action:'logConnections', member, connections:conns, reportDay:data['Report Date']})}).catch(()=>{});
       if (bills.length) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({action:'submitBillables', member, billables:bills, reportDay:data['Report Date']})}).catch(()=>{});
-      // Late-arrival context (replaces messaging Siddharth on WhatsApp);
-      // Siddharth decides excuse-vs-absent when he reviews the Paytime import.
-      // Optional since 2026-10-15 — only when "I came in late" was ticked.
-      if (document.getElementById('late-toggle')?.checked) await fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({action:'submitLateRequest', member, email:googleUser?.email||'',
-          date: data['Report Date'],
-          informedBefore9: document.querySelector('input[name=late-informed]:checked')?.value||'No',
-          reportedPunchIn: '',
-          reason: document.getElementById('late-req-reason')?.value.trim()||''})}).catch(()=>{});
     }
     document.getElementById('sending').classList.remove('show');
     document.getElementById('fin-pts').textContent=data['Total Weighted Pts'].toFixed(1);
@@ -1857,11 +1828,6 @@ async function submitForm() {
   }
 }
 
-function toggleLateReq(){
-  const isLate = !!document.getElementById('late-toggle')?.checked;
-  const wrap = document.getElementById('late-req-wrap');
-  if (wrap) wrap.style.display = isLate ? 'block' : 'none';
-}
 
 // ── Already submitted → correct it once (2026-10-15) ────────────────────
 // When the chosen day (reportday.js) is already filed, the form shows that
