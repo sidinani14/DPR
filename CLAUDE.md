@@ -335,6 +335,12 @@ Q Lead Approved) and refuses task requests + emails Siddharth if it changes.
   for Aman (never scored as delayed). Payment stages read from CONFIG cols V(Discipline)/
   W(Milestone) under a "PAYMENT STAGES" marker → readConfig.paymentStages/paymentDisciplines.
 
+## Visit/meeting points — CURRENT RULE (2026-11-23, Siddharth; supersedes the project-multiplier part below)
+- Points = hours × rate (site visit / material selection 2, meeting 1) × `seniorityMultiplier` (weekly target ÷ 6 ÷ 8, only when above 1). **No project multiplier** for visits or meetings any more: `calcVisitPts` ignores its `projectMult` argument.
+- **Assigned** visits and meetings (scheduler, missed-visit catch-up, CRM "Tomorrow's meetings") are created at a standard length: site visit 2 h, meeting 1 h (`standardVisitHours`). They carry G = hours, F = 1, I = `defaultVisitPts(type, assignee)`.
+- **When marked Done**, the actual hours logged replace the standard ones (user's choice).
+- `restampOpenVisitTaskPts` (manager action) re-applies the planned points to Not-Started visit tasks, e.g. after a target change.
+
 ## Senior-staff visit/meeting multiplier (built 2026-08)
 - Design task points already reflect a higher target for senior staff; visit/
   meeting points (`calcVisitPts`, hours × rate) never did — same rate for

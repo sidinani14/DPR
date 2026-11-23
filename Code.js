@@ -75,17 +75,32 @@ function getProjectMultiplier(projectNameOrId) {
 // multiplier only ever stacks on top of an actual seniority bump (sm > 1) —
 // per the 2026-08 decision, it does NOT start applying to everyone else's
 // visit/meeting points, only to the senior cohort this was built for.
+// 2026-11-23 (Siddharth): site visits and meetings are hours × rate ×
+// seniority ONLY — the project multiplier no longer applies to them (it
+// stacked on top for the senior cohort from 2026-08). projectMult is kept in
+// the signature so existing callers don't change, but it is ignored.
 function calcVisitPts(taskType, hours, member, projectMult) {
-  var t = String(taskType||'').trim();
+  var t = String(taskType||'').trim(), tl = t.toLowerCase();
   var h = parseFloat(hours) || 0;
   var rate = 0;
-  // Site Visit + Material Selection = ×2/hr; Meeting = ×1/hr
-  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection') rate = 2;
-  else if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting') rate = 1;
+  // Site Visit + Material Selection = ×2/hr; Meeting (incl. Client Meeting
+  // Regular/Special) = ×1/hr
+  if (VISIT_TYPES_ARCH.indexOf(t) > -1 || t === 'Site Visit' || t === 'Material Selection' || tl.indexOf('site visit') > -1) rate = 2;
+  else if (VISIT_TYPES_MTG.indexOf(t)  > -1 || t === 'Meeting' || tl.indexOf('meeting') > -1) rate = 1;
   else return 0;
   var sm = seniorityMultiplier(member);
-  var pm = sm > 1 ? (parseFloat(projectMult) || 1.0) : 1.0;
-  return Math.round(h * rate * sm * pm * 10) / 10;
+  return Math.round(h * rate * sm * 10) / 10;
+}
+
+// Standard length of an ASSIGNED visit/meeting (2026-11-23, Siddharth): a
+// client meeting is planned as 1 hour, a site visit as 2 hours. The task is
+// created with those hours × rate × the assignee's seniority as its points;
+// when it's marked Done the real hours logged replace them.
+function standardVisitHours(taskType) {
+  var tl = String(taskType||'').toLowerCase();
+  if (tl.indexOf('site visit') > -1 || tl.indexOf('material selection') > -1) return 2;
+  if (tl.indexOf('meeting') > -1) return 1;
+  return 0;
 }
 
 // Which rate-family a visit/meeting task type belongs to — 'site' (×2/hr) or
@@ -135,11 +150,10 @@ function visitFamily(taskType) {
 // reports it (same code path as always -- see updateTaskStatusesFromDPR /
 // createDoneTask's visit-pts recalculation) -- it's only ever the number
 // shown before that happens.
-function defaultVisitPts(taskType) {
-  var fam = visitFamily(taskType);
-  if (fam === 'site') return 3;
-  if (fam === 'meeting') return 1;
-  return 0;
+// 2026-11-23: standard hours (site visit 2 h, meeting 1 h) × rate × the
+// assignee's seniority — was a flat 3 / 1 for everyone.
+function defaultVisitPts(taskType, member) {
+  return calcVisitPts(taskType, standardVisitHours(taskType), member);
 }
 
 // Aman's Client Satisfaction /MAX (2026-08 explicit rule) — count of
@@ -2279,6 +2293,7 @@ function doPost(e) {
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
     if (data.action === 'debugRawTaskRows') return respond(debugRawTaskRows(data.project||''));
+    if (data.action === 'restampOpenVisitTaskPts') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(withLock(restampOpenVisitTaskPts)); }
     if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true)); }
     if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
     if (data.action === 'debugMemberWeek') return respond(debugMemberWeek(data.member||'', data.mon||'', data.sat||''));
@@ -5981,17 +5996,19 @@ function pushVisitTasks(cadence, history, openTasks) {
       var newId   = 'T-'+Utilities.getUuid().substring(0,8).toUpperCase();
       var isVisit = VISIT_TYPES_ARCH.indexOf(entry.visitType) > -1 ||
                     (entry.visitType||'').toLowerCase().indexOf('site visit') > -1;
-      var defPts  = defaultVisitPts(entry.visitType);
+      // Standard 2 h site visit / 1 h meeting × rate × this assignee's
+      // seniority (2026-11-23); replaced by real hours when marked Done.
+      var defPts  = defaultVisitPts(entry.visitType, assignee);
       asSheet.appendRow([
         newId,                    // A TaskID
         '',                       // B ProjectID
         entry.project,            // C ProjectName
         assignee,                 // D AssignedTo
         entry.visitType,          // E Stage/TaskType
-        pd.mult,                  // F Disc. Multiplier (number)
-        defPts,                   // G Stage Base Pts (placeholder — real hours × rate replaces this once logged)
+        1,                        // F Multiplier — not used for visits/meetings (hours × rate × seniority)
+        standardVisitHours(entry.visitType), // G = planned hours (real hours replace it when Done)
         1,                        // H Units (always 1 visit unit)
-        defPts,                   // I Weighted Pts (placeholder so it's visible on dashboard/heatmap before hours are logged)
+        defPts,                   // I Weighted Pts = planned hours × rate × seniority
         today,                    // J AssignedDate
         dueDate,                  // K Deadline
         '',                       // L Area
@@ -6190,10 +6207,10 @@ function flagMissedVisits(cadence, history, openTasks) {
         entry.project,            // C ProjectName
         entry.assignee,           // D AssignedTo
         entry.visitType,          // E Stage/TaskType
-        pd.mult||1,               // F Disc. Multiplier (number)
-        0,                        // G Stage Base Pts (0 — visit pts based on hours)
+        1,                        // F Multiplier — not used for visits/meetings
+        standardVisitHours(entry.visitType), // G = planned hours (2026-11-23)
         1,                        // H Units (always 1 visit unit)
-        0,                        // I Weighted Pts (0 placeholder)
+        defaultVisitPts(entry.visitType, String(entry.assignee||'').split(',')[0].trim()), // I planned hours × rate × seniority
         today,                    // J AssignedDate
         today,                    // K Deadline = today (overdue)
         '',                       // L Area
@@ -6403,7 +6420,7 @@ function backfillVisitDefaultPts(){
     if (selfStatus !== 'Not Started') continue;
     var curPts = parseFloat(r[8]) || 0;
     if (curPts !== 0) continue;
-    var defPts = defaultVisitPts(taskType);
+    var defPts = defaultVisitPts(taskType, String(r[3]||'').trim());
     sheet.getRange(i+1, 7).setValue(defPts); // G Stage Base Pts
     sheet.getRange(i+1, 9).setValue(defPts); // I Weighted Pts
     updated++;
@@ -6587,6 +6604,27 @@ function writeNextVisitDates(planSheet) {
     return [calcNextVisitDate(entry, getEffectiveLastVisitDate(entry, history), openTasks).date || ''];
   });
   planSheet.getRange(4, 9, vals.length, 1).setValues(vals);
+}
+
+// One-off (2026-11-23): give already-assigned, not-yet-started visit/meeting
+// tasks the new planned points (2 h site visit / 1 h meeting × rate × the
+// assignee's seniority, no project multiplier). Only Not Started rows —
+// anything with progress or reported hours is left alone.
+function restampOpenVisitTaskPts() {
+  var sheet = db().getSheetByName(ASSIGN_TAB), rows = sheet.getDataRange().getValues(), out = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i], type = String(r[4]||'').trim(), st = String(r[13]||'').trim();
+    if (!visitFamily(type) && !isVisitType(type)) continue;
+    if (st !== 'Not Started' && st !== '') continue;
+    var hrs = standardVisitHours(type), who = String(r[3]||'').trim();
+    if (!hrs || !who) continue;
+    var pts = defaultVisitPts(type, who);
+    if ((parseFloat(r[8])||0) === pts && (parseFloat(r[6])||0) === hrs && (parseFloat(r[5])||0) === 1) continue;
+    sheet.getRange(i+1, 6, 1, 4).setValues([[1, hrs, 1, pts]]);   // F mult · G hours · H units · I pts
+    out.push(String(r[0]) + ' · ' + r[2] + ' · ' + type + ' · ' + who + ' · ' + (parseFloat(r[8])||0) + ' → ' + pts);
+  }
+  try { CacheService.getScriptCache().remove('c_getAllTasks'); } catch (e) {}
+  return { status:'ok', updated: out.length, rows: out };
 }
 
 // ── Rebuild VISIT_PLANNER "Last Site Visit Date" from the real logs ──────
@@ -10878,8 +10916,8 @@ function createMeetingTasks(agendas, member, today) {
       var description = (ag.agenda || ag.purpose || type) +
                         (ag.time ? ' @ ' + ag.time : '') +
                         (ag.project ? ' — ' + ag.project : '');
-      var metaNotes = '[Auto: pts = hours logged in DPR — Site Visit ×2/hr, Meeting ×1/hr]';
-      var defPts = defaultVisitPts(type);
+      var metaNotes = '[Auto: pts = hours logged in DPR × rate × seniority — Site Visit ×2/hr, Meeting ×1/hr]';
+      var defPts = defaultVisitPts(type, person);   // planned 2 h visit / 1 h meeting × seniority
       sheet.appendRow([
         newId,                        // A TaskID
         '',                           // B ProjectID
@@ -10887,9 +10925,9 @@ function createMeetingTasks(agendas, member, today) {
         person,                       // D AssignedTo
         type,                         // E Stage/Type
         1,                            // F Disc Multiplier
-        defPts,                       // G Base Pts (placeholder — real hours × rate replaces this once logged)
+        standardVisitHours(type),     // G = planned hours (real hours replace it when Done)
         1,                            // H Units
-        defPts,                       // I Weighted Pts (placeholder so it's visible on dashboard/heatmap before hours are logged)
+        defPts,                       // I Weighted Pts = planned hours × rate × seniority
         today,                        // J AssignedDate
         ag.date || today,             // K Deadline (meeting/visit date)
         description,                  // L Description (agenda/purpose)
