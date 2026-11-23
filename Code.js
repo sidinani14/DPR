@@ -1134,7 +1134,18 @@ function writeBlockLogHeaders(sheet){
   sheet.getRange(1,1,1,h.length).setValues([h]).setBackground('#8B2020').setFontColor('#FFF').setFontWeight('bold');
   sheet.setFrozenRows(1);
 }
-var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Khushi Gupta', 'Aashi Agrawal', 'Achal Rathore'];  // departed, or (Khushi Gupta) an unpaid intern learning at her own pace, not tracked — hidden from all forms & dashboards
+var EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Aashi Agrawal', 'Achal Rathore', 'Deepak Soni'];  // departed — hidden from all forms & dashboards, no sign-in (Deepak Soni left 2026-11)
+// Joiners who start filing on a set day (Siddharth, 2026-11-23): until then
+// they're treated exactly like EXCLUDED_MEMBERS — no sign-in, not on any
+// form/roster, never chased by reminders. From that day they're a normal
+// member; getWeeklyStats / weeklyreport.html don't score the week they start in.
+var MEMBER_START_DATES = { 'Khushi Gupta': '2026-12-05' };
+function isExcludedMember(name) {
+  var n = String(name||'').trim();
+  if (EXCLUDED_MEMBERS.indexOf(n) !== -1) return true;
+  var sd = MEMBER_START_DATES[n];
+  return !!sd && localDayNow() < sd;
+}
 var APPROVAL_FORM_URL = 'https://team.ideaformdesignstudio.com/approval.html';
 var DAYS_BEFORE_ARCH  = 90;
 
@@ -1306,7 +1317,7 @@ function doOptions(e) {
 // ════════════════════════════════════════════════════════════════
 var AUTH_CLIENT_ID = '48052407111-mantkqn708ejp5otfc34nch2ngl8o9ot.apps.googleusercontent.com';
 var AUTH_ALLOWED = {
-  'ar.deepaksoni@gmail.com':1, 'himanshu.malviya@ideaform.in':1,   // Achal Rathore + Aashi Agrawal removed (resigned)
+  'himanshu.malviya@ideaform.in':1,   // Achal Rathore + Aashi Agrawal (resigned) and Deepak Soni (left 2026-11) removed
   'poorvi.goyal@ideaform.in':1, 'sahil.maurya@ideaform.in':1, 'aaditya.koshti@ideaform.in':1,
   'aman.raghuwanshi@ideaform.in':1, 'bhavesh.bhagwat@ideaform.in':1,
   'siddharth@ideaform.in':1, 'sidinani14@gmail.com':1, 'astha@ideaform.in':1, 'astha.uch@gmail.com':1
@@ -1481,7 +1492,7 @@ function getAllowedEmails() {
         var active = String(rows[i][5] || '').trim().toLowerCase();
         // Departed members (EXCLUDED_MEMBERS) lose sign-in access too, even if
         // their TEAM row was never set Active = No.
-        if (email && active !== 'no' && EXCLUDED_MEMBERS.indexOf(String(rows[i][0]||'').trim()) === -1) set[email] = 1;
+        if (email && active !== 'no' && !isExcludedMember(rows[i][0])) set[email] = 1;
       }
     }
     // (Freelancers are TEAM rows too, so they're in here — what they can
@@ -2293,6 +2304,13 @@ function doPost(e) {
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
     if (data.action === 'debugRawTaskRows') return respond(debugRawTaskRows(data.project||''));
+    if (data.action === 'debugTeamRow') {   // manager-only, read-only: one TEAM row as stored (incl. excluded / not-yet-started members)
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'});
+      var tr0 = db().getSheetByName(TEAM_TAB).getDataRange().getValues(), want0 = String(data.name||'').trim().toLowerCase(), hit0 = [];
+      for (var t0 = 1; t0 < tr0.length; t0++) if (String(tr0[t0][0]||'').trim().toLowerCase().indexOf(want0) > -1)
+        hit0.push({ row:t0+1, name:tr0[t0][0], role:tr0[t0][1], weeklyTarget:tr0[t0][2], email:tr0[t0][4], active:tr0[t0][5], excludedNow:isExcludedMember(tr0[t0][0]), startDate:MEMBER_START_DATES[String(tr0[t0][0]).trim()]||'' });
+      return respond({status:'ok', rows:hit0});
+    }
     if (data.action === 'restampOpenVisitTaskPts') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(withLock(restampOpenVisitTaskPts)); }
     if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true)); }
     if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
@@ -2704,8 +2722,8 @@ function getLists() {
       var active = String(tRows[i][5] || '').trim().toLowerCase();
       var wtgt   = parseFloat(tRows[i][2]) || 0;   // C WeeklyTarget
       if (!name) continue;
-      // Departed — removed from all forms & dashboards
-      if (EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
+      // Departed, or not started yet — removed from all forms & dashboards
+      if (isExcludedMember(name)) continue;
       // Freelance architects (Role = Freelancer) are not studio team: kept out
       // of DPR / Plan Tasks / dashboard / attendance / weekly-report rosters.
       // Listed separately so the meeting log can still tick them as attendees.
@@ -2740,7 +2758,7 @@ function getLists() {
     }
   }
 
-  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets, freelancers:freelancers, roles:roles };
+  return { team:team, emails:emails, allMembers:allMembers, projects:projects, targets:targets, freelancers:freelancers, roles:roles, startDates:MEMBER_START_DATES };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -7332,7 +7350,8 @@ function getWeeklyStats(weekStart) {
     var role   = String(tRows[ti][1] || '').trim();
     var wkTgt  = parseFloat(tRows[ti][2]) || 50;
     var active = String(tRows[ti][5] || '').trim().toLowerCase();
-    if (!name || active === 'no' || DIRECTOR_NAMES[name] || EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
+    if (!name || active === 'no' || DIRECTOR_NAMES[name] || isExcludedMember(name)) continue;
+    if (MEMBER_START_DATES[name] && MEMBER_START_DATES[name] > mon) continue;   // started mid-week or later — the week they start in isn't scored
     if (isFreelancerRole(role)) continue;   // freelance architects aren't scored (no DPR / targets)
 
     // Tasks assigned this week (AssignedDate in Mon-Sat)

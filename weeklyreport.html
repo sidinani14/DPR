@@ -215,6 +215,9 @@ table.tasks tbody td:last-child,table.tasks tbody td:nth-last-child(2){text-alig
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyHnaAJ35ry0ot5HrWfz-IGaiM5algp4LLbTU8YtUwb9cvGhbCXkQZOYgMnY2CQ-Y5vA/exec';
 const INCLUDE_DEEPAK_AMAN = true;   // Deepak & Aman included this week
+// Deepak Soni left in November 2026 — his separate page only appears on
+// reports for weeks that started before this date.
+const DEEPAK_LAST_WEEK_BEFORE = '2026-11-23';
 // Editorial content, not derived from data — set per week before printing/
 // sharing, then clear it back out (a hardcoded commendation from an old
 // week was left in here and silently showed up on every later week's
@@ -289,12 +292,11 @@ const TARGETS = {
 // normally from that week onward (checked against whichever week is being
 // computed — see scoreCalc's weekStartOverride, needed because the 5-week
 // trend calls scoreCalc once per historical week, not just the current one).
-// Khushi Gupta / Sanskar Gupta: exempted from DPR filing entirely "for now"
-// (2026-08-22, Siddharth's call) — no known onboarding date yet, so a
-// far-future placeholder keeps them N/A indefinitely until that's decided;
-// update/remove their entries once they're actually expected to start.
+// Sanskar Gupta: exempted from DPR filing entirely "for now" (2026-08-22,
+// Siddharth's call) — far-future placeholder. Khushi Gupta files DPR from
+// Sat 5 Dec 2026 (Siddharth, 2026-11-23); her first scored week is 7 Dec.
 const DPR_NA_UNTIL = { 'Kritika Kaushik': '2026-08-03',
-  'Khushi Gupta': '2099-01-01', 'Sanskar Gupta': '2099-01-01' };
+  'Khushi Gupta': '2026-12-07', 'Sanskar Gupta': '2099-01-01' };
 
 // ── Biometric — live, built from ATTENDANCE via getMemberAttendance ────────
 // hrs score: ≥7:55 (475min) avg→10 · 7:00–7:54→7 · <7:00→4
@@ -1070,7 +1072,7 @@ async function loadAndRender(){
   // Add Deepak — Output /35 (approved pts ÷ target, same mechanism as team
   // members' Output) + Client Comm /10 + Issue Reporting /5.
   // DPR/punctuality/hours map to same columns as team
-  if (INCLUDE_DEEPAK_AMAN && deepakStats && deepakStats.scores) {
+  if (INCLUDE_DEEPAK_AMAN && WEEK_START < DEEPAK_LAST_WEEK_BEFORE && deepakStats && deepakStats.scores) {
     const ds = deepakStats.scores;
     const bd = BIO['Deepak Soni'];   // real biometric from the uploaded file
     if (bd) {
@@ -1522,6 +1524,10 @@ window.idsOnAuth = async function(u){   // gated by auth.js; weekly report = Sid
     const autoAdded = [];
     (d.team||[]).forEach(name => {
       if (!name || ROLES[name] || name === 'Deepak Soni' || /^aman /i.test(name)) return;
+      // Set start date (TEAM joiner, e.g. Khushi from 5 Dec 2026): the week
+      // they start in isn't scored — same rule as the backend's getWeeklyStats.
+      const sd = (d.startDates||{})[name];
+      if (sd && sd > WEEK_START) return;
       ROLES[name] = (d.roles && d.roles[name]) || 'Team member';
       if (TARGETS[name] == null) TARGETS[name] = 48;
       autoAdded.push(name);
