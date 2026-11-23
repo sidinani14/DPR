@@ -662,6 +662,9 @@ async function loadTasks() {
       const doneOn = _isoDate(t.actualCompletion) || _isoDate(t.selfStatusDate) || _isoDate(t.approvalDate);
       return doneOn && doneOn >= _mon;                          // completed → only if done on/after this Monday
     });
+    // Tasks that belong only to hidden members (departed / freelancers /
+    // Muskan — Siddharth, 2026-11-23) don't show as cards either.
+    allTasks = allTasks.filter(t => String(t.assignedTo||'').split(',').map(a=>a.trim()).filter(Boolean).some(a=>!EXCLUDED_MEMBERS.includes(a)));
 
     // Populate member filter (preserve current selection if possible)
     const prevMember = document.getElementById('member-filter').value;
