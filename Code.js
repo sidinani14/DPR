@@ -2312,7 +2312,7 @@ function doPost(e) {
       return respond({status:'ok', rows:hit0});
     }
     if (data.action === 'restampOpenVisitTaskPts') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(withLock(restampOpenVisitTaskPts)); }
-    if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true, { evidenceFor: data.evidenceFor || '', fromLogsOnly: data.fromLogsOnly === true })); }
+    if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true, { evidenceFor: data.evidenceFor || '', fromLogsOnly: data.fromLogsOnly === true, hOnly: data.hOnly === true })); }
     if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
     if (data.action === 'debugMemberWeek') return respond(debugMemberWeek(data.member||'', data.mon||'', data.sat||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
@@ -6753,6 +6753,12 @@ function rebuildVisitPlanner(apply, opts) {
   }
 
   var voided = [];
+  if (opts.hOnly) {   // just correct col H, keep existing tasks, then schedule
+    withLock(function(){ writes.forEach(function(w){ plan.getRange(w.row, 8).setValue(w.date); }); SpreadsheetApp.flush(); });
+    syncVisitScheduleInner();
+    try { CacheService.getScriptCache().remove('c_getAllTasks'); } catch (e) {}
+    return { status:'ok', applied:true, hOnly:true, colHUpdated: writes.length, rows: out };
+  }
   withLock(function(){
     writes.forEach(function(w){ plan.getRange(w.row, 8).setValue(w.date); });
     var sh = s.getSheetByName(ASSIGN_TAB), rows = sh.getDataRange().getValues();
