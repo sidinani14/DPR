@@ -2279,6 +2279,7 @@ function doPost(e) {
     if (data.action === 'getVisitPlannerForMember') return respond(getVisitPlannerForMember(data.member||''));
     if (data.action === 'debugTaskRows') return respond(debugTaskRows(data.member||'', data.from||'', data.to||''));
     if (data.action === 'debugRawTaskRows') return respond(debugRawTaskRows(data.project||''));
+    if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true)); }
     if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
     if (data.action === 'debugMemberWeek') return respond(debugMemberWeek(data.member||'', data.mon||'', data.sat||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
@@ -5538,6 +5539,7 @@ function loadCadence(planSheet) {
     ? planSheet.getRange(4,1,planSheet.getLastRow()-3,9).getValues()
     : [];
   var cadence = []; // array of cadence entries
+  var colIisNext = /next/i.test(String(planSheet.getRange(2, 9).getValue()||''));
   rows.forEach(function(r) {
     var proj   = String(r[0]||'').trim();
     var vType  = String(r[1]||'').trim();
@@ -5552,7 +5554,9 @@ function loadCadence(planSheet) {
       fixedTime    : String(r[5]||'').trim(),
       // Col G = Active (already checked above)
       manualLastDate: cellDate(r[7]),        // H Last Site Visit Date (manual history)
-      notes        : String(r[8]||'').trim(), // I Notes
+      // Col I was Notes; since 2026-11 it's "Next Site Visit Date", written by
+      // writeNextVisitDates() — so it is no longer copied into task notes.
+      notes        : colIisNext ? '' : String(r[8]||'').trim(),
     });
   });
   return cadence;
@@ -5721,7 +5725,16 @@ function loadOpenVisitTasks() {
     var status  = String(r[13]||'').trim();          // N SelfStatus
     var appr    = String(r[COL_LAPPR]||'').trim();   // Q LeadApproved
     if (!proj || !deadline || !isVisitType(tType)) continue;
-    if (status === 'Done' && appr === 'Yes') continue; // completed — skip
+    // Completed — skip. Done-but-awaiting-approval counts as done too
+    // (2026-11-23): it used to stay "open" and pin the cadence to the old
+    // deadline until a lead approved it, so approval lag delayed the next
+    // visit. A rejected visit is reopened (SelfStatus back to In Progress),
+    // so it is still caught as open.
+    if (status === 'Done') continue;
+    // Voided / reassigned / parked / closed-off rows aren't open (2026-11-23) —
+    // they used to block the cadence forever (Priority 1 in calcNextVisitDate).
+    if (status === 'Reassigned' || status === 'Work Not Done' || status.indexOf('Parked') === 0) continue;
+    if (status === 'Blocked' && String(r[COL_BLK_DISPO-1]||'').trim() === 'Cancelled') continue;
     // Use raw task type as key — consistent with pushVisitTasks
     var assigneeVal = String(r[3]||'').trim(); // D AssignedTo
     var key     = proj + '||' + tType + '||' + assigneeVal;
@@ -5751,8 +5764,29 @@ function loadOpenVisitTasks() {
 // silently skipped after the plan was corrected.
 function getEffectiveLastVisitDate(entry, history) {
   var hist = (history[entry.project]||{})[entry.visitType]||[];
-  var lastVisit = hist.length > 0 ? hist[0] : null;
-  return lastVisit ? lastVisit.date : (entry.manualLastDate || '');
+  var lastVisit = hist.length > 0 ? hist[0].date : '';
+  // 2026-11-23: the LATER of approved history and col H. Col H is rebuilt from
+  // every log (DPR tasks + Site Visit / MoM log, see rebuildVisitPlanner) and
+  // kept current by updateVisitPlannerLastVisitDate, so it is often newer
+  // than the approved-only history (approval lag); preferring the older
+  // approved date scheduled visits that had in fact just happened.
+  var manual = entry.manualLastDate || '';
+  return lastVisit > manual ? lastVisit : manual;
+}
+
+// "Tuesday" / "Tue" / "tues" → 0..6 (Sunday 0), or -1.
+function dayIndexOf(dayName) {
+  var k = String(dayName||'').trim().toLowerCase().slice(0, 3);
+  var m = { sun:0, mon:1, tue:2, wed:3, thu:4, fri:5, sat:6 };
+  return m.hasOwnProperty(k) ? m[k] : -1;
+}
+// The given weekday in the Monday–Sunday week containing dayStr.
+function weekdayInWeekOf(dayStr, idx) {
+  var d = new Date(dayStr + 'T12:00:00');
+  var dow = d.getDay(), toMon = dow === 0 ? -6 : 1 - dow;
+  var off = idx === 0 ? 6 : idx - 1;
+  d.setDate(d.getDate() + toMon + off);
+  return cellDate(d);
 }
 
 // Keeps VISIT_PLANNER col H (manual "Last Site Visit Date") in sync the
@@ -5835,6 +5869,21 @@ function calcNextVisitDate(entry, lastVisitDate, openTasks) {
     return {date: nextOccurrenceOfDay(entry.fixedDay), taskId:'', source:'cadence'};
   }
 
+  // Priority 2b (2026-11-23, Siddharth): Fortnightly WITH a fixed day = that
+  // weekday every alternate week, counted from the last time it happened:
+  // the fixed day in the week two weeks after the last visit/meeting. If that
+  // has already passed (missed), it's due on the next fixed day from today
+  // (catch up this week) and the rhythm restarts from whenever it's done.
+  // No history yet → the next fixed day from today.
+  var fIdx = dayIndexOf(entry.fixedDay);
+  if (freq === 'Fortnightly' && fIdx > -1) {
+    var nextFixed = weekdayInWeekOf(today, fIdx);
+    if (nextFixed < today) nextFixed = addDaysToStr(nextFixed, 7);
+    var due = lastVisitDate ? weekdayInWeekOf(addDaysToStr(lastVisitDate, 14), fIdx) : nextFixed;
+    if (due < today) due = nextFixed;
+    return {date: due, taskId:'', source:'cadence'};
+  }
+
   // Priority 3: Interval-based → last actual visit + frequency
   if (freqDays && lastVisitDate) {
     return {date: addDaysToStr(lastVisitDate, freqDays), taskId:'', source:'cadence'};
@@ -5910,6 +5959,10 @@ function pushVisitTasks(cadence, history, openTasks) {
     if (nextDate > threshold) { trace.push({project:entry.project, visitType:entry.visitType, nextDate:nextDate, skip:'after threshold '+threshold}); return; }
 
     var isOverdue = nextDate < today;
+    // An overdue visit is assigned for THIS week (due Saturday) instead of a
+    // deadline that has already passed — it used to show as Delayed from the
+    // moment it was created (2026-11-23). The note keeps the original due date.
+    var dueDate   = isOverdue ? threshold : nextDate;
     var pd        = projMap[entry.project] || {disc:'',mult:1.0};
 
     // Split comma-separated assignees and create one task per person
@@ -5940,7 +5993,7 @@ function pushVisitTasks(cadence, history, openTasks) {
         1,                        // H Units (always 1 visit unit)
         defPts,                   // I Weighted Pts (placeholder so it's visible on dashboard/heatmap before hours are logged)
         today,                    // J AssignedDate
-        nextDate,                 // K Deadline
+        dueDate,                  // K Deadline
         '',                       // L Area
         '',                       // M Drawing
         'Not Started',            // N SelfStatus
@@ -5955,6 +6008,10 @@ function pushVisitTasks(cadence, history, openTasks) {
         isOverdue ? 'High' : 'Medium', // W Priority
       ]);
       trace[trace.length-1].taskId = newId;
+      // Record it as open so flagMissedVisits (same run, same openTasks map)
+      // doesn't add a duplicate "MISSED VISIT" task for it (2026-11-23).
+      openTasks[key] = {taskId:newId, deadline:dueDate};
+      if (!openTasks[entry.project + '||' + entry.visitType]) openTasks[entry.project + '||' + entry.visitType] = {taskId:newId, deadline:dueDate, assignee:assignee};
 
       pushed++;
       Logger.log('Visit task: '+entry.project+' / '+entry.visitType+' / '+assignee+' due '+nextDate);
@@ -6505,10 +6562,136 @@ function syncVisitScheduleInner() {
     pushVisitTasks(cadence, history, openTasks);
     missedList = flagMissedVisits(cadence, history, openTasks);
   });
+  try { writeNextVisitDates(planSheet); } catch(e) { Logger.log('writeNextVisitDates error: '+e); }
   try { notifyMissedVisits(missedList); } catch(e) { Logger.log('notifyMissedVisits error: '+e); }
   try { checkOverdueAssignedVisits(); } catch(e) { Logger.log('checkOverdueAssignedVisits error: '+e); }
 
   Logger.log('=== syncVisitSchedule complete ===');
+}
+
+// VISIT_PLANNER col I "Next Site Visit Date" (added by Siddharth, 2026-11):
+// the date the scheduler has the next visit/meeting down for — the open
+// task's deadline if one exists, else the cadence date. Inactive rows blank.
+// Only runs when the col I header says "Next…", so an old Notes column is
+// never overwritten.
+function writeNextVisitDates(planSheet) {
+  if (!planSheet || planSheet.getLastRow() < 4) return;
+  if (!/next/i.test(String(planSheet.getRange(2, 9).getValue()||''))) return;
+  var history = loadVisitHistory(), openTasks = loadOpenVisitTasks();
+  var rows = planSheet.getRange(4, 1, planSheet.getLastRow()-3, 8).getValues();
+  var vals = rows.map(function(r){
+    var proj = String(r[0]||'').trim(), vt = String(r[1]||'').trim();
+    if (!proj || !vt || String(r[6]||'Yes').trim().toLowerCase() === 'no') return [''];
+    var entry = { project:proj, visitType:vt, assignee:String(r[2]||'').trim(), frequency:String(r[3]||'').trim(),
+      fixedDay:String(r[4]||'').trim(), manualLastDate:cellDate(r[7]) };
+    return [calcNextVisitDate(entry, getEffectiveLastVisitDate(entry, history), openTasks).date || ''];
+  });
+  planSheet.getRange(4, 9, vals.length, 1).setValues(vals);
+}
+
+// ── Rebuild VISIT_PLANNER "Last Site Visit Date" from the real logs ──────
+// (2026-11-23, Siddharth, after reworking the planner.) For every planner
+// row, col H = the latest date that project had a site visit (Site Visit
+// rows) or client meeting (Client Meeting rows), from:
+//   • TASK_ASSIGNMENTS visit/meeting tasks marked Done (DPR / DPER / CRM —
+//     approved or awaiting approval; rejected ones don't count),
+//   • MEETING_LOG (Site Visit / MoM log), any status except deleted,
+//   • SITE_EXECUTION (DPER) rows with Site Visit Done = Yes.
+// A log that names a discipline (Architecture / Interiors) only counts for
+// that row; a generic "Site Visit" / "Meeting" counts for every site / meeting
+// row of the project. Dry run by default; apply = write col H, void the old
+// Not-Started auto-scheduled visit tasks (they'd otherwise pin the old dates
+// — calcNextVisitDate Priority 1) and run the scheduler.
+function rebuildVisitPlanner(apply) {
+  var s = db(), today = todayStr();
+  var plan = s.getSheetByName(PLANNER_TAB);
+  if (!plan || plan.getLastRow() < 4) return { status:'error', message:'VISIT_PLANNER has no rows' };
+  var header = plan.getRange(2, 1, 1, 9).getValues()[0].map(function(x){ return String(x||'').trim(); });
+  var pRows = plan.getRange(4, 1, plan.getLastRow()-3, 9).getValues();
+  var norm = function(x){ return String(x||'').trim().toLowerCase().replace(/\s+/g, ' '); };
+  var specific = function(t){ t = String(t||'').toLowerCase();
+    return t.indexOf('architecture') > -1 ? VT_ARCH : t.indexOf('interior') > -1 ? VT_ID : ''; };
+  var familyOf = function(t){ t = String(t||'').toLowerCase();
+    if (t.indexOf('site visit') > -1) return 'site';
+    if (t.indexOf('meeting') > -1) return 'meeting';
+    return ''; };
+
+  var ev = {};   // project(lower) → [{fam, spec, date, src}]
+  function add(project, type, date, src){
+    var fam = familyOf(type); if (!fam || !date || date > today) return;
+    var k = norm(project); if (!k) return;
+    (ev[k] = ev[k] || []).push({ fam: fam, spec: specific(type), date: date, src: src });
+  }
+  var a = s.getSheetByName(ASSIGN_TAB).getDataRange().getValues();
+  for (var i = 1; i < a.length; i++) {
+    var st = String(a[i][13]||'').trim(), q = String(a[i][16]||'').trim();
+    if (st !== 'Done' || q === 'No') continue;
+    add(a[i][2], a[i][4], cellDate(a[i][15]) || cellDate(a[i][14]), 'task ' + a[i][0] + ' · ' + a[i][4] + ' · ' + a[i][3]);
+  }
+  var ml = s.getSheetByName(MEETING_LOG_TAB);
+  if (ml && ml.getLastRow() > 1) ml.getRange(2, 1, ml.getLastRow()-1, 16).getValues().forEach(function(r){
+    if (/delet/i.test(String(r[15]||''))) return;
+    add(r[4], r[3], cellDate(r[1]), 'log ' + r[0] + ' · ' + r[3] + ' · ' + r[5]);
+  });
+  var se = s.getSheetByName(SITE_EXEC_TAB);
+  if (se && se.getLastRow() > 1) se.getRange(2, 1, se.getLastRow()-1, 6).getValues().forEach(function(r){
+    if (String(r[5]||'').trim().toLowerCase() !== 'yes') return;
+    add(r[3], 'Site Visit', cellDate(r[1]), 'DPER ' + r[0] + ' · ' + r[4]);
+  });
+
+  var out = [], writes = [];
+  pRows.forEach(function(r, idx){
+    var project = String(r[0]||'').trim(), vType = String(r[1]||'').trim();
+    if (!project || !vType) return;
+    var fam = familyOf(vType), spec = specific(vType);
+    var best = null;
+    (ev[norm(project)] || []).forEach(function(e){
+      if (e.fam !== fam) return;
+      if (spec && e.spec && e.spec !== spec) return;   // other discipline's visit
+      if (!best || e.date > best.date) best = e;
+    });
+    var oldH = cellDate(r[7]);
+    // Never move col H backwards — a later date already there was entered by
+    // hand for a visit that never got logged.
+    var newH = (best && best.date > oldH) ? best.date : oldH;
+    if (newH !== oldH) writes.push({ row: idx + 4, date: newH });
+    var entry = { project: project, visitType: vType, assignee: String(r[2]||'').trim(), frequency: String(r[3]||'').trim(),
+      fixedDay: String(r[4]||'').trim(), fixedTime: String(r[5]||'').trim(), manualLastDate: newH, notes: String(r[8]||'').trim() };
+    var active = String(r[6]||'Yes').trim().toLowerCase() !== 'no';
+    out.push({ row: idx + 4, project: project, visitType: vType, assignee: entry.assignee, frequency: entry.frequency,
+      fixedDay: entry.fixedDay, active: active, oldH: oldH, newH: newH, colI: cellDate(r[8]),
+      source: best ? (best.date >= oldH ? best.src : 'kept ' + oldH + ' (latest log ' + best.date + ')') : (oldH ? 'kept (no log found)' : 'none found'),
+      next: active ? calcNextVisitDate(entry, newH, {}).date : '' });
+  });
+
+  if (!apply) {
+    var wouldVoid = [];
+    for (var v = 1; v < a.length; v++) {
+      var stv = String(a[v][13]||'').trim();
+      if (String(a[v][21]||'').trim() === 'Auto-scheduled' && isVisitType(a[v][4]) && (stv === 'Not Started' || stv === ''))
+        wouldVoid.push(String(a[v][0]) + ' · ' + a[v][2] + ' · ' + a[v][4] + ' · ' + a[v][3] + ' · due ' + cellDate(a[v][10]));
+    }
+    return { status:'ok', dryRun:true, header: header, rows: out, writes: writes, wouldVoid: wouldVoid };
+  }
+
+  var voided = [];
+  withLock(function(){
+    writes.forEach(function(w){ plan.getRange(w.row, 8).setValue(w.date); });
+    var sh = s.getSheetByName(ASSIGN_TAB), rows = sh.getDataRange().getValues();
+    for (var j = 1; j < rows.length; j++) {
+      var st2 = String(rows[j][13]||'').trim();
+      if (String(rows[j][21]||'').trim() !== 'Auto-scheduled' || !isVisitType(rows[j][4])) continue;
+      if (st2 !== 'Not Started' && st2 !== '') continue;
+      sh.getRange(j+1, 14).setValue('Reassigned');      // N — hidden & excluded everywhere
+      sh.getRange(j+1, 17).setValue('No');              // Q
+      sh.getRange(j+1, 21).setValue('[Replaced — visit planner rebuilt ' + today + '] ' + String(rows[j][20]||''));
+      voided.push(String(rows[j][0]) + ' ' + rows[j][2] + ' · ' + rows[j][4] + ' · ' + rows[j][3] + ' · due ' + cellDate(rows[j][10]));
+    }
+    SpreadsheetApp.flush();
+  });
+  syncVisitScheduleInner();
+  try { CacheService.getScriptCache().remove('c_getAllTasks'); } catch (e) {}
+  return { status:'ok', applied:true, colHUpdated: writes.length, voided: voided, rows: out };
 }
 
 // ════════════════════════════════════════════════════════════════

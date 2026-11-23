@@ -98,6 +98,14 @@
   consent-page HTML shell instead of JSON even with a valid token) — don't
   trust a single post-deploy live check, retry until the result is stable.
 
+- **2026-11-23 rework (Siddharth updated the planner):**
+  - **Fortnightly + Fixed Day** = that weekday every alternate week, counted from the last visit/meeting. A missed one is due on the next fixed day (catch up), and the rhythm restarts from there.
+  - **Col I is now "Next Site Visit Date"**, written by `writeNextVisitDates()` on every sync. It is no longer read as Notes.
+  - **Last visit** = the later of approved history and col H (`getEffectiveLastVisitDate`).
+  - **Open visit tasks:** Done-but-awaiting-approval, Reassigned/Parked and cancelled-block tasks no longer count as open, so they don't pin the cadence.
+  - **Overdue visits** are pushed due this Saturday, with the original date kept in the notes. `pushVisitTasks` records each pushed task in `openTasks`, so `flagMissedVisits` no longer adds a duplicate "MISSED VISIT" row.
+  - **`rebuildVisitPlanner {apply}`** (manager action) rebuilds col H from Done visit tasks (not rejected), MEETING_LOG and DPER SiteVisitDone. Col H never moves backwards. On apply it also voids Not-Started auto-scheduled visit tasks and runs the sync. It's a dry run by default.
+
 ## Reliability fixes (2026-08) — read before touching submission paths
 Root-caused two backend bugs behind reported "sometimes access denied" +
 "task submissions not reflected, no score":
