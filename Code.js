@@ -2312,7 +2312,7 @@ function doPost(e) {
       return respond({status:'ok', rows:hit0});
     }
     if (data.action === 'restampOpenVisitTaskPts') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(withLock(restampOpenVisitTaskPts)); }
-    if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true)); }
+    if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true, { evidenceFor: data.evidenceFor || '', fromLogsOnly: data.fromLogsOnly === true })); }
     if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
     if (data.action === 'debugMemberWeek') return respond(debugMemberWeek(data.member||'', data.mon||'', data.sat||''));
     if (data.action === 'getMemberExtras') return respond(getMemberExtras(data.member||'', data.from||'', data.to||''));
@@ -2722,8 +2722,12 @@ function getLists() {
       var active = String(tRows[i][5] || '').trim().toLowerCase();
       var wtgt   = parseFloat(tRows[i][2]) || 0;   // C WeeklyTarget
       if (!name) continue;
-      // Departed, or not started yet — removed from all forms & dashboards
-      if (isExcludedMember(name)) continue;
+      // Departed — removed from all forms & dashboards
+      if (EXCLUDED_MEMBERS.indexOf(name) !== -1) continue;
+      // Not started yet (MEMBER_START_DATES): can already be assigned work and
+      // shows on the dashboard (allMembers / targets / roles), but isn't on the
+      // DPR team list — no sign-in, reminders or scoring until the start date.
+      var notStarted = isExcludedMember(name);
       // Freelance architects (Role = Freelancer) are not studio team: kept out
       // of DPR / Plan Tasks / dashboard / attendance / weekly-report rosters.
       // Listed separately so the meeting log can still tick them as attendees.
@@ -2734,7 +2738,7 @@ function getLists() {
       allEmails.push(email);
       if (wtgt > 0) targets[name] = wtgt;
       // Active only — for DPR form
-      if (active !== 'no') { team.push(name); emails.push(email); }
+      if (active !== 'no' && !notStarted) { team.push(name); emails.push(email); }
     }
   }
 
@@ -5695,6 +5699,15 @@ function getVisitPlannerForMember(member) {
   return cadence.filter(function(c) { return c.assignee.toLowerCase() === m; });
 }
 
+// A Done visit/meeting task counts as a visit that actually happened unless
+// it's a director's (Siddharth/Astha) item closed from the approval page with
+// no hours logged — that's clearing the task, not visiting (2026-11-23).
+function isRealVisitRecord(r) {
+  var who = String(r[3]||'').trim();
+  if (!DIRECTOR_NAMES[who]) return true;
+  return (parseFloat(r[COL_HOURS_TAKEN-1]) || 0) > 0 || !!String(r[COL_SUBMITTED_AT-1]||'').trim();
+}
+
 // ── Load visit history from TASK_LOG ─────────────────────────
 // Returns: {project: {visitType: [{date, member, pts}]}}
 function loadVisitHistory() {
@@ -5721,6 +5734,7 @@ function loadVisitHistory() {
     var approved = String(r[is23?16:15]||'').trim(); // Q LeadApproved
     if (!proj || !isVisitType(tType)) continue;
     if (selfStat !== 'Done' || approved !== 'Yes') continue;
+    if (!isRealVisitRecord(r)) continue;
     var dStr = cellDate(r[15]) || cellDate(r[14]) || cellDate(r[is23?18:17]) || '';
     if (!dStr) continue;
     var vType = normaliseVisitType(tType) || tType;
@@ -6658,7 +6672,8 @@ function restampOpenVisitTaskPts() {
 // row of the project. Dry run by default; apply = write col H, void the old
 // Not-Started auto-scheduled visit tasks (they'd otherwise pin the old dates
 // — calcNextVisitDate Priority 1) and run the scheduler.
-function rebuildVisitPlanner(apply) {
+function rebuildVisitPlanner(apply, opts) {
+  opts = opts || {};
   var s = db(), today = todayStr();
   var plan = s.getSheetByName(PLANNER_TAB);
   if (!plan || plan.getLastRow() < 4) return { status:'error', message:'VISIT_PLANNER has no rows' };
@@ -6682,6 +6697,7 @@ function rebuildVisitPlanner(apply) {
   for (var i = 1; i < a.length; i++) {
     var st = String(a[i][13]||'').trim(), q = String(a[i][16]||'').trim();
     if (st !== 'Done' || q === 'No') continue;
+    if (!isRealVisitRecord(a[i])) continue;
     add(a[i][2], a[i][4], cellDate(a[i][15]) || cellDate(a[i][14]), 'task ' + a[i][0] + ' · ' + a[i][4] + ' · ' + a[i][3]);
   }
   var ml = s.getSheetByName(MEETING_LOG_TAB);
@@ -6695,6 +6711,10 @@ function rebuildVisitPlanner(apply) {
     add(r[3], 'Site Visit', cellDate(r[1]), 'DPER ' + r[0] + ' · ' + r[4]);
   });
 
+  if (opts && opts.evidenceFor) {   // read-only: every log found for one project
+    var evk = norm(opts.evidenceFor);
+    return { status:'ok', project: opts.evidenceFor, evidence: (ev[evk] || []).slice().sort(function(x, y){ return y.date.localeCompare(x.date); }) };
+  }
   var out = [], writes = [];
   pRows.forEach(function(r, idx){
     var project = String(r[0]||'').trim(), vType = String(r[1]||'').trim();
@@ -6709,14 +6729,16 @@ function rebuildVisitPlanner(apply) {
     var oldH = cellDate(r[7]);
     // Never move col H backwards — a later date already there was entered by
     // hand for a visit that never got logged.
-    var newH = (best && best.date > oldH) ? best.date : oldH;
+    // fromLogsOnly (2026-11-23): col H = the latest real log, even if that is
+    // earlier than what's there (a wrong date had crept in).
+    var newH = best ? ((opts.fromLogsOnly || best.date > oldH) ? best.date : oldH) : oldH;
     if (newH !== oldH) writes.push({ row: idx + 4, date: newH });
     var entry = { project: project, visitType: vType, assignee: String(r[2]||'').trim(), frequency: String(r[3]||'').trim(),
       fixedDay: String(r[4]||'').trim(), fixedTime: String(r[5]||'').trim(), manualLastDate: newH, notes: String(r[8]||'').trim() };
     var active = String(r[6]||'Yes').trim().toLowerCase() !== 'no';
     out.push({ row: idx + 4, project: project, visitType: vType, assignee: entry.assignee, frequency: entry.frequency,
       fixedDay: entry.fixedDay, active: active, oldH: oldH, newH: newH, colI: cellDate(r[8]),
-      source: best ? (best.date >= oldH ? best.src : 'kept ' + oldH + ' (latest log ' + best.date + ')') : (oldH ? 'kept (no log found)' : 'none found'),
+      source: best ? (newH === best.date ? best.src : 'kept ' + oldH + ' (latest log ' + best.date + ')') : (oldH ? 'kept (no log found)' : 'none found'),
       next: active ? calcNextVisitDate(entry, newH, {}).date : '' });
   });
 
@@ -7236,11 +7258,10 @@ function completeDirectorItem(data, authEmail) {
     var existing = String(sheet.getRange(row, 21).getValue() || '').trim(); // U Notes
     sheet.getRange(row, 21).setValue(existing ? existing + ' | ' + remarks : remarks);
   }
-  var dciTaskType = String(sheet.getRange(row, 5).getValue() || '').trim();
-  if (isVisitTask(dciTaskType)) {
-    var dciProject = String(sheet.getRange(row, 3).getValue() || '').trim();
-    updateVisitPlannerLastVisitDate(dciProject, dciTaskType, today);
-  }
+  // 2026-11-23: closing a director's item is NOT evidence a visit happened
+  // (Siddharth clears auto-scheduled visit tasks from here without visiting —
+  // it pushed Simrol Resort's "last site visit" to the day he cleared it), so
+  // it no longer updates VISIT_PLANNER col H. See isRealVisitRecord().
   Logger.log('Director item completed: row ' + row + ' (' + who + ') by ' + authEmail);
   try { CacheService.getScriptCache().remove('c_getDirectorPendingItems'); } catch(e) {}
   return {status:'ok'};

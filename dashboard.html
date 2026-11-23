@@ -221,13 +221,15 @@ window.idsOnAuth = loadTasks;   // gated: runs after authorized sign-in (auth.js
 // ── HEATMAP ──────────────────────────────────────────────────
 let hmView = 'week';
 
-const EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Khushi Gupta', 'Aashi Agrawal', 'Achal Rathore', 'Siddharth Inani', 'Astha Inani'];  // departed, unpaid intern not tracked, or directors not scored as team members — hidden from dashboard
+// Departed, directors, and (2026-11-23, Siddharth) Muskan Jain — hidden from
+// the dashboard. Freelancers (TEAM Role = Freelancer) are added from getLists
+// at load. Khushi Gupta is shown again (starts filing 5 Dec 2026).
+const EXCLUDED_MEMBERS = ['Simi', 'Khushi Agrawal', 'Aashi Agrawal', 'Achal Rathore', 'Deepak Soni', 'Muskan Jain', 'Siddharth Inani', 'Astha Inani'];
 const TEAM_TARGETS = {
-  'Aaditya Koshti':48,'Aashi Agrawal':48,'Achal Rathore':72,
-  'Bhavesh Bhagwat':72,'Himanshu Malviya':72,
-  'Poorvi Goyal':48,'Sahil Maurya':48,
-  'Aman Raghuwanshi':24,'Deepak Soni':30,
-};
+  'Aaditya Koshti':60,'Bhavesh Bhagwat':72,'Himanshu Malviya':72,
+  'Poorvi Goyal':60,'Sahil Maurya':60,'Aman Raghuwanshi':72,
+  'Jagrati Barfa':48,'Kritika Kaushik':48,'Shavy Sharma':48,'Shreyas Chourasia':48,'Khushi Gupta':36,
+};   // fallback only — live TEAM-tab targets replace these at load
 const DAILY_TARGETS = Object.fromEntries(
   Object.entries(TEAM_TARGETS).map(([k,v])=>[k, Math.round(v/6*10)/10])
 );
@@ -642,7 +644,9 @@ async function loadTasks() {
       allTasks=data.tasks||[];
       // Weekly targets come from the TEAM tab (col C) — overrides the hardcoded
       // defaults so a change in the sheet (e.g. Deepak 30→72) reflects here.
-      try { const lists = await listsRes.json(); if (lists){ if(lists.targets) Object.assign(TEAM_TARGETS, lists.targets); ROSTER = (lists.allMembers||[]).filter(m=>m && !EXCLUDED_MEMBERS.includes(m)); } } catch(e){}
+      try { const lists = await listsRes.json(); if (lists){ if(lists.targets) Object.assign(TEAM_TARGETS, lists.targets);
+        (lists.freelancers||[]).forEach(f=>{ if (f && !EXCLUDED_MEMBERS.includes(f)) EXCLUDED_MEMBERS.push(f); });   // freelancers aren't studio team
+        ROSTER = (lists.allMembers||[]).filter(m=>m && !EXCLUDED_MEMBERS.includes(m)); } } catch(e){}
     }
 
     // Only THIS WEEK's completed+approved tasks stay on the board; older ones drop off.
