@@ -999,6 +999,11 @@ const LEAD_ACTIONS = [
   {key:'Not Contacted',         label:'Not Contacted', cls:''},
   {key:'Contacted over call',   label:'Contacted',     cls:'la-contacted'},
   {key:'Briefing Meeting Done', label:'Briefing Done', cls:'la-brief'},
+  // 2026-11-25: proposal + converted stages added — a converted lead could
+  // never leave this panel before, and these stages earn CRM activity points.
+  {key:'Design Proposal Shared',label:'Design proposal', cls:'la-brief'},
+  {key:'Fee Proposal Shared',   label:'Fee proposal',  cls:'la-brief'},
+  {key:'Lead Converted',        label:'Converted',     cls:'la-contacted'},
   {key:'Lost',                  label:'Lost',          cls:'la-reject'},
   {key:'Dormant',               label:'Dormant',       cls:''},
 ];

@@ -535,6 +535,23 @@ Q Lead Approved) and refuses task requests + emails Siddharth if it changes.
 - DPR tab: DAILY_SUMMARY — Date(A) Time(B) Member(C) Email(D)
 - DPER tab: SITE_EXECUTION — col E = Execution Lead name
 
+## CRM activity points (2026-11-25, Siddharth: "Option A, count all without approval")
+- Each CRM report adds Done and auto-approved TASK_ASSIGNMENTS rows (project "CRM activity", R "Auto (CRM activity)", one row per activity type, H = count, I = count × value). They appear on the dashboard against Aman's 72 target. Function: `writeCrmActivityPoints` (in `submitAmanCRM`), values in `CRM_ACTIVITY_PTS`.
+- Values:
+  - Call / WhatsApp / email connection: 0.5
+  - New lead: 1
+  - Lead moving forward to Briefing: 2, to Proposal: 3, to Converted: 5
+  - Bill: 1
+  - Payment: 2
+  - Follow-up project: 0.5
+  - Vendor / site-issue / TnCP coordination: 1
+  - BNI: 1
+  - Issue or deliverable raised: 0.5
+- Meeting and site-visit connections get 0, because they're already scored via Field Work hours × rate × seniority.
+- Aman's weekly scorecard formula is unchanged.
+- CRM.html Open Leads now has Design proposal / Fee proposal / Converted buttons.
+- `testCrmActivityPoints {payload}` (manager): dry run, writes nothing.
+
 ## Aman Raghuwanshi — CRM scoring (separate page in weekly report)
 - getAmanWeeklyStats(weekStart) — routes: getAmanWeeklyStats (GET+POST)
 - Output /50 (components are N/A when there's nothing to measure → excluded &

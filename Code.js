@@ -2311,6 +2311,11 @@ function doPost(e) {
         hit0.push({ row:t0+1, name:tr0[t0][0], role:tr0[t0][1], weeklyTarget:tr0[t0][2], email:tr0[t0][4], active:tr0[t0][5], excludedNow:isExcludedMember(tr0[t0][0]), startDate:MEMBER_START_DATES[String(tr0[t0][0]).trim()]||'' });
       return respond({status:'ok', rows:hit0});
     }
+    if (data.action === 'testCrmActivityPoints') {   // manager-only, writes nothing: what a CRM payload would score
+      if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'});
+      var tp = data.payload || {};
+      return respond({ status:'ok', rows: writeCrmActivityPoints('Aman Raghuwanshi', dateStr(), tp.contacts||[], tp.newLeads||[], tp.leadMoves||[], tp.finance||{}, tp.activities||{}, tp.newIssues||[], true) });
+    }
     if (data.action === 'restampOpenVisitTaskPts') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(withLock(restampOpenVisitTaskPts)); }
     if (data.action === 'rebuildVisitPlanner') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(rebuildVisitPlanner(data.apply === true, { evidenceFor: data.evidenceFor || '', fromLogsOnly: data.fromLogsOnly === true, hOnly: data.hOnly === true })); }
     if (data.action === 'debugTaskRowRaw') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(debugTaskRowRaw(data.taskId||'')); }
@@ -10668,6 +10673,7 @@ function submitAmanCRM(data) {
     // generically via LEADS_FIELD_COLS; a status change carries the same
     // special-case side effects (Last Contacted / 24hr flag / SLA date
     // stamps / PROJECTS promotion) the old narrow follow-up flow had.
+    var crmLeadMoves = [];   // {client, from, to} — for CRM activity points
     if (leadFollows.length > 0) {
       var leadsData = leadsSheet.getDataRange().getValues();
       leadFollows.forEach(function(f) {
@@ -10678,6 +10684,7 @@ function submitAmanCRM(data) {
           var fields = f.fields || {};
           var newStatus = fields.leadStatus;
           if (newStatus !== undefined) {
+            crmLeadMoves.push({ client: String(leadsData[i][1]||''), from: String(leadsData[i][5]||'').trim(), to: String(newStatus||'').trim() });
             leadsSheet.getRange(rowNum, 13).setValue('Yes'); // M 24hr Contact Done
             leadsSheet.getRange(rowNum, 9).setValue(today);  // I Last Contacted
             if (!String(leadsData[i][16]||'').trim())        // Q First Response At (first time only)
@@ -10743,6 +10750,10 @@ function submitAmanCRM(data) {
     // ── 7. Auto-create Site Visit / Meeting tasks for attendees ──
     createMeetingTasks(agendas, member, today);
 
+    // ── 8. CRM activity points (2026-11-25, Siddharth) ──
+    try { writeCrmActivityPoints(member, today, contacts, newLeads, crmLeadMoves, finance, activities, newIssues); }
+    catch (cpErr) { Logger.log('CRM activity points error: ' + cpErr); }
+
     notifySubmissionRecorded(member, 'CRM Daily Report', realToday, [
       newLeads.length ? 'New leads: ' + newLeads.length : '',
       contacts.length ? 'Client connections: ' + contacts.length : '',
@@ -10755,6 +10766,84 @@ function submitAmanCRM(data) {
     Logger.log('submitAmanCRM error: ' + String(err));
     return {status:'error', message:String(err)};
   }
+}
+
+// ── CRM activity points (2026-11-25, Siddharth: "Option A, count all without
+// approval") ─────────────────────────────────────────────────────────────
+// CRM work (calls, leads, bills, payments, coordination) never produced
+// tasks, so Aman's dashboard showed ~0 points against his 72 target. Each
+// CRM report now adds one Done + auto-approved TASK_ASSIGNMENTS row per
+// activity type (units = how many, pts = units × value), dated the report
+// day, project "CRM activity", AssignedBy = the member. Flat values — no
+// seniority or project multiplier. Site visits / meetings are NOT here: they
+// already score as hours × rate × seniority through Field Work. Not part of
+// Aman's weekly scorecard formula (that stays coverage / leads / collection).
+var CRM_ACTIVITY_PTS = {
+  connection: 0.5,   // call / WhatsApp / email (meeting & site-visit connections score via field-work hours)
+  newLead: 1,
+  briefing: 2, proposal: 3, converted: 5,   // a lead moving forward TO this stage
+  bill: 1, payment: 2, followup: 0.5,      // follow-up = per project chased
+  coordination: 1,   // vendor / site issue / TnCP entry
+  bni: 1,
+  issue: 0.5         // issue or design deliverable raised
+};
+var CRM_STAGE_RANK = { 'Not Contacted':0, 'Contacted over call':1, 'Briefing Meeting Done':2, 'Design Proposal Shared':3, 'Fee Proposal Shared':3, 'Lead Converted':4 };
+function crmStagePts(status) {
+  var r = CRM_STAGE_RANK[String(status||'').trim()];
+  return r === 4 ? CRM_ACTIVITY_PTS.converted : r === 3 ? CRM_ACTIVITY_PTS.proposal : r === 2 ? CRM_ACTIVITY_PTS.briefing : 0;
+}
+function writeCrmActivityPoints(member, day, contacts, newLeads, leadMoves, finance, activities, newIssues, dryRun) {
+  var items = [];   // {type, count, unit, detail[]}
+  function add(type, unit, list) { list = (list || []).filter(Boolean); if (list.length) items.push({ type: type, unit: unit, count: list.length, detail: list }); }
+
+  add('CRM — Client connections', CRM_ACTIVITY_PTS.connection, (contacts || []).filter(function(c){
+    var t = String(c.type||'').toLowerCase();
+    return (c.project || c.notes) && t.indexOf('meeting') === -1 && t.indexOf('site') === -1;
+  }).map(function(c){ return (c.project || '—') + ' (' + (c.type || 'contact') + ')'; }));
+
+  add('CRM — New leads', CRM_ACTIVITY_PTS.newLead, (newLeads || []).filter(function(l){ return l.clientName; }).map(function(l){ return l.clientName; }));
+  var stageList = { 2: [], 3: [], 4: [] };
+  (newLeads || []).forEach(function(l){ var r = CRM_STAGE_RANK[String(l.leadStatus||'').trim()] || 0; if (l.clientName && r >= 2) stageList[r].push(l.clientName); });
+  (leadMoves || []).forEach(function(m){
+    var to = CRM_STAGE_RANK[m.to] || 0, from = CRM_STAGE_RANK[m.from] || 0;
+    if (to >= 2 && to > from) stageList[to].push(m.client);
+  });
+  add('CRM — Lead to Briefing Done', CRM_ACTIVITY_PTS.briefing, stageList[2]);
+  add('CRM — Lead to Proposal shared', CRM_ACTIVITY_PTS.proposal, stageList[3]);
+  add('CRM — Lead converted', CRM_ACTIVITY_PTS.converted, stageList[4]);
+
+  finance = finance || {};
+  add('CRM — Bills raised', CRM_ACTIVITY_PTS.bill, (finance.bills || []).map(function(b){ return (b.project || '—') + (b.amount ? ' ₹' + b.amount : ''); }));
+  add('CRM — Payments received', CRM_ACTIVITY_PTS.payment, (finance.payments || []).map(function(p){ return (p.project || '—') + (p.amount ? ' ₹' + p.amount : ''); }));
+  add('CRM — Payment follow-ups', CRM_ACTIVITY_PTS.followup, finance.followupProjects || []);
+
+  activities = activities || {};
+  var coord = [];
+  [['vendor','Vendor'], ['siteIssues','Site issue'], ['tncp','TnCP']].forEach(function(p){
+    var a = activities[p[0]] || {};
+    if (a.on === 'Yes') (a.entries || []).forEach(function(e){ if (e.project || e.notes) coord.push(p[1] + ': ' + (e.project || '—')); });
+  });
+  add('CRM — Coordination', CRM_ACTIVITY_PTS.coordination, coord);
+  if ((activities.bni || {}).on === 'Yes') add('CRM — BNI activity', CRM_ACTIVITY_PTS.bni, ['BNI']);
+  add('CRM — Issues / deliverables raised', CRM_ACTIVITY_PTS.issue, (newIssues || []).filter(function(i){ return i.description; }).map(function(i){ return (i.project || '—') + ' (' + (i.kind || 'Issue') + ')'; }));
+
+  if (!items.length) return 0;
+  var stamp = dateStr();
+  var rows = items.map(function(it){
+    var pts = Math.round(it.count * it.unit * 10) / 10;
+    return [ 'T-' + Utilities.getUuid().substring(0,8).toUpperCase(), '', 'CRM activity', member, it.type,
+      1, it.unit, it.count, pts,                 // F mult · G pts per item · H count · I pts
+      day, day,                                  // J AssignedDate · K Deadline
+      it.detail.join(', ').slice(0, 450), '',    // L what it covered · M
+      'Done', day, day,                          // N · O · P
+      'Yes', 'Auto (CRM activity)', stamp, '',   // Q LeadApproved · R · S · T
+      '[CRM activity points] ' + it.count + ' × ' + it.unit, member, 'Medium' ];
+  });
+  if (dryRun) return rows.map(function(r){ return r[4] + ' | ' + r[7] + ' × ' + r[6] + ' = ' + r[8] + ' | ' + r[11]; });
+  var sheet = getOrCreate(ASSIGN_TAB, writeAssignHeaders);
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  try { CacheService.getScriptCache().remove('c_getAllTasks'); } catch (e) {}
+  return rows.length;
 }
 
 // ════════════════════════════════════════════════════════════════
