@@ -2025,6 +2025,80 @@ function timestampForDay(day){
   var nowIso = new Date().toISOString();
   return nowIso.substring(0, 10) === day ? nowIso : (day + 'T12:00:00.000Z');
 }
+// ── Self-reports are filed under the TEAM-tab name (2026-11-26) ──────────
+// Forms sent the member name the PAGE worked out — CRM.html falls back to the
+// Google profile name when the sign-in email isn't in its own hardcoded map —
+// so the same person could be written as two slightly different names
+// ("Aman Raghuwanshi" twice on the dashboard). For the person's own reports,
+// the name is now always the TEAM-tab name of the verified sign-in email.
+// Directors (who may file on someone's behalf) are left alone.
+var SELF_REPORT_ACTIONS = { submitAmanCRM:1, submitFieldWorkBatch:1, logConnections:1, submitBillables:1,
+  submitLateRequest:1, updateTaskStatuses:1, createDoneTask:1, createSelfTask:1, submitSocialMediaLog:1 };
+function canonicaliseSelfReportName(data, authEmail){
+  if (!data || (data.action && !SELF_REPORT_ACTIONS[data.action])) return;
+  var name = nameForEmail(authEmail);
+  if (!name || DIRECTOR_NAMES[name]) return;
+  if (!data.action) {                                           // dpr.html main submission
+    data['Member'] = name;
+    ['Assigned Statuses','Done Tasks','Ongoing Tasks'].forEach(function(k){
+      if (!data[k]) return;
+      try {
+        var arr = typeof data[k] === 'string' ? JSON.parse(data[k]) : data[k];
+        (arr || []).forEach(function(t){ if (t && typeof t === 'object' && t.member !== undefined) t.member = name; });
+        data[k] = typeof data[k] === 'string' ? JSON.stringify(arr) : arr;
+      } catch (e) {}
+    });
+    return;
+  }
+  if (data.member !== undefined) data.member = name;
+  if (data.action === 'updateTaskStatuses') (data.statuses || []).forEach(function(s){ if (s) s.member = name; });
+}
+
+// Merge name variants into the TEAM-tab spelling (2026-11-26) — a cell is
+// rewritten only when it differs from a TEAM name by case / spacing /
+// punctuation alone ("aman  raghuwanshi" → "Aman Raghuwanshi"). Comma lists
+// (multi-assignee, meeting attendees) are handled per name. Names that merely
+// look similar (different letters) are only REPORTED, never changed.
+// Dry run unless apply.
+function mergeNameVariants(apply) {
+  var s = db(), key = function(n){ return String(n||'').toLowerCase().replace(/[^a-z]/g, ''); };
+  var team = s.getSheetByName(TEAM_TAB).getDataRange().getValues().slice(1)
+    .map(function(r){ return String(r[0]||'').trim(); }).filter(Boolean);
+  var canon = {}; team.forEach(function(n){ canon[key(n)] = n; });
+  var firstNames = {}; team.forEach(function(n){ firstNames[key(n.split(' ')[0])] = true; });
+  var TARGETS = [ [ASSIGN_TAB,4,true], [SUMMARY_TAB,3,false], [CRM_LOG_TAB,4,false], [FIELD_WORK_TAB,3,false],
+    [LATE_REQ_TAB,3,false], ['SOCIAL_MEDIA_LOG',3,false], [DPR_SUBS_TAB,2,false], [BLOCK_LOG_TAB,4,false],
+    [LEADS_TAB,7,false], [LEADS_TAB,10,false], [MEETING_LOG_TAB,6,false], [MEETING_LOG_TAB,7,true],
+    [BILL_REQ_TAB,3,false], [ATTENDANCE_TAB,2,false] ];
+  var changes = [], lookalikes = {};
+  function fix(v, isList){
+    var parts = isList ? String(v||'').split(',') : [String(v||'')], changed = false;
+    var out = parts.map(function(p, idx){
+      var t = p.trim(); if (!t) return p;
+      var c = canon[key(t)];
+      if (c && c !== p.trim()) { changed = true; return (idx > 0 ? ' ' : '') + c; }
+      if (!c && firstNames[key(t.split(' ')[0])] && t.indexOf('(') === -1) lookalikes[t] = (lookalikes[t] || 0) + 1;
+      return p;
+    });
+    return changed ? out.join(',') : null;
+  }
+  function run(){
+    TARGETS.forEach(function(tg){
+      var sh = s.getSheetByName(tg[0]); if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < tg[1]) return;
+      var vals = sh.getRange(2, tg[1], sh.getLastRow()-1, 1).getValues();
+      vals.forEach(function(v, i){
+        var nv = fix(v[0], tg[2]); if (nv === null) return;
+        changes.push(tg[0] + ' row ' + (i+2) + ': "' + v[0] + '" → "' + nv + '"');
+        if (apply) sh.getRange(i+2, tg[1]).setValue(nv);
+      });
+    });
+  }
+  if (apply) withLock(run); else run();
+  if (apply) { try { var c = CacheService.getScriptCache(); c.remove('c_getAllTasks'); c.remove('c_getLists'); } catch (e) {} }
+  return { status:'ok', applied: !!apply, changed: changes.length, changes: changes.slice(0, 300),
+    lookalikesNotMerged: Object.keys(lookalikes).map(function(n){ return n + ' (' + lookalikes[n] + ')'; }) };
+}
+
 function lockDailyFormDates(data){
   if (!data) return;
   if (!data.action) {                          // dpr.html main submission
@@ -2263,6 +2337,7 @@ function doPost(e) {
     var flRefusalP = freelancerGate(authEmail, data.action, data);
     if (flRefusalP) return respond(flRefusalP);
     lockDailyFormDates(data);
+    canonicaliseSelfReportName(data, authEmail);
     if ((!data.action || TASK_LAYOUT_ACTIONS[data.action]) && !taskLayoutOk())
       return respond({ status:'error', code:'layout_changed', message:'The task sheet\u2019s columns were changed, so task features are paused to protect your data. Siddharth has been notified \u2014 please try again later.' });
     var flUserP = freelancerFor(authEmail);
@@ -2311,6 +2386,7 @@ function doPost(e) {
         hit0.push({ row:t0+1, name:tr0[t0][0], role:tr0[t0][1], weeklyTarget:tr0[t0][2], email:tr0[t0][4], active:tr0[t0][5], excludedNow:isExcludedMember(tr0[t0][0]), startDate:MEMBER_START_DATES[String(tr0[t0][0]).trim()]||'' });
       return respond({status:'ok', rows:hit0});
     }
+    if (data.action === 'mergeNameVariants') { if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'}); return respond(mergeNameVariants(data.apply === true)); }
     if (data.action === 'testCrmActivityPoints') {   // manager-only, writes nothing: what a CRM payload would score
       if (!isManager(authEmail)) return respond({status:'error',code:'forbidden'});
       var tp = data.payload || {};
